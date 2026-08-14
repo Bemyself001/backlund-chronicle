@@ -1,0 +1,11 @@
+.dialog { width: min(92vw, 42rem); max-height: min(88svh, 54rem); margin: auto; padding: 0; overflow: hidden; border: 1px solid var(--brass); border-radius: 2px; background: var(--paper); color: var(--ink); box-shadow: 0 30px 90px #000c; }
+.dialog::backdrop { background: rgb(4 6 7 / 82%); backdrop-filter: blur(2px); }
+.wide { width: min(94vw, 64rem); }
+.heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.4rem 1rem; border-bottom: 1px solid color-mix(in srgb, var(--brass), transparent 58%); background: linear-gradient(90deg, #201d18, #111517); color: var(--paper-pale); }
+.heading p { margin: 0 0 .2rem; color: var(--brass-light); font: 700 .66rem/1.2 var(--font-sans); letter-spacing: .16em; text-transform: uppercase; }
+.heading h2 { margin: 0; font: 500 1.4rem/1.2 var(--font-serif); letter-spacing: .08em; }
+.close { width: 2.5rem; min-height: 2.5rem; border: 1px solid #a991674d; background: transparent; color: inherit; font-size: 1.45rem; }
+.close:hover { border-color: var(--brass-light); background: #c6a15a1a; }
+.body { max-height: calc(88svh - 5rem); overflow: auto; padding: 1.35rem; }
+@media (max-width: 600px) { .dialog { width: 100%; max-width: none; max-height: 94svh; margin: auto 0 0; border-width: 1px 0 0; } .body { max-height: calc(94svh - 4.7rem); padding: 1rem; } }
+

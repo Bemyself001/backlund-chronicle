@@ -1,0 +1,16 @@
+:root {
+  --coal: #0c1112;
+  --smoke: #151b1b;
+  --paper: #e4d7bd;
+  --paper-pale: #eee3cf;
+  --ink: #29261f;
+  --ink-soft: #655e51;
+  --brass: #a78750;
+  --brass-light: #c3a363;
+  --verdigris: #477d6c;
+  --danger: #863c34;
+  --font-serif: "Noto Serif SC", "Songti SC", SimSun, Georgia, serif;
+  --font-sans: "Microsoft YaHei", "PingFang SC", system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", Consolas, monospace;
+}
+

@@ -1,0 +1,17 @@
+.toolbar { display: flex; align-items: end; gap: .6rem; padding-bottom: 1rem; border-bottom: 1px solid #89765455; }
+.toolbar label { display: grid; flex: 1; gap: .35rem; color: var(--ink-soft); font: 700 .66rem var(--font-sans); letter-spacing: .1em; text-transform: uppercase; }
+.toolbar input { min-height: 2.65rem; padding: .6rem .7rem; border: 1px solid #76684f; border-radius: 0; background: #f2e7d1; color: var(--ink); }
+.list { display: grid; gap: .55rem; margin-top: 1rem; }
+.slot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem; border-left: 3px solid var(--brass); background: #c4ab7a18; }
+.slot span { color: var(--verdigris); font: 700 .62rem var(--font-mono); letter-spacing: .14em; }
+.slot h3 { margin: .2rem 0; font: 500 1rem var(--font-serif); }
+.slot p, .footnote { margin: 0; color: var(--ink-soft); font: .72rem/1.5 var(--font-sans); }
+.slotActions { display: flex; gap: .3rem; }
+.slotActions button { min-height: 2.4rem; padding: .45rem .7rem; border: 1px solid #76684f; background: transparent; color: var(--ink); font: 700 .7rem var(--font-sans); }
+.slotActions button:hover { background: #241f19; color: var(--paper-pale); }
+.slotActions .delete { color: #7d2822; }
+.empty { padding: 2rem; border: 1px dashed #8b7a5a88; color: var(--ink-soft); text-align: center; }
+.error { padding: .7rem; background: #7d282217; color: #72241e; }
+.notice { padding: .7rem; border-left: 3px solid var(--verdigris); background: #275f4d14; color: #285548; font: .78rem var(--font-sans); }
+.footnote { margin-top: 1rem; text-align: right; }
+@media (max-width: 700px) { .toolbar { align-items: stretch; flex-wrap: wrap; } .toolbar label { flex-basis: 100%; } .toolbar button { flex: 1; } .slot { align-items: stretch; flex-direction: column; } .slotActions button { flex: 1; } }

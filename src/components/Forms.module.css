@@ -1,0 +1,23 @@
+.form { display: grid; gap: 1rem; }
+.field { display: grid; gap: .42rem; color: var(--ink-soft); font: 700 .72rem/1.2 var(--font-sans); letter-spacing: .08em; text-transform: uppercase; }
+.field input, .field textarea, .field select { width: 100%; border: 1px solid #665d4c; border-radius: 1px; background: #f1e7d1; color: var(--ink); font: 500 .92rem/1.5 var(--font-sans); letter-spacing: normal; text-transform: none; }
+.field input, .field select { min-height: 2.8rem; padding: .65rem .72rem; }
+.field textarea { min-height: 5rem; padding: .7rem; resize: vertical; }
+.field input:disabled { opacity: .48; cursor: not-allowed; }
+.twoCol, .threeCol { display: grid; gap: .85rem; grid-template-columns: repeat(2, 1fr); }
+.threeCol { grid-template-columns: repeat(3, 1fr); }
+.notice { padding: .8rem 1rem; border-left: 3px solid var(--verdigris); background: #1f55471a; color: #3f3a30; font: .86rem/1.55 var(--font-sans); }
+.helper { margin: 0; color: var(--ink-soft); font: .9rem/1.6 var(--font-sans); }
+.switches { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; padding: 1rem; border: 1px solid #8b7a5a80; }
+.switches legend { padding: 0 .4rem; color: var(--ink-soft); font: 700 .68rem var(--font-sans); letter-spacing: .12em; text-transform: uppercase; }
+.switch { display: flex; align-items: flex-start; gap: .7rem; padding: .65rem; font-family: var(--font-sans); cursor: pointer; }
+.switch input { width: 1.05rem; height: 1.05rem; margin-top: .2rem; accent-color: var(--verdigris); }
+.switch span { display: grid; gap: .12rem; }
+.switch strong { color: var(--ink); font-size: .88rem; }
+.switch small { color: var(--ink-soft); font-size: .73rem; line-height: 1.4; }
+.dangerSwitch { border: 1px solid #7c2d2d66; background: #7c2d2d0d; }
+.status { margin: 0; padding: .7rem; background: #111817; color: #d8c69f; font: .82rem/1.5 var(--font-mono); }
+.actions { display: flex; justify-content: flex-end; gap: .7rem; padding-top: .25rem; }
+.prompt { min-height: 25rem !important; font-family: var(--font-mono) !important; font-size: .82rem !important; line-height: 1.65 !important; }
+@media (max-width: 650px) { .twoCol, .threeCol, .switches { grid-template-columns: 1fr; } .actions { flex-wrap: wrap; } .actions > * { flex: 1; } .prompt { min-height: 19rem !important; } }
+

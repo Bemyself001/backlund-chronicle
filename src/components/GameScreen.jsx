@@ -1,0 +1,83 @@
+import { useEffect, useMemo, useRef, useState } from "react";
+import styles from "./GameScreen.module.css";
+
+const RISK_LABEL = { low: "谨慎", medium: "交涉", high: "高风险" };
+
+function StatBar({ label, value, max }) {
+  const percent = Math.max(0, Math.min(100, (value / max) * 100));
+  return <div className={styles.stat}><div><span>{label}</span><strong>{value}<small>/{max}</small></strong></div><i><b style={{ width: `${percent}%` }} /></i></div>;
+}
+
+function CharacterPanel({ game }) {
+  const { character } = game;
+  return <div className={styles.panelContent}>
+    <div className={styles.profile}><div className={styles.avatar} aria-hidden="true"><i /><b /></div><div><p>{character.extraordinary === "low" ? character.pathway : "普通人"}</p><h2>{character.name}</h2><span>{character.occupation} · {character.age}岁</span></div></div>
+    <div className={styles.metaGrid}><div><span>世界时间</span><strong>{game.worldTime.split("·")[0]}</strong><small>{game.worldTime.split("·").slice(1).join("·")}</small></div><div><span>当前位置</span><strong>{game.location.name}</strong><small>{game.location.district}</small></div></div>
+    <section><h3>角色状态 <small>STATUS</small></h3><div className={styles.stats}><StatBar label="生命" value={character.stats.health} max={character.stats.maxHealth} /><StatBar label="理智" value={character.stats.sanity} max={character.stats.maxSanity} /><StatBar label="灵性" value={character.stats.spirituality} max={character.stats.maxSpirituality} /></div></section>
+    <section><h3>当前影响 <small>EFFECTS</small></h3><div className={styles.tags}>{game.statusEffects.length ? game.statusEffects.map((status) => <span key={status.id} className={status.kind === "danger" ? styles.dangerTag : ""} title={status.description}>{status.name}</span>) : <em>状态稳定</em>}</div></section>
+    <section><h3>人物关系 <small>CONTACTS</small></h3>{game.relationships.map((npc) => <div className={styles.relationship} key={npc.id}><div><strong>{npc.name}</strong><span>{npc.role}</span></div><b>{npc.value >= 0 ? "+" : ""}{npc.value}</b><p>{npc.note}</p></div>)}</section>
+    <section><h3>已知地点 <small>{game.discoveredLocations.length}</small></h3><ul className={styles.locationList}>{game.discoveredLocations.map((place) => <li key={place.id} className={place.id === game.location.id ? styles.current : ""}><span>{place.name}</span><small>{place.note}</small></li>)}</ul></section>
+  </div>;
+}
+
+function InventoryPanel({ game, onLocalTool }) {
+  const [tab, setTab] = useState("inventory");
+  const [search, setSearch] = useState("");
+  const [category, setCategory] = useState("全部");
+  const [selectedId, setSelectedId] = useState(null);
+  const categories = ["全部", ...new Set(game.inventory.map((item) => item.category))];
+  const items = game.inventory.filter((item) => (category === "全部" || item.category === category) && item.name.includes(search));
+  const selected = game.inventory.find((item) => item.instanceId === selectedId);
+  const weight = game.inventory.reduce((sum, item) => sum + item.weight * item.quantity, 0);
+  return <div className={styles.rightPanel}>
+    <div className={styles.tabs} role="tablist" aria-label="档案类别">{[["inventory", "物品"], ["clues", "线索"], ["quests", "任务"], ["log", "变更"]].map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{label}</button>)}</div>
+    {tab === "inventory" && <div className={styles.panelContent}>
+      <div className={styles.capacity}><span>负重</span><strong>{weight.toFixed(1)} / {game.capacity.maxWeight} kg</strong><i><b style={{ width: `${Math.min(100, weight / game.capacity.maxWeight * 100)}%` }} /></i></div>
+      <div className={styles.filters}><input aria-label="搜索物品" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索物品…" /><select aria-label="物品分类" value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((entry) => <option key={entry}>{entry}</option>)}</select></div>
+      <div className={styles.itemList}>{items.length === 0 ? <div className={styles.empty}>没有符合条件的物品。</div> : items.map((item) => <button key={item.instanceId} className={`${styles.item} ${item.isNew ? styles.newItem : ""}`} type="button" onClick={() => setSelectedId(item.instanceId)}><span className={styles.itemGlyph}>{item.name.slice(0, 1)}</span><span><strong>{item.name}{item.equipped && <small>已装备</small>}</strong><em>{item.category} · {item.condition}</em></span><b>×{item.quantity}</b></button>)}</div>
+      {selected && <div className={styles.itemDetail}><button type="button" aria-label="关闭物品详情" onClick={() => setSelectedId(null)}>×</button><p>{selected.rarity} · {selected.category}</p><h3>{selected.name}</h3><span>{selected.description}</span><dl><div><dt>重量</dt><dd>{selected.weight} kg</dd></div><div><dt>状态</dt><dd>{selected.condition}</dd></div><div><dt>来源</dt><dd>{selected.source}</dd></div></dl><div className={styles.itemActions}><button type="button" onClick={() => onLocalTool("item.inspect", { instanceId: selected.instanceId }, `检查${selected.name}`)}>检查</button>{selected.tags.includes("消耗品") && <button type="button" onClick={() => onLocalTool("item.use", { instanceId: selected.instanceId }, `主动使用${selected.name}`)}>使用</button>}{selected.tags.includes("装备") && <button type="button" onClick={() => onLocalTool(selected.equipped ? "item.unequip" : "item.equip", { instanceId: selected.instanceId }, `玩家${selected.equipped ? "卸下" : "装备"}${selected.name}`)}>{selected.equipped ? "卸下" : "装备"}</button>}<button className={styles.discard} type="button" onClick={() => { if (window.confirm(`丢弃一件“${selected.name}”？`)) { onLocalTool("inventory.remove", { instanceId: selected.instanceId, quantity: 1 }, `玩家主动丢弃${selected.name}`); setSelectedId(null); } }}>丢弃</button></div></div>}
+    </div>}
+    {tab === "clues" && <div className={styles.panelContent}><h3 className={styles.archiveTitle}>已发现线索 <span>{game.clues.length}/3</span></h3>{game.clues.length ? game.clues.map((clue) => <article className={styles.record} key={clue.id}><span>CLUE</span><h4>{clue.title}</h4><p>{clue.detail}</p><small>{clue.discoveredAt}</small></article>) : <div className={styles.empty}>尚未确认任何线索。谨慎调查通常能得到最可靠的记录。</div>}</div>}
+    {tab === "quests" && <div className={styles.panelContent}><h3 className={styles.archiveTitle}>案件任务 <span>{game.quests.length}</span></h3>{game.quests.map((quest) => <article className={styles.record} key={quest.id}><span>{quest.status}</span><h4>{quest.title}</h4><p>{quest.summary}</p></article>)}</div>}
+    {tab === "log" && <div className={styles.panelContent}><h3 className={styles.archiveTitle}>变更记录 <span>{game.changeLog.length}</span></h3><ol className={styles.log}>{game.changeLog.slice().reverse().map((entry) => <li key={entry.id} className={entry.tone === "danger" ? styles.dangerLog : ""}><span>{String(entry.turn).padStart(2, "0")}</span><p>{entry.text}</p></li>)}</ol></div>}
+  </div>;
+}
+
+export default function GameScreen({ game, loading, streamText, error, onAction, onAbort, onRetry, onLocalTool, onOpenApi, onOpenPrompt, onOpenSaves, onHome }) {
+  const [input, setInput] = useState("");
+  const [mobilePanel, setMobilePanel] = useState(null);
+  const storyRef = useRef(null);
+  const assistantMessages = useMemo(() => game.recentDialogues, [game.recentDialogues]);
+  useEffect(() => {
+    const scroller = storyRef.current;
+    if (scroller) scroller.scrollTo({ top: scroller.scrollHeight, behavior: loading ? "smooth" : "auto" });
+  }, [game.turn, loading, streamText]);
+  const submit = () => { const value = input.trim(); if (!value || loading) return; setInput(""); onAction(value); };
+  return <main className={styles.shell} id="main">
+    <header className={styles.topbar}>
+      <button className={styles.wordmark} type="button" onClick={onHome} aria-label="返回欢迎页"><i>MC</i><span>雾中纪事<small>MIST CHRONICLE</small></span></button>
+      <div className={styles.chapter}><span>CHAPTER {String(game.chapter.number).padStart(2, "0")}</span><strong>{game.chapter.title}</strong></div>
+      <div className={styles.topActions}><button type="button" onClick={onOpenPrompt}>提示词</button><button type="button" onClick={onOpenApi}>API</button><button type="button" onClick={onOpenSaves}>存档</button></div>
+      <div className={styles.mobileActions}><button type="button" onClick={() => setMobilePanel("character")}>角色</button><button type="button" onClick={() => setMobilePanel("inventory")}>物品</button><button type="button" onClick={() => setMobilePanel("menu")}>设置</button></div>
+    </header>
+    <div className={styles.workspace}>
+      <aside className={`${styles.left} ${mobilePanel === "character" ? styles.drawerOpen : ""}`} aria-label="角色状态"><div className={styles.drawerHeader}><span>角色状态</span><button type="button" onClick={() => setMobilePanel(null)}>关闭</button></div><CharacterPanel game={game} /></aside>
+      <section className={styles.story} aria-label="剧情与行动">
+        <div className={styles.storyScroll} ref={storyRef}>
+          <div className={styles.sceneMeta}><span>第 {game.turn + 1} 幕</span><i /><strong>{game.location.name}</strong></div>
+          {assistantMessages.map((message) => message.role === "assistant" ? <article className={styles.narrative} key={message.id}><span className={styles.dropcap}>叙</span>{message.content.split("\n").filter(Boolean).map((paragraph, index) => <p key={`${message.id}-${index}`}>{paragraph}</p>)}</article> : <blockquote className={styles.playerLine} key={message.id}><span>你的行动</span>{message.content}</blockquote>)}
+          {loading && <article className={`${styles.narrative} ${styles.streaming}`} aria-live="polite"><span className={styles.dropcap}>雾</span>{streamText ? streamText.split("\n").filter(Boolean).map((paragraph, index) => <p key={index}>{paragraph}</p>) : <p className={styles.loadingLine}>叙事引擎正在梳理因果<span>···</span></p>}</article>}
+          {error && <div className={styles.error} role="alert"><strong>本轮未能完成</strong><span>{error}</span><button type="button" onClick={onRetry}>重试本轮</button></div>}
+        </div>
+        <div className={styles.interaction}>
+          <p className={styles.choiceLabel}>下一步行动 <span>CHOOSE OR WRITE YOUR OWN</span></p>
+          <div className={styles.choices}>{game.choices.map((choice, index) => <button key={`${choice.intent}-${index}`} type="button" disabled={loading} onClick={() => onAction(choice.label)}><span>0{index + 1}</span><strong>{choice.label}</strong><small data-risk={choice.risk}>{RISK_LABEL[choice.risk]}</small></button>)}</div>
+          <div className={styles.composer}><textarea aria-label="自由输入行动" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }} placeholder="描述你的行动、问题或对话…" disabled={loading} /><div><span>Enter 发送 · Shift+Enter 换行</span>{loading ? <button className={styles.abort} type="button" onClick={onAbort}>中止生成</button> : <button className="button button--primary" type="button" onClick={submit} disabled={!input.trim()}>提交行动</button>}</div></div>
+        </div>
+      </section>
+      <aside className={`${styles.right} ${mobilePanel === "inventory" ? styles.drawerOpen : ""}`} aria-label="物品与档案"><div className={styles.drawerHeader}><span>物品与档案</span><button type="button" onClick={() => setMobilePanel(null)}>关闭</button></div><InventoryPanel game={game} onLocalTool={onLocalTool} /></aside>
+      {mobilePanel === "menu" && <div className={styles.settingsMenu} role="dialog" aria-label="游戏设置菜单"><div><span>游戏设置</span><button type="button" onClick={() => setMobilePanel(null)}>关闭</button></div><button type="button" onClick={() => { setMobilePanel(null); onOpenPrompt(); }}>查看与编辑提示词</button><button type="button" onClick={() => { setMobilePanel(null); onOpenApi(); }}>自定义 API</button><button type="button" onClick={() => { setMobilePanel(null); onOpenSaves(); }}>存档柜</button></div>}
+      {mobilePanel && <button className={styles.scrim} type="button" aria-label="关闭抽屉" onClick={() => setMobilePanel(null)} />}
+    </div>
+  </main>;
+}
