@@ -36,16 +36,30 @@ export function migrateSave(raw) {
   if (!raw || typeof raw !== "object" || !raw.character || !Array.isArray(raw.inventory)) throw new Error("存档缺少角色或物品数据，无法读取。");
   const version = Number(raw.version || 0);
   if (version > SAVE_VERSION) throw new Error("该存档来自更高版本，请升级游戏后再试。");
-  return { ...raw, version: SAVE_VERSION, processedToolCalls: raw.processedToolCalls || [], memoryNotes: raw.memoryNotes || [] };
+  const migrateStoryValue = (value) => {
+    if (typeof value === "string") {
+      return value
+        .replaceAll("灰檐港旧钟区", "贝克兰德桥区·旧钟街")
+        .replaceAll("灰檐港市档案馆", "贝克兰德市政档案分馆")
+        .replaceAll("灰檐港", "贝克兰德")
+        .replaceAll("原创港城贝克兰德", "鲁恩王国首都贝克兰德")
+        .replaceAll("旧钟区", "旧钟街");
+    }
+    if (Array.isArray(value)) return value.map(migrateStoryValue);
+    if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, migrateStoryValue(entry)]));
+    return value;
+  };
+  const migrated = version < 2 ? migrateStoryValue(raw) : raw;
+  return { ...migrated, version: SAVE_VERSION, processedToolCalls: migrated.processedToolCalls || [], memoryNotes: migrated.memoryNotes || [] };
 }
 
 export function exportSave(game) {
-  const payload = JSON.stringify({ format: "mist-chronicle-save", version: SAVE_VERSION, exportedAt: new Date().toISOString(), game: cleanGame(game) }, null, 2);
+  const payload = JSON.stringify({ format: "backlund-chronicle-save", version: SAVE_VERSION, exportedAt: new Date().toISOString(), game: cleanGame(game) }, null, 2);
   const blob = new Blob([payload], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `雾中纪事-${game.character.name}-第${game.turn}轮.json`;
+  anchor.download = `贝克兰德纪事-${game.character.name}-第${game.turn}轮.json`;
   anchor.click();
   URL.revokeObjectURL(url);
 }
@@ -59,4 +73,3 @@ export async function importSave(file) {
 }
 
 export { AUTOSAVE_ID };
-

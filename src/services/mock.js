@@ -17,12 +17,12 @@ export async function mockResponse(game, action, signal, onChunk) {
       { id: makeId("mock"), name: "inventory.add", reason: "从信封夹层取出", args: { item: { itemId: "scorched-ticket", name: "烧焦的时刻票", category: "线索", description: "半张受潮车票，目的地栏写着“十一点零七分”。", quantity: 1, weight: 0.02, rarity: "少见", tags: ["线索", "可检查"], source: "黑函夹层" } } },
     ];
   } else if (includesAny(lower, ["玛拉", "询问", "打听", "交涉"])) {
-    narrative = "你没有追问信的来历，而是先请玛拉回忆埃利奥特点过什么。这个寻常问题让她稍稍放松：杜松子酒，一口未动；热水，两壶；还借走了修壁炉用的细铁钩。\n\n她从柜台暗格取出一张被酒渍浸过的便笺。“这是他留下的。我原本不想惹麻烦。”便笺上只有一行地址，指向市档案馆后门对面的废弃洗衣房。玛拉把它交给你，却仍按住一角：“如果钟响第三次，就别在街上抬头。”";
+    narrative = "你没有追问信的来历，而是先请玛拉回忆埃利奥特点过什么。这个寻常问题让她稍稍放松：杜松子酒，一口未动；热水，两壶；还借走了修壁炉用的细铁钩。\n\n她从柜台暗格取出一张被酒渍浸过的便笺。“这是他留下的。我原本不想惹麻烦。”便笺上只有一行地址，指向市政档案分馆后门对面的废弃洗衣房。玛拉把它交给你，却仍按住一角：“如果钟响第三次，就别在街上抬头。”";
     toolCalls = [{ id: makeId("mock"), name: "relationship.update", reason: "耐心询问降低了玛拉的戒备", args: { npcId: "mara", delta: 4, note: "你尊重她的节奏，她愿意提供埃利奥特留下的便笺。" } }];
   } else if (includesAny(lower, ["钟塔", "追踪", "闯", "冒险"])) {
-    narrative = "你推门走进雨幕。旧钟区的煤气灯一盏接一盏熄灭，像有什么东西沿街追赶你的影子。抵达废车场时，钟塔仍停在十一点零七分；但每一扇蒙尘表盘后，都浮着一层刚刚凝结的水汽。\n\n你翻过生锈围栏，鞋底踩碎一枚空玻璃安瓿。辛辣气味直冲鼻腔，视野边缘的砖墙仿佛向内倾斜。高处传来拖动铁链的声音——不是风。你及时握住罗盘，指针正死死指向塔门下方的排水沟。";
+    narrative = "你推门走进雨幕。越过桥区与东区的分界后，旧钟街的煤气灯一盏接一盏熄灭，像有什么东西沿街追赶你的影子。抵达废车场时，钟塔仍停在十一点零七分；但每一扇蒙尘表盘后，都浮着一层刚刚凝结的水汽。\n\n你翻过生锈围栏，鞋底踩碎一枚空玻璃安瓿。辛辣气味直冲鼻腔，视野边缘的砖墙仿佛向内倾斜。高处传来拖动铁链的声音——不是风。你及时握住罗盘，指针正死死指向塔门下方的排水沟。";
     toolCalls = [
-      { id: makeId("mock"), name: "location.move", reason: "玩家主动前往旧钟塔区域", args: { locationId: "clock-yard", district: "灰檐港旧钟区" } },
+      { id: makeId("mock"), name: "location.move", reason: "玩家主动前往旧钟塔区域", args: { locationId: "clock-yard", district: "贝克兰德东区·旧钟街" } },
       { id: makeId("mock"), name: "status.add", reason: "吸入不明安瓿的残留气体", args: { status: { id: `vertigo-${game.turn + 1}`, name: "轻微眩晕", kind: "danger", description: "感知偶尔出现倾斜；下一次高风险行动需谨慎。" } } },
     ];
   } else {
@@ -34,7 +34,7 @@ export async function mockResponse(game, action, signal, onChunk) {
     narrative,
     toolCalls,
     memoryNotes: [`第${game.turn + 1}轮：玩家选择“${action.slice(0, 40)}”。`],
-    worldEvents: game.turn === 1 ? ["港务局宣布旧钟区部分街道因地基渗水临时封闭。"] : [],
+    worldEvents: game.turn === 1 ? ["贝克兰德市政厅宣布旧钟街部分路段因地基渗水临时封闭。"] : [],
     choices: [
       { label: "比对钟声、罗盘与现有记录", intent: "investigate", risk: "low" },
       { label: "寻找目击者并交换有限信息", intent: "social", risk: "medium" },
@@ -42,4 +42,3 @@ export async function mockResponse(game, action, signal, onChunk) {
     ],
   };
 }
-

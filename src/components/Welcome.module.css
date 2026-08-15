@@ -14,7 +14,7 @@
 .registry { position: absolute; top: -.5rem; left: -8rem; display: grid; gap: .2rem; color: #8d816b; font: .62rem var(--font-mono); letter-spacing: .12em; text-align: left; text-transform: uppercase; transform: rotate(-90deg) translateX(-100%); transform-origin: top left; }
 .registry strong { color: var(--brass-light); font-size: .75rem; }
 .kicker { margin: 0 0 1.2rem; color: var(--brass-light); font: 700 .68rem var(--font-sans); letter-spacing: .45em; }
-.hero h1 { margin: 0; font: 400 clamp(4.8rem, 12vw, 9rem)/.87 var(--font-serif); letter-spacing: .1em; text-shadow: 0 8px 40px #000; }
+.hero h1 { margin: 0; font: 400 clamp(3.8rem, 8.5vw, 7rem)/.9 var(--font-serif); letter-spacing: .07em; text-shadow: 0 8px 40px #000; white-space: nowrap; }
 .hero h1 span { color: var(--brass-light); }
 .subtitle { margin: 2rem 0; color: #c4b9a2; font: 400 clamp(1rem, 2vw, 1.2rem)/1.9 var(--font-serif); letter-spacing: .14em; }
 .rule { display: flex; align-items: center; justify-content: center; gap: .8rem; width: min(25rem, 80%); margin: 2rem auto; color: var(--brass); font-size: .55rem; }
@@ -32,5 +32,4 @@
 .caseNote span { color: var(--brass); font: .65rem var(--font-mono); }
 .caseNote p { margin: 0; font: .75rem/1.7 var(--font-serif); letter-spacing: .05em; }
 .footer { position: absolute; inset: auto 0 0; display: flex; justify-content: center; gap: clamp(1rem, 5vw, 4rem); padding: 1.1rem; border-top: 1px solid #bc9a611c; color: #746f64; font: .6rem var(--font-sans); letter-spacing: .14em; text-transform: uppercase; }
-@media (max-width: 700px) { .masthead { min-height: 4.6rem; padding: 0 1rem; } .masthead > p { display: none; } .hero { width: calc(100% - 2rem); margin-top: 4.5rem; } .hero h1 { font-size: clamp(4.2rem, 24vw, 6rem); letter-spacing: .04em; } .registry, .caseNote { display: none; } .actions { flex-direction: column; align-items: stretch; width: min(100%, 21rem); margin: 0 auto; } .footer { justify-content: space-around; gap: .5rem; } .footer span:nth-child(2) { display: none; } }
-
+@media (max-width: 700px) { .masthead { min-height: 4.6rem; padding: 0 1rem; } .masthead > p { display: none; } .hero { width: calc(100% - 2rem); margin-top: 4.5rem; } .hero h1 { font-size: clamp(2.65rem, 12.5vw, 3.85rem); letter-spacing: .025em; } .registry, .caseNote { display: none; } .actions { flex-direction: column; align-items: stretch; width: min(100%, 21rem); margin: 0 auto; } .footer { justify-content: space-around; gap: .5rem; } .footer span:nth-child(2) { display: none; } }

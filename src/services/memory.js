@@ -20,7 +20,7 @@ export function buildContext(game, action, systemPrompt) {
   };
   return [
     { role: "system", content: systemPrompt },
-    { role: "system", content: `【当前剧本】原创案件“没有寄件人的黑函”。隐藏危险不得无铺垫直接揭露。` },
+    { role: "system", content: `【当前剧本】故事发生在贝克兰德，围绕桥区与东区交界处的原创案件“没有寄件人的黑函”展开。原作主线只作为遥远背景；隐藏危险不得无铺垫直接揭露。` },
     { role: "system", content: `【角色状态】${JSON.stringify(characterState)}` },
     { role: "system", content: `【当前场景】${JSON.stringify(scene)}` },
     { role: "system", content: "【NPC认知边界】玛拉只知道旅店见闻；普通市民不知道非凡途径真相；埃利奥特的秘密必须经线索逐步揭示。" },

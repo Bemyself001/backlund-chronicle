@@ -1,4 +1,4 @@
-# 雾中纪事
+# 贝克兰德纪事
 
 - Stack: JavaScript, React, Vite, native CSS, and CSS Modules.
 - This template is intentionally JavaScript-only. Use a different initializer when TypeScript is required.

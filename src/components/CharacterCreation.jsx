@@ -22,7 +22,7 @@ export default function CharacterCreation({ onBack, onCreate }) {
   };
   return (
     <main className={styles.page} id="main">
-      <header className={styles.header}><button type="button" onClick={onBack}>← 返回</button><span>灰檐港居民登记处</span><small>FORM GH—04</small></header>
+      <header className={styles.header}><button type="button" onClick={onBack}>← 返回</button><span>贝克兰德临时居民登记处</span><small>FORM BK—04</small></header>
       <section className={styles.layout}>
         <aside className={styles.intro}>
           <p className={styles.kicker}>CHARACTER DOSSIER</p><h1>建立你的<br />私人档案</h1>
@@ -45,10 +45,9 @@ export default function CharacterCreation({ onBack, onCreate }) {
           </fieldset>
           {character.extraordinary === "low" && <label className={styles.field}><span>途径与序列</span><input value={character.pathway} onChange={(e) => update("pathway", e.target.value)} /></label>}
           {error && <p className={styles.error} role="alert">{error}</p>}
-          <footer className={styles.formFooter}><p>创建后将生成独立自动存档，你仍可从欢迎页开始其他角色。</p><button className="button button--primary button--large" type="submit">签署档案并进入灰檐港</button></footer>
+          <footer className={styles.formFooter}><p>创建后将生成独立自动存档，你仍可从欢迎页开始其他角色。</p><button className="button button--primary button--large" type="submit">签署档案并进入贝克兰德</button></footer>
         </form>
       </section>
     </main>
   );
 }
-

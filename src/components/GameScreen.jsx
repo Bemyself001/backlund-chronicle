@@ -55,7 +55,7 @@ export default function GameScreen({ game, loading, streamText, error, onAction,
   const submit = () => { const value = input.trim(); if (!value || loading) return; setInput(""); onAction(value); };
   return <main className={styles.shell} id="main">
     <header className={styles.topbar}>
-      <button className={styles.wordmark} type="button" onClick={onHome} aria-label="返回欢迎页"><i>MC</i><span>雾中纪事<small>MIST CHRONICLE</small></span></button>
+      <button className={styles.wordmark} type="button" onClick={onHome} aria-label="返回欢迎页"><i>BC</i><span>贝克兰德纪事<small>BACKLUND CHRONICLE</small></span></button>
       <div className={styles.chapter}><span>CHAPTER {String(game.chapter.number).padStart(2, "0")}</span><strong>{game.chapter.title}</strong></div>
       <div className={styles.topActions}><button type="button" onClick={onOpenPrompt}>提示词</button><button type="button" onClick={onOpenApi}>API</button><button type="button" onClick={onOpenSaves}>存档</button></div>
       <div className={styles.mobileActions}><button type="button" onClick={() => setMobilePanel("character")}>角色</button><button type="button" onClick={() => setMobilePanel("inventory")}>物品</button><button type="button" onClick={() => setMobilePanel("menu")}>设置</button></div>

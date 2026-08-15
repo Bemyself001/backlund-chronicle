@@ -146,7 +146,7 @@ function executeOne(game, call) {
     case "location.move": {
       const location = game.discoveredLocations.find((entry) => entry.id === args.locationId);
       if (!location) return fail(call.name, "目的地尚未发现，不能直接移动");
-      game.location = { id: location.id, name: location.name, district: args.district || "灰檐港" };
+      game.location = { id: location.id, name: location.name, district: args.district || "贝克兰德" };
       return succeed(call.name, `${turnLabel}：前往「${location.name}」——${call.reason}。`);
     }
     case "clue.add": {

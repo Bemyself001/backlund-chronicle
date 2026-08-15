@@ -5,7 +5,7 @@ import GameScreen from "./components/GameScreen.jsx";
 import ApiSettings from "./components/ApiSettings.jsx";
 import PromptEditor from "./components/PromptEditor.jsx";
 import SaveManager from "./components/SaveManager.jsx";
-import { createInitialGame, DEFAULT_SYSTEM_PROMPT } from "./data/defaults.js";
+import { createInitialGame, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from "./data/defaults.js";
 import { executeToolCalls } from "./engine/tools.js";
 import { loadApiSettings, requestAI, saveApiSettings } from "./services/api.js";
 import { buildContext, updateMemory } from "./services/memory.js";
@@ -25,7 +25,13 @@ export default function App() {
   const [screen, setScreen] = useState("welcome");
   const [game, setGame] = useState(null);
   const [settings, setSettings] = useState(loadApiSettings);
-  const [prompt, setPrompt] = useState(() => localStorage.getItem("mist-system-prompt") || DEFAULT_SYSTEM_PROMPT);
+  const [prompt, setPrompt] = useState(() => {
+    const saved = localStorage.getItem("mist-system-prompt");
+    if (!saved) return DEFAULT_SYSTEM_PROMPT;
+    const migrated = migrateSystemPrompt(saved);
+    if (migrated !== saved) localStorage.setItem("mist-system-prompt", migrated);
+    return migrated;
+  });
   const [modal, setModal] = useState(null);
   const [saves, setSaves] = useState(listSaves);
   const [loading, setLoading] = useState(false);
