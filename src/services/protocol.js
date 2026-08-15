@@ -32,6 +32,13 @@ function firstBalancedObject(text) {
 
 export function textFromContent(content) {
   if (typeof content === "string") return content;
+  if (content && typeof content === "object" && !Array.isArray(content)) {
+    if (typeof content.text === "string") return content.text;
+    if (typeof content.text?.value === "string") return content.text.value;
+    if (typeof content.content === "string") return content.content;
+    if (typeof content.value === "string") return content.value;
+    return "";
+  }
   if (!Array.isArray(content)) return "";
   return content.map((part) => {
     if (typeof part === "string") return part;

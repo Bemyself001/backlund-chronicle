@@ -16,6 +16,7 @@ test("plain text API responses continue as narrative with fallback choices", () 
 
 test("content-part arrays and alternate action fields are normalized", () => {
   assert.equal(textFromContent([{ type: "text", text: "第一段" }, { text: { value: "第二段" } }]), "第一段\n第二段");
+  assert.equal(textFromContent({ type: "text", text: "单段正文" }), "单段正文");
   const result = normalizeAIResponse({ content: [{ text: "回声" }], actions: ["检查窗台"] });
   assert.equal(result.narrative, "回声");
   assert.equal(result.choices[0].label, "检查窗台");

@@ -129,11 +129,32 @@ function nativeCallsFromMessage(message) {
 function assistantPayload(data) {
   const choice = data?.choices?.[0] || {};
   const message = choice.message || {};
-  if (message.content !== undefined && message.content !== null) return message.content;
-  if (choice.text !== undefined && choice.text !== null) return choice.text;
-  if (data?.output_text !== undefined && data.output_text !== null) return data.output_text;
+  const candidates = [message.content, message.output_text, message.text, message.refusal, choice.text, choice.content, data?.output_text, data?.response, data?.content];
+  for (const candidate of candidates) {
+    if (typeof candidate === "string" && candidate.trim()) return candidate;
+    if (Array.isArray(candidate) && textFromContent(candidate).trim()) return candidate;
+    if (candidate && typeof candidate === "object" && Object.keys(candidate).length) return candidate;
+  }
   if (data?.narrative !== undefined) return data;
   return "";
+}
+
+function emptyResponseError(finishReason, hasReasoning = false) {
+  if (finishReason === "length" || hasReasoning) {
+    return new Error("模型生成了推理内容，但在输出剧情正文前已停止。请在 API 设置中把 Max Tokens 提高到至少 4000，或改用非推理模型后重试本轮。");
+  }
+  return new Error("API 请求成功，但模型没有返回剧情正文。请先关闭“流式输出”后重试；若仍为空，再关闭“原生 Tool Calling”或更换模型。");
+}
+
+function normalizeChatCompletion(data) {
+  const choice = data?.choices?.[0] || {};
+  const message = choice.message || {};
+  const nativeCalls = nativeCallsFromMessage(message);
+  const payload = assistantPayload(data);
+  if (!textFromContent(payload).trim() && !(payload && typeof payload === "object" && !Array.isArray(payload)) && !nativeCalls.length) {
+    throw emptyResponseError(choice.finish_reason, Boolean(textFromContent(message.reasoning_content).trim()));
+  }
+  return normalizeAIResponse(payload, nativeCalls);
 }
 
 function appendToolCallFragments(calls, fragments = []) {
@@ -162,35 +183,52 @@ export async function requestAI(settings, messages, signal, onChunk) {
     body: JSON.stringify(body),
   });
   if (!response.ok) await apiError(response, "API 请求失败");
-  if (!settings.stream) {
+  const contentType = response.headers.get("content-type") || "";
+  if (!settings.stream || contentType.includes("application/json")) {
     const data = await response.json();
-    const message = data.choices?.[0]?.message || {};
-    return normalizeAIResponse(assistantPayload(data), nativeCallsFromMessage(message));
+    return normalizeChatCompletion(data);
   }
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
+  let rawResponse = "";
   let content = "";
   const calls = {};
+  let finishReason = "";
+  let hasReasoning = false;
   const consumeLine = (line) => {
     const trimmed = line.trim();
     if (!trimmed.startsWith("data:") || trimmed.includes("[DONE]")) return;
     try {
-      const delta = JSON.parse(trimmed.slice(5).trim()).choices?.[0]?.delta || {};
+      const choice = JSON.parse(trimmed.slice(5).trim()).choices?.[0] || {};
+      const delta = choice.delta || choice.message || {};
       const chunk = textFromContent(delta.content);
       if (chunk) { content += chunk; onChunk?.(content); }
+      if (textFromContent(delta.reasoning_content).trim()) hasReasoning = true;
+      if (choice.finish_reason) finishReason = choice.finish_reason;
       appendToolCallFragments(calls, delta.tool_calls);
     } catch { /* ignore non-JSON keepalive chunks */ }
   };
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
-    buffer += decoder.decode(value, { stream: true });
+    const decoded = decoder.decode(value, { stream: true });
+    rawResponse += decoded;
+    buffer += decoded;
     const lines = buffer.split("\n");
     buffer = lines.pop() || "";
     lines.forEach(consumeLine);
   }
-  buffer += decoder.decode();
+  const finalChunk = decoder.decode();
+  rawResponse += finalChunk;
+  buffer += finalChunk;
   buffer.split("\n").forEach(consumeLine);
-  return normalizeAIResponse(content, nativeCallsFromMessage({ tool_calls: Object.values(calls) }));
+  const nativeCalls = nativeCallsFromMessage({ tool_calls: Object.values(calls) });
+  if (!content.trim() && !nativeCalls.length) {
+    try { return normalizeChatCompletion(JSON.parse(rawResponse.trim())); } catch (error) {
+      if (error instanceof SyntaxError) throw emptyResponseError(finishReason, hasReasoning);
+      throw error;
+    }
+  }
+  return normalizeAIResponse(content, nativeCalls);
 }
