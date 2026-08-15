@@ -1,6 +1,6 @@
 import { DEFAULT_API_SETTINGS } from "../data/defaults.js";
 import { createProviderProfile, inferApiProvider } from "./apiProviders.js";
-import { normalizeAIResponse } from "./protocol.js";
+import { normalizeAIResponse, textFromContent } from "./protocol.js";
 
 const SETTINGS_KEY = "mist-api-settings-v1";
 const LEGACY_SESSION_KEY = "mist-api-key";
@@ -126,6 +126,26 @@ function nativeCallsFromMessage(message) {
   });
 }
 
+function assistantPayload(data) {
+  const choice = data?.choices?.[0] || {};
+  const message = choice.message || {};
+  if (message.content !== undefined && message.content !== null) return message.content;
+  if (choice.text !== undefined && choice.text !== null) return choice.text;
+  if (data?.output_text !== undefined && data.output_text !== null) return data.output_text;
+  if (data?.narrative !== undefined) return data;
+  return "";
+}
+
+function appendToolCallFragments(calls, fragments = []) {
+  for (const call of fragments) {
+    const index = call.index ?? Object.keys(calls).length;
+    calls[index] ||= { id: call.id, function: { name: "", arguments: "" } };
+    if (call.id) calls[index].id = call.id;
+    if (call.function?.name) calls[index].function.name += call.function.name;
+    if (call.function?.arguments) calls[index].function.arguments += call.function.arguments;
+  }
+}
+
 export async function requestAI(settings, messages, signal, onChunk) {
   const body = {
     model: settings.model,
@@ -145,31 +165,32 @@ export async function requestAI(settings, messages, signal, onChunk) {
   if (!settings.stream) {
     const data = await response.json();
     const message = data.choices?.[0]?.message || {};
-    return normalizeAIResponse(message.content || "{}", nativeCallsFromMessage(message));
+    return normalizeAIResponse(assistantPayload(data), nativeCallsFromMessage(message));
   }
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
   let content = "";
   const calls = {};
+  const consumeLine = (line) => {
+    const trimmed = line.trim();
+    if (!trimmed.startsWith("data:") || trimmed.includes("[DONE]")) return;
+    try {
+      const delta = JSON.parse(trimmed.slice(5).trim()).choices?.[0]?.delta || {};
+      const chunk = textFromContent(delta.content);
+      if (chunk) { content += chunk; onChunk?.(content); }
+      appendToolCallFragments(calls, delta.tool_calls);
+    } catch { /* ignore non-JSON keepalive chunks */ }
+  };
   while (true) {
     const { done, value } = await reader.read();
     if (done) break;
     buffer += decoder.decode(value, { stream: true });
     const lines = buffer.split("\n");
     buffer = lines.pop() || "";
-    for (const line of lines) {
-      if (!line.startsWith("data:") || line.includes("[DONE]")) continue;
-      try {
-        const delta = JSON.parse(line.slice(5)).choices?.[0]?.delta || {};
-        if (delta.content) { content += delta.content; onChunk?.(content); }
-        for (const call of delta.tool_calls || []) {
-          calls[call.index] ||= { id: call.id, function: { name: "", arguments: "" } };
-          if (call.function?.name) calls[call.index].function.name += call.function.name;
-          if (call.function?.arguments) calls[call.index].function.arguments += call.function.arguments;
-        }
-      } catch { /* ignore non-JSON keepalive chunks */ }
-    }
+    lines.forEach(consumeLine);
   }
-  return normalizeAIResponse(content || "{}", nativeCallsFromMessage({ tool_calls: Object.values(calls) }));
+  buffer += decoder.decode();
+  buffer.split("\n").forEach(consumeLine);
+  return normalizeAIResponse(content, nativeCallsFromMessage({ tool_calls: Object.values(calls) }));
 }
