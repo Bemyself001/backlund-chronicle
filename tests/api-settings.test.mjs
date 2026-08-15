@@ -20,6 +20,13 @@ test.beforeEach(() => {
   sessionStorage.clear();
 });
 
+test("uses the OpenAI preset for a fresh browser", () => {
+  const settings = loadApiSettings();
+  assert.equal(settings.provider, "openai");
+  assert.equal(settings.baseUrl, "https://api.openai.com/v1");
+  assert.equal(settings.model, "gpt-4.1-mini");
+});
+
 test("keeps a session-only key out of persistent settings", () => {
   saveApiSettings({
     ...DEFAULT_API_SETTINGS,

@@ -22,13 +22,13 @@ function captureProfile(settings) {
 export function loadApiSettings() {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}"); } catch { saved = {}; }
-  const provider = saved.provider || inferApiProvider(saved.baseUrl);
-  const legacyProfile = {
+  const provider = saved.provider || (saved.baseUrl ? inferApiProvider(saved.baseUrl) : DEFAULT_API_SETTINGS.provider);
+  const legacyProfile = Object.fromEntries(Object.entries({
     baseUrl: saved.baseUrl,
     model: saved.model,
     apiKey: saved.apiKey,
     persistKey: saved.persistKey,
-  };
+  }).filter(([, value]) => value !== undefined));
   const sourceProfiles = Object.keys(saved.profiles || {}).length ? saved.profiles : { [provider]: legacyProfile };
   const profiles = Object.fromEntries(Object.entries(sourceProfiles).map(([id, profile]) => {
     const persistedKey = profile.persistKey ? profile.apiKey || "" : "";
