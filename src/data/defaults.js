@@ -1,7 +1,7 @@
 import { makeId } from "../utils/id.js";
 
 export const SAVE_VERSION = 1;
-export const AI_SETTINGS_VERSION = "1.0";
+export const AI_SETTINGS_VERSION = "1.1";
 
 export const DEFAULT_SYSTEM_PROMPT = `你是《雾中纪事》的叙事者与世界模拟器。故事运行在一个受《诡秘之主》启发、但城市、人物、案件与主线均为原创的蒸汽时代神秘世界。
 
@@ -16,6 +16,7 @@ export const DEFAULT_SYSTEM_PROMPT = `你是《雾中纪事》的叙事者与世
 8. narrative 使用克制、可读的中文，每轮约 250—600 字，不复述原著段落，不让原作角色抢占玩家中心位置。`;
 
 export const DEFAULT_API_SETTINGS = {
+  provider: "openai",
   baseUrl: "https://api.openai.com/v1",
   apiKey: "",
   model: "gpt-4.1-mini",
@@ -28,6 +29,9 @@ export const DEFAULT_API_SETTINGS = {
   jsonMode: true,
   mockMode: true,
   persistKey: false,
+  profiles: {},
+  savedModels: {},
+  modelCatalogs: {},
 };
 
 export const EMPTY_CHARACTER = {
@@ -160,4 +164,3 @@ export function createInitialGame(character) {
     hiddenDanger: { id: "hollow-chime", name: "空鸣者的回声", stage: 0, revealed: false },
   };
 }
-

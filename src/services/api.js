@@ -1,22 +1,60 @@
 import { DEFAULT_API_SETTINGS } from "../data/defaults.js";
+import { createProviderProfile, inferApiProvider } from "./apiProviders.js";
 import { normalizeAIResponse } from "./protocol.js";
 
 const SETTINGS_KEY = "mist-api-settings-v1";
-const SESSION_KEY = "mist-api-key";
+const LEGACY_SESSION_KEY = "mist-api-key";
+const SESSION_KEY_PREFIX = "mist-api-key:";
+
+function sessionKey(provider) {
+  return `${SESSION_KEY_PREFIX}${provider}`;
+}
+
+function captureProfile(settings) {
+  return {
+    baseUrl: settings.baseUrl || "",
+    model: settings.model || "",
+    apiKey: settings.apiKey || "",
+    persistKey: Boolean(settings.persistKey),
+  };
+}
 
 export function loadApiSettings() {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}"); } catch { saved = {}; }
-  const apiKey = sessionStorage.getItem(SESSION_KEY) || (saved.persistKey ? saved.apiKey || "" : "");
-  return { ...DEFAULT_API_SETTINGS, ...saved, apiKey };
+  const provider = saved.provider || inferApiProvider(saved.baseUrl);
+  const legacyProfile = {
+    baseUrl: saved.baseUrl,
+    model: saved.model,
+    apiKey: saved.apiKey,
+    persistKey: saved.persistKey,
+  };
+  const sourceProfiles = Object.keys(saved.profiles || {}).length ? saved.profiles : { [provider]: legacyProfile };
+  const profiles = Object.fromEntries(Object.entries(sourceProfiles).map(([id, profile]) => {
+    const persistedKey = profile.persistKey ? profile.apiKey || "" : "";
+    const activeLegacyKey = id === provider ? sessionStorage.getItem(LEGACY_SESSION_KEY) || "" : "";
+    const apiKey = sessionStorage.getItem(sessionKey(id)) || activeLegacyKey || persistedKey;
+    return [id, { ...createProviderProfile(id), ...profile, apiKey }];
+  }));
+  const active = { ...createProviderProfile(provider), ...(profiles[provider] || {}) };
+  return { ...DEFAULT_API_SETTINGS, ...saved, ...active, provider, profiles: { ...profiles, [provider]: active }, apiKey: active.apiKey || "" };
 }
 
 export function saveApiSettings(settings) {
-  if (settings.apiKey) sessionStorage.setItem(SESSION_KEY, settings.apiKey);
-  else sessionStorage.removeItem(SESSION_KEY);
-  const stored = { ...settings };
-  if (!settings.persistKey) delete stored.apiKey;
+  const provider = settings.provider || inferApiProvider(settings.baseUrl);
+  const profiles = { ...(settings.profiles || {}), [provider]: captureProfile(settings) };
+  const storedProfiles = {};
+  for (const [id, profile] of Object.entries(profiles)) {
+    if (profile.apiKey) sessionStorage.setItem(sessionKey(id), profile.apiKey);
+    else sessionStorage.removeItem(sessionKey(id));
+    storedProfiles[id] = { ...profile };
+    if (!profile.persistKey) delete storedProfiles[id].apiKey;
+  }
+  sessionStorage.removeItem(LEGACY_SESSION_KEY);
+  const stored = { ...settings, provider, profiles: storedProfiles };
+  delete stored.apiKey;
   localStorage.setItem(SETTINGS_KEY, JSON.stringify(stored));
+  return { ...settings, provider, profiles };
 }
 
 function endpoint(baseUrl, path) {
@@ -30,15 +68,49 @@ function parseHeaders(raw) {
   return Object.fromEntries(Object.entries(parsed).map(([key, value]) => [key, String(value)]));
 }
 
+function requestHeaders(settings, withContentType = false) {
+  return {
+    ...(withContentType ? { "Content-Type": "application/json" } : {}),
+    ...(settings.apiKey ? { Authorization: `Bearer ${settings.apiKey}` } : {}),
+    ...parseHeaders(settings.customHeaders),
+  };
+}
+
+async function apiError(response, prefix) {
+  let detail = "";
+  try {
+    const data = await response.json();
+    detail = data?.error?.message || data?.message || "";
+  } catch { /* response body is not JSON */ }
+  throw new Error(`${prefix}：HTTP ${response.status}${detail ? ` · ${detail}` : ""}`);
+}
+
+export async function listApiModels(settings, signal) {
+  if (settings.mockMode) return ["mock-narrator"];
+  if (!settings.baseUrl) throw new Error("请先选择服务商或填写 Base URL。");
+  let response;
+  try {
+    response = await fetch(endpoint(settings.baseUrl, "/models"), {
+      signal,
+      headers: requestHeaders(settings),
+    });
+  } catch (error) {
+    if (error.name === "AbortError") throw error;
+    throw new Error("无法读取模型：浏览器网络或跨域策略阻止了请求。仍可手动填写模型名称。");
+  }
+  if (!response.ok) await apiError(response, "读取模型失败");
+  const data = await response.json();
+  const models = [...new Set((Array.isArray(data?.data) ? data.data : []).map((model) => model?.id).filter(Boolean))];
+  if (!models.length) throw new Error("接口连接成功，但没有返回可用模型。");
+  return models.sort((a, b) => a.localeCompare(b));
+}
+
 export async function testApiConnection(settings, signal) {
   if (settings.mockMode) return "Mock 模式就绪：无需网络连接。";
   if (!settings.baseUrl || !settings.model) throw new Error("请填写 Base URL 和 Model。");
-  const response = await fetch(endpoint(settings.baseUrl, "/models"), {
-    signal,
-    headers: { Authorization: `Bearer ${settings.apiKey}`, ...parseHeaders(settings.customHeaders) },
-  });
-  if (!response.ok) throw new Error(`连接失败：HTTP ${response.status}`);
-  return "连接成功，接口可以访问。";
+  const models = await listApiModels(settings, signal);
+  const selected = models.includes(settings.model) ? "当前模型可用" : "当前模型未出现在列表中，请确认名称";
+  return `连接成功：发现 ${models.length} 个模型，${selected}。`;
 }
 
 function toolDefinitions() {
@@ -66,10 +138,10 @@ export async function requestAI(settings, messages, signal, onChunk) {
   if (settings.nativeTools) body.tools = toolDefinitions();
   const response = await fetch(endpoint(settings.baseUrl, "/chat/completions"), {
     method: "POST", signal,
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${settings.apiKey}`, ...parseHeaders(settings.customHeaders) },
+    headers: requestHeaders(settings, true),
     body: JSON.stringify(body),
   });
-  if (!response.ok) throw new Error(`API 请求失败：HTTP ${response.status}`);
+  if (!response.ok) await apiError(response, "API 请求失败");
   if (!settings.stream) {
     const data = await response.json();
     const message = data.choices?.[0]?.message || {};
@@ -101,4 +173,3 @@ export async function requestAI(settings, messages, signal, onChunk) {
   }
   return normalizeAIResponse(content || "{}", nativeCallsFromMessage({ tool_calls: Object.values(calls) }));
 }
-

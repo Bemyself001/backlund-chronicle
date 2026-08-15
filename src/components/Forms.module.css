@@ -1,4 +1,28 @@
 .form { display: grid; gap: 1rem; }
+.providerFieldset { display: grid; gap: .65rem; margin: 0; padding: 0; border: 0; }
+.providerFieldset legend { margin-bottom: .65rem; color: var(--ink-soft); font: 700 .72rem/1.2 var(--font-sans); letter-spacing: .12em; text-transform: uppercase; }
+.providerGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
+.providerButton { display: grid; min-width: 0; min-height: 4.7rem; align-content: center; gap: .28rem; padding: .8rem .9rem; color: var(--ink); text-align: left; background: #f1e7d1c7; border: 1px solid #8b7a5a66; border-radius: 1px; }
+.providerButton:hover { border-color: var(--brass); background: #f1e7d1; }
+.providerButton strong, .providerButton small { min-width: 0; overflow-wrap: anywhere; }
+.providerButton strong { font-family: var(--font-display); letter-spacing: .04em; }
+.providerButton small { color: var(--ink-soft); line-height: 1.35; }
+.providerButtonActive { border-color: var(--verdigris); background: #1f554717; box-shadow: inset 3px 0 var(--verdigris); }
+.providerMeta { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem .75rem; padding-bottom: .75rem; color: var(--ink-soft); border-bottom: 1px solid #8b7a5a42; font-size: .82rem; line-height: 1.55; }
+.savedState { padding: .18rem .42rem; color: var(--verdigris); border: 1px solid #1f554773; font-size: .72rem; font-weight: 700; letter-spacing: .08em; }
+.modelPanel { display: grid; gap: .8rem; padding: .9rem; background: #f1e7d170; border: 1px solid #8b7a5a4d; }
+.modelPanelHeading { display: flex; align-items: end; justify-content: space-between; gap: .75rem; }
+.modelPanelHeading h3 { margin: 0 0 .2rem; font-family: var(--font-display); font-size: 1rem; letter-spacing: .05em; }
+.modelPanelHeading span { color: var(--ink-soft); font-size: .76rem; }
+.inlineActions { display: flex; flex-wrap: wrap; gap: .5rem; }
+.savedModels { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; }
+.savedModels > div { display: flex; flex: 1 1 17rem; flex-wrap: wrap; gap: .4rem; min-width: 0; }
+.savedModels > span { color: var(--ink-soft); font-size: .76rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.savedModels button, .modelResults button { min-width: 0; color: var(--ink); background: transparent; border: 1px solid #8b7a5a57; border-radius: 1px; overflow-wrap: anywhere; }
+.savedModels button { padding: .36rem .55rem; font-size: .76rem; }
+.modelResults { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .4rem; max-height: 13rem; padding: .35rem; overflow: auto; border: 1px solid #8b7a5a3d; }
+.modelResults button { padding: .5rem .6rem; text-align: left; line-height: 1.35; }
+.savedModels button:hover, .modelResults button:hover, .modelResults button[aria-selected="true"] { color: #fff7e5; background: var(--verdigris); border-color: var(--verdigris); }
 .field { display: grid; gap: .42rem; color: var(--ink-soft); font: 700 .72rem/1.2 var(--font-sans); letter-spacing: .08em; text-transform: uppercase; }
 .field input, .field textarea, .field select { width: 100%; border: 1px solid #665d4c; border-radius: 1px; background: #f1e7d1; color: var(--ink); font: 500 .92rem/1.5 var(--font-sans); letter-spacing: normal; text-transform: none; }
 .field input, .field select { min-height: 2.8rem; padding: .65rem .72rem; }
@@ -19,5 +43,4 @@
 .status { margin: 0; padding: .7rem; background: #111817; color: #d8c69f; font: .82rem/1.5 var(--font-mono); }
 .actions { display: flex; justify-content: flex-end; gap: .7rem; padding-top: .25rem; }
 .prompt { min-height: 25rem !important; font-family: var(--font-mono) !important; font-size: .82rem !important; line-height: 1.65 !important; }
-@media (max-width: 650px) { .twoCol, .threeCol, .switches { grid-template-columns: 1fr; } .actions { flex-wrap: wrap; } .actions > * { flex: 1; } .prompt { min-height: 19rem !important; } }
-
+@media (max-width: 650px) { .providerGrid, .modelResults, .twoCol, .threeCol, .switches { grid-template-columns: minmax(0, 1fr); } .modelPanelHeading { align-items: stretch; flex-direction: column; } .inlineActions > button { flex: 1 1 9rem; } .actions { flex-wrap: wrap; } .actions > * { flex: 1; } .prompt { min-height: 19rem !important; } }

@@ -44,7 +44,7 @@ export default function App() {
   const handleCreate = (character) => { const next = createInitialGame(character); commitGame(next); setScreen("game"); };
   const handleContinue = () => { const loaded = loadGame(); if (loaded) { setGame(loaded); setScreen("game"); } };
   const handleImport = async (file) => { const imported = await importSave(file); setGame(imported); refreshSaves(); setScreen("game"); };
-  const handleSettingsSave = (next) => { saveApiSettings(next); setSettings(next); };
+  const handleSettingsSave = (next) => { setSettings(saveApiSettings(next)); };
   const handlePromptSave = (next) => { localStorage.setItem("mist-system-prompt", next); setPrompt(next); };
 
   const runTurn = async (action) => {
