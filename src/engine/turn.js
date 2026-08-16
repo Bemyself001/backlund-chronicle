@@ -17,7 +17,8 @@ export function minutesForTurn(action, toolCalls = [], toolResults = []) {
   if (OVERNIGHT_ACTION.test(text)) return 600;
   if (LONG_REST_ACTION.test(text)) return 240;
   if (TRAVEL_ACTION.test(text)) return 75;
-  if (successfulTool(toolCalls, toolResults, (call) => call.name === "location.move")) return 35;
+  const movementIndex = toolCalls.findIndex((call, index) => call.name === "location.move" && toolResults[index]?.ok);
+  if (movementIndex >= 0) return Math.max(1, Number(toolResults[movementIndex]?.data?.travelMinutes) || 35);
   if (INVESTIGATE_ACTION.test(text)) return 25;
   if (SOCIAL_ACTION.test(text)) return 10;
   if (QUICK_ACTION.test(text)) return 5;

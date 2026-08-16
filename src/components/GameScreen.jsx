@@ -70,7 +70,7 @@ function TurnProgress({ phase }) {
   </div>;
 }
 
-export default function GameScreen({ game, loading, turnPhase, streamText, error, onAction, onAbort, onRetry, onLocalTool, onOpenApi, onOpenPrompt, onOpenSaves, onHome }) {
+export default function GameScreen({ game, loading, turnPhase, streamText, error, onAction, onAbort, onRetry, onLocalTool, onOpenMap, onOpenApi, onOpenPrompt, onOpenSaves, onHome }) {
   const [input, setInput] = useState("");
   const [mobilePanel, setMobilePanel] = useState(null);
   const [followingLatest, setFollowingLatest] = useState(true);
@@ -109,8 +109,8 @@ export default function GameScreen({ game, loading, turnPhase, streamText, error
     <header className={styles.topbar}>
       <button className={styles.wordmark} type="button" onClick={onHome} aria-label="返回欢迎页"><i>BC</i><span>贝克兰德纪事<small>BACKLUND CHRONICLE</small></span></button>
       <div className={styles.chapter}><span>CHAPTER {String(game.chapter.number).padStart(2, "0")}</span><strong>{game.chapter.title}</strong></div>
-      <div className={styles.topActions}><button type="button" onClick={onOpenPrompt}>提示词</button><button type="button" onClick={onOpenApi}>API</button><button type="button" onClick={onOpenSaves}>存档</button></div>
-      <div className={styles.mobileActions}><button type="button" onClick={() => setMobilePanel("character")}>角色</button><button type="button" onClick={() => setMobilePanel("inventory")}>物品</button><button type="button" onClick={() => setMobilePanel("menu")}>设置</button></div>
+      <div className={styles.topActions}><button type="button" onClick={onOpenMap}>地图</button><button type="button" onClick={onOpenPrompt}>提示词</button><button type="button" onClick={onOpenApi}>API</button><button type="button" onClick={onOpenSaves}>存档</button></div>
+      <div className={styles.mobileActions}><button type="button" onClick={() => setMobilePanel("character")}>角色</button><button type="button" onClick={onOpenMap}>地图</button><button type="button" onClick={() => setMobilePanel("inventory")}>物品</button><button type="button" onClick={() => setMobilePanel("menu")}>设置</button></div>
     </header>
     <div className={styles.workspace}>
       <aside className={`${styles.left} ${mobilePanel === "character" ? styles.drawerOpen : ""}`} aria-label="角色状态"><div className={styles.drawerHeader}><span>角色状态</span><button type="button" onClick={() => setMobilePanel(null)}>关闭</button></div><CharacterPanel game={game} /></aside>
