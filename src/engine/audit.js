@@ -1,4 +1,5 @@
 import { getAdvancement } from "../data/character.js";
+import { formatMoney, moneyFromPence, moneyToPence } from "../data/money.js";
 
 const ITEM_FIELDS = ["name", "category", "description", "weight", "rarity", "condition", "equipped", "tags", "properties", "discoveredInfo"];
 
@@ -53,7 +54,7 @@ export function auditInventoryChanges(before = [], after = []) {
 }
 
 export function createAuditBaseline(game, turn = game.turn + 1) {
-  return { turn, inventory: structuredClone(game.inventory || []), character: structuredClone(game.character || {}) };
+  return { turn, inventory: structuredClone(game.inventory || []), money: structuredClone(game.money || moneyFromPence(0)), character: structuredClone(game.character || {}) };
 }
 
 export function auditTurnChanges(baseline, game) {
@@ -62,17 +63,27 @@ export function auditTurnChanges(baseline, game) {
   const afterAdvancement = getAdvancement(game.character);
   const beforeStats = baseline.character?.stats || {};
   const afterStats = game.character?.stats || {};
+  const beforeMoneyPence = moneyToPence(baseline.money || {});
+  const afterMoneyPence = moneyToPence(game.money || {});
+  const moneyDeltaPence = afterMoneyPence - beforeMoneyPence;
   const stats = Object.fromEntries(["health", "sanity", "spirituality"].filter((key) => beforeStats[key] !== afterStats[key]).map((key) => [key, { before: beforeStats[key], after: afterStats[key], delta: afterStats[key] - beforeStats[key] }]));
   return {
     turn: baseline.turn,
     inventory: auditInventoryChanges(baseline.inventory, game.inventory || []),
+    money: {
+      before: moneyFromPence(beforeMoneyPence),
+      after: moneyFromPence(afterMoneyPence),
+      deltaPence: moneyDeltaPence,
+      deltaLabel: `${moneyDeltaPence >= 0 ? "获得" : "失去"} ${formatMoney(moneyFromPence(Math.abs(moneyDeltaPence)))}`,
+      hasChanges: moneyDeltaPence !== 0,
+    },
     character: {
       stats,
       advancementChanged: !equalValue(beforeAdvancement, afterAdvancement),
       beforeAdvancement,
       afterAdvancement,
     },
-    hasChanges: auditInventoryChanges(baseline.inventory, game.inventory || []).hasChanges || Object.keys(stats).length > 0 || !equalValue(beforeAdvancement, afterAdvancement),
+    hasChanges: auditInventoryChanges(baseline.inventory, game.inventory || []).hasChanges || moneyDeltaPence !== 0 || Object.keys(stats).length > 0 || !equalValue(beforeAdvancement, afterAdvancement),
     auditedAt: new Date().toISOString(),
   };
 }

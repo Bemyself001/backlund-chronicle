@@ -1,10 +1,14 @@
 import { makeId } from "../utils/id.js";
 import { findTravelRoute, getMapLocation } from "../data/map.js";
+import { amountToPence, formatMoney, moneyFromPence, moneyToPence } from "../data/money.js";
 
 export const TOOL_SCHEMAS = {
   "inventory.add": { required: ["item"], description: "新增或合并一个结构化物品实例" },
   "inventory.remove": { required: ["instanceId", "quantity"], description: "减少物品数量或移除实例" },
   "inventory.update": { required: ["instanceId", "patch"], description: "更新物品的可变字段" },
+  "money.add": { required: ["amount"], description: "增加角色持有的镑、苏勒或便士" },
+  "money.remove": { required: ["amount"], description: "扣除角色持有的镑、苏勒或便士" },
+  "money.inspect": { required: [], description: "核对当前资金余额，不修改状态" },
   "item.inspect": { required: ["instanceId"], description: "检查物品并揭示已发现信息" },
   "item.use": { required: ["instanceId"], description: "使用消耗品或工具" },
   "item.equip": { required: ["instanceId"], description: "装备可装备物品" },
@@ -47,6 +51,10 @@ function validateCall(game, call) {
   return "";
 }
 
+function amountArg(args) {
+  return args.amount || { pounds: args.pounds, solers: args.solers, pence: args.pence };
+}
+
 function executeOne(game, call) {
   const args = call.args;
   const turnLabel = `第 ${game.turn + 1} 轮`;
@@ -83,6 +91,25 @@ function executeOne(game, call) {
       const allowed = ["description", "condition", "discoveredInfo", "properties", "tags"];
       Object.entries(args.patch || {}).forEach(([key, value]) => { if (allowed.includes(key)) target[key] = value; });
       return succeed(call.name, `${turnLabel}：更新「${target.name}」——${call.reason}。`);
+    }
+    case "money.add": {
+      const amountPence = amountToPence(amountArg(args));
+      if (!Number.isInteger(amountPence) || amountPence < 1) return fail(call.name, "增加金额必须是正整数，并按镑、苏勒、便士填写");
+      const current = moneyToPence(game.money || {});
+      game.money = moneyFromPence(current + amountPence);
+      return succeed(call.name, `${turnLabel}：获得资金 ${formatMoney(moneyFromPence(amountPence))}——${call.reason}。`, { amountPence, balance: game.money });
+    }
+    case "money.remove": {
+      const amountPence = amountToPence(amountArg(args));
+      const current = moneyToPence(game.money || {});
+      if (!Number.isInteger(amountPence) || amountPence < 1) return fail(call.name, "扣除金额必须是正整数，并按镑、苏勒、便士填写");
+      if (amountPence > current) return fail(call.name, `资金不足，当前余额为 ${formatMoney(game.money || {})}`);
+      game.money = moneyFromPence(current - amountPence);
+      return succeed(call.name, `${turnLabel}：支付 ${formatMoney(moneyFromPence(amountPence))}——${call.reason}。`, { amountPence, balance: game.money });
+    }
+    case "money.inspect": {
+      game.money = moneyFromPence(moneyToPence(game.money || {}));
+      return succeed(call.name, `${turnLabel}：资金核对——当前余额 ${formatMoney(game.money)}。`, { balance: game.money });
     }
     case "item.inspect": {
       const target = findItem();

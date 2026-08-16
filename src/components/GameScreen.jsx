@@ -1,6 +1,7 @@
 import { memo, useEffect, useRef, useState } from "react";
 import styles from "./GameScreen.module.css";
 import { getAdvancement } from "../data/character.js";
+import { formatMoney } from "../data/money.js";
 
 const RISK_LABEL = { low: "谨慎", medium: "交涉", high: "高风险" };
 const TURN_PHASES = [
@@ -47,19 +48,30 @@ const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, onAudit
   const selected = game.inventory.find((item) => item.instanceId === selectedId);
   const weight = game.inventory.reduce((sum, item) => sum + item.weight * item.quantity, 0);
   return <div className={styles.rightPanel}>
-    <div className={styles.tabs} role="tablist" aria-label="档案类别">{[["inventory", "物品"], ["clues", "线索"], ["quests", "任务"], ["log", "变更"], ["audit", "审计"]].map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{label}</button>)}</div>
+    <div className={styles.tabs} role="tablist" aria-label="档案类别">{[["inventory", "物品"], ["money", "资金"], ["clues", "线索"], ["quests", "任务"], ["log", "变更"], ["audit", "审计"]].map(([id, label]) => <button key={id} type="button" role="tab" aria-selected={tab === id} onClick={() => setTab(id)}>{label}</button>)}</div>
     {tab === "inventory" && <div className={styles.panelContent}>
       <div className={styles.capacity}><span>负重</span><strong>{weight.toFixed(1)} / {game.capacity.maxWeight} kg</strong><i><b style={{ width: `${Math.min(100, weight / game.capacity.maxWeight * 100)}%` }} /></i></div>
       <div className={styles.filters}><input aria-label="搜索物品" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索物品…" /><select aria-label="物品分类" value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((entry) => <option key={entry}>{entry}</option>)}</select></div>
       <div className={styles.itemList}>{items.length === 0 ? <div className={styles.empty}>没有符合条件的物品。</div> : items.map((item) => <button key={item.instanceId} className={`${styles.item} ${item.isNew ? styles.newItem : ""}`} type="button" onClick={() => setSelectedId(item.instanceId)}><span className={styles.itemGlyph}>{item.name.slice(0, 1)}</span><span><strong>{item.name}{item.equipped && <small>已装备</small>}</strong><em>{item.category} · {item.condition}</em></span><b>×{item.quantity}</b></button>)}</div>
       {selected && <div className={styles.itemDetail}><button type="button" aria-label="关闭物品详情" onClick={() => setSelectedId(null)}>×</button><p>{selected.rarity} · {selected.category}</p><h3>{selected.name}</h3><span>{selected.description}</span><dl><div><dt>重量</dt><dd>{selected.weight} kg</dd></div><div><dt>状态</dt><dd>{selected.condition}</dd></div><div><dt>来源</dt><dd>{selected.source}</dd></div></dl><div className={styles.itemActions}><button type="button" disabled={disabled} onClick={() => onLocalTool("item.inspect", { instanceId: selected.instanceId }, `检查${selected.name}`)}>检查</button>{selected.tags.includes("消耗品") && <button type="button" disabled={disabled} onClick={() => onLocalTool("item.use", { instanceId: selected.instanceId }, `主动使用${selected.name}`)}>使用</button>}{selected.tags.includes("装备") && <button type="button" disabled={disabled} onClick={() => onLocalTool(selected.equipped ? "item.unequip" : "item.equip", { instanceId: selected.instanceId }, `玩家${selected.equipped ? "卸下" : "装备"}${selected.name}`)}>{selected.equipped ? "卸下" : "装备"}</button>}<button className={styles.discard} type="button" disabled={disabled} onClick={() => { if (window.confirm(`丢弃一件“${selected.name}”？`)) { onLocalTool("inventory.remove", { instanceId: selected.instanceId, quantity: 1 }, `玩家主动丢弃${selected.name}`); setSelectedId(null); } }}>丢弃</button></div></div>}
     </div>}
+    {tab === "money" && <MoneyPanel game={game} />}
     {tab === "clues" && <div className={styles.panelContent}><h3 className={styles.archiveTitle}>已发现线索 <span>{game.clues.length}/3</span></h3>{game.clues.length ? game.clues.map((clue) => <article className={styles.record} key={clue.id}><span>CLUE</span><h4>{clue.title}</h4><p>{clue.detail}</p><small>{clue.discoveredAt}</small></article>) : <div className={styles.empty}>尚未确认任何线索。谨慎调查通常能得到最可靠的记录。</div>}</div>}
     {tab === "quests" && <div className={styles.panelContent}><h3 className={styles.archiveTitle}>案件任务 <span>{game.quests.length}</span></h3>{game.quests.map((quest) => <article className={styles.record} key={quest.id}><span>{quest.status}</span><h4>{quest.title}</h4><p>{quest.summary}</p></article>)}</div>}
     {tab === "log" && <div className={styles.panelContent}><h3 className={styles.archiveTitle}>变更记录 <span>{game.changeLog.length}</span></h3><ol className={styles.log}>{game.changeLog.slice().reverse().map((entry) => <li key={entry.id} className={entry.tone === "danger" ? styles.dangerLog : ""}><span>{String(entry.turn).padStart(2, "0")}</span><p>{entry.text}</p></li>)}</ol></div>}
     {tab === "audit" && <AuditPanel game={game} disabled={disabled} onAudit={onAudit} />}
   </div>;
 }, (previous, next) => previous.game === next.game && previous.disabled === next.disabled && previous.onAudit === next.onAudit);
+
+function MoneyPanel({ game }) {
+  const money = game.money || { pounds: 0, solers: 0, pence: 0 };
+  return <div className={`${styles.panelContent} ${styles.moneyPanel}`}>
+    <h3 className={styles.archiveTitle}>持有资金 <span>MONEY</span></h3>
+    <div className={styles.moneyBalance}><strong>{formatMoney(money)}</strong><small>1 镑 = 20 苏勒 = 240 便士</small></div>
+    <dl className={styles.moneyBreakdown}><div><dt>镑</dt><dd>{money.pounds}</dd></div><div><dt>苏勒</dt><dd>{money.solers}</dd></div><div><dt>便士</dt><dd>{money.pence}</dd></div></dl>
+    <p className={styles.moneyNote}>资金独立于物品栏保存。收款、消费与找零必须由资金工具验证后才会生效。</p>
+  </div>;
+}
 
 function AuditPanel({ game, disabled, onAudit }) {
   const audit = game.lastTurnAudit;
@@ -80,6 +92,7 @@ function AuditPanel({ game, disabled, onAudit }) {
     {audit && <>
       <div className={`${styles.auditResult} ${audit.hasChanges ? styles.auditHasChanges : ""}`}><strong>{audit.hasChanges ? "发现已确认的状态变化" : "本轮没有已确认的物品或角色变化"}</strong><small>审计只比较本地执行前后的结构化数据，不把剧情正文当作事实。</small></div>
       {changeRows.length > 0 && <ul className={styles.auditList}>{changeRows.map((row, index) => <li key={`${row.text}-${index}`} data-tone={row.tone}><span>{row.tone === "gain" ? "+" : row.tone === "loss" ? "−" : "·"}</span><p>{row.text}</p></li>)}</ul>}
+      {audit.money?.hasChanges && <div className={styles.moneyAudit}><strong>资金变化</strong><span>{formatMoney(audit.money.before)} → {formatMoney(audit.money.after)}</span><small>{audit.money.deltaPence > 0 ? "收入已确认" : "支出已确认"}</small></div>}
       {character?.advancementChanged && <div className={styles.auditNote}>非凡档案：{character.beforeAdvancement.sequenceLabel} → {character.afterAdvancement.sequenceLabel}</div>}
     </>}
   </div>;

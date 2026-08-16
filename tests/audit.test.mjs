@@ -2,6 +2,8 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createInitialGame, EMPTY_CHARACTER } from "../src/data/defaults.js";
 import { auditInventoryChanges, auditTurnChanges, createAuditBaseline } from "../src/engine/audit.js";
+import { executeToolCalls } from "../src/engine/tools.js";
+import { formatMoney, moneyFromPence } from "../src/data/money.js";
 
 test("inventory audit detects quantity changes, new items, removal, and equipment", () => {
   const before = [
@@ -29,4 +31,23 @@ test("turn audit compares a retained baseline and exposes structured advancement
   assert.equal(audit.inventory.gained[0].name, game.inventory[0].name);
   assert.equal(audit.character.afterAdvancement.sequenceLabel, "普通人");
   assert.equal(audit.character.advancementChanged, false);
+});
+
+test("money tools keep currency separate and the audit reports denomination-aware changes", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "钱币测试员", startingMoneyPence: 720 });
+  assert.deepEqual(game.money, moneyFromPence(720));
+  assert.equal(game.inventory.some((item) => item.category === "货币"), false);
+  const baseline = createAuditBaseline(game, 1);
+  const execution = executeToolCalls(game, [{ id: "money-add", name: "money.add", args: { amount: { solers: 2, pence: 3 } }, reason: "完成短工后收到报酬" }]);
+  assert.equal(execution.results[0].ok, true);
+  assert.equal(formatMoney(execution.game.money), "£3 · 2苏勒 · 3便士");
+  const audit = auditTurnChanges(baseline, execution.game);
+  assert.equal(audit.money.deltaPence, 27);
+  assert.equal(audit.money.before.pounds, 3);
+  assert.equal(audit.money.after.solers, 2);
+});
+
+test("starting money is capped at three pounds", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "上限测试员", startingMoneyPence: 9999 });
+  assert.deepEqual(game.money, moneyFromPence(720));
 });

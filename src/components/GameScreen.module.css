@@ -30,7 +30,7 @@
 .metaGrid span, .metaGrid small { display: block; overflow: hidden; color: #777266; font: .55rem/1.45 var(--font-sans); letter-spacing: .08em; text-overflow: ellipsis; text-transform: uppercase; white-space: nowrap; }
 .metaGrid strong { display: block; overflow: hidden; margin: .28rem 0 .18rem; color: #c7bda8; font: 500 .74rem var(--font-serif); text-overflow: ellipsis; white-space: nowrap; }
 .panelContent section { padding: 1.05rem 0; border-bottom: 1px solid #aa875035; }
-.panelContent section h3, .archiveTitle { display: flex; align-items: center; justify-content: space-between; margin: 0 0 .8rem; color: #c8bda8; font: 600 .71rem var(--font-serif); letter-spacing: .1em; }
+.panelContent section h3, .archiveTitle { display: flex; align-items: center; justify-content: space-between; margin: 0 0 .8rem; color: #c8bda8; font: 600 .82rem var(--font-serif); letter-spacing: .1em; }
 .panelContent section h3 small, .archiveTitle span { color: #776e60; font: 600 .52rem var(--font-sans); letter-spacing: .12em; }
 .stats { display: grid; gap: .65rem; }
 .stat > div { display: flex; align-items: baseline; justify-content: space-between; }
@@ -109,14 +109,22 @@
 .composer > div { display: flex; align-items: center; gap: .6rem; padding: .35rem; }
 .composer > div > span { color: #8a806e; font: .52rem var(--font-sans); }
 .composer .abort { min-height: 2.65rem; padding: 0 1rem; border: 1px solid var(--danger); background: #6a2923; color: #f3dfd8; font: 700 .68rem var(--font-sans); }
-.tabs { position: sticky; top: 0; z-index: 3; display: grid; grid-template-columns: repeat(5, 1fr); background: #0e1314; }
-.tabs button { min-height: 3rem; border: 0; border-bottom: 1px solid #aa875035; background: transparent; color: #79766e; font: 700 .62rem var(--font-sans); letter-spacing: .08em; }
+.tabs { position: sticky; top: 0; z-index: 3; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); background: #0e1314; }
+.tabs button { min-height: 3.15rem; border: 0; border-bottom: 1px solid #aa875035; background: transparent; color: #79766e; font: 700 .72rem var(--font-sans); letter-spacing: .06em; }
 .tabs button[aria-selected="true"] { border-bottom: 2px solid var(--brass); color: var(--brass-light); background: #b18e5010; }
 .capacity { display: grid; grid-template-columns: 1fr auto; gap: .35rem; color: #837f74; font: .62rem var(--font-sans); }
 .capacity strong { color: #aaa18f; font: 600 .62rem var(--font-mono); }
 .capacity i { grid-column: 1 / -1; }
 .filters { display: grid; grid-template-columns: 1fr 5.4rem; gap: .4rem; margin: .9rem 0; }
 .filters input, .filters select { min-width: 0; min-height: 2.35rem; padding: .45rem .55rem; border: 1px solid #655f52; border-radius: 0; background: #0d1213; color: #aaa393; font: .65rem var(--font-sans); }
+.moneyBalance { display: grid; gap: .35rem; padding: 1rem .75rem; border-left: 2px solid var(--brass); background: #b18e5014; }
+.moneyBalance strong { color: #d0bd93; font: 600 1.05rem var(--font-mono); letter-spacing: .03em; }
+.moneyBalance small { color: #817d71; font: .6rem var(--font-sans); }
+.moneyBreakdown { display: grid; grid-template-columns: repeat(3, 1fr); gap: .4rem; margin: 1rem 0; }
+.moneyBreakdown div { padding: .7rem .55rem; border: 1px solid #5d625c; background: #202625; text-align: center; }
+.moneyBreakdown dt { color: #8c897d; font: .62rem var(--font-sans); }
+.moneyBreakdown dd { margin: .25rem 0 0; color: #c5b99f; font: 700 .9rem var(--font-mono); }
+.moneyNote { margin: 0; color: #85847c; font: .66rem/1.6 var(--font-sans); }
 .itemList { display: grid; gap: .35rem; }
 .item { display: grid; grid-template-columns: 2.3rem 1fr auto; align-items: center; gap: .55rem; width: 100%; min-height: 3.4rem; padding: .45rem; border: 1px solid transparent; background: #202625; color: #beb5a2; text-align: left; }
 .item:hover { border-color: #826b43; background: #272d2b; }
@@ -165,6 +173,10 @@
 .auditList li[data-tone="loss"] > span { border-color: #87423b; color: #c78379; }
 .auditList p { margin: 0; color: #aaa393; font: .63rem/1.45 var(--font-sans); }
 .auditNote { margin-top: .8rem; padding: .55rem .65rem; border-left: 2px solid var(--verdigris); color: #9eafa6; font: .62rem var(--font-sans); }
+.moneyAudit { display: grid; gap: .28rem; margin-top: .8rem; padding: .7rem; border-left: 2px solid var(--brass); background: #b18e5014; }
+.moneyAudit strong { color: #c7b78f; font: 600 .72rem var(--font-serif); }
+.moneyAudit span { color: #d1bd8b; font: 700 .7rem var(--font-mono); }
+.moneyAudit small { color: #85847d; font: .59rem var(--font-sans); }
 .log { display: grid; gap: .65rem; margin: 0; padding: 0; list-style: none; }
 .log li { display: grid; grid-template-columns: 1.7rem 1fr; gap: .5rem; }
 .log li > span { display: grid; width: 1.6rem; height: 1.6rem; place-items: center; border: 1px solid #5d635e; color: #74857d; font: .52rem var(--font-mono); }
@@ -190,6 +202,7 @@
   .topbar { grid-template-columns: 3.9rem 1fr auto; } .wordmark { padding: 0; justify-content: center; } .wordmark > span { display: none; } .wordmark i { width: 1.85rem; } .chapter { padding-left: .7rem; } .chapter strong { max-width: 9rem; font-size: .68rem; } .mobileActions { padding: 0 .15rem; } .mobileActions button { padding: 0 .48rem; font-size: .6rem; }
   .storyScroll { padding: 1.25rem 1rem 2rem; } .sceneMeta { margin-bottom: 1rem; } .narrative { padding-left: 2.1rem; font-size: .94rem; line-height: 1.82; } .dropcap { width: 1.55rem; font-size: .82rem; } .playerLine { margin: .8rem 0 1.2rem; }
   .interaction { padding: .7rem .65rem .65rem; } .choiceLabel { margin-inline: .15rem; } .choiceLabel span { display: none; } .choices { display: grid; grid-template-columns: 1fr; gap: .3rem; } .choices button { grid-template-columns: 1.5rem 1fr auto; min-height: 2.65rem; align-items: center; padding: .42rem .55rem; } .choices button > span { grid-row: auto; } .choices strong { align-self: center; font-size: .68rem; } .choices small { align-self: center; }
+  .tabs { grid-template-columns: repeat(3, 1fr); } .tabs button { min-height: 2.65rem; font-size: .68rem; }
   .composer { grid-template-columns: 1fr auto; } .composer textarea { min-height: 3rem; max-height: 5rem; padding: .65rem; } .composer > div { padding: .25rem; } .composer .abort { min-height: 2.5rem; padding: 0 .65rem; } .composer :global(.button) { min-height: 2.5rem; padding-inline: .75rem; }
 }
 @media (prefers-reduced-motion: reduce) { .left, .right, .stat > i b, .capacity > i b { transition: none; } .loadingLine span, .turnStatus > p span, .newItem { animation: none; } }

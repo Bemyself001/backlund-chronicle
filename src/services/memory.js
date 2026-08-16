@@ -10,6 +10,7 @@ export function buildContext(game, action, systemPrompt) {
   };
   const characterState = {
     profile: game.character,
+    money: game.money,
     statusEffects: game.statusEffects,
     relationships: game.relationships,
     inventory: game.inventory.map((item) => {

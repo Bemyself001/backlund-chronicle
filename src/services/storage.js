@@ -1,5 +1,6 @@
 import { SAVE_VERSION } from "../data/defaults.js";
 import { withAdvancement } from "../data/character.js";
+import { moneyFromPence } from "../data/money.js";
 
 const SAVES_KEY = "mist-chronicle-saves-v1";
 const AUTOSAVE_ID = "autosave";
@@ -51,10 +52,15 @@ export function migrateSave(raw) {
     return value;
   };
   const migrated = version < 2 ? migrateStoryValue(raw) : raw;
+  const legacyCoin = (migrated.inventory || []).find((item) => item?.itemId === "copper-coins" || item?.category === "货币");
+  const inventory = migrated.money ? migrated.inventory : (migrated.inventory || []).filter((item) => item !== legacyCoin);
+  const money = migrated.money || moneyFromPence(legacyCoin?.quantity || 0);
   return {
     ...migrated,
     version: SAVE_VERSION,
     character: withAdvancement(migrated.character),
+    inventory,
+    money,
     processedToolCalls: migrated.processedToolCalls || [],
     memoryNotes: migrated.memoryNotes || [],
     lastTurnBaseline: migrated.lastTurnBaseline || null,

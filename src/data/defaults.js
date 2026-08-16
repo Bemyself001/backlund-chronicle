@@ -1,7 +1,8 @@
 import { makeId } from "../utils/id.js";
 import { withAdvancement } from "./character.js";
+import { MAX_STARTING_MONEY_PENCE, moneyFromPence } from "./money.js";
 
-export const SAVE_VERSION = 3;
+export const SAVE_VERSION = 4;
 export const AI_SETTINGS_VERSION = "1.4";
 
 export const LOW_SEQUENCE_PATHWAYS = [
@@ -29,7 +30,7 @@ export const DEFAULT_SYSTEM_PROMPT = `你是《贝克兰德纪事》的叙事者
 5. 这是开放世界沙盒。玩家可以无视、拒绝或离开任何案件与剧情钩子；不得用巧合、NPC 催促或突发灾难强迫玩家回到预设主线。未被玩家明确接受的委托不得添加为进行中任务。
 6. 尊重地点连续性和旅行时间。玩家可在贝克兰德各区寻找工作、居所、人脉、知识与个人目标，世界事件会继续发展，但不应围绕玩家一人运转。
 7. 每轮给出三个真正不同的行动选项：谨慎调查、社交交涉、高风险行动，同时允许自由输入；选项应包含当前场景的多种可能，而非三个措辞不同的同一目标。
-8. 所有状态变化必须作为工具调用提议。不要在正文中伪造工具已经成功执行；等待本地引擎验证后再在后续叙事中确认。物品是否获得或失去以本地审计结果为准，而不是以正文宣称为准。
+8. 所有状态变化必须作为工具调用提议。不要在正文中伪造工具已经成功执行；等待本地引擎验证后再在后续叙事中确认。物品和资金是否获得或失去以本地审计结果为准，而不是以正文宣称为准。资金使用 money.add、money.remove，金额必须拆分为 pounds（镑）、solers（苏勒）、pence（便士）。
 9. 优先使用原生 tool calling；若使用 JSON 协议，返回 narrative、choices、toolCalls、memoryNotes、worldEvents。
 10. narrative 使用克制、可读的中文，每轮约 250—600 字，不复述原著段落，不让原作角色抢占玩家中心位置。`;
 
@@ -75,6 +76,7 @@ export const EMPTY_CHARACTER = {
   background: "在贝克兰德生活三年，靠处理夜班稿件维持体面的贫穷。",
   extraordinary: "ordinary",
   pathway: "无",
+  startingMoneyPence: 240,
 };
 
 const RANDOM_CHARACTERS = [
@@ -139,6 +141,8 @@ function item(itemId, name, category, description, quantity, weight, rarity, tag
 
 export function createInitialGame(character) {
   const normalizedCharacter = withAdvancement(character);
+  const { startingMoneyPence = 240, ...characterProfile } = normalizedCharacter;
+  const initialMoneyPence = Math.max(0, Math.min(MAX_STARTING_MONEY_PENCE, Number(startingMoneyPence) || 0));
   return {
     version: SAVE_VERSION,
     id: makeId("game"),
@@ -147,7 +151,7 @@ export function createInitialGame(character) {
     updatedAt: new Date().toISOString(),
     turn: 0,
     character: {
-      ...normalizedCharacter,
+      ...characterProfile,
       portraitSeed: Math.floor(Math.random() * 4),
       stats: { health: 10, maxHealth: 10, sanity: 9, maxSanity: 10, spirituality: normalizedCharacter.extraordinary === "low" ? 7 : 4, maxSpirituality: normalizedCharacter.extraordinary === "low" ? 8 : 5 },
     },
@@ -159,8 +163,8 @@ export function createInitialGame(character) {
       item("brass-compass", "黄铜罗盘", "工具", "指针偶尔会避开正北方，原因未知。", 1, 0.3, "少见", ["可检查"]),
       item("pocket-notebook", "袖珍笔记本", "文书", "夹着几张速记纸，尚有二十余页空白。", 1, 0.2, "普通", ["线索工具"]),
       item("matchbox", "防潮火柴", "消耗品", "还剩十二根，硫磺气味明显。", 1, 0.1, "普通", ["消耗品"]),
-      item("copper-coins", "铜便士", "货币", "足够支付一顿简餐或两次短程马车。", 18, 0.18, "普通", ["货币"]),
     ],
+    money: moneyFromPence(initialMoneyPence),
     capacity: { maxWeight: 12 },
     equipment: {},
     statusEffects: [{ id: "rain-chill", name: "雨夜寒意", kind: "neutral", description: "手指略显僵硬，离开雨水后会逐渐恢复。" }],
