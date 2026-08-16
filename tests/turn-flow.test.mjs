@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { buildRejectedToolNarrative } from "../src/engine/tools.js";
 import { advanceWorldTime, dangerDeltaForTurn, minutesForTurn, resolveTurnProgress } from "../src/engine/turn.js";
 import { extractNarrativePreview } from "../src/services/streamPreview.js";
 
@@ -7,7 +8,14 @@ test("stream preview exposes only the partial narrative from JSON", () => {
   assert.equal(extractNarrativePreview('{"narrative":"煤气灯在雨中'), "煤气灯在雨中");
   assert.equal(extractNarrativePreview('{"narrative":"第一行\\n第二行","choices":['), "第一行\n第二行");
   assert.equal(extractNarrativePreview('{"choices":['), "");
+  assert.equal(extractNarrativePreview('```json\n{"response":"备用字段正在流入'), "备用字段正在流入");
   assert.equal(extractNarrativePreview("接口直接返回的普通文本"), "接口直接返回的普通文本");
+});
+
+test("rejected tool-only turns can finish locally without another model request", () => {
+  const narrative = buildRejectedToolNarrative("用不存在的钥匙开门", [{ ok: false, reason: "找不到要使用的物品" }]);
+  assert.match(narrative, /不存在的钥匙/);
+  assert.match(narrative, /找不到要使用的物品/);
 });
 
 test("turn duration follows the action and successful movement", () => {

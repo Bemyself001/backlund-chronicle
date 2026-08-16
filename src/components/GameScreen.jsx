@@ -10,6 +10,7 @@ const TURN_PHASES = [
 const PHASE_MESSAGE = {
   generating: "叙事引擎正在编织当前场景",
   manualRetry: "正在重新提交上一轮行动",
+  streaming: "剧情正文正在抵达",
   budgetRecovery: "正文暂未出现，正在保留推理强度并增加输出预算",
   reasoningRetry: "推理预算已耗尽，正在降低推理强度后重试",
   validating: "本地规则正在校验状态提议",

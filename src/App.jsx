@@ -7,7 +7,7 @@ import PromptEditor from "./components/PromptEditor.jsx";
 import SaveManager from "./components/SaveManager.jsx";
 import UpdateDialog from "./components/UpdateDialog.jsx";
 import { createInitialGame, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from "./data/defaults.js";
-import { executeToolCalls } from "./engine/tools.js";
+import { buildRejectedToolNarrative, executeToolCalls } from "./engine/tools.js";
 import { resolveTurnProgress } from "./engine/turn.js";
 import { buildToolResultMessages, loadApiSettings, requestAIWithReasoningFallback, saveApiSettings } from "./services/api.js";
 import { buildContext, updateMemory } from "./services/memory.js";
@@ -59,7 +59,9 @@ export default function App() {
     setStreamText("");
   };
   const queueStreamPreview = (rawContent) => {
-    pendingStreamRef.current = extractNarrativePreview(rawContent);
+    const preview = extractNarrativePreview(rawContent);
+    pendingStreamRef.current = preview;
+    if (preview) setTurnPhase((current) => ["generating", "manualRetry", "budgetRecovery", "reasoningRetry", "finalizing"].includes(current) ? "streaming" : current);
     if (streamTimerRef.current) return;
     streamTimerRef.current = setTimeout(() => {
       setStreamText(pendingStreamRef.current);
@@ -95,11 +97,13 @@ export default function App() {
       const toolReasoningContent = response.reasoningContent || "";
       setTurnPhase("validating");
       const execution = executeToolCalls(game, proposedToolCalls);
-      if (!settings.mockMode && response.requiresToolFollowUp) {
+      if (!settings.mockMode && response.requiresToolFollowUp && execution.results.some((result) => result.ok)) {
         resetStreamPreview();
         setTurnPhase("finalizing");
         const followUpMessages = [...messages, ...buildToolResultMessages(proposedToolCalls, execution.results, toolReasoningContent)];
         response = await requestModel(followUpMessages, { disableTools: true });
+      } else if (response.requiresToolFollowUp) {
+        response = { ...response, narrative: buildRejectedToolNarrative(action, execution.results), requiresToolFollowUp: false };
       }
       const memory = updateMemory(execution.game, action, response.narrative, response.memoryNotes);
       const progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results);

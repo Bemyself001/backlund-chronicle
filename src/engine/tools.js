@@ -195,3 +195,10 @@ export function executeToolCalls(currentGame, calls = []) {
   const logs = results.map((result) => ({ id: makeId("log"), turn: game.turn + 1, text: result.log, tone: result.ok ? "success" : "danger" }));
   return { game, results, logs };
 }
+
+export function buildRejectedToolNarrative(action, results = []) {
+  const reasons = [...new Set(results.filter((result) => !result.ok).map((result) => String(result.reason || "当前条件不足").trim()).filter(Boolean))].slice(0, 3);
+  const attempted = String(action || "继续行动").replace(/[。！？!?]+$/g, "");
+  const detail = reasons.length ? `本地规则给出的原因是：${reasons.join("；")}。` : "当前条件不足，本轮没有发生状态变化。";
+  return `你尝试执行“${attempted}”，但预期的变化没有发生。${detail}你可以补充条件、检查现有物品，或换一种方式继续。`;
+}

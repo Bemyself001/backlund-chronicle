@@ -293,7 +293,7 @@ function parseStreamEventData(eventData, state, onChunk) {
     const packet = JSON.parse(trimmed);
     const choice = packet?.choices?.[0] || {};
     const delta = choice.delta || choice.message || {};
-    const chunk = textFromContent(delta.content || delta.output_text || delta.text);
+    const chunk = textFromContent(delta.content || delta.output_text || delta.text || delta.narrative || packet.output_text || packet.text);
     if (chunk) {
       state.content += chunk;
       onChunk?.(state.content);

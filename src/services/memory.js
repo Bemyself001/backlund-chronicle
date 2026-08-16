@@ -26,7 +26,7 @@ export function buildContext(game, action, systemPrompt) {
     { role: "system", content: "【NPC认知边界】车站职员只知道铁路与东区见闻；各区普通市民依据职业和生活圈提供有限信息；普通人不知道非凡途径真相，失踪文员等秘密必须由玩家主动接触并通过线索逐步揭示。" },
     { role: "system", content: `【长期摘要】${game.longTermSummary}` },
     ...recent,
-    { role: "system", content: `【本轮输出协议】只返回一个合法 JSON 对象，不要使用 Markdown 代码块，也不要在对象前后添加说明。结构必须为：{"narrative":"剧情正文","choices":[{"label":"行动","intent":"investigate","risk":"low"},{"label":"行动","intent":"social","risk":"medium"},{"label":"行动","intent":"dangerous","risk":"high"}],"toolCalls":[],"memoryNotes":[],"worldEvents":[]}。choices 必须恰好三项；所有状态变化只能放入 toolCalls。即使拒绝或无法完成，也要把说明写进 narrative 并返回合法对象。` },
+    { role: "system", content: `【本轮输出协议】只返回一个合法 JSON 对象，不要使用 Markdown 代码块，也不要在对象前后添加说明。结构必须为：{"narrative":"剧情正文","choices":[{"label":"行动","intent":"investigate","risk":"low"},{"label":"行动","intent":"social","risk":"medium"},{"label":"行动","intent":"dangerous","risk":"high"}],"toolCalls":[],"memoryNotes":[],"worldEvents":[]}。choices 必须恰好三项；所有状态变化只能放入 toolCalls。即使拒绝、无法完成或使用原生 Tool Calling，也必须同时在 assistant.content 中返回上述 JSON 正文与选项，工具调用仅是待本地验证的提议；正文不得提前确认工具结果。` },
     { role: "user", content: `【本轮玩家行动】${action}` },
   ];
 }

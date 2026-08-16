@@ -25,9 +25,9 @@ function decodePartialJsonString(source) {
 
 export function extractNarrativePreview(rawContent) {
   const raw = String(rawContent || "");
-  const narrative = /"narrative"\s*:\s*"/.exec(raw);
+  const narrative = /"(?:narrative|response|output_text|text)"\s*:\s*"/.exec(raw);
   if (narrative) return decodePartialJsonString(raw.slice(narrative.index + narrative[0].length));
-  const trimmed = raw.trimStart();
+  const trimmed = raw.trimStart().replace(/^```(?:json)?\s*/i, "");
   if (trimmed.startsWith("{") || trimmed.startsWith("```")) return "";
   return raw;
 }

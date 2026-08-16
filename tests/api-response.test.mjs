@@ -151,6 +151,21 @@ test("stream parser accepts delta.text and text/plain bodies", async (context) =
   assert.match(result.narrative, /兼容字段/);
 });
 
+test("stream parser accepts a provider narrative delta", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const encoder = new TextEncoder();
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"narrative":"叙事字段无需等待完整 JSON。"}}]}\n\n'));
+      controller.close();
+    },
+  });
+  globalThis.fetch = async () => new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } });
+  const result = await requestAI({ ...settings, stream: true }, [{ role: "user", content: "继续" }]);
+  assert.match(result.narrative, /无需等待/);
+});
+
 test("stream request falls back to a plain text response body", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
