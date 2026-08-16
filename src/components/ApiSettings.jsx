@@ -3,6 +3,7 @@ import Modal from "./Modal.jsx";
 import styles from "./Forms.module.css";
 import { listApiModels, testApiConnection } from "../services/api.js";
 import { API_PROVIDER_PRESETS, createProviderProfile, getApiProvider } from "../services/apiProviders.js";
+import { isNativeAndroid } from "../services/updates.js";
 
 function captureProfile(settings) {
   return {
@@ -33,6 +34,7 @@ export default function ApiSettings({ settings, onSave, onClose, onCheckUpdate }
   const [testing, setTesting] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
   const [modelQuery, setModelQuery] = useState("");
+  const nativeAndroid = isNativeAndroid();
   const provider = getApiProvider(draft.provider);
   const models = useMemo(
     () => draft.modelCatalogs?.[draft.provider] || [],
@@ -139,8 +141,8 @@ export default function ApiSettings({ settings, onSave, onClose, onCheckUpdate }
           <label className={styles.field}>
             <span>API Key</span>
             <input
-              type="password"
-              name="backlund-api-token"
+              className={nativeAndroid ? styles.secretInput : undefined}
+              type={nativeAndroid ? "text" : "password"}
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="none"
@@ -151,7 +153,9 @@ export default function ApiSettings({ settings, onSave, onClose, onCheckUpdate }
               placeholder="输入服务商密钥"
               disabled={draft.mockMode}
               spellCheck="false"
+              aria-describedby="api-key-autofill-hint"
             />
+            <small className={styles.helper} id="api-key-autofill-hint">密钥使用本地遮罩显示，并阻止系统把它识别为登录密码。</small>
           </label>
           <label className={styles.field}>
             <span>当前模型</span>

@@ -12,6 +12,9 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(UpdaterPlugin.class);
         super.onCreate(savedInstanceState);
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            getWindow().getDecorView().setImportantForAutofill(
+                View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
+            );
             getBridge().getWebView().setImportantForAutofill(
                 View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
             );

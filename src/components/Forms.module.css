@@ -28,6 +28,7 @@
 .field input, .field select { min-height: 2.8rem; padding: .65rem .72rem; }
 .field textarea { min-height: 5rem; padding: .7rem; resize: vertical; }
 .field input:disabled { opacity: .48; cursor: not-allowed; }
+.secretInput { -webkit-text-security: disc; }
 .twoCol, .threeCol { display: grid; gap: .85rem; grid-template-columns: repeat(2, 1fr); }
 .threeCol { grid-template-columns: repeat(3, 1fr); }
 .notice { padding: .8rem 1rem; border-left: 3px solid var(--verdigris); background: #1f55471a; color: #3f3a30; font: .86rem/1.55 var(--font-sans); }
