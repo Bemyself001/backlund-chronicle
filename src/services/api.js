@@ -126,6 +126,30 @@ function nativeCallsFromMessage(message) {
   });
 }
 
+export function buildToolResultMessages(toolCalls, results) {
+  const calls = toolCalls.map((call, index) => ({
+    id: call.id || `local-call-${index + 1}`,
+    type: "function",
+    function: {
+      name: String(call.name || "unknown").replace(".", "__"),
+      arguments: JSON.stringify(call.args || {}),
+    },
+  }));
+  return [
+    { role: "assistant", content: null, tool_calls: calls },
+    ...calls.map((call, index) => {
+      const result = results[index] || { ok: false, reason: "本地引擎没有返回执行结果" };
+      return {
+        role: "tool",
+        tool_call_id: call.id,
+        name: call.function.name,
+        content: JSON.stringify({ ok: result.ok, log: result.log, reason: result.reason || "", data: result.data || {} }),
+      };
+    }),
+    { role: "system", content: "【本地工具结果已返回】现在生成本轮最终剧情正文与恰好三个差异化行动选项。只确认 ok=true 的变化；对失败结果可自然描述为行动受阻，但不要重复工具调用。必须返回约定的合法 JSON 对象。" },
+  ];
+}
+
 function assistantPayload(data) {
   const choice = data?.choices?.[0] || {};
   const message = choice.message || {};
@@ -167,7 +191,7 @@ function appendToolCallFragments(calls, fragments = []) {
   }
 }
 
-export async function requestAI(settings, messages, signal, onChunk) {
+export async function requestAI(settings, messages, signal, onChunk, options = {}) {
   const body = {
     model: settings.model,
     messages,
@@ -176,7 +200,7 @@ export async function requestAI(settings, messages, signal, onChunk) {
     stream: Boolean(settings.stream),
   };
   if (settings.jsonMode) body.response_format = { type: "json_object" };
-  if (settings.nativeTools) body.tools = toolDefinitions();
+  if (settings.nativeTools && !options.disableTools) body.tools = toolDefinitions();
   const response = await fetch(endpoint(settings.baseUrl, "/chat/completions"), {
     method: "POST", signal,
     headers: requestHeaders(settings, true),

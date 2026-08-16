@@ -7,7 +7,7 @@ import PromptEditor from "./components/PromptEditor.jsx";
 import SaveManager from "./components/SaveManager.jsx";
 import { createInitialGame, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from "./data/defaults.js";
 import { executeToolCalls } from "./engine/tools.js";
-import { loadApiSettings, requestAI, saveApiSettings } from "./services/api.js";
+import { buildToolResultMessages, loadApiSettings, requestAI, saveApiSettings } from "./services/api.js";
 import { buildContext, updateMemory } from "./services/memory.js";
 import { mockResponse } from "./services/mock.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
@@ -59,8 +59,13 @@ export default function App() {
     const controller = new AbortController(); controllerRef.current = controller;
     try {
       const messages = buildContext(game, action, prompt);
-      const response = settings.mockMode ? await mockResponse(game, action, controller.signal, setStreamText) : await requestAI(settings, messages, controller.signal, setStreamText);
+      let response = settings.mockMode ? await mockResponse(game, action, controller.signal, setStreamText) : await requestAI(settings, messages, controller.signal, setStreamText);
       const execution = executeToolCalls(game, response.toolCalls);
+      if (!settings.mockMode && response.requiresToolFollowUp) {
+        setStreamText("");
+        const followUpMessages = [...messages, ...buildToolResultMessages(response.toolCalls, execution.results)];
+        response = await requestAI(settings, followUpMessages, controller.signal, setStreamText, { disableTools: true });
+      }
       const memory = updateMemory(execution.game, action, response.narrative, response.memoryNotes);
       const next = {
         ...execution.game, ...memory, turn: game.turn + 1, worldTime: advanceTime(game.worldTime), choices: response.choices,

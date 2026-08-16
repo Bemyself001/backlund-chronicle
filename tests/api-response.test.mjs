@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { requestAI } from "../src/services/api.js";
+import { buildToolResultMessages, requestAI } from "../src/services/api.js";
 
 const settings = {
   baseUrl: "https://example.test/v1",
@@ -73,4 +73,25 @@ test("requestAI preserves native calls when content is null", async (context) =>
   const result = await requestAI({ ...settings, nativeTools: true }, [{ role: "user", content: "侧耳倾听" }]);
   assert.equal(result.toolCalls[0].name, "status.add");
   assert.equal(result.toolCalls[0].args.name, "警觉");
+  assert.equal(result.requiresToolFollowUp, true);
+});
+
+test("tool follow-up reports local validation and disables repeated native calls", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  let requestBody;
+  globalThis.fetch = async (_url, init) => {
+    requestBody = JSON.parse(init.body);
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"narrative":"钥匙未能转动，门锁仍然完好。","choices":[]}' } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  const resultMessages = buildToolResultMessages(
+    [{ id: "call-1", name: "item.use", args: { instanceId: "missing-key" } }],
+    [{ ok: false, log: "变更被拒绝：找不到要使用的物品", reason: "找不到要使用的物品" }],
+  );
+  const result = await requestAI({ ...settings, nativeTools: true }, resultMessages, undefined, undefined, { disableTools: true });
+
+  assert.equal(requestBody.tools, undefined);
+  assert.equal(requestBody.messages[1].role, "tool");
+  assert.match(requestBody.messages[1].content, /找不到要使用的物品/);
+  assert.match(result.narrative, /门锁仍然完好/);
 });

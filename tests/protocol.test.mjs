@@ -28,4 +28,5 @@ test("native tool calls remain usable when the assistant content is empty", () =
   const result = normalizeAIResponse("", [nativeCall]);
   assert.equal(result.toolCalls[0], nativeCall);
   assert.match(result.narrative, /本地规则校验/);
+  assert.equal(result.requiresToolFollowUp, true);
 });

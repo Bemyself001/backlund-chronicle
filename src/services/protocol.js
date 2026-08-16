@@ -82,6 +82,7 @@ export function normalizeAIResponse(raw, nativeToolCalls = []) {
   const parsed = responseObject(raw);
   const candidate = parsed.narrative ?? parsed.response ?? parsed.content ?? parsed.text ?? parsed.message;
   const narrativeText = textFromContent(candidate) || (typeof candidate === "string" ? candidate : "");
+  const hasNarrative = Boolean(narrativeText.trim());
   const narrative = narrativeText.trim()
     || (nativeToolCalls.length ? "命运的齿轮轻轻转动。本轮状态提议正由本地规则校验。" : "雾中的细节暂时无法拼成完整叙述。你可以重试，或换一种行动方式。");
   const sourceChoices = parsed.choices ?? parsed.actions ?? parsed.options;
@@ -97,5 +98,6 @@ export function normalizeAIResponse(raw, nativeToolCalls = []) {
     memoryNotes: Array.isArray(memoryNotes) ? memoryNotes.map(String).slice(0, 5) : [],
     worldEvents: Array.isArray(worldEvents) ? worldEvents.map(String).slice(0, 5) : [],
     protocolWarning: parsed.protocolWarning || "",
+    requiresToolFollowUp: nativeToolCalls.length > 0 && !hasNarrative,
   };
 }
