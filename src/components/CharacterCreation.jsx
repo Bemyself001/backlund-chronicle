@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { EMPTY_CHARACTER, randomCharacter } from "../data/defaults.js";
+import { EMPTY_CHARACTER, LOW_SEQUENCE_PATHWAYS, randomCharacter } from "../data/defaults.js";
 import styles from "./CharacterCreation.module.css";
 
 const fields = [
@@ -13,11 +13,17 @@ export default function CharacterCreation({ onBack, onCreate }) {
   const [character, setCharacter] = useState({ ...EMPTY_CHARACTER });
   const [error, setError] = useState("");
   const update = (key, value) => setCharacter((current) => ({ ...current, [key]: value }));
+  const selectExtraordinary = (extraordinary) => setCharacter((current) => ({
+    ...current,
+    extraordinary,
+    pathway: extraordinary === "low" ? LOW_SEQUENCE_PATHWAYS[0] : "无",
+  }));
   const submit = (event) => {
     event.preventDefault();
     if (!character.name.trim() || !character.background.trim()) { setError("请至少填写姓名与个人背景。"); return; }
     const age = Number(character.age);
     if (age < 16 || age > 80) { setError("年龄需在 16—80 岁之间。"); return; }
+    if (character.extraordinary === "low" && !LOW_SEQUENCE_PATHWAYS.includes(character.pathway)) { setError("请选择一条有效的序列9途径。"); return; }
     onCreate({ ...character, age });
   };
   return (
@@ -40,10 +46,10 @@ export default function CharacterCreation({ onBack, onCreate }) {
             </label>)}
           </div>
           <fieldset className={styles.identity}><legend>非凡身份</legend>
-            <label><input type="radio" name="extraordinary" value="ordinary" checked={character.extraordinary === "ordinary"} onChange={(e) => { update("extraordinary", e.target.value); update("pathway", "无"); }} /><span><strong>普通人</strong><small>以知识、人脉与谨慎面对未知</small></span></label>
-            <label><input type="radio" name="extraordinary" value="low" checked={character.extraordinary === "low"} onChange={(e) => { update("extraordinary", e.target.value); update("pathway", "窥秘人（序列9）"); }} /><span><strong>低序列非凡者</strong><small>拥有有限能力，也承担失控风险</small></span></label>
+            <label><input type="radio" name="extraordinary" value="ordinary" checked={character.extraordinary === "ordinary"} onChange={() => selectExtraordinary("ordinary")} /><span><strong>普通人</strong><small>以知识、人脉与谨慎面对未知</small></span></label>
+            <label><input type="radio" name="extraordinary" value="low" checked={character.extraordinary === "low"} onChange={() => selectExtraordinary("low")} /><span><strong>低序列非凡者</strong><small>拥有有限能力，也承担失控风险</small></span></label>
           </fieldset>
-          {character.extraordinary === "low" && <label className={styles.field}><span>途径与序列</span><input value={character.pathway} onChange={(e) => update("pathway", e.target.value)} /></label>}
+          {character.extraordinary === "low" && <label className={`${styles.field} ${styles.pathwayField}`}><span>序列9途径</span><select value={character.pathway} onChange={(e) => update("pathway", e.target.value)} required aria-describedby="pathway-help">{LOW_SEQUENCE_PATHWAYS.map((pathway) => <option key={pathway} value={pathway}>{pathway}</option>)}</select><small id="pathway-help">初始仅开放常见途径；非凡能力同时伴随失控与暴露风险。</small></label>}
           {error && <p className={styles.error} role="alert">{error}</p>}
           <footer className={styles.formFooter}><p>创建后将生成独立自动存档，你仍可从欢迎页开始其他角色。</p><button className="button button--primary button--large" type="submit">签署档案并进入贝克兰德</button></footer>
         </form>

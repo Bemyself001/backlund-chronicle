@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createInitialGame, DEFAULT_SYSTEM_PROMPT, EMPTY_CHARACTER } from "../src/data/defaults.js";
+import { createInitialGame, DEFAULT_SYSTEM_PROMPT, EMPTY_CHARACTER, LOW_SEQUENCE_PATHWAYS } from "../src/data/defaults.js";
 import { buildContext } from "../src/services/memory.js";
 import { mockResponse } from "../src/services/mock.js";
 
@@ -15,6 +15,14 @@ test("new characters begin freely at the East Borough railway station", () => {
   assert.match(game.recentDialogues[0].content, /贝克兰德向四面八方展开/);
   assert.match(game.longTermSummary, /尚未接受任何委托/);
   assert.equal(game.choices.length, 3);
+});
+
+test("character creation exposes twelve distinct sequence 9 pathways", () => {
+  assert.equal(LOW_SEQUENCE_PATHWAYS.length, 12);
+  assert.equal(new Set(LOW_SEQUENCE_PATHWAYS).size, 12);
+  LOW_SEQUENCE_PATHWAYS.forEach((pathway) => assert.match(pathway, /（序列9）$/));
+  assert.ok(LOW_SEQUENCE_PATHWAYS.includes("窥秘人（序列9）"));
+  assert.ok(LOW_SEQUENCE_PATHWAYS.includes("猎人（序列9）"));
 });
 
 test("AI context treats mysteries as optional world threads", () => {

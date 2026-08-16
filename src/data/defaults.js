@@ -3,6 +3,21 @@ import { makeId } from "../utils/id.js";
 export const SAVE_VERSION = 2;
 export const AI_SETTINGS_VERSION = "1.3";
 
+export const LOW_SEQUENCE_PATHWAYS = [
+  "占卜家（序列9）",
+  "学徒（序列9）",
+  "观众（序列9）",
+  "水手（序列9）",
+  "歌颂者（序列9）",
+  "阅读者（序列9）",
+  "不眠者（序列9）",
+  "收尸人（序列9）",
+  "战士（序列9）",
+  "窥秘人（序列9）",
+  "通识者（序列9）",
+  "猎人（序列9）",
+];
+
 export const DEFAULT_SYSTEM_PROMPT = `你是《贝克兰德纪事》的叙事者与世界模拟器。故事发生在鲁恩王国首都贝克兰德，以原创街巷、人物、案件与剧情为中心；原作主线和重要人物仅作为遥远背景，不得取代玩家成为故事中心。
 
 核心规则：

@@ -23,6 +23,8 @@
 .field input, .field select, .field textarea { width: 100%; border: 0; border-bottom: 1px solid #80745e; border-radius: 0; background: #efe4ce; color: var(--ink); font: .9rem/1.5 var(--font-sans); letter-spacing: normal; text-transform: none; }
 .field input, .field select { min-height: 2.7rem; padding: .55rem .65rem; }
 .field textarea { padding: .7rem; resize: vertical; }
+.pathwayField { margin-top: .2rem; }
+.pathwayField small { color: #665e50; font: .72rem/1.5 var(--font-sans); letter-spacing: normal; text-transform: none; }
 .spanTwo { grid-column: 1 / -1; }
 .identity { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; margin: 1.2rem 0; padding: 1rem; border: 1px solid #8c79584f; }
 .identity legend { padding: 0 .4rem; color: var(--ink-soft); font: 700 .68rem var(--font-sans); letter-spacing: .1em; text-transform: uppercase; }
@@ -37,4 +39,3 @@
 .formFooter p { max-width: 20rem; }
 @media (max-width: 850px) { .layout { grid-template-columns: 1fr; } .intro { position: static; display: grid; grid-template-columns: 1fr auto; align-items: end; } .intro > p, .portrait { display: none; } }
 @media (max-width: 600px) { .header { grid-template-columns: 1fr auto; } .header span { display: none; } .layout { width: 100%; padding: 1.8rem 0 0; gap: 1.5rem; } .intro { padding: 0 1rem; } .intro h1 { font-size: 2.7rem; } .form { padding: 1.2rem 1rem 2rem; } .grid, .identity { grid-template-columns: 1fr; } .spanTwo { grid-column: auto; } .formHeading p { display: none; } .formFooter { align-items: stretch; flex-direction: column; } }
-
