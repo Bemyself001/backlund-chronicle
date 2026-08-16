@@ -138,7 +138,20 @@ export default function ApiSettings({ settings, onSave, onClose, onCheckUpdate }
         <div className={styles.twoCol}>
           <label className={styles.field}>
             <span>API Key</span>
-            <input type="password" autoComplete="new-password" value={draft.apiKey} onChange={(event) => update("apiKey", event.target.value)} placeholder="输入服务商密钥" disabled={draft.mockMode} spellCheck="false" />
+            <input
+              type="password"
+              name="backlund-api-token"
+              autoComplete="off"
+              autoCorrect="off"
+              autoCapitalize="none"
+              data-1p-ignore="true"
+              data-lpignore="true"
+              value={draft.apiKey}
+              onChange={(event) => update("apiKey", event.target.value)}
+              placeholder="输入服务商密钥"
+              disabled={draft.mockMode}
+              spellCheck="false"
+            />
           </label>
           <label className={styles.field}>
             <span>当前模型</span>

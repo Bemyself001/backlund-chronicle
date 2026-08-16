@@ -38,6 +38,8 @@ npm run preview
 
 游戏存档保存在 LocalStorage。API Key 默认只保存在 sessionStorage；只有用户明确开启“跨会话保存”时才会写入单独的本地 API 设置。剧情状态与导出的 JSON 存档均会剔除 API Key。
 
+API Key 输入框会请求浏览器关闭自动填充；Android APK 还会将游戏 WebView 排除出系统自动填充，以避免部分 ColorOS 设备反复弹出密码建议。手动输入、粘贴和用户主动选择的本地密钥保存不受影响。
+
 没有 API Key 时保持 Mock 模式即可完成全部核心流程。真实接口默认按 OpenAI Chat Completions 协议调用，兼容流式输出、原生 tool calling 与 JSON 回退。
 
 ## GitHub 云端构建 APK
