@@ -95,6 +95,7 @@
 .interaction { position: relative; z-index: 2; padding: .85rem clamp(1rem, 2.5vw, 2.2rem) 1rem; border-top: 1px solid #77654866; background: #d9cbb1; box-shadow: 0 -10px 30px #53452e12; }
 .choiceLabel { display: flex; justify-content: space-between; margin: 0 0 .45rem; color: #635844; font: 700 .6rem var(--font-sans); letter-spacing: .11em; text-transform: uppercase; }
 .choiceLabel span { color: #8b7c64; font-size: .48rem; }
+.choiceSource { margin-left: auto; color: #7d6841; font: 600 .5rem var(--font-sans); letter-spacing: .03em; text-transform: none; }
 .choices { display: grid; grid-template-columns: repeat(3, 1fr); gap: .45rem; }
 .choices button { display: grid; grid-template-columns: auto 1fr; gap: .15rem .55rem; min-height: 3.75rem; padding: .55rem .65rem; border: 1px solid #86745380; border-radius: 0; background: #e8dcc4; color: var(--ink); text-align: left; }
 .choices button:hover:not(:disabled) { border-color: #6b5430; background: #f1e7d3; transform: translateY(-1px); }

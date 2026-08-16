@@ -1,4 +1,4 @@
-const FALLBACK_CHOICES = [
+export const FALLBACK_CHOICES = [
   { label: "留在原地继续观察", intent: "investigate", risk: "low" },
   { label: "向在场的人谨慎打听", intent: "social", risk: "medium" },
   { label: "冒险追查最异常的迹象", intent: "dangerous", risk: "high" },
@@ -70,7 +70,7 @@ function responseObject(raw) {
 
 function normalizeChoice(choice, index) {
   const fallback = FALLBACK_CHOICES[index];
-  const label = typeof choice === "string" ? choice : choice?.label;
+  const label = typeof choice === "string" ? choice : choice?.label ?? choice?.text ?? choice?.title ?? choice?.action;
   return {
     label: String(label || fallback.label),
     intent: ["investigate", "social", "dangerous"].includes(choice?.intent) ? choice.intent : fallback.intent,
@@ -85,8 +85,16 @@ export function normalizeAIResponse(raw, nativeToolCalls = []) {
   const hasNarrative = Boolean(narrativeText.trim());
   const narrative = narrativeText.trim()
     || (nativeToolCalls.length ? "命运的齿轮轻轻转动。本轮状态提议正由本地规则校验。" : "雾中的细节暂时无法拼成完整叙述。你可以重试，或换一种行动方式。");
-  const sourceChoices = parsed.choices ?? parsed.actions ?? parsed.options;
-  const choices = Array.isArray(sourceChoices) ? sourceChoices.slice(0, 3).map(normalizeChoice) : [];
+  const sourceChoices = parsed.choices ?? parsed.actions ?? parsed.options ?? parsed.nextActions ?? parsed.next_actions ?? parsed.suggestions;
+  const rawChoices = Array.isArray(sourceChoices) ? sourceChoices : [];
+  const choices = rawChoices.slice(0, 3).map(normalizeChoice);
+  const labels = rawChoices.slice(0, 3).map((choice) => String(typeof choice === "string" ? choice : choice?.label ?? choice?.text ?? choice?.title ?? choice?.action ?? "").trim()).filter(Boolean);
+  const hasThreeDistinctLabels = rawChoices.length === 3 && labels.length === 3 && new Set(labels).size === 3;
+  const choiceMeta = !Array.isArray(sourceChoices)
+    ? { source: "fallback", fallback: true, reason: "missing_choices" }
+    : hasThreeDistinctLabels
+      ? { source: "model", fallback: false, reason: "" }
+      : { source: "recovered", fallback: false, reason: rawChoices.length === 3 ? "invalid_or_duplicate_labels" : "choice_count" };
   while (choices.length < 3) choices.push({ ...FALLBACK_CHOICES[choices.length] });
   const protocolToolCalls = parsed.toolCalls ?? parsed.tool_calls;
   const memoryNotes = parsed.memoryNotes ?? parsed.memory_notes;
@@ -97,7 +105,8 @@ export function normalizeAIResponse(raw, nativeToolCalls = []) {
     toolCalls: [...(Array.isArray(protocolToolCalls) ? protocolToolCalls : []), ...nativeToolCalls],
     memoryNotes: Array.isArray(memoryNotes) ? memoryNotes.map(String).slice(0, 5) : [],
     worldEvents: Array.isArray(worldEvents) ? worldEvents.map(String).slice(0, 5) : [],
-    protocolWarning: parsed.protocolWarning || "",
+    protocolWarning: parsed.protocolWarning || (choiceMeta.source === "fallback" ? "模型没有返回 choices，已生成临时行动建议。" : choiceMeta.source === "recovered" ? "choices 字段不完整，已生成临时行动建议。" : ""),
+    choiceMeta,
     requiresToolFollowUp: nativeToolCalls.length > 0 && !hasNarrative,
   };
 }

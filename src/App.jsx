@@ -17,6 +17,7 @@ import { mockResponse } from "./services/mock.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
 import { extractNarrativePreview } from "./services/streamPreview.js";
 import { ensureMapMoveToolCall } from "./services/mapTravel.js";
+import { resolveChoices } from "./services/choices.js";
 import { makeId } from "./utils/id.js";
 import { checkForUpdate, isNativeAndroid } from "./services/updates.js";
 
@@ -96,6 +97,7 @@ export default function App() {
         onReasoningFallback: () => { resetStreamPreview(); setTurnPhase("reasoningRetry"); },
       });
       let response = settings.mockMode ? await mockResponse(game, action, controller.signal, queueStreamPreview) : await requestModel(messages);
+      response = resolveChoices(response, game, action);
       const proposedToolCalls = ensureMapMoveToolCall(response.toolCalls, options.mapDestination, game.turn + 1);
       const toolReasoningContent = response.reasoningContent || "";
       setTurnPhase("validating");
@@ -104,14 +106,16 @@ export default function App() {
         resetStreamPreview();
         setTurnPhase("finalizing");
         const followUpMessages = [...messages, ...buildToolResultMessages(proposedToolCalls, execution.results, toolReasoningContent)];
+        const previousChoices = { choices: response.choices, meta: response.choiceMeta };
         response = await requestModel(followUpMessages, { disableTools: true });
+        response = resolveChoices(response, game, action, previousChoices);
       } else if (response.requiresToolFollowUp) {
         response = { ...response, narrative: buildRejectedToolNarrative(action, execution.results), requiresToolFollowUp: false };
       }
       const memory = updateMemory(execution.game, action, response.narrative, response.memoryNotes);
       const progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results);
       const next = {
-        ...execution.game, ...memory, turn: game.turn + 1, worldTime: progress.worldTime, choices: response.choices,
+        ...execution.game, ...memory, turn: game.turn + 1, worldTime: progress.worldTime, choices: response.choices, choiceMeta: response.choiceMeta,
         worldEvents: [...game.worldEvents, ...response.worldEvents.map((text) => ({ id: makeId("event"), turn: game.turn + 1, text }))].slice(-40),
         changeLog: [...game.changeLog, ...execution.logs].slice(-100),
         hiddenDanger: progress.hiddenDanger,

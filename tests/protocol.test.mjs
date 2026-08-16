@@ -12,6 +12,7 @@ test("plain text API responses continue as narrative with fallback choices", () 
   assert.match(result.narrative, /煤气灯/);
   assert.equal(result.choices.length, 3);
   assert.match(result.protocolWarning, /普通文本/);
+  assert.equal(result.choiceMeta.source, "fallback");
 });
 
 test("content-part arrays and alternate action fields are normalized", () => {
@@ -29,4 +30,14 @@ test("native tool calls remain usable when the assistant content is empty", () =
   assert.equal(result.toolCalls[0], nativeCall);
   assert.match(result.narrative, /本地规则校验/);
   assert.equal(result.requiresToolFollowUp, true);
+});
+
+test("choice parser accepts alternate action fields and text labels", () => {
+  const result = normalizeAIResponse({ narrative: "街灯下有人停步。", nextActions: [
+    { text: "检查街角的脚印", intent: "investigate", risk: "low" },
+    { title: "询问巡夜人", intent: "social", risk: "medium" },
+    { action: "跟上黑伞客", intent: "dangerous", risk: "high" },
+  ] });
+  assert.equal(result.choiceMeta.source, "model");
+  assert.deepEqual(result.choices.map((choice) => choice.label), ["检查街角的脚印", "询问巡夜人", "跟上黑伞客"]);
 });

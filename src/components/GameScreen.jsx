@@ -166,7 +166,7 @@ export default function GameScreen({ game, loading, turnPhase, streamText, error
         {!followingLatest && <button className={styles.jumpLatest} type="button" onClick={jumpToLatest}>回到最新</button>}
         </div>
         <div className={styles.interaction}>
-          <p className={styles.choiceLabel}>下一步行动 <span>CHOOSE OR WRITE YOUR OWN</span></p>
+          <p className={styles.choiceLabel}>下一步行动 <span>CHOOSE OR WRITE YOUR OWN</span>{game.choiceMeta?.source === "local" && <em className={styles.choiceSource}>本地场景建议 · 模型选项未完整返回</em>}{game.choiceMeta?.source === "reused" && <em className={styles.choiceSource}>沿用上一组有效选项 · 确认响应未重复返回</em>}</p>
           <div className={styles.choices}>{game.choices.map((choice, index) => <button key={`${choice.intent}-${index}`} type="button" disabled={loading} onClick={() => onAction(choice.label)}><span>0{index + 1}</span><strong>{choice.label}</strong><small data-risk={choice.risk}>{RISK_LABEL[choice.risk]}</small></button>)}</div>
           <div className={styles.composer}><textarea aria-label="自由输入行动" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }} placeholder="描述你的行动、问题或对话…" disabled={loading} /><div><span>Enter 发送 · Shift+Enter 换行</span>{loading ? <button className={styles.abort} type="button" onClick={onAbort}>中止生成</button> : <button className="button button--primary" type="button" onClick={submit} disabled={!input.trim()}>提交行动</button>}</div></div>
         </div>

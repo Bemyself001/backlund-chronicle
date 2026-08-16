@@ -191,6 +191,7 @@ export function createInitialGame(character) {
       { label: "向搬运工打听各区近况与落脚处", intent: "social", risk: "medium" },
       { label: "跟随异常声响靠近封闭的第七码头", intent: "dangerous", risk: "high" },
     ],
+    choiceMeta: { source: "initial", fallback: false, reason: "opening" },
     changeLog: [{ id: makeId("log"), turn: 0, text: "档案建立：你抵达贝克兰德东区火车站，尚未接受任何委托。", tone: "neutral" }],
     processedToolCalls: [],
     aiSettingsVersion: AI_SETTINGS_VERSION,

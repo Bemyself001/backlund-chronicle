@@ -40,5 +40,6 @@ export async function mockResponse(game, action, signal, onChunk) {
       { label: "找当地人打听住处、工作和街区消息", intent: "social", risk: "medium" },
       { label: "主动接近一处尚未解释的异常", intent: "dangerous", risk: "high" },
     ],
+    choiceMeta: { source: "model", fallback: false, reason: "mock" },
   };
 }
