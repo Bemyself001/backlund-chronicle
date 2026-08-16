@@ -87,6 +87,7 @@ export default function App() {
       const messages = buildContext(game, action, prompt);
       const requestModel = (requestMessages, requestOptions = {}) => requestAIWithReasoningFallback(settings, requestMessages, controller.signal, queueStreamPreview, {
         ...requestOptions,
+        onReasoningRecovery: () => { resetStreamPreview(); setTurnPhase("budgetRecovery"); },
         onReasoningFallback: () => { resetStreamPreview(); setTurnPhase("reasoningRetry"); },
       });
       let response = settings.mockMode ? await mockResponse(game, action, controller.signal, queueStreamPreview) : await requestModel(messages);

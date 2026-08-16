@@ -93,30 +93,73 @@ test("OpenAI reasoning models use the compatible output limit", async (context) 
   assert.equal(requestBody.reasoning_effort, "low");
 });
 
-test("reasoning exhaustion automatically retries once with thinking disabled", async (context) => {
+test("reasoning exhaustion first retries with a larger budget before lowering thinking", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
   const requestBodies = [];
   let fallbackCount = 0;
+  let recoveryCount = 0;
   globalThis.fetch = async (_url, init) => {
     requestBodies.push(JSON.parse(init.body));
-    if (requestBodies.length === 1) {
+    if (requestBodies.length < 3) {
       return new Response(JSON.stringify({ choices: [{ finish_reason: "length", message: { content: "", reasoning_content: "仍在推理" } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
     }
-    return new Response(JSON.stringify({ choices: [{ message: { content: '{"narrative":"自动降低推理后，正文顺利返回。","choices":[]}' } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"narrative":"自动恢复后，正文顺利返回。","choices":[]}' } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
   };
   const result = await requestAIWithReasoningFallback(
     { ...settings, provider: "deepseek" },
     [{ role: "user", content: "继续" }],
     undefined,
     undefined,
-    { onReasoningFallback: () => { fallbackCount += 1; } },
+    { onReasoningRecovery: () => { recoveryCount += 1; }, onReasoningFallback: () => { fallbackCount += 1; } },
   );
-  assert.equal(result.narrative, "自动降低推理后，正文顺利返回。");
-  assert.equal(requestBodies.length, 2);
+  assert.equal(result.narrative, "自动恢复后，正文顺利返回。");
+  assert.equal(requestBodies.length, 3);
+  assert.equal(requestBodies[1].max_tokens, 2400);
+  assert.equal(requestBodies[1].thinking, undefined);
   assert.equal(requestBodies[0].thinking, undefined);
-  assert.deepEqual(requestBodies[1].thinking, { type: "disabled" });
+  assert.deepEqual(requestBodies[2].thinking, { type: "disabled" });
+  assert.equal(recoveryCount, 1);
   assert.equal(fallbackCount, 1);
+});
+
+test("stream parser accepts delta.text and text/plain bodies", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const encoder = new TextEncoder();
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode('data: {"choices":[{"delta":{"text":"正文来自兼容字段。"},"finish_reason":"stop"}]}\n\n'));
+      controller.close();
+    },
+  });
+  globalThis.fetch = async () => new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } });
+  const result = await requestAI({ ...settings, stream: true }, [{ role: "user", content: "继续" }]);
+  assert.match(result.narrative, /兼容字段/);
+});
+
+test("stream request falls back to a plain text response body", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async () => new Response("服务商没有开启 SSE，但返回了可读正文。", { status: 200, headers: { "Content-Type": "text/plain" } });
+  const result = await requestAI({ ...settings, stream: true }, [{ role: "user", content: "继续" }]);
+  assert.match(result.narrative, /没有开启 SSE/);
+});
+
+test("reasoning-only response is recovered without exposing reasoning as narrative", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    const payload = calls === 1
+      ? { choices: [{ message: { content: "", reasoning: "内部分析" } }] }
+      : { choices: [{ message: { content: '{"narrative":"补全后的剧情正文。","choices":[]}' } }] };
+    return new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  const result = await requestAIWithReasoningFallback(settings, [{ role: "user", content: "继续" }]);
+  assert.equal(result.narrative, "补全后的剧情正文。");
+  assert.equal(calls, 2);
 });
 
 test("requestAI preserves native calls when content is null", async (context) => {

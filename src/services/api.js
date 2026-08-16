@@ -155,7 +155,20 @@ export function buildToolResultMessages(toolCalls, results, reasoningContent = "
 function assistantPayload(data) {
   const choice = data?.choices?.[0] || {};
   const message = choice.message || {};
-  const candidates = [message.content, message.output_text, message.text, message.refusal, choice.text, choice.content, data?.output_text, data?.response, data?.content];
+  const candidates = [
+    message.content,
+    message.output_text,
+    message.text,
+    message.refusal,
+    message.narrative,
+    choice.text,
+    choice.content,
+    choice.output_text,
+    data?.output_text,
+    data?.response,
+    data?.narrative,
+    data?.content,
+  ];
   for (const candidate of candidates) {
     if (typeof candidate === "string" && candidate.trim()) return candidate;
     if (Array.isArray(candidate) && textFromContent(candidate).trim()) return candidate;
@@ -165,14 +178,20 @@ function assistantPayload(data) {
   return "";
 }
 
-function emptyResponseError(finishReason, hasReasoning = false) {
+function emptyResponseError(finishReason, hasReasoning = false, metadata = {}) {
   if (finishReason === "length" || hasReasoning) {
-    const error = new Error("模型用完了输出预算，但还没有生成剧情正文。请关闭或降低推理模式、提高 Max Tokens，或改用非推理模型后重试本轮。");
+    const error = new Error("模型用完了输出预算，但还没有生成剧情正文。可以提高 Max Tokens；系统会优先保留推理并自动补全，必要时才降低推理模式。");
     error.code = "REASONING_EXHAUSTED";
     error.finishReason = finishReason;
+    error.hasReasoning = hasReasoning;
+    error.metadata = metadata;
     return error;
   }
-  return new Error("API 请求成功，但模型没有返回剧情正文。请先关闭“流式输出”后重试；若仍为空，再关闭“原生 Tool Calling”或更换模型。");
+  const error = new Error("API 请求成功，但模型没有返回剧情正文。系统将尝试兼容模式恢复；若仍失败，请检查模型的响应格式。");
+  error.code = "EMPTY_RESPONSE";
+  error.finishReason = finishReason;
+  error.metadata = metadata;
+  return error;
 }
 
 function normalizeChatCompletion(data) {
@@ -181,9 +200,21 @@ function normalizeChatCompletion(data) {
   const nativeCalls = nativeCallsFromMessage(message);
   const payload = assistantPayload(data);
   if (!textFromContent(payload).trim() && !(payload && typeof payload === "object" && !Array.isArray(payload)) && !nativeCalls.length) {
-    throw emptyResponseError(choice.finish_reason, Boolean(textFromContent(message.reasoning_content).trim()));
+    throw emptyResponseError(choice.finish_reason, Boolean(reasoningFromMessage(message).trim()), responseMetadata(data));
   }
-  return { ...normalizeAIResponse(payload, nativeCalls), reasoningContent: textFromContent(message.reasoning_content) };
+  return { ...normalizeAIResponse(payload, nativeCalls), reasoningContent: reasoningFromMessage(message), responseMetadata: responseMetadata(data) };
+}
+
+function reasoningFromMessage(message = {}) {
+  return textFromContent(message.reasoning_content || message.reasoning || message.thinking);
+}
+
+function responseMetadata(data = {}) {
+  return {
+    id: data.id || "",
+    finishReason: data.choices?.[0]?.finish_reason || "",
+    usage: data.usage || null,
+  };
 }
 
 function appendToolCallFragments(calls, fragments = []) {
@@ -231,17 +262,90 @@ function requestMessages(messages, forceDisableReasoning) {
   });
 }
 
+function safeMaxTokens(settings, options) {
+  const requested = Number(options.maxTokensOverride ?? settings.maxTokens);
+  return Number.isFinite(requested) && requested > 0 ? Math.round(requested) : 1200;
+}
+
+function parseStreamEventData(eventData, state, onChunk) {
+  const trimmed = eventData.trim();
+  if (!trimmed || trimmed === "[DONE]") return;
+  try {
+    const packet = JSON.parse(trimmed);
+    const choice = packet?.choices?.[0] || {};
+    const delta = choice.delta || choice.message || {};
+    const chunk = textFromContent(delta.content || delta.output_text || delta.text);
+    if (chunk) {
+      state.content += chunk;
+      onChunk?.(state.content);
+    }
+    state.reasoningContent += reasoningFromMessage(delta);
+    if (choice.finish_reason) state.finishReason = choice.finish_reason;
+    appendToolCallFragments(state.calls, delta.tool_calls);
+    if (packet.id) state.responseId = packet.id;
+    if (packet.usage) state.usage = packet.usage;
+  } catch {
+    // Keepalive lines and provider-specific non-JSON events are ignored.
+  }
+}
+
+async function readStreamResponse(response, onChunk) {
+  const reader = response.body?.getReader();
+  if (!reader) return { content: "", calls: {}, finishReason: "", reasoningContent: "", responseId: "", usage: null, rawResponse: "" };
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let rawResponse = "";
+  let eventLines = [];
+  const state = { content: "", calls: {}, finishReason: "", reasoningContent: "", responseId: "", usage: null };
+  const consumeEvent = (event) => {
+    const dataLines = event.split(/\r?\n/).filter((line) => line.trimStart().startsWith("data:"));
+    if (dataLines.length) parseStreamEventData(dataLines.map((line) => line.slice(line.indexOf(":") + 1).trimStart()).join("\n"), state, onChunk);
+  };
+  const consumeBuffer = (flush = false) => {
+    const hasLineBreak = /\r?\n/.test(buffer);
+    if (!flush && !hasLineBreak) return;
+    const lines = buffer.split(/\r?\n/);
+    buffer = flush ? "" : (lines.pop() || "");
+    lines.forEach((line) => {
+      if (!line.trim()) {
+        consumeEvent(eventLines.join("\n"));
+        eventLines = [];
+      } else {
+        eventLines.push(line);
+      }
+    });
+    if (flush && buffer.trim()) eventLines.push(buffer);
+    if (flush && eventLines.length) {
+      consumeEvent(eventLines.join("\n"));
+      eventLines = [];
+    }
+  };
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    const decoded = decoder.decode(value, { stream: true });
+    rawResponse += decoded;
+    buffer += decoded;
+    consumeBuffer();
+  }
+  const finalChunk = decoder.decode();
+  rawResponse += finalChunk;
+  buffer += finalChunk;
+  consumeBuffer(true);
+  return { ...state, rawResponse };
+}
+
 export async function requestAI(settings, messages, signal, onChunk, options = {}) {
   const body = {
     model: settings.model,
     messages: requestMessages(messages, options.forceDisableReasoning),
     temperature: Number(settings.temperature),
-    max_tokens: Number(settings.maxTokens),
-    stream: Boolean(settings.stream),
+    max_tokens: safeMaxTokens(settings, options),
+    stream: options.streamOverride ?? Boolean(settings.stream),
   };
   applyReasoningSettings(body, settings, options);
   applyProviderCompatibility(body, settings);
-  if (settings.jsonMode) body.response_format = { type: "json_object" };
+  if (settings.jsonMode && !options.disableJsonMode) body.response_format = { type: "json_object" };
   if (settings.nativeTools && !options.disableTools) body.tools = toolDefinitions();
   const response = await fetch(endpoint(settings.baseUrl, "/chat/completions"), {
     method: "POST", signal,
@@ -250,74 +354,59 @@ export async function requestAI(settings, messages, signal, onChunk, options = {
   });
   if (!response.ok) await apiError(response, "API 请求失败");
   const contentType = response.headers.get("content-type") || "";
-  if (!settings.stream || contentType.includes("application/json")) {
-    const data = await response.json();
+  if (!body.stream || contentType.includes("application/json")) {
+    const raw = await response.text();
+    let data;
+    try { data = JSON.parse(raw); } catch {
+      if (raw.trim()) return { ...normalizeAIResponse(raw), responseMetadata: { contentType, rawLength: raw.length } };
+      throw emptyResponseError("", false, { contentType, rawLength: raw.length });
+    }
     return normalizeChatCompletion(data);
   }
-  const reader = response.body.getReader();
-  const decoder = new TextDecoder();
-  let buffer = "";
-  let rawResponse = "";
-  let content = "";
-  const calls = {};
-  let finishReason = "";
-  let reasoningContent = "";
-  const consumeLine = (line) => {
-    const trimmed = line.trim();
-    if (!trimmed.startsWith("data:") || trimmed.includes("[DONE]")) return;
+  const streamed = await readStreamResponse(response, onChunk);
+  const nativeCalls = nativeCallsFromMessage({ tool_calls: Object.values(streamed.calls) });
+  if (!streamed.content.trim() && !nativeCalls.length) {
     try {
-      const choice = JSON.parse(trimmed.slice(5).trim()).choices?.[0] || {};
-      const delta = choice.delta || choice.message || {};
-      const chunk = textFromContent(delta.content);
-      if (chunk) { content += chunk; onChunk?.(content); }
-      reasoningContent += textFromContent(delta.reasoning_content);
-      if (choice.finish_reason) finishReason = choice.finish_reason;
-      appendToolCallFragments(calls, delta.tool_calls);
-    } catch { /* ignore non-JSON keepalive chunks */ }
-  };
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const decoded = decoder.decode(value, { stream: true });
-    rawResponse += decoded;
-    buffer += decoded;
-    const lines = buffer.split("\n");
-    buffer = lines.pop() || "";
-    lines.forEach(consumeLine);
-  }
-  const finalChunk = decoder.decode();
-  rawResponse += finalChunk;
-  buffer += finalChunk;
-  buffer.split("\n").forEach(consumeLine);
-  const nativeCalls = nativeCallsFromMessage({ tool_calls: Object.values(calls) });
-  if (!content.trim() && !nativeCalls.length) {
-    try { return normalizeChatCompletion(JSON.parse(rawResponse.trim())); } catch (error) {
-      if (error instanceof SyntaxError) throw emptyResponseError(finishReason, Boolean(reasoningContent.trim()));
-      throw error;
+      const parsed = JSON.parse(streamed.rawResponse.trim());
+      return normalizeChatCompletion(parsed);
+    } catch (error) {
+      if (!(error instanceof SyntaxError)) throw error;
+      const rawText = streamed.rawResponse.trim();
+      const protocolOnly = rawText.split(/\r?\n/).every((line) => !line.trim() || /^(?:data:|event:|\[DONE\])/.test(line.trim()));
+      if (rawText && !protocolOnly) return { ...normalizeAIResponse(rawText), responseMetadata: { finishReason: streamed.finishReason, id: streamed.responseId, usage: streamed.usage, contentType, rawLength: streamed.rawResponse.length } };
+      throw emptyResponseError(streamed.finishReason, Boolean(streamed.reasoningContent.trim()), { finishReason: streamed.finishReason, id: streamed.responseId, usage: streamed.usage, contentType });
     }
   }
-  return { ...normalizeAIResponse(content, nativeCalls), reasoningContent };
+  return { ...normalizeAIResponse(streamed.content, nativeCalls), reasoningContent: streamed.reasoningContent, responseMetadata: { finishReason: streamed.finishReason, id: streamed.responseId, usage: streamed.usage, contentType } };
 }
 
 export async function requestAIWithReasoningFallback(settings, messages, signal, onChunk, options = {}) {
   try {
     return await requestAI(settings, messages, signal, onChunk, options);
   } catch (error) {
-    const shouldRetry = error.code === "REASONING_EXHAUSTED"
+    const shouldRetry = ["REASONING_EXHAUSTED", "EMPTY_RESPONSE"].includes(error.code)
       && settings.autoRetryReasoning !== false
-      && (settings.reasoningMode || "auto") !== "off"
       && !options.forceDisableReasoning;
     if (!shouldRetry) throw error;
-    options.onReasoningFallback?.();
+    const currentMax = safeMaxTokens(settings, options);
+    const expandedMax = Math.max(currentMax + 1600, Math.ceil(currentMax * 2));
+    options.onReasoningRecovery?.({ error, maxTokens: expandedMax });
     onChunk?.("");
     try {
-      return await requestAI(settings, messages, signal, onChunk, { ...options, forceDisableReasoning: true });
+      return await requestAI(settings, messages, signal, onChunk, { ...options, maxTokensOverride: expandedMax, streamOverride: false, recoveryAttempt: 1 });
     } catch (retryError) {
-      if (retryError.name !== "AbortError") {
-        retryError.message = `自动降低推理后仍未完成：${retryError.message}`;
-        retryError.autoFallbackAttempted = true;
+      if (retryError.name === "AbortError") throw retryError;
+      options.onReasoningFallback?.();
+      onChunk?.("");
+      try {
+        return await requestAI(settings, messages, signal, onChunk, { ...options, forceDisableReasoning: true, streamOverride: false, disableTools: true, disableJsonMode: true, recoveryAttempt: 2 });
+      } catch (finalError) {
+        if (finalError.name !== "AbortError") {
+          finalError.message = `保留推理并自动补全后仍未完成：${finalError.message}`;
+          finalError.autoFallbackAttempted = true;
+        }
+        throw finalError;
       }
-      throw retryError;
     }
   }
 }

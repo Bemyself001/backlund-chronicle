@@ -223,7 +223,7 @@ export default function ApiSettings({ settings, onSave, onClose, onCheckUpdate }
           {[
             ["mockMode", "Mock 模式", "无需 API 也能完整体验"], ["stream", "流式输出", "逐步呈现模型回复"],
             ["nativeTools", "原生 Tool Calling", "优先接收函数调用提议"], ["jsonMode", "JSON 兼容模式", "使用结构化回退协议"],
-            ["autoRetryReasoning", "推理耗尽自动重试", "正文为空时自动关闭或降低推理，并安全重试一次"],
+            ["autoRetryReasoning", "推理耗尽自动恢复", "先保留推理并增加输出预算；仍失败时才降低推理并使用兼容模式"],
           ].map(([key, label, hint]) => <label key={key} className={styles.switch}><input type="checkbox" checked={draft[key]} onChange={(event) => update(key, event.target.checked)} /><span><strong>{label}</strong><small>{hint}</small></span></label>)}
         </fieldset>
         {status && <p className={styles.status} role="status">{status}</p>}
