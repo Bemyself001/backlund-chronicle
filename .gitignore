@@ -1,6 +1,7 @@
 node_modules
 .pnpm-store
 dist
+.sites-build
 .DS_Store
 *.local
 *.log

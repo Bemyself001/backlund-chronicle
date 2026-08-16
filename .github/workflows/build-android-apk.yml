@@ -6,7 +6,7 @@ on:
     branches: [main]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build-debug-apk:
@@ -47,6 +47,11 @@ jobs:
           chmod +x gradlew
           ./gradlew assembleDebug
 
+      - name: Prepare public APK
+        run: |
+          cp android/app/build/outputs/apk/debug/app-debug.apk backlund-chronicle-debug.apk
+          sha256sum backlund-chronicle-debug.apk > backlund-chronicle-debug.apk.sha256
+
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
@@ -54,3 +59,17 @@ jobs:
           path: android/app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
           retention-days: 14
+
+      - name: Publish public APK release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RELEASE_TAG="apk-${GITHUB_RUN_NUMBER}"
+          gh release create "$RELEASE_TAG" \
+            backlund-chronicle-debug.apk \
+            backlund-chronicle-debug.apk.sha256 \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$GITHUB_SHA" \
+            --title "贝克兰德纪事 APK · Build ${GITHUB_RUN_NUMBER}" \
+            --notes "自动构建的 Android 调试版。下载 APK 后可直接安装；Android 可能提示允许安装未知来源应用。" \
+            --latest
