@@ -1,14 +1,24 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import styles from "./GameScreen.module.css";
 
 const RISK_LABEL = { low: "谨慎", medium: "交涉", high: "高风险" };
+const TURN_PHASES = [
+  ["generating", "生成剧情"],
+  ["validating", "校验状态"],
+  ["finalizing", "确认结果"],
+];
+const PHASE_MESSAGE = {
+  generating: "叙事引擎正在编织当前场景",
+  validating: "本地规则正在校验状态提议",
+  finalizing: "叙事引擎正在确认校验结果",
+};
 
 function StatBar({ label, value, max }) {
   const percent = Math.max(0, Math.min(100, (value / max) * 100));
   return <div className={styles.stat}><div><span>{label}</span><strong>{value}<small>/{max}</small></strong></div><i><b style={{ width: `${percent}%` }} /></i></div>;
 }
 
-function CharacterPanel({ game }) {
+const CharacterPanel = memo(function CharacterPanel({ game }) {
   const { character } = game;
   return <div className={styles.panelContent}>
     <div className={styles.profile}><div className={styles.avatar} aria-hidden="true"><i /><b /></div><div><p>{character.extraordinary === "low" ? character.pathway : "普通人"}</p><h2>{character.name}</h2><span>{character.occupation} · {character.age}岁</span></div></div>
@@ -18,9 +28,9 @@ function CharacterPanel({ game }) {
     <section><h3>人物关系 <small>CONTACTS</small></h3>{game.relationships.map((npc) => <div className={styles.relationship} key={npc.id}><div><strong>{npc.name}</strong><span>{npc.role}</span></div><b>{npc.value >= 0 ? "+" : ""}{npc.value}</b><p>{npc.note}</p></div>)}</section>
     <section><h3>已知地点 <small>{game.discoveredLocations.length}</small></h3><ul className={styles.locationList}>{game.discoveredLocations.map((place) => <li key={place.id} className={place.id === game.location.id ? styles.current : ""}><span>{place.name}</span><small>{place.note}</small></li>)}</ul></section>
   </div>;
-}
+});
 
-function InventoryPanel({ game, onLocalTool }) {
+const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, disabled }) {
   const [tab, setTab] = useState("inventory");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("全部");
@@ -35,24 +45,61 @@ function InventoryPanel({ game, onLocalTool }) {
       <div className={styles.capacity}><span>负重</span><strong>{weight.toFixed(1)} / {game.capacity.maxWeight} kg</strong><i><b style={{ width: `${Math.min(100, weight / game.capacity.maxWeight * 100)}%` }} /></i></div>
       <div className={styles.filters}><input aria-label="搜索物品" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="搜索物品…" /><select aria-label="物品分类" value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((entry) => <option key={entry}>{entry}</option>)}</select></div>
       <div className={styles.itemList}>{items.length === 0 ? <div className={styles.empty}>没有符合条件的物品。</div> : items.map((item) => <button key={item.instanceId} className={`${styles.item} ${item.isNew ? styles.newItem : ""}`} type="button" onClick={() => setSelectedId(item.instanceId)}><span className={styles.itemGlyph}>{item.name.slice(0, 1)}</span><span><strong>{item.name}{item.equipped && <small>已装备</small>}</strong><em>{item.category} · {item.condition}</em></span><b>×{item.quantity}</b></button>)}</div>
-      {selected && <div className={styles.itemDetail}><button type="button" aria-label="关闭物品详情" onClick={() => setSelectedId(null)}>×</button><p>{selected.rarity} · {selected.category}</p><h3>{selected.name}</h3><span>{selected.description}</span><dl><div><dt>重量</dt><dd>{selected.weight} kg</dd></div><div><dt>状态</dt><dd>{selected.condition}</dd></div><div><dt>来源</dt><dd>{selected.source}</dd></div></dl><div className={styles.itemActions}><button type="button" onClick={() => onLocalTool("item.inspect", { instanceId: selected.instanceId }, `检查${selected.name}`)}>检查</button>{selected.tags.includes("消耗品") && <button type="button" onClick={() => onLocalTool("item.use", { instanceId: selected.instanceId }, `主动使用${selected.name}`)}>使用</button>}{selected.tags.includes("装备") && <button type="button" onClick={() => onLocalTool(selected.equipped ? "item.unequip" : "item.equip", { instanceId: selected.instanceId }, `玩家${selected.equipped ? "卸下" : "装备"}${selected.name}`)}>{selected.equipped ? "卸下" : "装备"}</button>}<button className={styles.discard} type="button" onClick={() => { if (window.confirm(`丢弃一件“${selected.name}”？`)) { onLocalTool("inventory.remove", { instanceId: selected.instanceId, quantity: 1 }, `玩家主动丢弃${selected.name}`); setSelectedId(null); } }}>丢弃</button></div></div>}
+      {selected && <div className={styles.itemDetail}><button type="button" aria-label="关闭物品详情" onClick={() => setSelectedId(null)}>×</button><p>{selected.rarity} · {selected.category}</p><h3>{selected.name}</h3><span>{selected.description}</span><dl><div><dt>重量</dt><dd>{selected.weight} kg</dd></div><div><dt>状态</dt><dd>{selected.condition}</dd></div><div><dt>来源</dt><dd>{selected.source}</dd></div></dl><div className={styles.itemActions}><button type="button" disabled={disabled} onClick={() => onLocalTool("item.inspect", { instanceId: selected.instanceId }, `检查${selected.name}`)}>检查</button>{selected.tags.includes("消耗品") && <button type="button" disabled={disabled} onClick={() => onLocalTool("item.use", { instanceId: selected.instanceId }, `主动使用${selected.name}`)}>使用</button>}{selected.tags.includes("装备") && <button type="button" disabled={disabled} onClick={() => onLocalTool(selected.equipped ? "item.unequip" : "item.equip", { instanceId: selected.instanceId }, `玩家${selected.equipped ? "卸下" : "装备"}${selected.name}`)}>{selected.equipped ? "卸下" : "装备"}</button>}<button className={styles.discard} type="button" disabled={disabled} onClick={() => { if (window.confirm(`丢弃一件“${selected.name}”？`)) { onLocalTool("inventory.remove", { instanceId: selected.instanceId, quantity: 1 }, `玩家主动丢弃${selected.name}`); setSelectedId(null); } }}>丢弃</button></div></div>}
     </div>}
     {tab === "clues" && <div className={styles.panelContent}><h3 className={styles.archiveTitle}>已发现线索 <span>{game.clues.length}/3</span></h3>{game.clues.length ? game.clues.map((clue) => <article className={styles.record} key={clue.id}><span>CLUE</span><h4>{clue.title}</h4><p>{clue.detail}</p><small>{clue.discoveredAt}</small></article>) : <div className={styles.empty}>尚未确认任何线索。谨慎调查通常能得到最可靠的记录。</div>}</div>}
     {tab === "quests" && <div className={styles.panelContent}><h3 className={styles.archiveTitle}>案件任务 <span>{game.quests.length}</span></h3>{game.quests.map((quest) => <article className={styles.record} key={quest.id}><span>{quest.status}</span><h4>{quest.title}</h4><p>{quest.summary}</p></article>)}</div>}
     {tab === "log" && <div className={styles.panelContent}><h3 className={styles.archiveTitle}>变更记录 <span>{game.changeLog.length}</span></h3><ol className={styles.log}>{game.changeLog.slice().reverse().map((entry) => <li key={entry.id} className={entry.tone === "danger" ? styles.dangerLog : ""}><span>{String(entry.turn).padStart(2, "0")}</span><p>{entry.text}</p></li>)}</ol></div>}
   </div>;
+}, (previous, next) => previous.game === next.game && previous.disabled === next.disabled);
+
+const StoryHistory = memo(function StoryHistory({ messages }) {
+  return messages.map((message) => message.role === "assistant" ? <article className={styles.narrative} key={message.id}><span className={styles.dropcap}>叙</span>{message.content.split("\n").filter(Boolean).map((paragraph, index) => <p key={`${message.id}-${index}`}>{paragraph}</p>)}</article> : <blockquote className={styles.playerLine} key={message.id}><span>你的行动</span>{message.content}</blockquote>);
+});
+
+function TurnProgress({ phase }) {
+  const currentIndex = TURN_PHASES.findIndex(([id]) => id === phase);
+  return <div className={styles.turnStatus}>
+    <ol aria-label="本轮处理进度">{TURN_PHASES.map(([id, label], index) => <li key={id} data-state={index < currentIndex ? "done" : index === currentIndex ? "current" : "pending"}><span>{index + 1}</span>{label}</li>)}</ol>
+    <p role="status" aria-live="polite">{PHASE_MESSAGE[phase] || PHASE_MESSAGE.generating}<span>···</span></p>
+  </div>;
 }
 
-export default function GameScreen({ game, loading, streamText, error, onAction, onAbort, onRetry, onLocalTool, onOpenApi, onOpenPrompt, onOpenSaves, onHome }) {
+export default function GameScreen({ game, loading, turnPhase, streamText, error, onAction, onAbort, onRetry, onLocalTool, onOpenApi, onOpenPrompt, onOpenSaves, onHome }) {
   const [input, setInput] = useState("");
   const [mobilePanel, setMobilePanel] = useState(null);
+  const [followingLatest, setFollowingLatest] = useState(true);
   const storyRef = useRef(null);
-  const assistantMessages = useMemo(() => game.recentDialogues, [game.recentDialogues]);
+  const followRef = useRef(true);
   useEffect(() => {
     const scroller = storyRef.current;
-    if (scroller) scroller.scrollTo({ top: scroller.scrollHeight, behavior: loading ? "smooth" : "auto" });
+    if (scroller && followRef.current) scroller.scrollTo({ top: scroller.scrollHeight, behavior: "auto" });
   }, [game.turn, loading, streamText]);
-  const submit = () => { const value = input.trim(); if (!value || loading) return; setInput(""); onAction(value); };
+  const handleStoryScroll = () => {
+    const scroller = storyRef.current;
+    if (!scroller) return;
+    const isNearBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 96;
+    followRef.current = isNearBottom;
+    setFollowingLatest(isNearBottom);
+  };
+  const jumpToLatest = () => {
+    const scroller = storyRef.current;
+    if (!scroller) return;
+    followRef.current = true;
+    setFollowingLatest(true);
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    scroller.scrollTo({ top: scroller.scrollHeight, behavior: reducedMotion ? "auto" : "smooth" });
+  };
+  const submit = async () => {
+    const value = input.trim();
+    if (!value || loading) return;
+    const completed = await onAction(value);
+    if (completed) setInput("");
+  };
+  const retry = async () => {
+    const completed = await onRetry();
+    if (completed) setInput("");
+  };
   return <main className={styles.shell} id="main">
     <header className={styles.topbar}>
       <button className={styles.wordmark} type="button" onClick={onHome} aria-label="返回欢迎页"><i>BC</i><span>贝克兰德纪事<small>BACKLUND CHRONICLE</small></span></button>
@@ -63,11 +110,14 @@ export default function GameScreen({ game, loading, streamText, error, onAction,
     <div className={styles.workspace}>
       <aside className={`${styles.left} ${mobilePanel === "character" ? styles.drawerOpen : ""}`} aria-label="角色状态"><div className={styles.drawerHeader}><span>角色状态</span><button type="button" onClick={() => setMobilePanel(null)}>关闭</button></div><CharacterPanel game={game} /></aside>
       <section className={styles.story} aria-label="剧情与行动">
-        <div className={styles.storyScroll} ref={storyRef}>
+        <div className={styles.storyViewport}>
+        <div className={styles.storyScroll} ref={storyRef} onScroll={handleStoryScroll}>
           <div className={styles.sceneMeta}><span>第 {game.turn + 1} 幕</span><i /><strong>{game.location.name}</strong></div>
-          {assistantMessages.map((message) => message.role === "assistant" ? <article className={styles.narrative} key={message.id}><span className={styles.dropcap}>叙</span>{message.content.split("\n").filter(Boolean).map((paragraph, index) => <p key={`${message.id}-${index}`}>{paragraph}</p>)}</article> : <blockquote className={styles.playerLine} key={message.id}><span>你的行动</span>{message.content}</blockquote>)}
-          {loading && <article className={`${styles.narrative} ${styles.streaming}`} aria-live="polite"><span className={styles.dropcap}>雾</span>{streamText ? streamText.split("\n").filter(Boolean).map((paragraph, index) => <p key={index}>{paragraph}</p>) : <p className={styles.loadingLine}>叙事引擎正在梳理因果<span>···</span></p>}</article>}
-          {error && <div className={styles.error} role="alert"><strong>本轮未能完成</strong><span>{error}</span><button type="button" onClick={onRetry}>重试本轮</button></div>}
+          <StoryHistory messages={game.recentDialogues} />
+          {loading && <article className={`${styles.narrative} ${styles.streaming}`} aria-busy="true"><span className={styles.dropcap}>雾</span><TurnProgress phase={turnPhase} />{streamText && <div className={styles.streamCopy}>{streamText.split("\n").filter(Boolean).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>}</article>}
+          {error && <div className={styles.error} role="alert"><strong>本轮未能完成</strong><span>{error}</span><button type="button" onClick={retry}>重试本轮</button></div>}
+        </div>
+        {!followingLatest && <button className={styles.jumpLatest} type="button" onClick={jumpToLatest}>回到最新</button>}
         </div>
         <div className={styles.interaction}>
           <p className={styles.choiceLabel}>下一步行动 <span>CHOOSE OR WRITE YOUR OWN</span></p>
@@ -75,7 +125,7 @@ export default function GameScreen({ game, loading, streamText, error, onAction,
           <div className={styles.composer}><textarea aria-label="自由输入行动" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }} placeholder="描述你的行动、问题或对话…" disabled={loading} /><div><span>Enter 发送 · Shift+Enter 换行</span>{loading ? <button className={styles.abort} type="button" onClick={onAbort}>中止生成</button> : <button className="button button--primary" type="button" onClick={submit} disabled={!input.trim()}>提交行动</button>}</div></div>
         </div>
       </section>
-      <aside className={`${styles.right} ${mobilePanel === "inventory" ? styles.drawerOpen : ""}`} aria-label="物品与档案"><div className={styles.drawerHeader}><span>物品与档案</span><button type="button" onClick={() => setMobilePanel(null)}>关闭</button></div><InventoryPanel game={game} onLocalTool={onLocalTool} /></aside>
+      <aside className={`${styles.right} ${mobilePanel === "inventory" ? styles.drawerOpen : ""}`} aria-label="物品与档案"><div className={styles.drawerHeader}><span>物品与档案</span><button type="button" onClick={() => setMobilePanel(null)}>关闭</button></div><InventoryPanel game={game} onLocalTool={onLocalTool} disabled={loading} /></aside>
       {mobilePanel === "menu" && <div className={styles.settingsMenu} role="dialog" aria-label="游戏设置菜单"><div><span>游戏设置</span><button type="button" onClick={() => setMobilePanel(null)}>关闭</button></div><button type="button" onClick={() => { setMobilePanel(null); onOpenPrompt(); }}>查看与编辑提示词</button><button type="button" onClick={() => { setMobilePanel(null); onOpenApi(); }}>自定义 API</button><button type="button" onClick={() => { setMobilePanel(null); onOpenSaves(); }}>存档柜</button></div>}
       {mobilePanel && <button className={styles.scrim} type="button" aria-label="关闭抽屉" onClick={() => setMobilePanel(null)} />}
     </div>

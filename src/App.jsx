@@ -7,19 +7,13 @@ import PromptEditor from "./components/PromptEditor.jsx";
 import SaveManager from "./components/SaveManager.jsx";
 import { createInitialGame, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from "./data/defaults.js";
 import { executeToolCalls } from "./engine/tools.js";
+import { resolveTurnProgress } from "./engine/turn.js";
 import { buildToolResultMessages, loadApiSettings, requestAI, saveApiSettings } from "./services/api.js";
 import { buildContext, updateMemory } from "./services/memory.js";
 import { mockResponse } from "./services/mock.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
+import { extractNarrativePreview } from "./services/streamPreview.js";
 import { makeId } from "./utils/id.js";
-
-function advanceTime(value, minutes = 12) {
-  const match = value.match(/(\d{1,2}):(\d{2})/);
-  if (!match) return value;
-  const total = Number(match[1]) * 60 + Number(match[2]) + minutes;
-  const formatted = `${String(Math.floor(total / 60) % 24).padStart(2, "0")}:${String(total % 60).padStart(2, "0")}`;
-  return value.replace(match[0], formatted);
-}
 
 export default function App() {
   const [screen, setScreen] = useState("welcome");
@@ -36,11 +30,29 @@ export default function App() {
   const [saves, setSaves] = useState(listSaves);
   const [loading, setLoading] = useState(false);
   const [streamText, setStreamText] = useState("");
+  const [turnPhase, setTurnPhase] = useState("idle");
   const [error, setError] = useState("");
   const controllerRef = useRef(null);
   const busyRef = useRef(false);
   const lastActionRef = useRef("");
+  const streamTimerRef = useRef(null);
+  const pendingStreamRef = useRef("");
   const refreshSaves = () => setSaves(listSaves());
+
+  const resetStreamPreview = () => {
+    if (streamTimerRef.current) clearTimeout(streamTimerRef.current);
+    streamTimerRef.current = null;
+    pendingStreamRef.current = "";
+    setStreamText("");
+  };
+  const queueStreamPreview = (rawContent) => {
+    pendingStreamRef.current = extractNarrativePreview(rawContent);
+    if (streamTimerRef.current) return;
+    streamTimerRef.current = setTimeout(() => {
+      setStreamText(pendingStreamRef.current);
+      streamTimerRef.current = null;
+    }, 40);
+  };
 
   const commitGame = (next) => {
     const saved = saveGame(next);
@@ -54,29 +66,36 @@ export default function App() {
   const handlePromptSave = (next) => { localStorage.setItem("mist-system-prompt", next); setPrompt(next); };
 
   const runTurn = async (action) => {
-    if (!game || busyRef.current || !action.trim()) return;
-    busyRef.current = true; lastActionRef.current = action; setLoading(true); setError(""); setStreamText("");
+    if (!game || busyRef.current || !action.trim()) return false;
+    const selectedRisk = game.choices.find((choice) => choice.label === action)?.risk;
+    busyRef.current = true; lastActionRef.current = action; setLoading(true); setTurnPhase("generating"); setError(""); resetStreamPreview();
     const controller = new AbortController(); controllerRef.current = controller;
     try {
       const messages = buildContext(game, action, prompt);
-      let response = settings.mockMode ? await mockResponse(game, action, controller.signal, setStreamText) : await requestAI(settings, messages, controller.signal, setStreamText);
-      const execution = executeToolCalls(game, response.toolCalls);
+      let response = settings.mockMode ? await mockResponse(game, action, controller.signal, queueStreamPreview) : await requestAI(settings, messages, controller.signal, queueStreamPreview);
+      const proposedToolCalls = response.toolCalls;
+      setTurnPhase("validating");
+      const execution = executeToolCalls(game, proposedToolCalls);
       if (!settings.mockMode && response.requiresToolFollowUp) {
-        setStreamText("");
-        const followUpMessages = [...messages, ...buildToolResultMessages(response.toolCalls, execution.results)];
-        response = await requestAI(settings, followUpMessages, controller.signal, setStreamText, { disableTools: true });
+        resetStreamPreview();
+        setTurnPhase("finalizing");
+        const followUpMessages = [...messages, ...buildToolResultMessages(proposedToolCalls, execution.results)];
+        response = await requestAI(settings, followUpMessages, controller.signal, queueStreamPreview, { disableTools: true });
       }
       const memory = updateMemory(execution.game, action, response.narrative, response.memoryNotes);
+      const progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results);
       const next = {
-        ...execution.game, ...memory, turn: game.turn + 1, worldTime: advanceTime(game.worldTime), choices: response.choices,
+        ...execution.game, ...memory, turn: game.turn + 1, worldTime: progress.worldTime, choices: response.choices,
         worldEvents: [...game.worldEvents, ...response.worldEvents.map((text) => ({ id: makeId("event"), turn: game.turn + 1, text }))].slice(-40),
         changeLog: [...game.changeLog, ...execution.logs].slice(-100),
-        hiddenDanger: { ...game.hiddenDanger, stage: Math.min(5, game.hiddenDanger.stage + (response.choices.some((choice) => choice.risk === "high") ? 1 : 0)) },
+        hiddenDanger: progress.hiddenDanger,
       };
-      commitGame(next); setStreamText("");
+      resetStreamPreview(); commitGame(next);
+      return true;
     } catch (err) {
       setError(err.name === "AbortError" ? "生成已由你中止；游戏状态没有改变。" : err.message || "未知错误，请重试本轮。");
-    } finally { setLoading(false); busyRef.current = false; controllerRef.current = null; }
+      return false;
+    } finally { resetStreamPreview(); setTurnPhase("idle"); setLoading(false); busyRef.current = false; controllerRef.current = null; }
   };
 
   const runLocalTool = (name, args, reason) => {
@@ -92,7 +111,7 @@ export default function App() {
     <a className="skip-link" href="#main">跳到主要内容</a>
     {screen === "welcome" && <Welcome hasSave={saves.some((slot) => slot.slotId === "autosave")} apiSettings={settings} onNew={() => setScreen("create")} onContinue={handleContinue} onImport={handleImport} onApi={() => setModal("api")} />}
     {screen === "create" && <CharacterCreation onBack={() => setScreen("welcome")} onCreate={handleCreate} />}
-    {screen === "game" && game && <GameScreen game={game} loading={loading} streamText={streamText} error={error} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={() => runTurn(lastActionRef.current)} onLocalTool={runLocalTool} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => setScreen("welcome")} />}
+    {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={() => runTurn(lastActionRef.current)} onLocalTool={runLocalTool} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => setScreen("welcome")} />}
     {modal === "api" && <ApiSettings settings={settings} onSave={handleSettingsSave} onClose={() => setModal(null)} />}
     {modal === "prompt" && <PromptEditor value={prompt} onSave={handlePromptSave} onClose={() => setModal(null)} />}
     {modal === "saves" && game && <SaveManager saves={saves} game={game} onSave={saveSlot} onLoad={loadSlot} onDelete={removeSlot} onExport={exportSave} onImport={handleImport} onClose={() => setModal(null)} />}
