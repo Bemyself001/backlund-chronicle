@@ -23,6 +23,19 @@ test("empty tool names are rejected as incomplete calls instead of unknown empty
   assert.doesNotMatch(execution.results[0].reason, /未知工具/);
 });
 
+test("relationship updates repair a numeric alias and uniquely resolve an NPC", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "关系工具测试员" });
+  game.relationships = [{ id: "npc-porter", name: "阿尔文", role: "搬运工", value: 0, note: "" }];
+  const normalized = normalizeToolCall({ name: "relationship.update", args: { name: "阿尔文", change: "关系提升 3" }, reason: "主动帮助对方" }, game);
+  assert.equal(normalized.args.npcId, "npc-porter");
+  assert.equal(normalized.args.delta, 3);
+  assert.match(normalized.repairNote, /delta|匹配 NPC/);
+
+  const execution = executeToolCalls(game, [{ id: "relationship-repair", name: "relationship.update", args: { name: "阿尔文", change: "关系提升 3" }, reason: "主动帮助对方" }]);
+  assert.equal(execution.results[0].ok, true);
+  assert.equal(execution.game.relationships[0].value, 3);
+});
+
 test("repaired clue proposals execute, while incomplete clues remain rejected", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "工具测试员" });
   const repaired = executeToolCalls(game, [{ id: "clue-repair", name: "clue.add", args: { title: "被划去的站台", detail: "编号被墨水反复涂抹。" }, reason: "检查车站公告" }]);

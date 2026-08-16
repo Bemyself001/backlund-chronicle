@@ -78,6 +78,38 @@ function resolveInventoryReference(game, args = {}) {
   return { item: null, resolutionError: `背包中找不到「${candidates[0]}」` };
 }
 
+function relationshipCandidates(args = {}) {
+  const nested = [args.npc, args.relationship, args.target].filter((value) => value && typeof value === "object");
+  return [
+    args.npcId,
+    args.npcName,
+    args.name,
+    ...nested.flatMap((value) => [value.id, value.npcId, value.name]),
+  ].map((value) => String(value || "").trim()).filter(Boolean);
+}
+
+function parseRelationshipDelta(value) {
+  if (typeof value === "number" && Number.isFinite(value)) return value;
+  if (typeof value !== "string") return null;
+  const text = value.trim();
+  if (!text) return null;
+  const number = text.match(/[+-]?\d+(?:\.\d+)?/);
+  if (!number) return null;
+  const amount = Math.abs(Number(number[0]));
+  if (!Number.isFinite(amount)) return null;
+  return /下降|减少|降低|恶化|敌意|负面|不满/.test(text) ? -amount : amount;
+}
+
+function resolveRelationshipReference(game, args = {}) {
+  const candidates = relationshipCandidates(args);
+  if (!candidates.length) return { npc: null, resolutionError: "缺少 NPC 标识：请提供 npcId，或唯一的 npcName/name" };
+  const matches = (game.relationships || []).filter((npc) => candidates.some((candidate) => [npc.id, npc.name].map(String).includes(candidate)));
+  const unique = [...new Map(matches.map((npc) => [npc.id, npc])).values()];
+  if (unique.length === 1) return { npc: unique[0] };
+  if (unique.length > 1) return { npc: null, resolutionError: `NPC 标识「${candidates[0]}」对应多个对象，请改用 npcId` };
+  return { npc: null, resolutionError: `找不到 NPC「${candidates[0]}」` };
+}
+
 function repairToolArgs(name, rawArgs = {}, game = null) {
   const args = { ...rawArgs };
   let repairNote = "";
@@ -154,6 +186,29 @@ function repairToolArgs(name, rawArgs = {}, game = null) {
   if (name === "occult.contact" && game?.occult?.entryAvailable && !args.entryId && game.occult.currentEntry?.id) {
     args.entryId = game.occult.currentEntry.id;
     repairNote = appendRepairNote(repairNote, "已匹配当前非凡入口");
+  }
+  if (name === "relationship.update") {
+    const nestedRelationship = args.relationship && typeof args.relationship === "object" ? args.relationship : null;
+    if (args.delta === undefined) {
+      const deltaSource = args.change ?? args.relationshipDelta ?? args.adjustment ?? args.amount ?? nestedRelationship?.delta ?? nestedRelationship?.change;
+      const parsedDelta = parseRelationshipDelta(deltaSource);
+      if (parsedDelta !== null) {
+        args.delta = parsedDelta;
+        repairNote = appendRepairNote(repairNote, "已将关系变化整理为 delta");
+      }
+    } else {
+      const parsedDelta = parseRelationshipDelta(args.delta);
+      if (parsedDelta !== null && parsedDelta !== args.delta) args.delta = parsedDelta;
+    }
+    if (!args.npcId && game) {
+      const resolved = resolveRelationshipReference(game, args);
+      if (resolved.npc) {
+        args.npcId = resolved.npc.id;
+        repairNote = appendRepairNote(repairNote, `已根据「${resolved.npc.name}」匹配 NPC`);
+      } else {
+        resolutionError = resolved.resolutionError;
+      }
+    }
   }
   return { args, repairNote, resolutionError };
 }

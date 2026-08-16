@@ -228,6 +228,17 @@ const TOOL_PARAMETER_SCHEMAS = {
       reason: { type: "string", description: "本轮行动为何足以揭示该信息" },
     },
   },
+  "relationship.update": {
+    type: "object",
+    additionalProperties: false,
+    required: ["npcId", "delta", "reason"],
+    properties: {
+      npcId: { type: "string", description: "当前上下文中已知 NPC 的精确 ID" },
+      delta: { type: "number", minimum: -10, maximum: 10, description: "本轮关系变化，范围为 -10 到 10" },
+      note: { type: "string", description: "可选的关系变化说明" },
+      reason: { type: "string", description: "与本轮玩家行动对应的关系变化理由" },
+    },
+  },
   "clue.add": {
     type: "object",
     additionalProperties: false,
