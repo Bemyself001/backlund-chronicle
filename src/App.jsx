@@ -98,7 +98,7 @@ export default function App() {
       });
       let response = settings.mockMode ? await mockResponse(game, action, controller.signal, queueStreamPreview) : await requestModel(messages);
       response = resolveChoices(response, game, action);
-      const proposedToolCalls = normalizeToolCalls(ensureMapMoveToolCall(response.toolCalls, options.mapDestination, game.turn + 1));
+      const proposedToolCalls = normalizeToolCalls(ensureMapMoveToolCall(response.toolCalls, options.mapDestination, game.turn + 1), game);
       const toolReasoningContent = response.reasoningContent || "";
       setTurnPhase("validating");
       const execution = executeToolCalls(game, proposedToolCalls);

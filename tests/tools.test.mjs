@@ -27,3 +27,29 @@ test("repaired clue proposals execute, while incomplete clues remain rejected", 
   assert.equal(rejected.game.clues.length, 0);
   assert.match(buildRejectedToolNarrative("检查现场", rejected.results), /缺少|线索/);
 });
+
+test("item tools repair flat item proposals and resolve unique inventory references", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "物品工具测试员" });
+  const coat = game.inventory.find((item) => item.name === "旧呢外套");
+  const inspected = normalizeToolCall({ name: "item.inspect", args: { name: coat.name }, reason: "查看随身物品" }, game);
+  assert.equal(inspected.args.instanceId, coat.instanceId);
+  assert.match(inspected.repairNote, /匹配背包实例/);
+
+  const removed = executeToolCalls(game, [{ id: "remove-by-name", name: "inventory.remove", args: { name: coat.name }, reason: "丢弃破旧外套" }]);
+  assert.equal(removed.results[0].ok, true);
+  assert.equal(removed.game.inventory.some((item) => item.instanceId === coat.instanceId), false);
+
+  const added = executeToolCalls(game, [{ id: "add-flat-item", name: "inventory.add", args: { name: "风化的铜哨", description: "从旧木柜夹层取出。" }, reason: "发现隐藏物品" }]);
+  assert.equal(added.results[0].ok, true);
+  assert.equal(added.game.inventory.some((item) => item.name === "风化的铜哨" && item.itemId.startsWith("item-")), true);
+});
+
+test("ambiguous item names are rejected instead of changing the wrong instance", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "歧义测试员" });
+  const duplicate = { ...game.inventory[0], instanceId: "item-duplicate-coat" };
+  game.inventory.push(duplicate);
+  const execution = executeToolCalls(game, [{ id: "ambiguous-inspect", name: "item.inspect", args: { name: duplicate.name }, reason: "检查外套" }]);
+  assert.equal(execution.results[0].ok, false);
+  assert.match(execution.results[0].reason, /多个实例|instanceId/);
+  assert.equal(execution.game.inventory.length, game.inventory.length);
+});

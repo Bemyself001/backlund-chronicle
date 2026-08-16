@@ -114,6 +114,101 @@ export async function testApiConnection(settings, signal) {
 }
 
 const TOOL_PARAMETER_SCHEMAS = {
+  "inventory.add": {
+    type: "object",
+    additionalProperties: false,
+    required: ["item", "reason"],
+    properties: {
+      item: {
+        type: "object",
+        additionalProperties: false,
+        required: ["itemId", "name", "description"],
+        properties: {
+          itemId: { type: "string", description: "稳定且可去重的物品 ID" },
+          name: { type: "string", description: "物品名称" },
+          description: { type: "string", description: "物品描述" },
+          category: { type: "string" },
+          quantity: { type: "integer", minimum: 1, maximum: 10 },
+          weight: { type: "number", minimum: 0 },
+          rarity: { type: "string" },
+          condition: { type: "string" },
+          tags: { type: "array", items: { type: "string" } },
+          properties: { type: "object" },
+          source: { type: "string" },
+        },
+      },
+      reason: { type: "string", description: "与本轮玩家行动对应的获得理由" },
+    },
+  },
+  "inventory.remove": {
+    type: "object",
+    additionalProperties: false,
+    required: ["quantity", "reason"],
+    properties: {
+      instanceId: { type: "string", description: "背包中的精确物品实例 ID；优先使用它" },
+      itemId: { type: "string", description: "仅在能唯一匹配时使用" },
+      name: { type: "string", description: "仅在能唯一匹配时使用" },
+      quantity: { type: "integer", minimum: 1 },
+      reason: { type: "string" },
+    },
+  },
+  "inventory.update": {
+    type: "object",
+    additionalProperties: false,
+    required: ["patch", "reason"],
+    properties: {
+      instanceId: { type: "string" },
+      itemId: { type: "string" },
+      name: { type: "string" },
+      patch: { type: "object" },
+      reason: { type: "string" },
+    },
+  },
+  "item.inspect": {
+    type: "object",
+    additionalProperties: false,
+    required: ["reason"],
+    properties: {
+      instanceId: { type: "string", description: "必须复制当前背包中的 instanceId" },
+      itemId: { type: "string" },
+      name: { type: "string" },
+      reveal: { type: "boolean" },
+      reason: { type: "string" },
+    },
+  },
+  "item.use": {
+    type: "object",
+    additionalProperties: false,
+    required: ["reason"],
+    properties: {
+      instanceId: { type: "string", description: "必须复制当前背包中的 instanceId" },
+      itemId: { type: "string" },
+      name: { type: "string" },
+      reason: { type: "string" },
+    },
+  },
+  "item.equip": {
+    type: "object",
+    additionalProperties: false,
+    required: ["reason"],
+    properties: {
+      instanceId: { type: "string", description: "必须复制当前背包中的 instanceId" },
+      itemId: { type: "string" },
+      name: { type: "string" },
+      reason: { type: "string" },
+    },
+  },
+  "item.unequip": {
+    type: "object",
+    additionalProperties: false,
+    required: ["reason"],
+    properties: {
+      instanceId: { type: "string", description: "必须复制当前背包中的 instanceId" },
+      itemId: { type: "string" },
+      name: { type: "string" },
+      reason: { type: "string" },
+    },
+  },
   "clue.add": {
     type: "object",
     additionalProperties: false,

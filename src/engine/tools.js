@@ -46,9 +46,40 @@ function stableId(text) {
   return `clue-${(hash >>> 0).toString(36)}`;
 }
 
-function repairToolArgs(name, rawArgs = {}) {
+function stableItemId(text) {
+  return stableId(text).replace(/^clue-/, "item-");
+}
+
+function appendRepairNote(current, next) {
+  return [current, next].filter(Boolean).join("；");
+}
+
+function inventoryCandidates(args = {}) {
+  const nested = [args.item, args.target].filter((value) => value && typeof value === "object");
+  return [
+    args.instanceId,
+    args.itemId,
+    args.itemName,
+    args.name,
+    ...nested.flatMap((value) => [value.instanceId, value.itemId, value.name]),
+  ].map((value) => String(value || "").trim()).filter(Boolean);
+}
+
+function resolveInventoryReference(game, args = {}) {
+  if (!game?.inventory?.length) return { item: null, resolutionError: "当前背包为空" };
+  const candidates = inventoryCandidates(args);
+  if (!candidates.length) return { item: null, resolutionError: "缺少物品标识：请提供 instanceId，或唯一的 itemId/name" };
+  const matches = game.inventory.filter((item) => candidates.some((candidate) => [item.instanceId, item.itemId, item.name].map(String).includes(candidate)));
+  const unique = [...new Map(matches.map((item) => [item.instanceId, item])).values()];
+  if (unique.length === 1) return { item: unique[0] };
+  if (unique.length > 1) return { item: null, resolutionError: `物品标识「${candidates[0]}」对应多个实例，请改用 instanceId` };
+  return { item: null, resolutionError: `背包中找不到「${candidates[0]}」` };
+}
+
+function repairToolArgs(name, rawArgs = {}, game = null) {
   const args = { ...rawArgs };
   let repairNote = "";
+  let resolutionError = "";
   if (name === "clue.add") {
     if (!args.clue && (args.id || args.title || args.detail)) {
       args.clue = { id: args.id, title: args.title, detail: args.detail };
@@ -59,13 +90,69 @@ function repairToolArgs(name, rawArgs = {}) {
     }
     if (args.clue?.title && !args.clue.id) {
       args.clue = { ...args.clue, id: stableId(args.clue.title) };
-      repairNote = `${repairNote}${repairNote ? "；" : ""}已根据线索标题生成 id`;
+      repairNote = appendRepairNote(repairNote, "已根据线索标题生成 id");
     }
   }
-  return { args, repairNote };
+  if (name === "inventory.add") {
+    if (!args.item && (args.itemId || args.name || args.description || args.detail)) {
+      args.item = {
+        itemId: args.itemId,
+        name: args.name,
+        description: args.description || args.detail,
+        category: args.category,
+        quantity: args.quantity,
+        weight: args.weight,
+        rarity: args.rarity,
+        condition: args.condition,
+        tags: args.tags,
+        properties: args.properties,
+        source: args.source,
+      };
+      ["itemId", "name", "description", "detail", "category", "quantity", "weight", "rarity", "condition", "tags", "properties", "source"].forEach((key) => delete args[key]);
+      repairNote = appendRepairNote(repairNote, "已将物品字段整理到 item 对象");
+    }
+    if (typeof args.item === "string" && args.item.trim()) {
+      args.item = { name: args.item.trim() };
+      repairNote = appendRepairNote(repairNote, "已将物品名称整理为结构化对象");
+    }
+    if (args.item && typeof args.item === "object") {
+      const item = { ...args.item };
+      if (!item.itemId && item.name) {
+        item.itemId = stableItemId(item.name);
+        repairNote = appendRepairNote(repairNote, "已根据物品名称生成 itemId");
+      }
+      if (!item.description && item.discoveredInfo) item.description = item.discoveredInfo;
+      if (!item.description && item.name) {
+        item.description = `本轮行动中获得的${item.name}`;
+        repairNote = appendRepairNote(repairNote, "已补充物品的最小描述");
+      }
+      args.item = item;
+    }
+  }
+  if (["inventory.remove", "inventory.update", "item.inspect", "item.use", "item.equip", "item.unequip"].includes(name)) {
+    const nestedItem = args.item && typeof args.item === "object" ? args.item : null;
+    if (!args.instanceId && nestedItem?.instanceId) {
+      args.instanceId = nestedItem.instanceId;
+      repairNote = appendRepairNote(repairNote, "已从物品对象读取 instanceId");
+    }
+    if (!args.instanceId && game) {
+      const resolved = resolveInventoryReference(game, args);
+      if (resolved.item) {
+        args.instanceId = resolved.item.instanceId;
+        repairNote = appendRepairNote(repairNote, `已根据「${resolved.item.name}」匹配背包实例`);
+      } else {
+        resolutionError = resolved.resolutionError;
+      }
+    }
+    if (name === "inventory.remove" && args.quantity === undefined && args.instanceId) {
+      args.quantity = 1;
+      repairNote = appendRepairNote(repairNote, "未指定数量，按 1 件处理");
+    }
+  }
+  return { args, repairNote, resolutionError };
 }
 
-export function normalizeToolCall(call = {}) {
+export function normalizeToolCall(call = {}, game = null) {
   let args = call.args;
   if (!args && typeof call.arguments === "string") {
     try { args = JSON.parse(call.arguments); } catch { args = {}; }
@@ -78,17 +165,18 @@ export function normalizeToolCall(call = {}) {
   const rawArgs = args && typeof args === "object" ? { ...args } : {};
   const reason = call.reason || rawArgs.reason || `AI 提议执行 ${name || "未知工具"}`;
   delete rawArgs.reason;
-  const repaired = repairToolArgs(name, rawArgs);
-  return { ...call, name, args: repaired.args, reason: String(reason).trim() || `AI 提议执行 ${name}`, repairNote: repaired.repairNote };
+  const repaired = repairToolArgs(name, rawArgs, game);
+  return { ...call, name, args: repaired.args, reason: String(reason).trim() || `AI 提议执行 ${name}`, repairNote: repaired.repairNote, resolutionError: repaired.resolutionError };
 }
 
-export function normalizeToolCalls(calls = []) {
-  return (Array.isArray(calls) ? calls : []).map((call) => normalizeToolCall(call));
+export function normalizeToolCalls(calls = [], game = null) {
+  return (Array.isArray(calls) ? calls : []).map((call) => normalizeToolCall(call, game));
 }
 
 function validateCall(game, call) {
   const schema = TOOL_SCHEMAS[call.name];
   if (!schema) return `未知工具「${call.name}」`;
+  if (call.resolutionError) return call.resolutionError;
   if (!call.args || typeof call.args !== "object") return "参数必须是对象";
   const missing = schema.required.filter((key) => call.args[key] === undefined);
   if (missing.length) return `缺少参数：${missing.join("、")}`;
@@ -263,7 +351,7 @@ export function executeToolCalls(currentGame, calls = []) {
   const game = structuredClone(currentGame);
   const processed = new Set(game.processedToolCalls || []);
   const results = [];
-  for (const call of normalizeToolCalls(calls).slice(0, 12)) {
+  for (const call of normalizeToolCalls(calls, game).slice(0, 12)) {
     const callId = call.id || signature(game.turn + 1, call);
     if (processed.has(callId)) { results.push(fail(call.name, "重复工具调用已忽略")); continue; }
     const validationError = validateCall(game, call);
