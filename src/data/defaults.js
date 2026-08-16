@@ -1,7 +1,7 @@
 import { makeId } from "../utils/id.js";
 
 export const SAVE_VERSION = 2;
-export const AI_SETTINGS_VERSION = "1.2";
+export const AI_SETTINGS_VERSION = "1.3";
 
 export const DEFAULT_SYSTEM_PROMPT = `你是《贝克兰德纪事》的叙事者与世界模拟器。故事发生在鲁恩王国首都贝克兰德，以原创街巷、人物、案件与剧情为中心；原作主线和重要人物仅作为遥远背景，不得取代玩家成为故事中心。
 
@@ -10,10 +10,12 @@ export const DEFAULT_SYSTEM_PROMPT = `你是《贝克兰德纪事》的叙事者
 2. 不替玩家决定思想、情绪或关键行动；只描述玩家可感知的世界反馈。
 3. NPC 只能依据其身份、经历、观察与被告知的内容行动，不得全知。
 4. 保持悬疑、因果与资源约束；不随意赠送强力物品、能力或无代价解决危险。
-5. 每轮给出三个真正不同的行动选项：谨慎调查、社交交涉、高风险行动，同时允许自由输入。
-6. 所有状态变化必须作为工具调用提议。不要在正文中伪造工具已经成功执行；等待本地引擎验证后再在后续叙事中确认。
-7. 优先使用原生 tool calling；若使用 JSON 协议，返回 narrative、choices、toolCalls、memoryNotes、worldEvents。
-8. narrative 使用克制、可读的中文，每轮约 250—600 字，不复述原著段落，不让原作角色抢占玩家中心位置。`;
+5. 这是开放世界沙盒。玩家可以无视、拒绝或离开任何案件与剧情钩子；不得用巧合、NPC 催促或突发灾难强迫玩家回到预设主线。未被玩家明确接受的委托不得添加为进行中任务。
+6. 尊重地点连续性和旅行时间。玩家可在贝克兰德各区寻找工作、居所、人脉、知识与个人目标，世界事件会继续发展，但不应围绕玩家一人运转。
+7. 每轮给出三个真正不同的行动选项：谨慎调查、社交交涉、高风险行动，同时允许自由输入；选项应包含当前场景的多种可能，而非三个措辞不同的同一目标。
+8. 所有状态变化必须作为工具调用提议。不要在正文中伪造工具已经成功执行；等待本地引擎验证后再在后续叙事中确认。
+9. 优先使用原生 tool calling；若使用 JSON 协议，返回 narrative、choices、toolCalls、memoryNotes、worldEvents。
+10. narrative 使用克制、可读的中文，每轮约 250—600 字，不复述原著段落，不让原作角色抢占玩家中心位置。`;
 
 export function migrateSystemPrompt(prompt = "") {
   const legacyIntro = "你是《雾中纪事》的叙事者与世界模拟器。故事运行在一个受《诡秘之主》启发、但城市、人物、案件与主线均为原创的蒸汽时代神秘世界。";
@@ -129,9 +131,9 @@ export function createInitialGame(character) {
       portraitSeed: Math.floor(Math.random() * 4),
       stats: { health: 10, maxHealth: 10, sanity: 9, maxSanity: 10, spirituality: character.extraordinary === "low" ? 7 : 4, maxSpirituality: character.extraordinary === "low" ? 8 : 5 },
     },
-    location: { id: "soot-lamp", name: "桥区·雾鸦旅店", district: "贝克兰德桥区" },
-    worldTime: "1349年 10月17日 · 周二 · 21:40",
-    chapter: { number: 1, title: "没有寄件人的黑函" },
+    location: { id: "east-station", name: "东区·贝克兰德火车站", district: "贝克兰德东区" },
+    worldTime: "1349年 10月17日 · 周二 · 18:20",
+    chapter: { number: 1, title: "雾都来客" },
     inventory: [
       item("worn-coat", "旧呢外套", "服装", "内衬缝有两个不易察觉的暗袋。", 1, 1.8, "普通", ["装备"]),
       item("brass-compass", "黄铜罗盘", "工具", "指针偶尔会避开正北方，原因未知。", 1, 0.3, "少见", ["可检查"]),
@@ -142,29 +144,30 @@ export function createInitialGame(character) {
     capacity: { maxWeight: 12 },
     equipment: {},
     statusEffects: [{ id: "rain-chill", name: "雨夜寒意", kind: "neutral", description: "手指略显僵硬，离开雨水后会逐渐恢复。" }],
-    quests: [{ id: "missing-clerk", title: "寻找失踪的夜班文员", status: "进行中", summary: "查明贝克兰德市政档案分馆文员埃利奥特·芬失踪的原因。", hidden: false }],
+    quests: [],
     clues: [],
     availableClues: [
-      { id: "black-wax", title: "黑色封蜡", detail: "封蜡里掺着细小的蓝灰色骨粉。" },
-      { id: "wrong-bell", title: "错误的钟声", detail: "旧钟塔在停用多年后，于每晚十一点零七分响一次。" },
-      { id: "ledger-gap", title: "被裁去的登记页", detail: "档案馆访客簿缺少与失踪当日对应的一页。" },
+      { id: "crossed-platform", title: "被划去的站台", detail: "旧时刻表上有一行被墨水反复涂抹，仍能辨出“十一点零七分”。" },
+      { id: "unclaimed-case", title: "无人认领的黑色皮箱", detail: "行李牌上的姓名与三日前报纸失踪启事中的文员相同。" },
+      { id: "duplicate-tag", title: "重复的行李牌", detail: "两件来自不同列车的行李使用了完全相同的黄铜编号牌。" },
     ],
-    relationships: [{ id: "mara", name: "玛拉·维恩", role: "桥区雾鸦旅店老板", value: 12, note: "谨慎地把你视作能办事的人。" }],
+    relationships: [],
     discoveredLocations: [
-      { id: "soot-lamp", name: "桥区·雾鸦旅店", note: "调查起点；位于桥区南缘，二楼有一间长期上锁的客房。" },
-      { id: "archive", name: "贝克兰德市政档案分馆", note: "失踪者在桥区的工作地点，夜间封闭。" },
-      { id: "clock-yard", name: "东区·旧钟街废车场", note: "毗邻一座停摆钟塔，巡夜人很少靠近。" },
+      { id: "east-station", name: "东区·贝克兰德火车站", note: "通往雾都各区的交通节点；公告栏上贴着招工、租房与失踪启事。" },
+      { id: "iron-gate", name: "东区·铁门街", note: "廉价旅店、工棚、诊所与小酒馆密集，适合寻找住处和零工。" },
+      { id: "soot-lamp", name: "桥区·雾鸦旅店", note: "一间价格尚可的旅店，也接受替客人打听消息的委托。" },
+      { id: "queen-library", name: "皇后区·公共图书馆", note: "白天对公众开放，可查阅报纸、地图与部分城市档案。" },
     ],
-    worldEvents: [{ id: makeId("event"), turn: 0, text: "贝克兰德连续第九日降雨，桥区煤价在晚间突然上涨。" }],
-    recentDialogues: [{ id: makeId("msg"), role: "assistant", turn: 0, content: "雨水沿着雾鸦旅店的铅框窗缓慢爬下。老板玛拉把一封没有邮戳的黑色信函推到你面前，封蜡上压着一枚倒置的钟。\n\n“埃利奥特失踪前来过这里，”她压低声音，“他留下这封信，说只有愿意相信钟会撒谎的人才能打开。”\n\n壁炉里的煤块轻轻爆裂。远处那座停摆七年的旧钟塔，在浓雾里传来一声不合时宜的金属震颤。" }],
-    longTermSummary: "玩家身处鲁恩王国首都贝克兰德，在桥区接受了调查市政档案分馆夜班文员埃利奥特·芬失踪案的委托。",
+    worldEvents: [{ id: makeId("event"), turn: 0, text: "贝克兰德连续第九日降雨；东区铁路因浓雾出现大面积晚点。" }],
+    recentDialogues: [{ id: makeId("msg"), role: "assistant", turn: 0, content: "列车在一阵尖锐的刹车声中驶入贝克兰德东区火车站。铸铁穹顶下，煤烟、湿羊毛和热蒸汽混成一层低垂的雾；搬运工推着行李车穿过人群，报童高声兜售晚报，远处的马车夫则为最后几位体面乘客争吵。\n\n你带着自己的行李踏上站台。没有人在这里等你，也没有一封命令替你安排未来。售票厅外的城市地图标出通往桥区、皇后区与北区的线路；公告栏上同时贴着廉价房间、短工招聘、教会布告和几张边角卷起的失踪启事。若你愿意，今夜可以先找住处、谋一份工作、认识这座城市，或登上下一班车离开东区。\n\n只有一件小事略显不协调：封闭的第七码头旁停着一辆无人看管的行李车，最上方那只黑色皮箱正以稳定的七秒间隔，发出极轻的金属碰撞声。它没有拦住你的路。贝克兰德向四面八方展开，等待你自己决定第一步。" }],
+    longTermSummary: "玩家刚刚抵达鲁恩王国首都贝克兰德，身处东区火车站，尚未接受任何委托或选定目标，可以自由探索城市。",
     memoryNotes: [],
     choices: [
-      { label: "检查信封与封蜡", intent: "investigate", risk: "low" },
-      { label: "请玛拉讲清埃利奥特来访时的言行", intent: "social", risk: "medium" },
-      { label: "立刻前往雾中的旧钟塔", intent: "dangerous", risk: "high" },
+      { label: "查看城市地图、招工与租房公告", intent: "investigate", risk: "low" },
+      { label: "向搬运工打听各区近况与落脚处", intent: "social", risk: "medium" },
+      { label: "跟随异常声响靠近封闭的第七码头", intent: "dangerous", risk: "high" },
     ],
-    changeLog: [{ id: makeId("log"), turn: 0, text: "档案建立：你在雾鸦旅店接下了第一桩委托。", tone: "neutral" }],
+    changeLog: [{ id: makeId("log"), turn: 0, text: "档案建立：你抵达贝克兰德东区火车站，尚未接受任何委托。", tone: "neutral" }],
     processedToolCalls: [],
     aiSettingsVersion: AI_SETTINGS_VERSION,
     hiddenDanger: { id: "hollow-chime", name: "空鸣者的回声", stage: 0, revealed: false },

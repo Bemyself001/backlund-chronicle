@@ -36,7 +36,7 @@ export default function Welcome({ hasSave, apiSettings, onNew, onContinue, onImp
         </div>
         {importError && <p className={styles.error} role="alert">{importError}</p>}
       </section>
-      <aside className={styles.caseNote} aria-label="开局介绍"><span>01</span><p>贝克兰德连续第九日落雨。<br />今夜，桥区一座停摆七年的钟将再次报时。</p></aside>
+      <aside className={styles.caseNote} aria-label="开局介绍"><span>01</span><p>列车驶入贝克兰德东区。<br />没有既定路线，整座雾都由你选择。</p></aside>
       <footer className={styles.footer}><span>单人叙事 · 本地存档</span><span>原创人物与案件</span><span>OpenAI-compatible</span></footer>
     </main>
   );

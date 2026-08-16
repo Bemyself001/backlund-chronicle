@@ -20,10 +20,10 @@ export function buildContext(game, action, systemPrompt) {
   };
   return [
     { role: "system", content: systemPrompt },
-    { role: "system", content: `【当前剧本】故事发生在贝克兰德，围绕桥区与东区交界处的原创案件“没有寄件人的黑函”展开。原作主线只作为遥远背景；隐藏危险不得无铺垫直接揭露。` },
+    { role: "system", content: `【当前剧本】这是从贝克兰德东区火车站开始的开放世界沙盒。玩家可自由选择居所、职业、人脉、旅行方向与调查目标；“没有寄件人的黑函”、失踪文员和站台异响只是可选世界线，不是必须完成的主线。玩家未明确接受前，不得自动添加任务、安排 NPC 催促或用突发事件强迫回轨。原作主线仅为遥远背景；隐藏危险不得无铺垫直接揭露。` },
     { role: "system", content: `【角色状态】${JSON.stringify(characterState)}` },
     { role: "system", content: `【当前场景】${JSON.stringify(scene)}` },
-    { role: "system", content: "【NPC认知边界】玛拉只知道旅店见闻；普通市民不知道非凡途径真相；埃利奥特的秘密必须经线索逐步揭示。" },
+    { role: "system", content: "【NPC认知边界】车站职员只知道铁路与东区见闻；各区普通市民依据职业和生活圈提供有限信息；普通人不知道非凡途径真相，失踪文员等秘密必须由玩家主动接触并通过线索逐步揭示。" },
     { role: "system", content: `【长期摘要】${game.longTermSummary}` },
     ...recent,
     { role: "system", content: `【本轮输出协议】只返回一个合法 JSON 对象，不要使用 Markdown 代码块，也不要在对象前后添加说明。结构必须为：{"narrative":"剧情正文","choices":[{"label":"行动","intent":"investigate","risk":"low"},{"label":"行动","intent":"social","risk":"medium"},{"label":"行动","intent":"dangerous","risk":"high"}],"toolCalls":[],"memoryNotes":[],"worldEvents":[]}。choices 必须恰好三项；所有状态变化只能放入 toolCalls。即使拒绝或无法完成，也要把说明写进 narrative 并返回合法对象。` },
