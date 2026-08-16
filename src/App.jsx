@@ -8,7 +8,7 @@ import SaveManager from "./components/SaveManager.jsx";
 import UpdateDialog from "./components/UpdateDialog.jsx";
 import WorldMap from "./components/WorldMap.jsx";
 import { createInitialGame, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from "./data/defaults.js";
-import { buildRejectedToolNarrative, executeToolCalls } from "./engine/tools.js";
+import { buildRejectedToolNarrative, executeToolCalls, normalizeToolCalls } from "./engine/tools.js";
 import { auditTurnChanges, createAuditBaseline } from "./engine/audit.js";
 import { resolveTurnProgress } from "./engine/turn.js";
 import { buildToolResultMessages, loadApiSettings, requestAIWithReasoningFallback, saveApiSettings } from "./services/api.js";
@@ -98,10 +98,12 @@ export default function App() {
       });
       let response = settings.mockMode ? await mockResponse(game, action, controller.signal, queueStreamPreview) : await requestModel(messages);
       response = resolveChoices(response, game, action);
-      const proposedToolCalls = ensureMapMoveToolCall(response.toolCalls, options.mapDestination, game.turn + 1);
+      const proposedToolCalls = normalizeToolCalls(ensureMapMoveToolCall(response.toolCalls, options.mapDestination, game.turn + 1));
       const toolReasoningContent = response.reasoningContent || "";
       setTurnPhase("validating");
       const execution = executeToolCalls(game, proposedToolCalls);
+      const rejectedTool = execution.results.some((result) => !result.ok);
+      let rejectionNarrativeHandled = false;
       if (!settings.mockMode && response.requiresToolFollowUp && execution.results.some((result) => result.ok)) {
         resetStreamPreview();
         setTurnPhase("finalizing");
@@ -111,6 +113,15 @@ export default function App() {
         response = resolveChoices(response, game, action, previousChoices);
       } else if (response.requiresToolFollowUp) {
         response = { ...response, narrative: buildRejectedToolNarrative(action, execution.results), requiresToolFollowUp: false };
+        rejectionNarrativeHandled = true;
+      }
+      if (rejectedTool && !rejectionNarrativeHandled) {
+        const rejectionNarrative = buildRejectedToolNarrative(action, execution.results);
+        response = {
+          ...response,
+          narrative: execution.results.some((result) => result.ok) ? `${response.narrative}\n\n${rejectionNarrative}` : rejectionNarrative,
+          protocolWarning: `${response.protocolWarning || ""} 本轮有状态提议未通过本地校验。`.trim(),
+        };
       }
       const memory = updateMemory(execution.game, action, response.narrative, response.memoryNotes);
       const progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results);

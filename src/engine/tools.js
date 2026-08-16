@@ -40,6 +40,52 @@ function succeed(name, log, data = {}) {
   return { name, ok: true, log, data };
 }
 
+function stableId(text) {
+  let hash = 2166136261;
+  for (const character of String(text)) hash = Math.imul(hash ^ character.charCodeAt(0), 16777619);
+  return `clue-${(hash >>> 0).toString(36)}`;
+}
+
+function repairToolArgs(name, rawArgs = {}) {
+  const args = { ...rawArgs };
+  let repairNote = "";
+  if (name === "clue.add") {
+    if (!args.clue && (args.id || args.title || args.detail)) {
+      args.clue = { id: args.id, title: args.title, detail: args.detail };
+      delete args.id;
+      delete args.title;
+      delete args.detail;
+      repairNote = "已将线索字段整理到 clue 对象";
+    }
+    if (args.clue?.title && !args.clue.id) {
+      args.clue = { ...args.clue, id: stableId(args.clue.title) };
+      repairNote = `${repairNote}${repairNote ? "；" : ""}已根据线索标题生成 id`;
+    }
+  }
+  return { args, repairNote };
+}
+
+export function normalizeToolCall(call = {}) {
+  let args = call.args;
+  if (!args && typeof call.arguments === "string") {
+    try { args = JSON.parse(call.arguments); } catch { args = {}; }
+  }
+  if (!args && call.parameters && typeof call.parameters === "object") args = call.parameters;
+  if (!args && call.function?.arguments) {
+    try { args = JSON.parse(call.function.arguments); } catch { args = {}; }
+  }
+  const name = String(call.name || call.tool || call.function?.name || "").replace("__", ".");
+  const rawArgs = args && typeof args === "object" ? { ...args } : {};
+  const reason = call.reason || rawArgs.reason || `AI 提议执行 ${name || "未知工具"}`;
+  delete rawArgs.reason;
+  const repaired = repairToolArgs(name, rawArgs);
+  return { ...call, name, args: repaired.args, reason: String(reason).trim() || `AI 提议执行 ${name}`, repairNote: repaired.repairNote };
+}
+
+export function normalizeToolCalls(calls = []) {
+  return (Array.isArray(calls) ? calls : []).map((call) => normalizeToolCall(call));
+}
+
 function validateCall(game, call) {
   const schema = TOOL_SCHEMAS[call.name];
   if (!schema) return `未知工具「${call.name}」`;
@@ -217,12 +263,16 @@ export function executeToolCalls(currentGame, calls = []) {
   const game = structuredClone(currentGame);
   const processed = new Set(game.processedToolCalls || []);
   const results = [];
-  for (const call of calls.slice(0, 12)) {
+  for (const call of normalizeToolCalls(calls).slice(0, 12)) {
     const callId = call.id || signature(game.turn + 1, call);
     if (processed.has(callId)) { results.push(fail(call.name, "重复工具调用已忽略")); continue; }
     const validationError = validateCall(game, call);
     if (validationError) { results.push(fail(call.name, validationError)); continue; }
     const result = executeOne(game, call);
+    if (call.repairNote) {
+      result.repairNote = call.repairNote;
+      result.log = `${result.log}（${call.repairNote}）`;
+    }
     results.push(result);
     processed.add(callId);
   }

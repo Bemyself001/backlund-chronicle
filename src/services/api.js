@@ -113,9 +113,30 @@ export async function testApiConnection(settings, signal) {
   return `连接成功：发现 ${models.length} 个模型，${selected}。`;
 }
 
+const TOOL_PARAMETER_SCHEMAS = {
+  "clue.add": {
+    type: "object",
+    additionalProperties: false,
+    required: ["clue", "reason"],
+    properties: {
+      clue: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "title"],
+        properties: {
+          id: { type: "string", description: "稳定且可去重的线索 ID" },
+          title: { type: "string", description: "线索标题" },
+          detail: { type: "string", description: "玩家已经确认的线索细节" },
+        },
+      },
+      reason: { type: "string", description: "与本轮玩家行动对应的发现理由" },
+    },
+  },
+};
+
 function toolDefinitions() {
   const names = ["inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "character.update", "status.add", "status.remove", "relationship.update", "location.move", "clue.add", "quest.add", "quest.update", "dice.check"];
-  return names.map((name) => ({ type: "function", function: { name: name.replace(".", "__"), description: `提议执行 ${name}；本地引擎将验证。`, parameters: { type: "object", additionalProperties: true } } }));
+  return names.map((name) => ({ type: "function", function: { name: name.replace(".", "__"), description: `提议执行 ${name}；本地引擎将验证。`, parameters: TOOL_PARAMETER_SCHEMAS[name] || { type: "object", additionalProperties: true } } }));
 }
 
 function nativeCallsFromMessage(message) {
