@@ -205,6 +205,21 @@ test("requestAI preserves native calls when content is null", async (context) =>
   assert.match(result.reasoningContent, /状态变化/);
 });
 
+test("requestAI ignores native tool fragments without a function name", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async () => new Response(JSON.stringify({ choices: [{ message: {
+    content: '{"narrative":"钟声在雨幕后逐渐远去。","choices":[]}',
+    tool_calls: [
+      { id: "empty-call", function: { arguments: "{}" } },
+      { id: "valid-call", function: { name: "status__add", arguments: '{"name":"警觉"}' } },
+    ],
+  } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+  const result = await requestAI({ ...settings, nativeTools: true }, [{ role: "user", content: "观察雨夜" }]);
+  assert.deepEqual(result.toolCalls.map((call) => call.name), ["status.add"]);
+  assert.doesNotMatch(result.narrative, /未知工具「」/);
+});
+
 test("tool follow-up reports local validation and disables repeated native calls", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });

@@ -257,8 +257,11 @@ function nativeCallsFromMessage(message) {
   return (message.tool_calls || []).map((call) => {
     let args = {};
     try { args = JSON.parse(call.function?.arguments || "{}"); } catch { args = {}; }
-    return { id: call.id, name: call.function?.name?.replace("__", "."), args, reason: args.reason || "AI 原生工具调用" };
-  });
+    const rawName = call.function?.name || call.name || call.tool;
+    const name = String(rawName || "").replace("__", ".").trim();
+    if (!name) return null;
+    return { id: call.id, name, args, reason: args.reason || "AI 原生工具调用" };
+  }).filter(Boolean);
 }
 
 export function buildToolResultMessages(toolCalls, results, reasoningContent = "") {

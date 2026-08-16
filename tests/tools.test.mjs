@@ -15,6 +15,14 @@ test("tool normalization moves reason out of args and repairs a flat clue propos
   assert.match(call.args.clue.id, /^clue-/);
 });
 
+test("empty tool names are rejected as incomplete calls instead of unknown empty tools", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "空工具测试员" });
+  const execution = executeToolCalls(game, [{ id: "empty-tool", args: {} }]);
+  assert.equal(execution.results[0].ok, false);
+  assert.match(execution.results[0].reason, /缺少名称/);
+  assert.doesNotMatch(execution.results[0].reason, /未知工具/);
+});
+
 test("repaired clue proposals execute, while incomplete clues remain rejected", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "工具测试员" });
   const repaired = executeToolCalls(game, [{ id: "clue-repair", name: "clue.add", args: { title: "被划去的站台", detail: "编号被墨水反复涂抹。" }, reason: "检查车站公告" }]);

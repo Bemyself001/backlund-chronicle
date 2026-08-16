@@ -32,6 +32,17 @@ test("native tool calls remain usable when the assistant content is empty", () =
   assert.equal(result.requiresToolFollowUp, true);
 });
 
+test("incomplete JSON tool calls are ignored with an actionable warning", () => {
+  const result = normalizeAIResponse({
+    narrative: "雨声压过了远处的钟响。",
+    toolCalls: [{}, { name: "status.add", args: { status: { id: "alert", name: "警觉" } } }],
+  });
+  assert.equal(result.toolCalls.length, 1);
+  assert.equal(result.toolCalls[0].name, "status.add");
+  assert.match(result.protocolWarning, /不完整工具调用/);
+  assert.doesNotMatch(result.protocolWarning, /未知工具/);
+});
+
 test("choice parser accepts alternate action fields and text labels", () => {
   const result = normalizeAIResponse({ narrative: "街灯下有人停步。", nextActions: [
     { text: "检查街角的脚印", intent: "investigate", risk: "low" },

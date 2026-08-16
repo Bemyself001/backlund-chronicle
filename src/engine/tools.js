@@ -180,6 +180,7 @@ export function normalizeToolCalls(calls = [], game = null) {
 }
 
 function validateCall(game, call) {
+  if (!call.name) return "工具调用缺少名称，已忽略";
   const schema = TOOL_SCHEMAS[call.name];
   if (!schema) return `未知工具「${call.name}」`;
   if (call.resolutionError) return call.resolutionError;

@@ -78,6 +78,11 @@ function normalizeChoice(choice, index) {
   };
 }
 
+function hasToolName(call) {
+  const name = call?.name || call?.tool || call?.function?.name;
+  return typeof name === "string" && name.trim().length > 0;
+}
+
 export function normalizeAIResponse(raw, nativeToolCalls = []) {
   const parsed = responseObject(raw);
   const candidate = parsed.narrative ?? parsed.response ?? parsed.content ?? parsed.text ?? parsed.message;
@@ -96,16 +101,20 @@ export function normalizeAIResponse(raw, nativeToolCalls = []) {
       ? { source: "model", fallback: false, reason: "" }
       : { source: "recovered", fallback: false, reason: rawChoices.length === 3 ? "invalid_or_duplicate_labels" : "choice_count" };
   while (choices.length < 3) choices.push({ ...FALLBACK_CHOICES[choices.length] });
-  const protocolToolCalls = parsed.toolCalls ?? parsed.tool_calls;
+  const rawProtocolToolCalls = parsed.toolCalls ?? parsed.tool_calls;
+  const protocolToolCalls = Array.isArray(rawProtocolToolCalls) ? rawProtocolToolCalls.filter(hasToolName) : [];
+  const ignoredToolCalls = Array.isArray(rawProtocolToolCalls) ? rawProtocolToolCalls.length - protocolToolCalls.length : 0;
   const memoryNotes = parsed.memoryNotes ?? parsed.memory_notes;
   const worldEvents = parsed.worldEvents ?? parsed.world_events;
+  const baseProtocolWarning = parsed.protocolWarning || (choiceMeta.source === "fallback" ? "模型没有返回 choices，已生成临时行动建议。" : choiceMeta.source === "recovered" ? "choices 字段不完整，已生成临时行动建议。" : "");
+  const protocolWarning = [baseProtocolWarning, ignoredToolCalls ? `模型返回了 ${ignoredToolCalls} 条不完整工具调用，已忽略。` : ""].filter(Boolean).join(" ");
   return {
     narrative,
     choices,
     toolCalls: [...(Array.isArray(protocolToolCalls) ? protocolToolCalls : []), ...nativeToolCalls],
     memoryNotes: Array.isArray(memoryNotes) ? memoryNotes.map(String).slice(0, 5) : [],
     worldEvents: Array.isArray(worldEvents) ? worldEvents.map(String).slice(0, 5) : [],
-    protocolWarning: parsed.protocolWarning || (choiceMeta.source === "fallback" ? "模型没有返回 choices，已生成临时行动建议。" : choiceMeta.source === "recovered" ? "choices 字段不完整，已生成临时行动建议。" : ""),
+    protocolWarning,
     choiceMeta,
     requiresToolFollowUp: nativeToolCalls.length > 0 && !hasNarrative,
   };
