@@ -67,4 +67,12 @@ export function resolveChoices(response, game, action, previous = null) {
   };
 }
 
+export function injectOccultEntryChoice(choices = [], entry = null) {
+  if (!entry || !Array.isArray(choices) || choices.some((choice) => choice.intent === "occult")) return choices;
+  const next = choices.slice(0, 3).map((choice) => ({ ...choice }));
+  const replaceIndex = Math.max(0, next.findIndex((choice) => choice.risk === "high"));
+  next[replaceIndex] = { ...entry.choice };
+  return uniqueChoices(next);
+}
+
 export { hasUsableChoices };

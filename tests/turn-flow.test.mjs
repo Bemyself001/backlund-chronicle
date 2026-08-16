@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { buildRejectedToolNarrative } from "../src/engine/tools.js";
-import { advanceWorldTime, dangerDeltaForTurn, minutesForTurn, resolveTurnProgress } from "../src/engine/turn.js";
+import { advanceWorldTime, dangerDeltaForTurn, minutesForTurn, occultEntryForTurn, resolveTurnProgress } from "../src/engine/turn.js";
 import { extractNarrativePreview } from "../src/services/streamPreview.js";
 
 test("stream preview exposes only the partial narrative from JSON", () => {
@@ -42,4 +42,16 @@ test("turn progress applies elapsed time and actual danger only", () => {
   assert.equal(progress.elapsedMinutes, 25);
   assert.equal(progress.worldTime, "1349年 10月17日 · 周二 · 18:45");
   assert.equal(progress.hiddenDanger.stage, 0);
+});
+
+test("ordinary characters receive optional occult entry windows every five turns", () => {
+  const game = { turn: 4, worldTime: "1349年 10月17日 · 周二 · 18:20", character: { extraordinary: "ordinary" }, occult: { contact: 0, entryAvailable: false } };
+  assert.equal(occultEntryForTurn(game, 5)?.id, "occult-entry-5");
+  assert.equal(occultEntryForTurn(game, 6), null);
+  const next = resolveTurnProgress(game, "观察车站", "low");
+  assert.equal(next.occult.contact, 0);
+  assert.equal(next.occult.entryAvailable, true);
+  assert.equal(next.occultEntry.turn, 5);
+  assert.equal(occultEntryForTurn({ ...game, turn: 9 }, 10)?.id, "occult-entry-10");
+  assert.equal(occultEntryForTurn({ ...game, occult: { contact: 1 } }, 5), null);
 });

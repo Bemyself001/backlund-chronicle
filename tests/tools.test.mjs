@@ -53,3 +53,28 @@ test("ambiguous item names are rejected instead of changing the wrong instance",
   assert.match(execution.results[0].reason, /多个实例|instanceId/);
   assert.equal(execution.game.inventory.length, game.inventory.length);
 });
+
+test("occult contact gates reveal and occult character updates", () => {
+  const ordinary = createInitialGame({ ...EMPTY_CHARACTER, name: "普通人测试员", extraordinary: "ordinary" });
+  const lowSequence = createInitialGame({ ...EMPTY_CHARACTER, name: "非凡者测试员", extraordinary: "low", pathway: "窥秘人（序列9）" });
+  assert.equal(ordinary.occult.contact, 0);
+  assert.equal(lowSequence.occult.contact, 1);
+
+  const blockedReveal = executeToolCalls(ordinary, [{ id: "blocked-reveal", name: "occult.reveal", args: { topic: "仪式", evidence: "残页" }, reason: "试图理解残页" }]);
+  assert.equal(blockedReveal.results[0].ok, false);
+  assert.match(blockedReveal.results[0].reason, /尚未接触/);
+
+  const withEntry = { ...ordinary, occult: { ...ordinary.occult, entryAvailable: true, currentEntry: { id: "occult-entry-5", title: "非凡入口" } } };
+  const contacted = executeToolCalls(withEntry, [{ id: "contact", name: "occult.contact", args: { entryId: "occult-entry-5" }, reason: "主动追查入口" }]);
+  assert.equal(contacted.results[0].ok, true);
+  assert.equal(contacted.game.occult.contact, 1);
+  assert.equal(contacted.game.occult.entryAvailable, false);
+
+  const revealed = executeToolCalls(contacted.game, [{ id: "reveal", name: "occult.reveal", args: { topic: "仪式痕迹", evidence: "入口收据" }, reason: "整理已确认证据" }]);
+  assert.equal(revealed.results[0].ok, true);
+  assert.equal(revealed.game.occult.revealLevel, 1);
+
+  const blockedUpdate = executeToolCalls(ordinary, [{ id: "blocked-update", name: "character.update", args: { requiresOccult: true, patch: { spirituality: 5 } }, reason: "非凡影响" }]);
+  assert.equal(blockedUpdate.results[0].ok, false);
+  assert.match(blockedUpdate.results[0].reason, /尚未接触/);
+});

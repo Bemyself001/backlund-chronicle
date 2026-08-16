@@ -13,6 +13,8 @@ export const TOOL_SCHEMAS = {
   "item.use": { required: ["instanceId"], description: "使用消耗品或工具" },
   "item.equip": { required: ["instanceId"], description: "装备可装备物品" },
   "item.unequip": { required: ["instanceId"], description: "卸下已装备物品" },
+  "occult.contact": { required: ["entryId"], description: "确认玩家主动接触当前非凡入口" },
+  "occult.reveal": { required: ["topic", "evidence"], description: "在已有非凡接触后揭示有限神秘知识" },
   "character.update": { required: ["patch"], description: "更新受限角色数值" },
   "status.add": { required: ["status"], description: "添加状态效果" },
   "status.remove": { required: ["statusId"], description: "移除状态效果" },
@@ -149,6 +151,10 @@ function repairToolArgs(name, rawArgs = {}, game = null) {
       repairNote = appendRepairNote(repairNote, "未指定数量，按 1 件处理");
     }
   }
+  if (name === "occult.contact" && game?.occult?.entryAvailable && !args.entryId && game.occult.currentEntry?.id) {
+    args.entryId = game.occult.currentEntry.id;
+    repairNote = appendRepairNote(repairNote, "已匹配当前非凡入口");
+  }
   return { args, repairNote, resolutionError };
 }
 
@@ -276,7 +282,24 @@ function executeOne(game, call) {
       delete game.equipment[target.category];
       return succeed(call.name, `${turnLabel}：卸下「${target.name}」。`);
     }
+    case "occult.contact": {
+      const occult = game.occult || { contact: 0, revealLevel: 0, entryAvailable: false, entryHistory: [] };
+      if (Number(occult.contact) === 1) return fail(call.name, "玩家已经接触过非凡世界，本轮不重复记录");
+      if (!occult.entryAvailable || !occult.currentEntry) return fail(call.name, "当前没有可验证的非凡入口");
+      if (args.entryId !== occult.currentEntry.id) return fail(call.name, "入口 ID 与当前可见入口不匹配");
+      game.occult = { ...occult, contact: 1, entryAvailable: false, contactedAt: turnLabel, contactedEntryId: args.entryId };
+      return succeed(call.name, `${turnLabel}：你确认接触了非凡世界的入口「${occult.currentEntry.title}」——${call.reason}。`, { contact: 1, entryId: args.entryId });
+    }
+    case "occult.reveal": {
+      const occult = game.occult || { contact: 0, revealLevel: 0 };
+      if (Number(occult.contact) !== 1) return fail(call.name, "尚未接触非凡世界，不能揭示神秘知识");
+      if (Number(occult.revealLevel) >= 1) return fail(call.name, "本轮之前已经揭示过该阶段的神秘知识");
+      if (String(args.topic || "").trim().length < 2 || String(args.evidence || "").trim().length < 2) return fail(call.name, "揭示神秘知识必须提供主题和已确认的证据");
+      game.occult = { ...occult, revealLevel: 1, lastReveal: { topic: String(args.topic).trim(), evidence: String(args.evidence).trim(), at: turnLabel } };
+      return succeed(call.name, `${turnLabel}：你从「${args.evidence}」中确认了关于「${args.topic}」的有限神秘信息——${call.reason}。`, { revealLevel: 1 });
+    }
     case "character.update": {
+      if (args.requiresOccult && Number(game.occult?.contact) !== 1) return fail(call.name, "尚未接触非凡世界，不能应用非凡相关角色变化");
       const allowed = ["health", "sanity", "spirituality"];
       Object.entries(args.patch || {}).forEach(([key, value]) => {
         if (!allowed.includes(key) || !Number.isFinite(Number(value))) return;

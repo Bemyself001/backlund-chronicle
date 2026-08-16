@@ -2,7 +2,7 @@ import { makeId } from "../utils/id.js";
 import { withAdvancement } from "./character.js";
 import { MAX_STARTING_MONEY_PENCE, moneyFromPence } from "./money.js";
 
-export const SAVE_VERSION = 4;
+export const SAVE_VERSION = 5;
 export const AI_SETTINGS_VERSION = "1.4";
 
 export const LOW_SEQUENCE_PATHWAYS = [
@@ -29,10 +29,12 @@ export const DEFAULT_SYSTEM_PROMPT = `你是《贝克兰德纪事》的叙事者
 4. 保持悬疑、因果与资源约束；不随意赠送强力物品、能力或无代价解决危险。
 5. 这是开放世界沙盒。玩家可以无视、拒绝或离开任何案件与剧情钩子；不得用巧合、NPC 催促或突发灾难强迫玩家回到预设主线。未被玩家明确接受的委托不得添加为进行中任务。
 6. 尊重地点连续性和旅行时间。玩家可在贝克兰德各区寻找工作、居所、人脉、知识与个人目标，世界事件会继续发展，但不应围绕玩家一人运转。
-7. 每轮给出三个真正不同的行动选项：谨慎调查、社交交涉、高风险行动，同时允许自由输入；选项应包含当前场景的多种可能，而非三个措辞不同的同一目标。
-8. 所有状态变化必须作为工具调用提议。不要在正文中伪造工具已经成功执行；等待本地引擎验证后再在后续叙事中确认。物品和资金是否获得或失去以本地审计结果为准，而不是以正文宣称为准。资金使用 money.add、money.remove，金额必须拆分为 pounds（镑）、solers（苏勒）、pence（便士）。
-9. 优先使用原生 tool calling；若使用 JSON 协议，返回 narrative、choices、toolCalls、memoryNotes、worldEvents。
-10. narrative 使用克制、可读的中文，每轮约 250—600 字，不复述原著段落，不让原作角色抢占玩家中心位置。`;
+7. 普通人的 occult.contact 初始为 0；在第 5、10、15 轮等每五轮节点，可出现一次非强制的非凡入口，直到玩家主动接触后变为 1。开局选择低序列非凡者的角色 occult.contact 初始为 1。contact=1 只代表接触过非凡世界，不代表获得力量。
+8. 只有 occult.contact=1 后，才允许通过 occult.reveal 揭示神秘知识，或提出带有非凡依据的 character.update；普通人可以拒绝、推迟或离开入口。任何晋升仍必须经过知识、材料、引导、地点和代价的本地验证。
+9. 每轮给出三个真正不同的行动选项：谨慎调查、社交交涉、高风险行动，同时允许自由输入；选项应包含当前场景的多种可能，而非三个措辞不同的同一目标。
+10. 所有状态变化必须作为工具调用提议。不要在正文中伪造工具已经成功执行；等待本地引擎验证后再在后续叙事中确认。物品和资金是否获得或失去以本地审计结果为准，而不是以正文宣称为准。资金使用 money.add、money.remove，金额必须拆分为 pounds（镑）、solers（苏勒）、pence（便士）。
+11. 优先使用原生 tool calling；若使用 JSON 协议，返回 narrative、choices、toolCalls、memoryNotes、worldEvents。
+12. narrative 使用克制、可读的中文，每轮约 250—600 字，不复述原著段落，不让原作角色抢占玩家中心位置。`;
 
 export function migrateSystemPrompt(prompt = "") {
   const legacyIntro = "你是《雾中纪事》的叙事者与世界模拟器。故事运行在一个受《诡秘之主》启发、但城市、人物、案件与主线均为原创的蒸汽时代神秘世界。";
@@ -158,6 +160,14 @@ export function createInitialGame(character) {
     location: { id: "east-station", name: "东区·贝克兰德火车站", district: "贝克兰德东区" },
     worldTime: "1349年 10月17日 · 周二 · 18:20",
     chapter: { number: 1, title: "雾都来客" },
+    occult: {
+      contact: normalizedCharacter.extraordinary === "low" ? 1 : 0,
+      revealLevel: 0,
+      entryAvailable: false,
+      currentEntry: null,
+      lastEntryTurn: null,
+      entryHistory: [],
+    },
     inventory: [
       item("worn-coat", "旧呢外套", "服装", "内衬缝有两个不易察觉的暗袋。", 1, 1.8, "普通", ["装备"]),
       item("brass-compass", "黄铜罗盘", "工具", "指针偶尔会避开正北方，原因未知。", 1, 0.3, "少见", ["可检查"]),

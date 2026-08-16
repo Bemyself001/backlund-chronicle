@@ -17,7 +17,7 @@ import { mockResponse } from "./services/mock.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
 import { extractNarrativePreview } from "./services/streamPreview.js";
 import { ensureMapMoveToolCall } from "./services/mapTravel.js";
-import { resolveChoices } from "./services/choices.js";
+import { injectOccultEntryChoice, resolveChoices } from "./services/choices.js";
 import { makeId } from "./utils/id.js";
 import { checkForUpdate, isNativeAndroid } from "./services/updates.js";
 
@@ -125,9 +125,12 @@ export default function App() {
       }
       const memory = updateMemory(execution.game, action, response.narrative, response.memoryNotes);
       const progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results);
+      const occultNarrative = progress.occultEntry ? `${response.narrative}\n\n【${progress.occultEntry.title}】${progress.occultEntry.text}` : response.narrative;
+      const nextChoices = injectOccultEntryChoice(response.choices, progress.occult.contact === 0 ? (progress.occultEntry || progress.occult.currentEntry) : null);
+      const nextMemory = progress.occultEntry ? updateMemory(execution.game, action, occultNarrative, response.memoryNotes) : memory;
       const next = {
-        ...execution.game, ...memory, turn: game.turn + 1, worldTime: progress.worldTime, choices: response.choices, choiceMeta: response.choiceMeta,
-        worldEvents: [...game.worldEvents, ...response.worldEvents.map((text) => ({ id: makeId("event"), turn: game.turn + 1, text }))].slice(-40),
+        ...execution.game, ...nextMemory, occult: progress.occult, turn: game.turn + 1, worldTime: progress.worldTime, choices: nextChoices, choiceMeta: response.choiceMeta,
+        worldEvents: [...game.worldEvents, ...response.worldEvents.map((text) => ({ id: makeId("event"), turn: game.turn + 1, text })), ...(progress.occultEntry ? [{ id: makeId("event"), turn: game.turn + 1, text: `非凡入口出现：${progress.occultEntry.title}` }] : [])].slice(-40),
         changeLog: [...game.changeLog, ...execution.logs].slice(-100),
         hiddenDanger: progress.hiddenDanger,
         lastTurnBaseline: createAuditBaseline(game, game.turn + 1),

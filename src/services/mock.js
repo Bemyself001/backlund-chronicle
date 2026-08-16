@@ -10,7 +10,13 @@ export async function mockResponse(game, action, signal, onChunk) {
   const lower = action.toLowerCase();
   let narrative;
   let toolCalls = [];
-  if (includesAny(lower, ["地图", "公告", "招工", "租房", "观察", "查看车站"])) {
+  if (game.occult?.entryAvailable && game.occult.currentEntry && includesAny(lower, ["非凡入口", "异常暗号", "接触", "追查这条"])) {
+    narrative = "你没有贸然触碰那张收据，而是先沿着暗号留下的线索观察周围。确认没有普通人被卷入后，你选择记下入口位置，并向留下暗号的人传递一个谨慎的回应。这个决定只代表你愿意接触更深一层的信息，不代表你已经拥有任何非凡力量。";
+    toolCalls = [{ id: makeId("mock"), name: "occult.contact", reason: "玩家主动追查并确认当前非凡入口", args: { entryId: game.occult.currentEntry.id } }];
+  } else if (game.occult?.contact === 1 && includesAny(lower, ["揭示", "神秘知识", "非凡知识", "理解仪式"])) {
+    narrative = "你把已经掌握的碎片与手边证据逐一对照，没有急于把猜测当成真相。某个有限的关联终于变得清晰，但它只解释了眼前现象的一小部分，更多内容仍需要材料、引导与代价。";
+    toolCalls = [{ id: makeId("mock"), name: "occult.reveal", reason: "玩家基于已接触的证据主动整理神秘信息", args: { topic: "非凡入口的暗号规律", evidence: "入口收据上的重复符号与现场记录" } }];
+  } else if (includesAny(lower, ["地图", "公告", "招工", "租房", "观察", "查看车站"])) {
     narrative = "你先把行李放在脚边，逐栏读完站内公告。城市地图把贝克兰德切成彼此相连又截然不同的区域：东区有最便宜的床位和最多的临时工作；桥区的旅店与小商行需要识字的帮工；皇后区的公共图书馆在白天允许访客查阅旧报。你可以先解决生计，也可以只选一条看顺眼的街道走下去。\n\n公告栏右下角压着几则互不相干的消息：钟表铺招聘学徒、教会施粥点征求登记员、货运公司寻找丢失账箱。最底下是一张三日前的失踪启事，照片中的夜班文员与第七码头黑色皮箱上的行李牌同姓。那也可能只是巧合。没有人注意你读到了这里，更没有人要求你负责。";
   } else if (includesAny(lower, ["搬运工", "询问", "打听", "交涉", "住宿", "工作", "茶摊"])) {
     narrative = "你拦住一位正靠着空行李车歇气的搬运工。他先打量你的鞋和箱子，确认你不像来查票的主管，才肯分享实用消息：铁门街的床位按周计价，桥区的店主更看重介绍信，若想找体面的文书工作，最好明早去皇后区的报馆街。\n\n他没有追问你的来历，只用下巴朝几个出口分别点了点。“想安稳，就在天黑前找房；想挣钱，东边仓库今晚还缺人；想听故事，去茶摊坐到末班车。”说完，他重新推起车，把选择完整地留给你。";

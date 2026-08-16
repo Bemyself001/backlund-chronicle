@@ -55,12 +55,24 @@ export function migrateSave(raw) {
   const legacyCoin = (migrated.inventory || []).find((item) => item?.itemId === "copper-coins" || item?.category === "货币");
   const inventory = migrated.money ? migrated.inventory : (migrated.inventory || []).filter((item) => item !== legacyCoin);
   const money = migrated.money || moneyFromPence(legacyCoin?.quantity || 0);
+  const advancement = withAdvancement(migrated.character).advancement;
+  const legacyContact = advancement?.type === "extraordinary" || migrated.character?.extraordinary === "low" ? 1 : 0;
+  const contact = migrated.occult?.contact === 1 || legacyContact === 1 ? 1 : 0;
+  const occult = {
+    contact,
+    revealLevel: Math.max(0, Number(migrated.occult?.revealLevel || 0)),
+    entryAvailable: Boolean(migrated.occult?.entryAvailable) && contact !== 1,
+    currentEntry: migrated.occult?.currentEntry || null,
+    lastEntryTurn: migrated.occult?.lastEntryTurn ?? null,
+    entryHistory: Array.isArray(migrated.occult?.entryHistory) ? migrated.occult.entryHistory : [],
+  };
   return {
     ...migrated,
     version: SAVE_VERSION,
-    character: withAdvancement(migrated.character),
+    character: { ...withAdvancement(migrated.character), advancement },
     inventory,
     money,
+    occult,
     processedToolCalls: migrated.processedToolCalls || [],
     memoryNotes: migrated.memoryNotes || [],
     lastTurnBaseline: migrated.lastTurnBaseline || null,

@@ -209,6 +209,25 @@ const TOOL_PARAMETER_SCHEMAS = {
       reason: { type: "string" },
     },
   },
+  "occult.contact": {
+    type: "object",
+    additionalProperties: false,
+    required: ["entryId", "reason"],
+    properties: {
+      entryId: { type: "string", description: "当前场景中明确出现的非凡入口 ID" },
+      reason: { type: "string", description: "玩家主动接触入口的理由" },
+    },
+  },
+  "occult.reveal": {
+    type: "object",
+    additionalProperties: false,
+    required: ["topic", "evidence", "reason"],
+    properties: {
+      topic: { type: "string", description: "已经接触到的有限神秘主题" },
+      evidence: { type: "string", description: "玩家已经获得或观察到的证据" },
+      reason: { type: "string", description: "本轮行动为何足以揭示该信息" },
+    },
+  },
   "clue.add": {
     type: "object",
     additionalProperties: false,
@@ -230,7 +249,7 @@ const TOOL_PARAMETER_SCHEMAS = {
 };
 
 function toolDefinitions() {
-  const names = ["inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "character.update", "status.add", "status.remove", "relationship.update", "location.move", "clue.add", "quest.add", "quest.update", "dice.check"];
+  const names = ["inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "occult.reveal", "character.update", "status.add", "status.remove", "relationship.update", "location.move", "clue.add", "quest.add", "quest.update", "dice.check"];
   return names.map((name) => ({ type: "function", function: { name: name.replace(".", "__"), description: `提议执行 ${name}；本地引擎将验证。`, parameters: TOOL_PARAMETER_SCHEMAS[name] || { type: "object", additionalProperties: true } } }));
 }
 

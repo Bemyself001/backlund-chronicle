@@ -12,13 +12,14 @@ test("version 1 saves migrate from Grayharbor to Backlund without losing progres
     inventory: [{ instanceId: "item-1", name: "旧呢外套" }],
     recentDialogues: [{ role: "assistant", content: "灰檐港市档案馆已经关门。" }],
   });
-  assert.equal(migrated.version, 4);
+  assert.equal(migrated.version, 5);
   assert.equal(migrated.turn, 8);
   assert.equal(migrated.title, "艾琳的贝克兰德档案");
   assert.equal(migrated.location.district, "贝克兰德桥区·旧钟街");
   assert.match(migrated.recentDialogues[0].content, /贝克兰德市政档案分馆/);
   assert.equal(migrated.inventory[0].name, "旧呢外套");
   assert.equal(migrated.character.advancement.sequenceLabel, "普通人");
+  assert.equal(migrated.occult.contact, 0);
   assert.equal(migrated.lastTurnAudit, null);
 });
 
