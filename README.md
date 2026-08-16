@@ -52,3 +52,9 @@ npm run preview
 pnpm install
 pnpm run android:sync
 ```
+
+## 开源许可与版权说明
+
+本仓库中由项目作者原创的程序代码与原创素材采用 [MIT License](LICENSE) 发布，Copyright © 2026 Bemyself001。
+
+MIT License 不授予《诡秘之主》名称、世界观、角色、地点、设定或其他第三方知识产权的任何权利。本项目为非官方同人创作，与原作者、出版方及其他权利人无隶属、授权或背书关系。使用者在复制、修改或分发项目时，仍须自行确保其内容使用符合适用法律及第三方权利要求。
