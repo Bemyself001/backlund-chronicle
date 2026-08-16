@@ -9,6 +9,8 @@ const TURN_PHASES = [
 ];
 const PHASE_MESSAGE = {
   generating: "叙事引擎正在编织当前场景",
+  manualRetry: "正在重新提交上一轮行动",
+  reasoningRetry: "推理预算已耗尽，正在降低推理强度后重试",
   validating: "本地规则正在校验状态提议",
   finalizing: "叙事引擎正在确认校验结果",
 };
@@ -58,7 +60,8 @@ const StoryHistory = memo(function StoryHistory({ messages }) {
 });
 
 function TurnProgress({ phase }) {
-  const currentIndex = TURN_PHASES.findIndex(([id]) => id === phase);
+  const matchedIndex = TURN_PHASES.findIndex(([id]) => id === phase);
+  const currentIndex = matchedIndex >= 0 ? matchedIndex : 0;
   return <div className={styles.turnStatus}>
     <ol aria-label="本轮处理进度">{TURN_PHASES.map(([id, label], index) => <li key={id} data-state={index < currentIndex ? "done" : index === currentIndex ? "current" : "pending"}><span>{index + 1}</span>{label}</li>)}</ol>
     <p role="status" aria-live="polite">{PHASE_MESSAGE[phase] || PHASE_MESSAGE.generating}<span>···</span></p>

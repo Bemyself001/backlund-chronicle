@@ -126,7 +126,7 @@ function nativeCallsFromMessage(message) {
   });
 }
 
-export function buildToolResultMessages(toolCalls, results) {
+export function buildToolResultMessages(toolCalls, results, reasoningContent = "") {
   const calls = toolCalls.map((call, index) => ({
     id: call.id || `local-call-${index + 1}`,
     type: "function",
@@ -135,8 +135,10 @@ export function buildToolResultMessages(toolCalls, results) {
       arguments: JSON.stringify(call.args || {}),
     },
   }));
+  const assistantMessage = { role: "assistant", content: null, tool_calls: calls };
+  if (reasoningContent) assistantMessage.reasoning_content = reasoningContent;
   return [
-    { role: "assistant", content: null, tool_calls: calls },
+    assistantMessage,
     ...calls.map((call, index) => {
       const result = results[index] || { ok: false, reason: "本地引擎没有返回执行结果" };
       return {
@@ -165,7 +167,10 @@ function assistantPayload(data) {
 
 function emptyResponseError(finishReason, hasReasoning = false) {
   if (finishReason === "length" || hasReasoning) {
-    return new Error("模型生成了推理内容，但在输出剧情正文前已停止。请在 API 设置中把 Max Tokens 提高到至少 4000，或改用非推理模型后重试本轮。");
+    const error = new Error("模型用完了输出预算，但还没有生成剧情正文。请关闭或降低推理模式、提高 Max Tokens，或改用非推理模型后重试本轮。");
+    error.code = "REASONING_EXHAUSTED";
+    error.finishReason = finishReason;
+    return error;
   }
   return new Error("API 请求成功，但模型没有返回剧情正文。请先关闭“流式输出”后重试；若仍为空，再关闭“原生 Tool Calling”或更换模型。");
 }
@@ -178,7 +183,7 @@ function normalizeChatCompletion(data) {
   if (!textFromContent(payload).trim() && !(payload && typeof payload === "object" && !Array.isArray(payload)) && !nativeCalls.length) {
     throw emptyResponseError(choice.finish_reason, Boolean(textFromContent(message.reasoning_content).trim()));
   }
-  return normalizeAIResponse(payload, nativeCalls);
+  return { ...normalizeAIResponse(payload, nativeCalls), reasoningContent: textFromContent(message.reasoning_content) };
 }
 
 function appendToolCallFragments(calls, fragments = []) {
@@ -191,14 +196,51 @@ function appendToolCallFragments(calls, fragments = []) {
   }
 }
 
+function isOpenAIReasoningModel(model = "") {
+  return /^(?:o\d|gpt-5)/i.test(model);
+}
+
+function applyReasoningSettings(body, settings, options) {
+  const provider = settings.provider || inferApiProvider(settings.baseUrl);
+  const selectedMode = options.forceDisableReasoning ? "off" : settings.reasoningMode || "auto";
+  if (selectedMode === "auto") return;
+  if (provider === "deepseek") {
+    body.thinking = { type: selectedMode === "off" ? "disabled" : "enabled" };
+    if (selectedMode !== "off") body.reasoning_effort = "high";
+    return;
+  }
+  if (provider === "openai" && !isOpenAIReasoningModel(settings.model)) return;
+  body.reasoning_effort = selectedMode === "off" ? "low" : selectedMode;
+}
+
+function applyProviderCompatibility(body, settings) {
+  const provider = settings.provider || inferApiProvider(settings.baseUrl);
+  if (provider !== "openai" || !isOpenAIReasoningModel(settings.model)) return;
+  body.max_completion_tokens = body.max_tokens;
+  delete body.max_tokens;
+  delete body.temperature;
+}
+
+function requestMessages(messages, forceDisableReasoning) {
+  if (!forceDisableReasoning) return messages;
+  return messages.map((message) => {
+    if (!message.reasoning_content) return message;
+    const cleaned = { ...message };
+    delete cleaned.reasoning_content;
+    return cleaned;
+  });
+}
+
 export async function requestAI(settings, messages, signal, onChunk, options = {}) {
   const body = {
     model: settings.model,
-    messages,
+    messages: requestMessages(messages, options.forceDisableReasoning),
     temperature: Number(settings.temperature),
     max_tokens: Number(settings.maxTokens),
     stream: Boolean(settings.stream),
   };
+  applyReasoningSettings(body, settings, options);
+  applyProviderCompatibility(body, settings);
   if (settings.jsonMode) body.response_format = { type: "json_object" };
   if (settings.nativeTools && !options.disableTools) body.tools = toolDefinitions();
   const response = await fetch(endpoint(settings.baseUrl, "/chat/completions"), {
@@ -219,7 +261,7 @@ export async function requestAI(settings, messages, signal, onChunk, options = {
   let content = "";
   const calls = {};
   let finishReason = "";
-  let hasReasoning = false;
+  let reasoningContent = "";
   const consumeLine = (line) => {
     const trimmed = line.trim();
     if (!trimmed.startsWith("data:") || trimmed.includes("[DONE]")) return;
@@ -228,7 +270,7 @@ export async function requestAI(settings, messages, signal, onChunk, options = {
       const delta = choice.delta || choice.message || {};
       const chunk = textFromContent(delta.content);
       if (chunk) { content += chunk; onChunk?.(content); }
-      if (textFromContent(delta.reasoning_content).trim()) hasReasoning = true;
+      reasoningContent += textFromContent(delta.reasoning_content);
       if (choice.finish_reason) finishReason = choice.finish_reason;
       appendToolCallFragments(calls, delta.tool_calls);
     } catch { /* ignore non-JSON keepalive chunks */ }
@@ -250,9 +292,32 @@ export async function requestAI(settings, messages, signal, onChunk, options = {
   const nativeCalls = nativeCallsFromMessage({ tool_calls: Object.values(calls) });
   if (!content.trim() && !nativeCalls.length) {
     try { return normalizeChatCompletion(JSON.parse(rawResponse.trim())); } catch (error) {
-      if (error instanceof SyntaxError) throw emptyResponseError(finishReason, hasReasoning);
+      if (error instanceof SyntaxError) throw emptyResponseError(finishReason, Boolean(reasoningContent.trim()));
       throw error;
     }
   }
-  return normalizeAIResponse(content, nativeCalls);
+  return { ...normalizeAIResponse(content, nativeCalls), reasoningContent };
+}
+
+export async function requestAIWithReasoningFallback(settings, messages, signal, onChunk, options = {}) {
+  try {
+    return await requestAI(settings, messages, signal, onChunk, options);
+  } catch (error) {
+    const shouldRetry = error.code === "REASONING_EXHAUSTED"
+      && settings.autoRetryReasoning !== false
+      && (settings.reasoningMode || "auto") !== "off"
+      && !options.forceDisableReasoning;
+    if (!shouldRetry) throw error;
+    options.onReasoningFallback?.();
+    onChunk?.("");
+    try {
+      return await requestAI(settings, messages, signal, onChunk, { ...options, forceDisableReasoning: true });
+    } catch (retryError) {
+      if (retryError.name !== "AbortError") {
+        retryError.message = `自动降低推理后仍未完成：${retryError.message}`;
+        retryError.autoFallbackAttempted = true;
+      }
+      throw retryError;
+    }
+  }
 }

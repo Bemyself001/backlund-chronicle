@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildToolResultMessages, requestAI } from "../src/services/api.js";
+import { buildToolResultMessages, requestAI, requestAIWithReasoningFallback } from "../src/services/api.js";
 
 const settings = {
   baseUrl: "https://example.test/v1",
@@ -9,6 +9,8 @@ const settings = {
   model: "compatible-model",
   temperature: 0.7,
   maxTokens: 800,
+  reasoningMode: "auto",
+  autoRetryReasoning: true,
   jsonMode: true,
   nativeTools: false,
   stream: false,
@@ -59,8 +61,62 @@ test("requestAI reports an actionable error when reasoning exhausts output token
   }] }), { status: 200, headers: { "Content-Type": "application/json" } });
   await assert.rejects(
     requestAI(settings, [{ role: "user", content: "继续" }]),
-    /Max Tokens.*4000/,
+    /输出预算.*剧情正文/,
   );
+});
+
+test("DeepSeek can explicitly disable thinking in the request body", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  let requestBody;
+  globalThis.fetch = async (_url, init) => {
+    requestBody = JSON.parse(init.body);
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"narrative":"雾气散开了一些。","choices":[]}' } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  await requestAI({ ...settings, provider: "deepseek", reasoningMode: "off" }, [{ role: "user", content: "继续" }]);
+  assert.deepEqual(requestBody.thinking, { type: "disabled" });
+  assert.equal(requestBody.reasoning_effort, undefined);
+});
+
+test("OpenAI reasoning models use the compatible output limit", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  let requestBody;
+  globalThis.fetch = async (_url, init) => {
+    requestBody = JSON.parse(init.body);
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"narrative":"推理模型返回了正文。","choices":[]}' } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  await requestAI({ ...settings, provider: "openai", model: "gpt-5-mini", reasoningMode: "off" }, [{ role: "user", content: "继续" }]);
+  assert.equal(requestBody.max_tokens, undefined);
+  assert.equal(requestBody.max_completion_tokens, 800);
+  assert.equal(requestBody.temperature, undefined);
+  assert.equal(requestBody.reasoning_effort, "low");
+});
+
+test("reasoning exhaustion automatically retries once with thinking disabled", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const requestBodies = [];
+  let fallbackCount = 0;
+  globalThis.fetch = async (_url, init) => {
+    requestBodies.push(JSON.parse(init.body));
+    if (requestBodies.length === 1) {
+      return new Response(JSON.stringify({ choices: [{ finish_reason: "length", message: { content: "", reasoning_content: "仍在推理" } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"narrative":"自动降低推理后，正文顺利返回。","choices":[]}' } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  const result = await requestAIWithReasoningFallback(
+    { ...settings, provider: "deepseek" },
+    [{ role: "user", content: "继续" }],
+    undefined,
+    undefined,
+    { onReasoningFallback: () => { fallbackCount += 1; } },
+  );
+  assert.equal(result.narrative, "自动降低推理后，正文顺利返回。");
+  assert.equal(requestBodies.length, 2);
+  assert.equal(requestBodies[0].thinking, undefined);
+  assert.deepEqual(requestBodies[1].thinking, { type: "disabled" });
+  assert.equal(fallbackCount, 1);
 });
 
 test("requestAI preserves native calls when content is null", async (context) => {
@@ -68,12 +124,14 @@ test("requestAI preserves native calls when content is null", async (context) =>
   context.after(() => { globalThis.fetch = originalFetch; });
   globalThis.fetch = async () => new Response(JSON.stringify({ choices: [{ message: {
     content: null,
+    reasoning_content: "需要先提出一个状态变化。",
     tool_calls: [{ id: "call-1", function: { name: "status__add", arguments: '{"name":"警觉"}' } }],
   } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
   const result = await requestAI({ ...settings, nativeTools: true }, [{ role: "user", content: "侧耳倾听" }]);
   assert.equal(result.toolCalls[0].name, "status.add");
   assert.equal(result.toolCalls[0].args.name, "警觉");
   assert.equal(result.requiresToolFollowUp, true);
+  assert.match(result.reasoningContent, /状态变化/);
 });
 
 test("tool follow-up reports local validation and disables repeated native calls", async (context) => {
@@ -87,10 +145,12 @@ test("tool follow-up reports local validation and disables repeated native calls
   const resultMessages = buildToolResultMessages(
     [{ id: "call-1", name: "item.use", args: { instanceId: "missing-key" } }],
     [{ ok: false, log: "变更被拒绝：找不到要使用的物品", reason: "找不到要使用的物品" }],
+    "先检查钥匙是否存在。",
   );
   const result = await requestAI({ ...settings, nativeTools: true }, resultMessages, undefined, undefined, { disableTools: true });
 
   assert.equal(requestBody.tools, undefined);
+  assert.equal(requestBody.messages[0].reasoning_content, "先检查钥匙是否存在。");
   assert.equal(requestBody.messages[1].role, "tool");
   assert.match(requestBody.messages[1].content, /找不到要使用的物品/);
   assert.match(result.narrative, /门锁仍然完好/);

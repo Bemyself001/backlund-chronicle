@@ -25,6 +25,8 @@ test("uses the OpenAI preset for a fresh browser", () => {
   assert.equal(settings.provider, "openai");
   assert.equal(settings.baseUrl, "https://api.openai.com/v1");
   assert.equal(settings.model, "gpt-4.1-mini");
+  assert.equal(settings.reasoningMode, "auto");
+  assert.equal(settings.autoRetryReasoning, true);
 });
 
 test("keeps a session-only key out of persistent settings", () => {

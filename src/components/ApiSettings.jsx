@@ -39,6 +39,11 @@ export default function ApiSettings({ settings, onSave, onClose }) {
     [draft.modelCatalogs, draft.provider],
   );
   const savedModels = draft.savedModels?.[draft.provider] || [];
+  const reasoningHint = draft.provider === "deepseek"
+    ? "DeepSeek 的“关闭”会发送 thinking.type=disabled；低、中档会按服务商兼容规则使用思考模式。"
+    : draft.provider === "openai"
+      ? "仅推理模型会收到该参数；“关闭 / 最低”会使用兼容性更好的最低推理强度。"
+      : "兼容接口是否支持推理强度取决于服务商；不确定时保持“自动”。";
   const filteredModels = useMemo(() => {
     const query = modelQuery.trim().toLowerCase();
     return models.filter((model) => !query || model.toLowerCase().includes(query)).slice(0, 80);
@@ -185,11 +190,23 @@ export default function ApiSettings({ settings, onSave, onClose }) {
           <label className={styles.field}><span>Max Tokens</span><input type="number" min="128" max="384000" value={draft.maxTokens} onChange={(event) => update("maxTokens", event.target.value)} /></label>
           <label className={styles.field}><span>上下文长度</span><input type="number" min="2000" max="1000000" value={draft.contextLength} onChange={(event) => update("contextLength", event.target.value)} /></label>
         </div>
+        <label className={styles.field}>
+          <span>推理模式</span>
+          <select value={draft.reasoningMode || "auto"} onChange={(event) => update("reasoningMode", event.target.value)} disabled={draft.mockMode}>
+            <option value="auto">自动 · 使用服务商默认值</option>
+            <option value="off">关闭 / 最低 · 优先保留正文预算</option>
+            <option value="low">低 · 更快、更省输出</option>
+            <option value="medium">中 · 平衡</option>
+            <option value="high">高 · 更多推理</option>
+          </select>
+          <small className={styles.helper}>{reasoningHint}</small>
+        </label>
         <label className={styles.field}><span>自定义请求头 · JSON</span><textarea rows="3" value={draft.customHeaders} onChange={(event) => update("customHeaders", event.target.value)} spellCheck="false" /></label>
         <fieldset className={styles.switches}><legend>协议能力</legend>
           {[
             ["mockMode", "Mock 模式", "无需 API 也能完整体验"], ["stream", "流式输出", "逐步呈现模型回复"],
             ["nativeTools", "原生 Tool Calling", "优先接收函数调用提议"], ["jsonMode", "JSON 兼容模式", "使用结构化回退协议"],
+            ["autoRetryReasoning", "推理耗尽自动重试", "正文为空时自动关闭或降低推理，并安全重试一次"],
           ].map(([key, label, hint]) => <label key={key} className={styles.switch}><input type="checkbox" checked={draft[key]} onChange={(event) => update(key, event.target.checked)} /><span><strong>{label}</strong><small>{hint}</small></span></label>)}
         </fieldset>
         {status && <p className={styles.status} role="status">{status}</p>}

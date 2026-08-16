@@ -8,7 +8,7 @@ import SaveManager from "./components/SaveManager.jsx";
 import { createInitialGame, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from "./data/defaults.js";
 import { executeToolCalls } from "./engine/tools.js";
 import { resolveTurnProgress } from "./engine/turn.js";
-import { buildToolResultMessages, loadApiSettings, requestAI, saveApiSettings } from "./services/api.js";
+import { buildToolResultMessages, loadApiSettings, requestAIWithReasoningFallback, saveApiSettings } from "./services/api.js";
 import { buildContext, updateMemory } from "./services/memory.js";
 import { mockResponse } from "./services/mock.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
@@ -65,22 +65,27 @@ export default function App() {
   const handleSettingsSave = (next) => { setSettings(saveApiSettings(next)); };
   const handlePromptSave = (next) => { localStorage.setItem("mist-system-prompt", next); setPrompt(next); };
 
-  const runTurn = async (action) => {
+  const runTurn = async (action, options = {}) => {
     if (!game || busyRef.current || !action.trim()) return false;
     const selectedRisk = game.choices.find((choice) => choice.label === action)?.risk;
-    busyRef.current = true; lastActionRef.current = action; setLoading(true); setTurnPhase("generating"); setError(""); resetStreamPreview();
+    busyRef.current = true; lastActionRef.current = action; setLoading(true); setTurnPhase(options.manualRetry ? "manualRetry" : "generating"); setError(""); resetStreamPreview();
     const controller = new AbortController(); controllerRef.current = controller;
     try {
       const messages = buildContext(game, action, prompt);
-      let response = settings.mockMode ? await mockResponse(game, action, controller.signal, queueStreamPreview) : await requestAI(settings, messages, controller.signal, queueStreamPreview);
+      const requestModel = (requestMessages, requestOptions = {}) => requestAIWithReasoningFallback(settings, requestMessages, controller.signal, queueStreamPreview, {
+        ...requestOptions,
+        onReasoningFallback: () => { resetStreamPreview(); setTurnPhase("reasoningRetry"); },
+      });
+      let response = settings.mockMode ? await mockResponse(game, action, controller.signal, queueStreamPreview) : await requestModel(messages);
       const proposedToolCalls = response.toolCalls;
+      const toolReasoningContent = response.reasoningContent || "";
       setTurnPhase("validating");
       const execution = executeToolCalls(game, proposedToolCalls);
       if (!settings.mockMode && response.requiresToolFollowUp) {
         resetStreamPreview();
         setTurnPhase("finalizing");
-        const followUpMessages = [...messages, ...buildToolResultMessages(proposedToolCalls, execution.results)];
-        response = await requestAI(settings, followUpMessages, controller.signal, queueStreamPreview, { disableTools: true });
+        const followUpMessages = [...messages, ...buildToolResultMessages(proposedToolCalls, execution.results, toolReasoningContent)];
+        response = await requestModel(followUpMessages, { disableTools: true });
       }
       const memory = updateMemory(execution.game, action, response.narrative, response.memoryNotes);
       const progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results);
@@ -98,6 +103,12 @@ export default function App() {
     } finally { resetStreamPreview(); setTurnPhase("idle"); setLoading(false); busyRef.current = false; controllerRef.current = null; }
   };
 
+  const retryLastTurn = () => {
+    const action = lastActionRef.current.trim();
+    if (!action) { setError("没有可以重试的上一轮行动。请在输入框中描述新的行动。"); return Promise.resolve(false); }
+    return runTurn(action, { manualRetry: true });
+  };
+
   const runLocalTool = (name, args, reason) => {
     if (!game || loading) return;
     const execution = executeToolCalls({ ...game, turn: game.turn - 1 }, [{ id: makeId("local"), name, args, reason }]);
@@ -111,7 +122,7 @@ export default function App() {
     <a className="skip-link" href="#main">跳到主要内容</a>
     {screen === "welcome" && <Welcome hasSave={saves.some((slot) => slot.slotId === "autosave")} apiSettings={settings} onNew={() => setScreen("create")} onContinue={handleContinue} onImport={handleImport} onApi={() => setModal("api")} />}
     {screen === "create" && <CharacterCreation onBack={() => setScreen("welcome")} onCreate={handleCreate} />}
-    {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={() => runTurn(lastActionRef.current)} onLocalTool={runLocalTool} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => setScreen("welcome")} />}
+    {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onLocalTool={runLocalTool} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => setScreen("welcome")} />}
     {modal === "api" && <ApiSettings settings={settings} onSave={handleSettingsSave} onClose={() => setModal(null)} />}
     {modal === "prompt" && <PromptEditor value={prompt} onSave={handlePromptSave} onClose={() => setModal(null)} />}
     {modal === "saves" && game && <SaveManager saves={saves} game={game} onSave={saveSlot} onLoad={loadSlot} onDelete={removeSlot} onExport={exportSave} onImport={handleImport} onClose={() => setModal(null)} />}

@@ -1,7 +1,7 @@
 import { makeId } from "../utils/id.js";
 
 export const SAVE_VERSION = 2;
-export const AI_SETTINGS_VERSION = "1.3";
+export const AI_SETTINGS_VERSION = "1.4";
 
 export const LOW_SEQUENCE_PATHWAYS = [
   "占卜家（序列9）",
@@ -46,6 +46,8 @@ export const DEFAULT_API_SETTINGS = {
   temperature: 0.8,
   maxTokens: 1200,
   contextLength: 12000,
+  reasoningMode: "auto",
+  autoRetryReasoning: true,
   customHeaders: "{}",
   stream: true,
   nativeTools: true,
