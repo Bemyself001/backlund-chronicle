@@ -7,7 +7,7 @@
 - 在线版：<https://bemyself001.github.io/backlund-chronicle/>
 - Android APK：<https://github.com/Bemyself001/backlund-chronicle/releases/latest>
 
-在线版由 GitHub Pages 自动发布，不依赖 Cloudflare。每次推送到 `main` 分支都会重新部署网页，并生成一个新的公开 APK Release。
+在线版由 GitHub Pages 自动发布，不依赖 Cloudflare。每次推送到 `main` 分支都会重新部署网页，并生成一个带递增版本号的正式签名 APK Release。
 
 ## 运行
 
@@ -42,9 +42,13 @@ npm run preview
 
 ## GitHub 云端构建 APK
 
-项目包含 Capacitor Android 工程与 `.github/workflows/build-android-apk.yml`。代码推送到 GitHub 的 `main` 分支后会自动构建调试 APK，也可以在仓库的 **Actions → Build Android APK → Run workflow** 手动运行。
+项目包含 Capacitor Android 工程与 `.github/workflows/build-android-apk.yml`。代码推送到 GitHub 的 `main` 分支后会自动构建正式签名 APK，也可以在仓库的 **Actions → Build Android APK → Run workflow** 手动运行。流水线以 `1.1.<Actions 运行编号>` 生成显示版本，以 `10000 + 运行编号` 生成始终递增的 Android `versionCode`。
 
-构建完成后，可直接从仓库的 **Releases** 页面下载 `backlund-chronicle-debug.apk`，无需登录且不会像 Actions Artifact 一样在 14 天后过期。Actions 运行记录仍会保留一份短期 Artifact 供排查构建问题。首次安装时，Android 需要允许浏览器或文件管理器“安装未知应用”。
+正式构建依赖四个 GitHub Actions Secrets：`ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和 `ANDROID_KEY_PASSWORD`。签名文件及其本地恢复信息保存在被 Git 忽略的 `.signing/`；必须离线备份，丢失后将无法覆盖更新现有安装。
+
+构建完成后，可直接从仓库的 **Releases** 页面下载 `backlund-chronicle.apk`，无需登录且不会像 Actions Artifact 一样在 14 天后过期。APK 会在启动约两秒后每天至多自动检查一次最新版；也可在 **API 设置 → 检查应用更新** 手动检查。发现新版后会跳转浏览器下载，最终安装仍由 Android 系统要求用户确认。
+
+旧的 `apk-8`、`apk-9` 等版本使用临时调试签名，无法直接覆盖升级为新的正式签名版。首次迁移前请先导出游戏存档，然后卸载旧版、安装新正式版并导入存档；API Key 不包含在存档中，需要重新填写。
 
 本地同步 Android 网页资源：
 

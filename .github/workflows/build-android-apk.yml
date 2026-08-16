@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 jobs:
-  build-debug-apk:
+  build-release-apk:
     runs-on: ubuntu-latest
     timeout-minutes: 30
 
@@ -38,25 +38,39 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Prepare release version and signing key
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "Missing ANDROID_KEYSTORE_BASE64 repository secret"; exit 1; }
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/backlund-release.jks"
+          echo "APP_VERSION_NAME=1.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          echo "APP_VERSION_CODE=$((10000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
+          echo "VITE_APP_VERSION=1.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/backlund-release.jks" >> "$GITHUB_ENV"
+          echo "ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> "$GITHUB_ENV"
+
       - name: Build web app and sync Android
         run: pnpm run android:sync
 
-      - name: Build debug APK
+      - name: Build signed release APK
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug
+          ./gradlew assembleRelease
 
       - name: Prepare public APK
         run: |
-          cp android/app/build/outputs/apk/debug/app-debug.apk backlund-chronicle-debug.apk
-          sha256sum backlund-chronicle-debug.apk > backlund-chronicle-debug.apk.sha256
+          cp android/app/build/outputs/apk/release/app-release.apk backlund-chronicle.apk
+          sha256sum backlund-chronicle.apk > backlund-chronicle.apk.sha256
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: backlund-chronicle-debug-apk
-          path: android/app/build/outputs/apk/debug/app-debug.apk
+          name: backlund-chronicle-${{ env.APP_VERSION_NAME }}-apk
+          path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
           retention-days: 14
 
@@ -64,12 +78,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          RELEASE_TAG="apk-${GITHUB_RUN_NUMBER}"
+          RELEASE_TAG="v${APP_VERSION_NAME}"
           gh release create "$RELEASE_TAG" \
-            backlund-chronicle-debug.apk \
-            backlund-chronicle-debug.apk.sha256 \
+            backlund-chronicle.apk \
+            backlund-chronicle.apk.sha256 \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "贝克兰德纪事 APK · Build ${GITHUB_RUN_NUMBER}" \
-            --notes "自动构建的 Android 调试版。下载 APK 后可直接安装；Android 可能提示允许安装未知来源应用。" \
+            --title "贝克兰德纪事 ${APP_VERSION_NAME}" \
+            --notes "正式签名的 Android 版本。应用会自动检查后续更新；安装仍需由你在 Android 系统界面确认。首次从旧调试版迁移前请导出存档并卸载旧版。" \
             --latest

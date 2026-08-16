@@ -1,10 +1,11 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Welcome from "./components/Welcome.jsx";
 import CharacterCreation from "./components/CharacterCreation.jsx";
 import GameScreen from "./components/GameScreen.jsx";
 import ApiSettings from "./components/ApiSettings.jsx";
 import PromptEditor from "./components/PromptEditor.jsx";
 import SaveManager from "./components/SaveManager.jsx";
+import UpdateDialog from "./components/UpdateDialog.jsx";
 import { createInitialGame, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from "./data/defaults.js";
 import { executeToolCalls } from "./engine/tools.js";
 import { resolveTurnProgress } from "./engine/turn.js";
@@ -14,6 +15,7 @@ import { mockResponse } from "./services/mock.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
 import { extractNarrativePreview } from "./services/streamPreview.js";
 import { makeId } from "./utils/id.js";
+import { checkForUpdate, isNativeAndroid } from "./services/updates.js";
 
 export default function App() {
   const [screen, setScreen] = useState("welcome");
@@ -38,6 +40,17 @@ export default function App() {
   const streamTimerRef = useRef(null);
   const pendingStreamRef = useRef("");
   const refreshSaves = () => setSaves(listSaves());
+
+  useEffect(() => {
+    if (!isNativeAndroid()) return undefined;
+    let active = true;
+    const timer = window.setTimeout(() => {
+      checkForUpdate().then((result) => {
+        if (active && result.hasUpdate) setModal("update-auto");
+      }).catch(() => {});
+    }, 1800);
+    return () => { active = false; window.clearTimeout(timer); };
+  }, []);
 
   const resetStreamPreview = () => {
     if (streamTimerRef.current) clearTimeout(streamTimerRef.current);
@@ -123,7 +136,8 @@ export default function App() {
     {screen === "welcome" && <Welcome hasSave={saves.some((slot) => slot.slotId === "autosave")} apiSettings={settings} onNew={() => setScreen("create")} onContinue={handleContinue} onImport={handleImport} onApi={() => setModal("api")} />}
     {screen === "create" && <CharacterCreation onBack={() => setScreen("welcome")} onCreate={handleCreate} />}
     {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onLocalTool={runLocalTool} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => setScreen("welcome")} />}
-    {modal === "api" && <ApiSettings settings={settings} onSave={handleSettingsSave} onClose={() => setModal(null)} />}
+    {modal === "api" && <ApiSettings settings={settings} onSave={handleSettingsSave} onCheckUpdate={() => setModal("update")} onClose={() => setModal(null)} />}
+    {(modal === "update" || modal === "update-auto") && <UpdateDialog automatic={modal === "update-auto"} onClose={() => setModal(null)} />}
     {modal === "prompt" && <PromptEditor value={prompt} onSave={handlePromptSave} onClose={() => setModal(null)} />}
     {modal === "saves" && game && <SaveManager saves={saves} game={game} onSave={saveSlot} onLoad={loadSlot} onDelete={removeSlot} onExport={exportSave} onImport={handleImport} onClose={() => setModal(null)} />}
   </>;

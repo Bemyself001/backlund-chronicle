@@ -1,0 +1,9 @@
+.content { display: grid; gap: 1rem; }
+.version { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding-bottom: .7rem; border-bottom: 1px solid #8b7a5a66; }
+.version span { color: var(--ink-soft); font-size: .78rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.version strong { color: var(--verdigris); font-family: var(--font-display); font-size: 1.25rem; }
+.status { margin: 0; color: var(--ink); line-height: 1.6; }
+.notes { display: grid; gap: .45rem; padding: .85rem; background: #f1e7d170; border-left: 3px solid var(--brass); }
+.notes p { max-height: 9rem; margin: 0; overflow: auto; color: var(--ink-soft); line-height: 1.65; white-space: pre-wrap; }
+.hint { margin: 0; color: var(--danger); font-size: .82rem; line-height: 1.55; }
+.actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .65rem; }

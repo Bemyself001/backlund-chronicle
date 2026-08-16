@@ -2,4 +2,12 @@ package io.github.bemyself001.backlundchronicle;
 
 import com.getcapacitor.BridgeActivity;
 
-public class MainActivity extends BridgeActivity {}
+import android.os.Bundle;
+
+public class MainActivity extends BridgeActivity {
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        registerPlugin(UpdaterPlugin.class);
+        super.onCreate(savedInstanceState);
+    }
+}
