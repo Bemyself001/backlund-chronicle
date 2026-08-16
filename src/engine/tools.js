@@ -153,7 +153,8 @@ function executeOne(game, call) {
       const discoveredIds = game.discoveredLocations.map((entry) => entry.id);
       const route = mappedOrigin && mappedTarget ? findTravelRoute(game.location.id, location.id, discoveredIds) : null;
       if (mappedOrigin && mappedTarget && !route) return fail(call.name, "当前已知交通图中没有通往该地点的可用路线");
-      game.location = { id: location.id, name: location.name, district: args.district || mappedTarget?.district || location.district || "贝克兰德" };
+      const mappedDistrict = mappedTarget?.district ? `贝克兰德${mappedTarget.district}` : null;
+      game.location = { id: location.id, name: location.name, district: mappedDistrict || args.district || location.district || "贝克兰德" };
       return succeed(call.name, `${turnLabel}：前往「${location.name}」——${call.reason}。`, { travelMinutes: route?.minutes || 35, path: route?.path || [location.id] });
     }
     case "clue.add": {

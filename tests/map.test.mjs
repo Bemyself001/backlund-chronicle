@@ -4,6 +4,7 @@ import { createInitialGame, EMPTY_CHARACTER } from "../src/data/defaults.js";
 import { findTravelRoute, MAP_LOCATIONS } from "../src/data/map.js";
 import { executeToolCalls } from "../src/engine/tools.js";
 import { minutesForTurn } from "../src/engine/turn.js";
+import { ensureMapMoveToolCall } from "../src/services/mapTravel.js";
 
 const known = ["east-station", "iron-gate", "soot-lamp", "queen-library"];
 
@@ -33,4 +34,23 @@ test("map travel refuses moving to the current place", () => {
   const execution = executeToolCalls(game, [{ id: "move-same", name: "location.move", args: { locationId: "east-station" }, reason: "重复选择当前位置" }]);
   assert.equal(execution.results[0].ok, false);
   assert.match(execution.results[0].reason, /已经位于/);
+});
+
+test("map selection always supplies a deterministic destination ID", () => {
+  const destination = MAP_LOCATIONS.find((location) => location.id === "soot-lamp");
+  const calls = ensureMapMoveToolCall([], destination, 4);
+  assert.deepEqual(calls[0].args, { locationId: "soot-lamp" });
+  assert.equal(calls[0].id, "map-move-4-soot-lamp");
+});
+
+test("map selection repairs an AI movement call without duplicating it", () => {
+  const destination = MAP_LOCATIONS.find((location) => location.id === "queen-library");
+  const calls = ensureMapMoveToolCall([
+    { id: "ai-move", name: "location.move", args: { district: "错误城区" }, reason: "模型未提供地点 ID" },
+    { id: "ai-clue", name: "clue.add", args: { name: "车票" } },
+  ], destination, 5);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].args.locationId, "queen-library");
+  assert.equal(calls[0].args.district, undefined);
+  assert.equal(calls[0].id, "map-move-5-queen-library");
 });

@@ -20,6 +20,8 @@
 .node span { overflow: hidden; font: 700 .58rem var(--font-serif); text-overflow: ellipsis; white-space: nowrap; }
 .node[data-known="true"] { border-style: solid; border-color: #346454; background: #e6d9c1; color: #244f43; }
 .node[data-current="true"] { border-color: #7f612d; background: #3b3122; box-shadow: 0 0 0 2px #b9924e55; color: #f1dfbd; }
+.playerMarker { position: absolute; bottom: calc(100% + .42rem); left: 50%; width: .82rem; height: .82rem; border: 2px solid #3f2e16; background: #d5aa58; box-shadow: 0 2px 0 #f4ddb0, 0 3px 8px #3d2d1970; transform: translateX(-50%) rotate(45deg); }
+.playerMarker::after { position: absolute; inset: 2px; border: 1px solid #fff0c8; background: #65471d; content: ""; }
 .node[aria-pressed="true"] { outline: 2px solid #8b6930; outline-offset: 2px; }
 .node:hover { z-index: 5; background: #f1e5cd; color: #2b5147; }
 .node[data-current="true"]:hover { background: #493b28; color: #fff0cc; }
@@ -33,6 +35,7 @@
 .detail dl div { display: flex; justify-content: space-between; gap: 1rem; }
 .detail dt, .detail dd { margin: 0; font: .68rem var(--font-sans); }
 .detail dt { color: #786f60; }.detail dd { color: #3f554c; font-weight: 700; text-align: right; }
+.detail code { overflow-wrap: anywhere; color: #6b4d21; font: 700 .64rem var(--font-mono); letter-spacing: .03em; }
 .routeText { margin: 0 0 1rem; padding-left: .65rem; border-left: 2px solid var(--brass); color: #655a47; font: .68rem/1.55 var(--font-sans); }
 .detail > button { width: 100%; margin-top: auto; }
 .detail > small { margin-top: .55rem; color: #777064; font: .62rem/1.45 var(--font-sans); }

@@ -15,6 +15,7 @@ import { buildContext, updateMemory } from "./services/memory.js";
 import { mockResponse } from "./services/mock.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
 import { extractNarrativePreview } from "./services/streamPreview.js";
+import { ensureMapMoveToolCall } from "./services/mapTravel.js";
 import { makeId } from "./utils/id.js";
 import { checkForUpdate, isNativeAndroid } from "./services/updates.js";
 
@@ -94,7 +95,7 @@ export default function App() {
         onReasoningFallback: () => { resetStreamPreview(); setTurnPhase("reasoningRetry"); },
       });
       let response = settings.mockMode ? await mockResponse(game, action, controller.signal, queueStreamPreview) : await requestModel(messages);
-      const proposedToolCalls = response.toolCalls;
+      const proposedToolCalls = ensureMapMoveToolCall(response.toolCalls, options.mapDestination, game.turn + 1);
       const toolReasoningContent = response.reasoningContent || "";
       setTurnPhase("validating");
       const execution = executeToolCalls(game, proposedToolCalls);
@@ -142,7 +143,7 @@ export default function App() {
     {screen === "welcome" && <Welcome hasSave={saves.some((slot) => slot.slotId === "autosave")} apiSettings={settings} onNew={() => setScreen("create")} onContinue={handleContinue} onImport={handleImport} onApi={() => setModal("api")} />}
     {screen === "create" && <CharacterCreation onBack={() => setScreen("welcome")} onCreate={handleCreate} />}
     {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onLocalTool={runLocalTool} onOpenMap={() => setModal("map")} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => setScreen("welcome")} />}
-    {modal === "map" && game && <WorldMap game={game} loading={loading} onClose={() => setModal(null)} onTravel={(location) => { setModal(null); return runTurn(`前往${location.name}`); }} />}
+    {modal === "map" && game && <WorldMap game={game} loading={loading} onClose={() => setModal(null)} onTravel={(location) => runTurn(`前往${location.name}`, { mapDestination: location })} />}
     {modal === "api" && <ApiSettings settings={settings} onSave={handleSettingsSave} onCheckUpdate={() => setModal("update")} onClose={() => setModal(null)} />}
     {(modal === "update" || modal === "update-auto") && <UpdateDialog automatic={modal === "update-auto"} onClose={() => setModal(null)} />}
     {modal === "prompt" && <PromptEditor value={prompt} onSave={handlePromptSave} onClose={() => setModal(null)} />}

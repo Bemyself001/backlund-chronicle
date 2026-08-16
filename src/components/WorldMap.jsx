@@ -37,9 +37,9 @@ export default function WorldMap({ game, loading, onClose, onTravel }) {
               data-current={isCurrent}
               data-known={isKnown}
               aria-pressed={selectedId === location.id}
-              aria-label={isKnown ? location.name : `${location.district}的未知地点`}
+              aria-label={isKnown ? `${location.name}${isCurrent ? "，玩家当前位置" : ""}` : `${location.district}的未知地点`}
               onClick={() => setSelectedId(location.id)}
-            ><b>{isKnown ? location.code : "?"}</b><span>{isKnown ? location.name.replace(`${location.district}·`, "") : "未知地点"}</span></button>;
+            >{isCurrent && <i className={styles.playerMarker} aria-hidden="true" />}<b>{isKnown ? location.code : "?"}</b><span>{isKnown ? location.name.replace(`${location.district}·`, "") : "未知地点"}</span></button>;
           })}
           <div className={styles.scale} aria-hidden="true"><i /><span>城区示意 · 非精确比例</span></div>
         </div>
@@ -49,13 +49,14 @@ export default function WorldMap({ game, loading, onClose, onTravel }) {
         <h3>{discovered ? selected.name : "尚未发现的地点"}</h3>
         <span>{discovered ? selected.description : "继续探索、打听消息或取得相关线索后，这里才会显示详细资料。"}</span>
         {discovered && <dl>
+          <div><dt>Location ID</dt><dd><code>{selected.id}</code></dd></div>
           <div><dt>档案状态</dt><dd>{current ? "当前位置" : "已发现"}</dd></div>
           <div><dt>预计耗时</dt><dd>{current ? "—" : route ? `约 ${route.minutes} 分钟` : "暂无可用路线"}</dd></div>
           <div><dt>建议交通</dt><dd>{current ? "—" : route ? [...new Set(route.transports)].join("、") : "—"}</dd></div>
         </dl>}
         {routeNames && !current && <p className={styles.routeText}>推荐路线：{routeNames}</p>}
         <button className="button button--primary" type="button" disabled={!discovered || current || !route || loading} onClick={() => onTravel(selected)}>{current ? "你正在这里" : loading ? "本轮处理中" : "前往此处"}</button>
-        <small>选择目的地会作为玩家行动提交，最终移动仍由本地规则验证。</small>
+        <small>地图会携带 Location ID 提交目的地；移动成功后，玩家标记会立即更新。</small>
       </aside>
     </div>
   </Modal>;
