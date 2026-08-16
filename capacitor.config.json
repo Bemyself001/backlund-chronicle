@@ -1,0 +1,8 @@
+{
+  "appId": "io.github.bemyself001.backlundchronicle",
+  "appName": "贝克兰德纪事",
+  "webDir": "dist/client",
+  "server": {
+    "androidScheme": "https"
+  }
+}

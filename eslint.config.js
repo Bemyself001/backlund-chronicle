@@ -6,7 +6,7 @@ import reactRefresh from "eslint-plugin-react-refresh";
 const sourceFiles = ["**/*.{js,jsx}"];
 
 export default [
-  { ignores: ["dist"] },
+  { ignores: ["dist", "android"] },
   {
     ...js.configs.recommended,
     files: sourceFiles,

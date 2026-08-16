@@ -10,17 +10,22 @@
     "dev": "vite --configLoader runner",
     "build": "vite build --configLoader runner",
     "postbuild": "node scripts/prepare-sites-build.mjs",
+    "android:sync": "pnpm run build && cap sync android",
+    "android:open": "cap open android",
     "lint": "eslint .",
     "test": "node --test tests/*.test.mjs",
     "preview": "vite preview"
   },
   "dependencies": {
+    "@capacitor/android": "^8.5.0",
+    "@capacitor/core": "^8.5.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },
   "devDependencies": {
-    "@openai/sites-vite-plugin": "0.1.0",
+    "@capacitor/cli": "^8.5.0",
     "@eslint/js": "^9.33.0",
+    "@openai/sites-vite-plugin": "0.1.0",
     "@types/react": "^19.1.10",
     "@types/react-dom": "^19.1.7",
     "@vitejs/plugin-react": "^5.0.0",

@@ -32,3 +32,16 @@ npm run preview
 游戏存档保存在 LocalStorage。API Key 默认只保存在 sessionStorage；只有用户明确开启“跨会话保存”时才会写入单独的本地 API 设置。剧情状态与导出的 JSON 存档均会剔除 API Key。
 
 没有 API Key 时保持 Mock 模式即可完成全部核心流程。真实接口默认按 OpenAI Chat Completions 协议调用，兼容流式输出、原生 tool calling 与 JSON 回退。
+
+## GitHub 云端构建 APK
+
+项目包含 Capacitor Android 工程与 `.github/workflows/build-android-apk.yml`。代码推送到 GitHub 的 `main` 分支后会自动构建调试 APK，也可以在仓库的 **Actions → Build Android APK → Run workflow** 手动运行。
+
+构建完成后，打开对应的 Actions 运行记录，在 **Artifacts** 下载 `backlund-chronicle-debug-apk`。解压后即可得到 `app-debug.apk`；首次安装时，Android 需要允许浏览器或文件管理器“安装未知应用”。
+
+本地同步 Android 网页资源：
+
+```bash
+pnpm install
+pnpm run android:sync
+```
