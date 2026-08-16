@@ -1,4 +1,5 @@
 import { SAVE_VERSION } from "../data/defaults.js";
+import { withAdvancement } from "../data/character.js";
 
 const SAVES_KEY = "mist-chronicle-saves-v1";
 const AUTOSAVE_ID = "autosave";
@@ -50,7 +51,15 @@ export function migrateSave(raw) {
     return value;
   };
   const migrated = version < 2 ? migrateStoryValue(raw) : raw;
-  return { ...migrated, version: SAVE_VERSION, processedToolCalls: migrated.processedToolCalls || [], memoryNotes: migrated.memoryNotes || [] };
+  return {
+    ...migrated,
+    version: SAVE_VERSION,
+    character: withAdvancement(migrated.character),
+    processedToolCalls: migrated.processedToolCalls || [],
+    memoryNotes: migrated.memoryNotes || [],
+    lastTurnBaseline: migrated.lastTurnBaseline || null,
+    lastTurnAudit: migrated.lastTurnAudit || null,
+  };
 }
 
 export function exportSave(game) {

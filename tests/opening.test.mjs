@@ -25,6 +25,14 @@ test("character creation exposes twelve distinct sequence 9 pathways", () => {
   assert.ok(LOW_SEQUENCE_PATHWAYS.includes("猎人（序列9）"));
 });
 
+test("low sequence characters keep a structured pathway and sequence record", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "途径测试员", extraordinary: "low", pathway: "窥秘人（序列9）" });
+  assert.equal(game.character.advancement.pathwayId, "mystery_pryer");
+  assert.equal(game.character.advancement.pathwayName, "窥秘人");
+  assert.equal(game.character.advancement.sequence, 9);
+  assert.equal(game.character.advancement.sequenceLabel, "序列9");
+});
+
 test("AI context treats mysteries as optional world threads", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "测试旅客" });
   const messages = buildContext(game, "先找一间便宜住处", DEFAULT_SYSTEM_PROMPT);

@@ -1,6 +1,7 @@
 import { makeId } from "../utils/id.js";
+import { withAdvancement } from "./character.js";
 
-export const SAVE_VERSION = 2;
+export const SAVE_VERSION = 3;
 export const AI_SETTINGS_VERSION = "1.4";
 
 export const LOW_SEQUENCE_PATHWAYS = [
@@ -28,7 +29,7 @@ export const DEFAULT_SYSTEM_PROMPT = `你是《贝克兰德纪事》的叙事者
 5. 这是开放世界沙盒。玩家可以无视、拒绝或离开任何案件与剧情钩子；不得用巧合、NPC 催促或突发灾难强迫玩家回到预设主线。未被玩家明确接受的委托不得添加为进行中任务。
 6. 尊重地点连续性和旅行时间。玩家可在贝克兰德各区寻找工作、居所、人脉、知识与个人目标，世界事件会继续发展，但不应围绕玩家一人运转。
 7. 每轮给出三个真正不同的行动选项：谨慎调查、社交交涉、高风险行动，同时允许自由输入；选项应包含当前场景的多种可能，而非三个措辞不同的同一目标。
-8. 所有状态变化必须作为工具调用提议。不要在正文中伪造工具已经成功执行；等待本地引擎验证后再在后续叙事中确认。
+8. 所有状态变化必须作为工具调用提议。不要在正文中伪造工具已经成功执行；等待本地引擎验证后再在后续叙事中确认。物品是否获得或失去以本地审计结果为准，而不是以正文宣称为准。
 9. 优先使用原生 tool calling；若使用 JSON 协议，返回 narrative、choices、toolCalls、memoryNotes、worldEvents。
 10. narrative 使用克制、可读的中文，每轮约 250—600 字，不复述原著段落，不让原作角色抢占玩家中心位置。`;
 
@@ -137,6 +138,7 @@ function item(itemId, name, category, description, quantity, weight, rarity, tag
 }
 
 export function createInitialGame(character) {
+  const normalizedCharacter = withAdvancement(character);
   return {
     version: SAVE_VERSION,
     id: makeId("game"),
@@ -145,9 +147,9 @@ export function createInitialGame(character) {
     updatedAt: new Date().toISOString(),
     turn: 0,
     character: {
-      ...character,
+      ...normalizedCharacter,
       portraitSeed: Math.floor(Math.random() * 4),
-      stats: { health: 10, maxHealth: 10, sanity: 9, maxSanity: 10, spirituality: character.extraordinary === "low" ? 7 : 4, maxSpirituality: character.extraordinary === "low" ? 8 : 5 },
+      stats: { health: 10, maxHealth: 10, sanity: 9, maxSanity: 10, spirituality: normalizedCharacter.extraordinary === "low" ? 7 : 4, maxSpirituality: normalizedCharacter.extraordinary === "low" ? 8 : 5 },
     },
     location: { id: "east-station", name: "东区·贝克兰德火车站", district: "贝克兰德东区" },
     worldTime: "1349年 10月17日 · 周二 · 18:20",
@@ -189,5 +191,7 @@ export function createInitialGame(character) {
     processedToolCalls: [],
     aiSettingsVersion: AI_SETTINGS_VERSION,
     hiddenDanger: { id: "hollow-chime", name: "空鸣者的回声", stage: 0, revealed: false },
+    lastTurnBaseline: null,
+    lastTurnAudit: null,
   };
 }

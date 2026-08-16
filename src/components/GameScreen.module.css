@@ -43,6 +43,10 @@
 .tags span { padding: .35rem .5rem; border: 1px solid #67756c; color: #aeb9b2; font: .6rem var(--font-sans); }
 .tags .dangerTag { border-color: #7c3b37; color: #c4877e; }
 .tags em { color: #6f736e; font: italic .7rem var(--font-serif); }
+.advancementCard { display: grid; grid-template-columns: 1fr auto; gap: .25rem .6rem; padding: .7rem; border-left: 2px solid var(--brass); background: #b18e5014; }
+.advancementCard strong { color: #c5b79e; font: 600 .86rem var(--font-serif); }
+.advancementCard span { color: var(--brass-light); font: 700 .68rem var(--font-mono); }
+.advancementCard small { grid-column: 1 / -1; color: #7f8078; font: .58rem var(--font-sans); }
 .relationship { display: grid; grid-template-columns: 1fr auto; gap: .12rem .5rem; padding: .6rem; border-left: 2px solid var(--verdigris); background: #243a341f; }
 .relationship strong, .relationship span { display: block; }
 .relationship strong { color: #bab29f; font: .74rem var(--font-serif); }
@@ -105,7 +109,7 @@
 .composer > div { display: flex; align-items: center; gap: .6rem; padding: .35rem; }
 .composer > div > span { color: #8a806e; font: .52rem var(--font-sans); }
 .composer .abort { min-height: 2.65rem; padding: 0 1rem; border: 1px solid var(--danger); background: #6a2923; color: #f3dfd8; font: 700 .68rem var(--font-sans); }
-.tabs { position: sticky; top: 0; z-index: 3; display: grid; grid-template-columns: repeat(4, 1fr); background: #0e1314; }
+.tabs { position: sticky; top: 0; z-index: 3; display: grid; grid-template-columns: repeat(5, 1fr); background: #0e1314; }
 .tabs button { min-height: 3rem; border: 0; border-bottom: 1px solid #aa875035; background: transparent; color: #79766e; font: 700 .62rem var(--font-sans); letter-spacing: .08em; }
 .tabs button[aria-selected="true"] { border-bottom: 2px solid var(--brass); color: var(--brass-light); background: #b18e5010; }
 .capacity { display: grid; grid-template-columns: 1fr auto; gap: .35rem; color: #837f74; font: .62rem var(--font-sans); }
@@ -144,6 +148,23 @@
 .record h4 { margin: .25rem 0 .35rem; color: #bfb5a1; font: 500 .82rem var(--font-serif); }
 .record p { margin: 0; color: #858279; font: .65rem/1.55 var(--font-sans); }
 .record small { display: block; margin-top: .5rem; color: #666762; font: .54rem var(--font-mono); }
+.auditHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: .7rem; margin-bottom: 1rem; }
+.auditHeading .archiveTitle { margin-bottom: .25rem; }
+.auditHeading p { margin: 0; color: #77766f; font: .6rem/1.45 var(--font-sans); }
+.auditHeading button { min-height: 2.2rem; padding: 0 .65rem; border: 1px solid #94784a; background: #b18e5020; color: #c0a66d; font: 700 .58rem var(--font-sans); white-space: nowrap; }
+.auditHeading button:hover:not(:disabled) { background: #b18e5040; color: #e0c78a; }
+.auditHeading button:disabled { cursor: not-allowed; opacity: .4; }
+.auditResult { display: grid; gap: .35rem; padding: .8rem; border-left: 2px solid #6c6558; background: #202625; }
+.auditResult.auditHasChanges { border-left-color: var(--brass); }
+.auditResult strong { color: #c2b8a4; font: 600 .72rem var(--font-serif); }
+.auditResult small { color: #85847d; font: .59rem/1.5 var(--font-sans); }
+.auditList { display: grid; gap: .4rem; margin: .8rem 0 0; padding: 0; list-style: none; }
+.auditList li { display: grid; grid-template-columns: 1.35rem 1fr; gap: .45rem; align-items: center; padding: .45rem .5rem; border: 1px solid #5b5b514d; background: #1a2020; }
+.auditList li > span { display: grid; width: 1.15rem; height: 1.15rem; place-items: center; border: 1px solid #6e6d62; color: #a5a18f; font: 700 .65rem var(--font-mono); }
+.auditList li[data-tone="gain"] > span { border-color: #477d6c; color: #83b5a2; }
+.auditList li[data-tone="loss"] > span { border-color: #87423b; color: #c78379; }
+.auditList p { margin: 0; color: #aaa393; font: .63rem/1.45 var(--font-sans); }
+.auditNote { margin-top: .8rem; padding: .55rem .65rem; border-left: 2px solid var(--verdigris); color: #9eafa6; font: .62rem var(--font-sans); }
 .log { display: grid; gap: .65rem; margin: 0; padding: 0; list-style: none; }
 .log li { display: grid; grid-template-columns: 1.7rem 1fr; gap: .5rem; }
 .log li > span { display: grid; width: 1.6rem; height: 1.6rem; place-items: center; border: 1px solid #5d635e; color: #74857d; font: .52rem var(--font-mono); }

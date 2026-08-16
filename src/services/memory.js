@@ -22,6 +22,7 @@ export function buildContext(game, action, systemPrompt) {
     { role: "system", content: systemPrompt },
     { role: "system", content: `【当前剧本】这是从贝克兰德东区火车站开始的开放世界沙盒。玩家可自由选择居所、职业、人脉、旅行方向与调查目标；“没有寄件人的黑函”、失踪文员和站台异响只是可选世界线，不是必须完成的主线。玩家未明确接受前，不得自动添加任务、安排 NPC 催促或用突发事件强迫回轨。原作主线仅为遥远背景；隐藏危险不得无铺垫直接揭露。` },
     { role: "system", content: `【角色状态】${JSON.stringify(characterState)}` },
+    { role: "system", content: `【上一轮本地审计】${JSON.stringify(game.lastTurnAudit || { status: "尚未由玩家执行审计" })}` },
     { role: "system", content: `【当前场景】${JSON.stringify(scene)}` },
     { role: "system", content: "【NPC认知边界】车站职员只知道铁路与东区见闻；各区普通市民依据职业和生活圈提供有限信息；普通人不知道非凡途径真相，失踪文员等秘密必须由玩家主动接触并通过线索逐步揭示。" },
     { role: "system", content: `【长期摘要】${game.longTermSummary}` },

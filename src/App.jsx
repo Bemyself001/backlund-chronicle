@@ -9,6 +9,7 @@ import UpdateDialog from "./components/UpdateDialog.jsx";
 import WorldMap from "./components/WorldMap.jsx";
 import { createInitialGame, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from "./data/defaults.js";
 import { buildRejectedToolNarrative, executeToolCalls } from "./engine/tools.js";
+import { auditTurnChanges, createAuditBaseline } from "./engine/audit.js";
 import { resolveTurnProgress } from "./engine/turn.js";
 import { buildToolResultMessages, loadApiSettings, requestAIWithReasoningFallback, saveApiSettings } from "./services/api.js";
 import { buildContext, updateMemory } from "./services/memory.js";
@@ -114,6 +115,8 @@ export default function App() {
         worldEvents: [...game.worldEvents, ...response.worldEvents.map((text) => ({ id: makeId("event"), turn: game.turn + 1, text }))].slice(-40),
         changeLog: [...game.changeLog, ...execution.logs].slice(-100),
         hiddenDanger: progress.hiddenDanger,
+        lastTurnBaseline: createAuditBaseline(game, game.turn + 1),
+        lastTurnAudit: null,
       };
       resetStreamPreview(); commitGame(next);
       return true;
@@ -132,7 +135,12 @@ export default function App() {
   const runLocalTool = (name, args, reason) => {
     if (!game || loading) return;
     const execution = executeToolCalls({ ...game, turn: game.turn - 1 }, [{ id: makeId("local"), name, args, reason }]);
-    commitGame({ ...execution.game, turn: game.turn, changeLog: [...game.changeLog, ...execution.logs].slice(-100) });
+    commitGame({ ...execution.game, turn: game.turn, changeLog: [...game.changeLog, ...execution.logs].slice(-100), lastTurnBaseline: createAuditBaseline(game, game.turn), lastTurnAudit: null });
+  };
+  const auditCurrentTurn = () => {
+    if (!game?.lastTurnBaseline || loading) return;
+    const audit = auditTurnChanges(game.lastTurnBaseline, game);
+    commitGame({ ...game, lastTurnAudit: audit });
   };
   const saveSlot = (slotId, label) => { if (game) saveGame(game, slotId, label); refreshSaves(); };
   const loadSlot = (slotId) => { const loaded = loadGame(slotId); if (loaded) { setGame(loaded); setScreen("game"); setModal(null); } };
@@ -142,7 +150,7 @@ export default function App() {
     <a className="skip-link" href="#main">跳到主要内容</a>
     {screen === "welcome" && <Welcome hasSave={saves.some((slot) => slot.slotId === "autosave")} apiSettings={settings} onNew={() => setScreen("create")} onContinue={handleContinue} onImport={handleImport} onApi={() => setModal("api")} />}
     {screen === "create" && <CharacterCreation onBack={() => setScreen("welcome")} onCreate={handleCreate} />}
-    {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onLocalTool={runLocalTool} onOpenMap={() => setModal("map")} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => setScreen("welcome")} />}
+    {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onLocalTool={runLocalTool} onAudit={auditCurrentTurn} onOpenMap={() => setModal("map")} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => setScreen("welcome")} />}
     {modal === "map" && game && <WorldMap game={game} loading={loading} onClose={() => setModal(null)} onTravel={(location) => runTurn(`前往${location.name}`, { mapDestination: location })} />}
     {modal === "api" && <ApiSettings settings={settings} onSave={handleSettingsSave} onCheckUpdate={() => setModal("update")} onClose={() => setModal(null)} />}
     {(modal === "update" || modal === "update-auto") && <UpdateDialog automatic={modal === "update-auto"} onClose={() => setModal(null)} />}
