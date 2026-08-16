@@ -211,7 +211,7 @@ export default function ApiSettings({ settings, onSave, onClose, onCheckUpdate }
         </fieldset>
         {status && <p className={styles.status} role="status">{status}</p>}
         <div className={styles.actions}>
-          <button className="button button--ghost" type="button" onClick={onCheckUpdate}>检查应用更新</button>
+          <button className="button button--ghost" type="button" onClick={onCheckUpdate}>检查版本状态</button>
           <button className="button button--ghost" type="button" onClick={test} disabled={testing || loadingModels}>{testing ? "正在测试…" : "测试连接"}</button>
           <button className="button button--primary" type="submit">保存全部设置</button>
         </div>

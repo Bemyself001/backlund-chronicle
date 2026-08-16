@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Modal from "./Modal.jsx";
 import styles from "./UpdateDialog.module.css";
-import { APP_VERSION, checkForUpdate, openUpdateDownload } from "../services/updates.js";
+import { APP_VERSION, WEB_BUILD, checkForUpdate, openUpdateDownload } from "../services/updates.js";
 
 export default function UpdateDialog({ onClose, automatic = false }) {
   const [result, setResult] = useState(null);
@@ -13,16 +13,23 @@ export default function UpdateDialog({ onClose, automatic = false }) {
       .then((next) => {
         if (!active) return;
         setResult(next);
-        setStatus(next.hasUpdate ? `发现新版本 ${next.latestVersion}` : `当前 ${APP_VERSION} 已是最新版。`);
+        if (next.autoUpdated) {
+          setStatus("网页版会随每次发布自动更新；当前页面已是最新部署版本。若页面一直开着，刷新即可载入新版本。");
+        } else {
+          setStatus(next.hasUpdate ? `发现新版本 ${next.latestVersion}` : `当前 ${APP_VERSION} 已是最新版。`);
+        }
       })
       .catch((error) => active && setStatus(error.message || "暂时无法检查更新。"));
     return () => { active = false; };
   }, []);
 
   return (
-    <Modal title={automatic ? "发现可用更新" : "检查应用更新"} eyebrow="Release telegraph" onClose={onClose}>
+    <Modal title={automatic ? "发现可用更新" : "检查版本状态"} eyebrow="Release telegraph" onClose={onClose}>
       <div className={styles.content}>
-        <div className={styles.version}><span>当前版本</span><strong>{APP_VERSION}</strong></div>
+        <div className={styles.version}>
+          <span>{result?.autoUpdated ? "当前部署" : "当前版本"}</span>
+          <strong>{result?.autoUpdated ? `网页版 · ${WEB_BUILD}` : APP_VERSION}</strong>
+        </div>
         <p className={styles.status} role="status">{status}</p>
         {result?.hasUpdate && <>
           <div className={styles.version}><span>最新版本</span><strong>{result.latestVersion}</strong></div>

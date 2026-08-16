@@ -6,6 +6,7 @@ const CHECKED_AT_KEY = "backlund-update-checked-at";
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000;
 
 export const APP_VERSION = import.meta.env?.VITE_APP_VERSION || "1.1.0";
+export const WEB_BUILD = (import.meta.env?.VITE_APP_BUILD || "local").slice(0, 7);
 
 const Updater = registerPlugin("Updater");
 
@@ -29,7 +30,15 @@ export function isNativeAndroid() {
 }
 
 export async function checkForUpdate({ force = false } = {}) {
-  if (!force && !isNativeAndroid()) return { skipped: true, reason: "web" };
+  if (!isNativeAndroid()) {
+    return {
+      platform: "web",
+      currentVersion: "网页版",
+      buildId: WEB_BUILD,
+      hasUpdate: false,
+      autoUpdated: true,
+    };
+  }
   const lastCheckedAt = Number(localStorage.getItem(CHECKED_AT_KEY) || 0);
   if (!force && Date.now() - lastCheckedAt < CHECK_INTERVAL) return { skipped: true, reason: "recent" };
 

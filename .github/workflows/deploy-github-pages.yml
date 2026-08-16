@@ -44,6 +44,8 @@ jobs:
         run: pnpm run lint
 
       - name: Build standalone site
+        env:
+          VITE_APP_BUILD: ${{ github.sha }}
         run: pnpm run build
 
       - name: Prepare Pages artifact
