@@ -262,7 +262,26 @@ function requestMessages(messages, forceDisableReasoning) {
   });
 }
 
-function safeMaxTokens(settings, options) {
+function estimatePromptTokens(messages = []) {
+  const serialized = JSON.stringify(messages);
+  // Conservative estimate for mixed Chinese/Latin prompts; the provider remains authoritative.
+  return Math.ceil(serialized.length / 3);
+}
+
+function autoMaxTokens(settings, messages, options) {
+  const contextLength = Number(settings.contextLength);
+  const contextLimit = Number.isFinite(contextLength) && contextLength > 0 ? contextLength : 12000;
+  const promptTokens = estimatePromptTokens(messages);
+  const safetyMargin = Math.max(512, Math.ceil(contextLimit * 0.08));
+  const available = Math.max(128, contextLimit - promptTokens - safetyMargin);
+  const requested = Number(options.maxTokensOverride);
+  return Math.round(Math.min(Number.isFinite(requested) && requested > 0 ? requested : available, available));
+}
+
+function safeMaxTokens(settings, options, messages = []) {
+  const auto = options.maxTokensModeOverride === "auto"
+    || (options.maxTokensModeOverride !== "manual" && (settings.maxTokensMode === "auto" || settings.maxTokens === "auto"));
+  if (auto) return autoMaxTokens(settings, messages, options);
   const requested = Number(options.maxTokensOverride ?? settings.maxTokens);
   return Number.isFinite(requested) && requested > 0 ? Math.round(requested) : 1200;
 }
@@ -340,7 +359,7 @@ export async function requestAI(settings, messages, signal, onChunk, options = {
     model: settings.model,
     messages: requestMessages(messages, options.forceDisableReasoning),
     temperature: Number(settings.temperature),
-    max_tokens: safeMaxTokens(settings, options),
+    max_tokens: safeMaxTokens(settings, options, messages),
     stream: options.streamOverride ?? Boolean(settings.stream),
   };
   applyReasoningSettings(body, settings, options);
@@ -388,7 +407,7 @@ export async function requestAIWithReasoningFallback(settings, messages, signal,
       && settings.autoRetryReasoning !== false
       && !options.forceDisableReasoning;
     if (!shouldRetry) throw error;
-    const currentMax = safeMaxTokens(settings, options);
+    const currentMax = safeMaxTokens(settings, options, messages);
     const expandedMax = Math.max(currentMax + 1600, Math.ceil(currentMax * 2));
     options.onReasoningRecovery?.({ error, maxTokens: expandedMax });
     onChunk?.("");

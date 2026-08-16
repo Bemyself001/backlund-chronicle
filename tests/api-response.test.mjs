@@ -27,6 +27,19 @@ test("requestAI accepts a non-stream plain-text compatible response", async (con
   assert.equal(result.choices.length, 3);
 });
 
+test("auto Max Tokens fits the prompt inside the configured context", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  let requestBody;
+  globalThis.fetch = async (_url, init) => {
+    requestBody = JSON.parse(init.body);
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"narrative":"自动预算已计算。","choices":[]}' } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  await requestAI({ ...settings, maxTokensMode: "auto", contextLength: 10000, maxTokens: 128 }, [{ role: "user", content: "观察东区车站" }]);
+  assert.ok(requestBody.max_tokens > 8000);
+  assert.ok(requestBody.max_tokens < 10000);
+});
+
 test("requestAI flushes a final SSE event without a trailing newline", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });

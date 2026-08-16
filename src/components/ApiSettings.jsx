@@ -204,7 +204,15 @@ export default function ApiSettings({ settings, onSave, onClose, onCheckUpdate }
 
         <div className={styles.threeCol}>
           <label className={styles.field}><span>Temperature</span><input type="number" min="0" max="2" step="0.1" value={draft.temperature} onChange={(event) => update("temperature", event.target.value)} /></label>
-          <label className={styles.field}><span>Max Tokens</span><input type="number" min="128" max="384000" value={draft.maxTokens} onChange={(event) => update("maxTokens", event.target.value)} /></label>
+          <label className={styles.field}>
+            <span>Max Tokens</span>
+            <select value={draft.maxTokensMode || "manual"} onChange={(event) => update("maxTokensMode", event.target.value)}>
+              <option value="auto">自动 · 按上下文动态计算</option>
+              <option value="manual">手动</option>
+            </select>
+            {draft.maxTokensMode !== "auto" && <input type="number" min="128" max="1000000" value={draft.maxTokens} onChange={(event) => update("maxTokens", event.target.value)} aria-label="手动 Max Tokens" />}
+            <small className={styles.helper}>{draft.maxTokensMode === "auto" ? "自动扣除提示词、对话和安全余量；不会超过上下文长度。" : "部分模型会把隐藏推理和正文共用此额度。"}</small>
+          </label>
           <label className={styles.field}><span>上下文长度</span><input type="number" min="2000" max="1000000" value={draft.contextLength} onChange={(event) => update("contextLength", event.target.value)} /></label>
         </div>
         <label className={styles.field}>
