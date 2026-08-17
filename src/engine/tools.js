@@ -215,36 +215,67 @@ function repairToolArgs(name, rawArgs = {}, game = null) {
 
 export function normalizeToolCall(call = {}, game = null) {
   let args = call.args;
+  let argsInvalid = Boolean(call.argsInvalid);
+  let argsInvalidCause = call.argsInvalidCause || "";
   if (!args && typeof call.arguments === "string") {
-    try { args = JSON.parse(call.arguments); } catch { args = {}; }
+    try { args = JSON.parse(call.arguments); } catch {
+      args = {};
+      argsInvalid = argsInvalid || call.arguments.trim().length > 0;
+      if (argsInvalid && !argsInvalidCause) argsInvalidCause = "json";
+    }
   }
   if (!args && call.parameters && typeof call.parameters === "object") args = call.parameters;
   if (!args && call.function?.arguments) {
-    try { args = JSON.parse(call.function.arguments); } catch { args = {}; }
+    try { args = JSON.parse(call.function.arguments); } catch {
+      args = {};
+      argsInvalid = argsInvalid || call.function.arguments.trim().length > 0;
+      if (argsInvalid && !argsInvalidCause) argsInvalidCause = "json";
+    }
   }
   const name = String(call.name || call.tool || call.function?.name || "").replace("__", ".");
   const rawArgs = args && typeof args === "object" ? { ...args } : {};
   const reason = call.reason || rawArgs.reason || `AI 提议执行 ${name || "未知工具"}`;
   delete rawArgs.reason;
   const repaired = repairToolArgs(name, rawArgs, game);
-  return { ...call, name, args: repaired.args, reason: String(reason).trim() || `AI 提议执行 ${name}`, repairNote: repaired.repairNote, resolutionError: repaired.resolutionError };
+  return { ...call, name, args: repaired.args, reason: String(reason).trim() || `AI 提议执行 ${name}`, repairNote: repaired.repairNote, resolutionError: repaired.resolutionError, argsInvalid, argsInvalidCause };
 }
 
 export function normalizeToolCalls(calls = [], game = null) {
   return (Array.isArray(calls) ? calls : []).map((call) => normalizeToolCall(call, game));
 }
 
+export function dedupeToolCalls(calls = []) {
+  const seen = new Set();
+  return calls.filter((call) => {
+    const key = `${call.name}:${JSON.stringify(call.args || {})}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function validateCall(game, call) {
   if (!call.name) return "工具调用缺少名称，已忽略";
   const schema = TOOL_SCHEMAS[call.name];
   if (!schema) return `未知工具「${call.name}」`;
+  if (call.argsInvalidCause === "length") return "工具参数不是合法 JSON，且响应因长度限制结束，很可能被输出预算截断。";
+  if (call.argsInvalid) return "工具参数不是合法 JSON，可能由输出截断、流式分片拼装异常或模型格式错误造成。";
   if (call.resolutionError) return call.resolutionError;
   if (!call.args || typeof call.args !== "object") return "参数必须是对象";
   const missing = schema.required.filter((key) => call.args[key] === undefined);
-  if (missing.length) return `缺少参数：${missing.join("、")}`;
+  if (missing.length) return `缺少参数（模型未提供）：${missing.join("、")}`;
   if (!call.reason || String(call.reason).trim().length < 2) return "缺少与本轮叙事对应的变更理由";
   if (!game.character || !Array.isArray(game.inventory)) return "游戏状态结构不完整";
   return "";
+}
+
+export function validateToolCall(game, call) {
+  const normalized = normalizeToolCall(call, game);
+  return { call: normalized, error: validateCall(game, normalized) };
+}
+
+export function isRepairableToolError(call, error = "") {
+  return Boolean(call?.argsInvalid) || /参数|缺少.*(?:ID|标识|字段)|必须提供/.test(error);
 }
 
 function amountArg(args) {

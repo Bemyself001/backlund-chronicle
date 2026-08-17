@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { buildToolResultMessages, requestAI, requestAIWithReasoningFallback } from "../src/services/api.js";
+import { buildToolResultMessages, expandedMaxTokensForRetry, requestAI, requestAIWithReasoningFallback } from "../src/services/api.js";
 
 const settings = {
   baseUrl: "https://example.test/v1",
@@ -128,12 +128,121 @@ test("reasoning exhaustion first retries with a larger budget before lowering th
   );
   assert.equal(result.narrative, "自动恢复后，正文顺利返回。");
   assert.equal(requestBodies.length, 3);
-  assert.equal(requestBodies[1].max_tokens, 2400);
+  assert.ok(requestBodies[1].max_tokens > requestBodies[0].max_tokens);
   assert.equal(requestBodies[1].thinking, undefined);
   assert.equal(requestBodies[0].thinking, undefined);
   assert.deepEqual(requestBodies[2].thinking, { type: "disabled" });
   assert.equal(recoveryCount, 1);
   assert.equal(fallbackCount, 1);
+});
+
+test("DeepSeek preserves low effort and safely maps medium effort to high", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const requestBodies = [];
+  globalThis.fetch = async (_url, init) => {
+    requestBodies.push(JSON.parse(init.body));
+    return new Response(JSON.stringify({ choices: [{ message: { content: '{"narrative":"思考档位已应用。","choices":[]}' } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+
+  await requestAI({ ...settings, provider: "deepseek", reasoningMode: "low", contextLength: 10000 }, [{ role: "user", content: "继续" }]);
+  await requestAI({ ...settings, provider: "deepseek", reasoningMode: "medium", contextLength: 10000 }, [{ role: "user", content: "继续" }]);
+
+  assert.equal(requestBodies[0].reasoning_effort, "low");
+  assert.equal(requestBodies[0].max_tokens, 1824);
+  assert.equal(requestBodies[1].reasoning_effort, "high");
+  assert.equal(requestBodies[1].max_tokens, 2848);
+});
+
+test("stream parser joins no-index tool fragments by repeated id and reports reasoning progress", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const encoder = new TextEncoder();
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode([
+        'data: {"choices":[{"delta":{"reasoning_content":"正在分析"}}]}',
+        'data: {"choices":[{"delta":{"tool_calls":[{"id":"call-1","function":{"name":"status__add","arguments":"{\\"name\\":\\"警"}}]}}]}',
+        'data: {"choices":[{"delta":{"tool_calls":[{"id":"call-1","function":{"name":"status__add","arguments":"觉\\"}"}}]},"finish_reason":"tool_calls"}]}',
+        "data: [DONE]",
+        "",
+      ].join("\n\n")));
+      controller.close();
+    },
+  });
+  globalThis.fetch = async () => new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } });
+  const reasoningUpdates = [];
+  const result = await requestAI(
+    { ...settings, stream: true, nativeTools: true },
+    [{ role: "user", content: "侧耳倾听" }],
+    undefined,
+    undefined,
+    { onReasoningChunk: (content) => reasoningUpdates.push(content) },
+  );
+
+  assert.deepEqual(reasoningUpdates, ["正在分析"]);
+  assert.equal(result.toolCalls.length, 1);
+  assert.equal(result.toolCalls[0].name, "status.add");
+  assert.equal(result.toolCalls[0].args.name, "警觉");
+});
+
+test("stream parser keeps parallel no-index tool fragments separated by position", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const encoder = new TextEncoder();
+  const body = new ReadableStream({
+    start(controller) {
+      controller.enqueue(encoder.encode([
+        'data: {"choices":[{"delta":{"tool_calls":[{"id":"call-a","function":{"name":"status__add","arguments":"{\\"name\\":\\"警"}},{"id":"call-b","function":{"name":"money__add","arguments":"{\\"amount\\":{\\"pounds\\":"}}]}}]}',
+        'data: {"choices":[{"delta":{"tool_calls":[{"function":{"arguments":"觉\\"}"}},{"function":{"arguments":"1}}"}}]},"finish_reason":"tool_calls"}]}',
+        "data: [DONE]",
+        "",
+      ].join("\n\n")));
+      controller.close();
+    },
+  });
+  globalThis.fetch = async () => new Response(body, { status: 200, headers: { "Content-Type": "text/event-stream" } });
+  const result = await requestAI({ ...settings, stream: true, nativeTools: true }, [{ role: "user", content: "继续" }]);
+
+  assert.deepEqual(result.toolCalls.map((call) => call.name), ["status.add", "money.add"]);
+  assert.equal(result.toolCalls[0].args.name, "警觉");
+  assert.equal(result.toolCalls[1].args.amount.pounds, 1);
+});
+
+test("invalid native arguments retain a diagnostic cause instead of becoming silent empty args", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  globalThis.fetch = async () => new Response(JSON.stringify({ choices: [{
+    finish_reason: "length",
+    message: { content: null, tool_calls: [{ id: "broken", function: { name: "status__add", arguments: '{"name":"警' } }] },
+  }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+
+  const result = await requestAI({ ...settings, nativeTools: true }, [{ role: "user", content: "继续" }]);
+  assert.equal(result.toolCalls[0].argsInvalid, true);
+  assert.equal(result.toolCalls[0].argsInvalidCause, "length");
+});
+
+test("automatic reasoning recovery keeps the configured streaming mode", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const requestBodies = [];
+  globalThis.fetch = async (_url, init) => {
+    requestBodies.push(JSON.parse(init.body));
+    const payload = requestBodies.length < 3
+      ? { choices: [{ finish_reason: "length", message: { content: "", reasoning_content: "仍在推理" } }] }
+      : { choices: [{ message: { content: '{"narrative":"流式恢复完成。","choices":[]}' } }] };
+    return new Response(JSON.stringify(payload), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+
+  await requestAIWithReasoningFallback({ ...settings, provider: "deepseek", stream: true }, [{ role: "user", content: "继续" }]);
+  assert.deepEqual(requestBodies.map((body) => body.stream), [true, true, true]);
+});
+
+test("retry budget expands from the actual request without exceeding context capacity", () => {
+  const messages = [{ role: "user", content: "继续" }];
+  const expanded = expandedMaxTokensForRetry({ ...settings, contextLength: 5000 }, messages, 3000);
+  assert.ok(expanded > 3000);
+  assert.ok(expanded < 5000);
 });
 
 test("stream parser accepts delta.text and text/plain bodies", async (context) => {
@@ -240,4 +349,43 @@ test("tool follow-up reports local validation and disables repeated native calls
   assert.equal(requestBody.messages[1].role, "tool");
   assert.match(requestBody.messages[1].content, /找不到要使用的物品/);
   assert.match(result.narrative, /门锁仍然完好/);
+});
+
+test("choice-only requests expose only the ui choice tool", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  let requestBody;
+  globalThis.fetch = async (_url, init) => {
+    requestBody = JSON.parse(init.body);
+    return new Response(JSON.stringify({ choices: [{ message: {
+      content: "煤气灯下的影子缩回了巷口。",
+      tool_calls: [{ id: "choice-1", function: { name: "ui__present_choices", arguments: JSON.stringify({ choices: [
+        { label: "检查巷口遗留的鞋印", intent: "investigate", risk: "low" },
+        { label: "向巡夜人询问黑影来路", intent: "social", risk: "medium" },
+        { label: "立刻追入没有灯光的窄巷", intent: "dangerous", risk: "high" },
+      ] }) } }],
+    } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+
+  const result = await requestAI({ ...settings, nativeTools: true }, [{ role: "user", content: "继续" }], undefined, undefined, { toolSet: "choices", disableJsonMode: true });
+  assert.deepEqual(requestBody.tools.map((tool) => tool.function.name), ["ui__present_choices"]);
+  assert.equal(requestBody.response_format, undefined);
+  assert.equal(result.choices.length, 3);
+  assert.deepEqual(result.toolCalls, []);
+});
+
+test("targeted tool repair sends only the failing state tool schema", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  let requestBody;
+  globalThis.fetch = async (_url, init) => {
+    requestBody = JSON.parse(init.body);
+    return new Response(JSON.stringify({ choices: [{ message: {
+      content: null,
+      tool_calls: [{ id: "repair-1", function: { name: "status__add", arguments: '{"status":{"id":"alert","name":"警觉"},"reason":"发现异常声响"}' } }],
+    } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+
+  await requestAI({ ...settings, nativeTools: true }, [{ role: "user", content: "修复参数" }], undefined, undefined, { toolSet: "state", allowedToolNames: ["status.add"] });
+  assert.deepEqual(requestBody.tools.map((tool) => tool.function.name), ["status__add"]);
 });

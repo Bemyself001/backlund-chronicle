@@ -12,8 +12,11 @@ const TURN_PHASES = [
 const PHASE_MESSAGE = {
   generating: "叙事引擎正在编织当前场景",
   manualRetry: "正在重新提交上一轮行动",
+  thinking: "模型正在思考中，剧情正文稍后开始逐字抵达",
   streaming: "剧情正文正在抵达",
   budgetRecovery: "正文暂未出现，正在保留推理强度并增加输出预算",
+  toolRetry: "工具参数格式异常，正在重新请求一次",
+  choiceRetry: "行动选项不完整，正在单独重新生成",
   reasoningRetry: "推理预算已耗尽，正在降低推理强度后重试",
   validating: "本地规则正在校验状态提议",
   finalizing: "叙事引擎正在确认校验结果",
@@ -111,7 +114,7 @@ function TurnProgress({ phase }) {
   </div>;
 }
 
-export default function GameScreen({ game, loading, turnPhase, streamText, error, onAction, onAbort, onRetry, onLocalTool, onAudit, onOpenMap, onOpenApi, onOpenPrompt, onOpenSaves, onHome }) {
+export default function GameScreen({ game, loading, turnPhase, streamText, error, onAction, onAbort, onRetry, onRegenerateChoices, onLocalTool, onAudit, onOpenMap, onOpenApi, onOpenPrompt, onOpenSaves, onHome }) {
   const [input, setInput] = useState("");
   const [mobilePanel, setMobilePanel] = useState(null);
   const [followingLatest, setFollowingLatest] = useState(true);
@@ -166,8 +169,8 @@ export default function GameScreen({ game, loading, turnPhase, streamText, error
         {!followingLatest && <button className={styles.jumpLatest} type="button" onClick={jumpToLatest}>回到最新</button>}
         </div>
         <div className={styles.interaction}>
-          <p className={styles.choiceLabel}>下一步行动 <span>CHOOSE OR WRITE YOUR OWN</span>{game.choiceMeta?.source === "local" && <em className={styles.choiceSource}>本地场景建议 · 模型选项未完整返回</em>}{game.choiceMeta?.source === "reused" && <em className={styles.choiceSource}>沿用上一组有效选项 · 确认响应未重复返回</em>}</p>
-          <div className={styles.choices}>{game.choices.map((choice, index) => <button key={`${choice.intent}-${index}`} type="button" disabled={loading} onClick={() => onAction(choice.label)}><span>0{index + 1}</span><strong>{choice.label}</strong><small data-risk={choice.risk}>{RISK_LABEL[choice.risk]}</small></button>)}</div>
+          <p className={styles.choiceLabel}>下一步行动 <span>CHOOSE OR WRITE YOUR OWN</span>{game.choiceMeta?.source === "regenerated" && <em className={styles.choiceSource}>AI 已单独重新生成选项</em>}{game.choiceMeta?.source === "unavailable" && <em className={styles.choiceSource}>选项暂不可用 · 仍可自由输入</em>}</p>
+          <div className={styles.choices}>{Array.isArray(game.choices) && game.choices.length ? game.choices.map((choice, index) => <button key={`${choice.intent}-${index}`} type="button" disabled={loading} onClick={() => onAction(choice.label)}><span>0{index + 1}</span><strong>{choice.label}</strong><small data-risk={choice.risk}>{RISK_LABEL[choice.risk] || "行动"}</small></button>) : <button type="button" disabled={loading} onClick={onRegenerateChoices}><span>AI</span><strong>重新生成行动选项</strong><small>不重写剧情</small></button>}</div>
           <div className={styles.composer}><textarea aria-label="自由输入行动" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }} placeholder="描述你的行动、问题或对话…" disabled={loading} /><div><span>Enter 发送 · Shift+Enter 换行</span>{loading ? <button className={styles.abort} type="button" onClick={onAbort}>中止生成</button> : <button className="button button--primary" type="button" onClick={submit} disabled={!input.trim()}>提交行动</button>}</div></div>
         </div>
       </section>

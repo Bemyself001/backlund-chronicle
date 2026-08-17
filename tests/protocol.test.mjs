@@ -32,6 +32,30 @@ test("native tool calls remain usable when the assistant content is empty", () =
   assert.equal(result.requiresToolFollowUp, true);
 });
 
+test("native state tools require local follow-up even when preliminary content exists", () => {
+  const nativeCall = { id: "call-1", name: "status.add", args: { status: { id: "alert", name: "警觉" } }, native: true };
+  const result = normalizeAIResponse("你暂时停下脚步。", [nativeCall]);
+  assert.equal(result.hasNarrative, true);
+  assert.equal(result.requiresToolFollowUp, true);
+});
+
+test("ui choice tools populate choices without entering the state tool channel", () => {
+  const result = normalizeAIResponse("雨声沿着窗框落下。", [{
+    id: "choice-call",
+    name: "ui.present_choices",
+    native: true,
+    args: { choices: [
+      { label: "检查窗框上的新鲜划痕", intent: "investigate", risk: "low" },
+      { label: "询问房东昨夜的访客", intent: "social", risk: "medium" },
+      { label: "翻窗追赶屋顶上的人影", intent: "dangerous", risk: "high" },
+    ] },
+  }]);
+  assert.equal(result.choiceMeta.source, "model");
+  assert.equal(result.choices.length, 3);
+  assert.deepEqual(result.toolCalls, []);
+  assert.equal(result.requiresToolFollowUp, false);
+});
+
 test("incomplete JSON tool calls are ignored with an actionable warning", () => {
   const result = normalizeAIResponse({
     narrative: "雨声压过了远处的钟响。",

@@ -90,7 +90,9 @@ export function normalizeAIResponse(raw, nativeToolCalls = []) {
   const hasNarrative = Boolean(narrativeText.trim());
   const narrative = narrativeText.trim()
     || (nativeToolCalls.length ? "命运的齿轮轻轻转动。本轮状态提议正由本地规则校验。" : "雾中的细节暂时无法拼成完整叙述。你可以重试，或换一种行动方式。");
-  const sourceChoices = parsed.choices ?? parsed.actions ?? parsed.options ?? parsed.nextActions ?? parsed.next_actions ?? parsed.suggestions;
+  const choiceToolCall = nativeToolCalls.find((call) => call.name === "ui.present_choices");
+  const nativeStateCalls = nativeToolCalls.filter((call) => call.name !== "ui.present_choices");
+  const sourceChoices = parsed.choices ?? parsed.actions ?? parsed.options ?? parsed.nextActions ?? parsed.next_actions ?? parsed.suggestions ?? choiceToolCall?.args?.choices;
   const rawChoices = Array.isArray(sourceChoices) ? sourceChoices : [];
   const choices = rawChoices.slice(0, 3).map(normalizeChoice);
   const labels = rawChoices.slice(0, 3).map((choice) => String(typeof choice === "string" ? choice : choice?.label ?? choice?.text ?? choice?.title ?? choice?.action ?? "").trim()).filter(Boolean);
@@ -111,11 +113,12 @@ export function normalizeAIResponse(raw, nativeToolCalls = []) {
   return {
     narrative,
     choices,
-    toolCalls: [...(Array.isArray(protocolToolCalls) ? protocolToolCalls : []), ...nativeToolCalls],
+    toolCalls: [...(Array.isArray(protocolToolCalls) ? protocolToolCalls : []), ...nativeStateCalls],
     memoryNotes: Array.isArray(memoryNotes) ? memoryNotes.map(String).slice(0, 5) : [],
     worldEvents: Array.isArray(worldEvents) ? worldEvents.map(String).slice(0, 5) : [],
     protocolWarning,
     choiceMeta,
-    requiresToolFollowUp: nativeToolCalls.length > 0 && !hasNarrative,
+    hasNarrative,
+    requiresToolFollowUp: nativeStateCalls.length > 0,
   };
 }

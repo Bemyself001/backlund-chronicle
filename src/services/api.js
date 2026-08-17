@@ -259,19 +259,56 @@ const TOOL_PARAMETER_SCHEMAS = {
   },
 };
 
-function toolDefinitions() {
-  const names = ["inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "occult.reveal", "character.update", "status.add", "status.remove", "relationship.update", "location.move", "clue.add", "quest.add", "quest.update", "dice.check"];
+const STATE_TOOL_NAMES = ["inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "occult.reveal", "character.update", "status.add", "status.remove", "relationship.update", "location.move", "clue.add", "quest.add", "quest.update", "dice.check"];
+
+const CHOICE_TOOL_SCHEMA = {
+  type: "object",
+  additionalProperties: false,
+  required: ["choices"],
+  properties: {
+    choices: {
+      type: "array",
+      minItems: 3,
+      maxItems: 3,
+      items: {
+        type: "object",
+        additionalProperties: false,
+        required: ["label", "intent", "risk"],
+        properties: {
+          label: { type: "string", description: "与当前场景紧密相关的具体行动" },
+          intent: { type: "string", enum: ["investigate", "social", "dangerous"] },
+          risk: { type: "string", enum: ["low", "medium", "high"] },
+        },
+      },
+    },
+  },
+};
+
+function toolDefinitions(toolSet = "state", allowedToolNames = null) {
+  if (toolSet === "choices") {
+    return [{ type: "function", function: { name: "ui__present_choices", description: "提交本轮三个真正不同的玩家行动选项。", parameters: CHOICE_TOOL_SCHEMA } }];
+  }
+  const allowed = Array.isArray(allowedToolNames) && allowedToolNames.length ? new Set(allowedToolNames) : null;
+  const names = STATE_TOOL_NAMES.filter((name) => !allowed || allowed.has(name));
   return names.map((name) => ({ type: "function", function: { name: name.replace(".", "__"), description: `提议执行 ${name}；本地引擎将验证。`, parameters: TOOL_PARAMETER_SCHEMAS[name] || { type: "object", additionalProperties: true } } }));
 }
 
-function nativeCallsFromMessage(message) {
+function nativeCallsFromMessage(message, context = {}) {
   return (message.tool_calls || []).map((call) => {
+    const rawArguments = call.function?.arguments || "";
     let args = {};
-    try { args = JSON.parse(call.function?.arguments || "{}"); } catch { args = {}; }
+    let argsInvalid = false;
+    try { args = JSON.parse(rawArguments || "{}"); } catch {
+      args = {};
+      argsInvalid = rawArguments.trim().length > 0;
+    }
     const rawName = call.function?.name || call.name || call.tool;
     const name = String(rawName || "").replace("__", ".").trim();
     if (!name) return null;
-    return { id: call.id, name, args, reason: args.reason || "AI 原生工具调用" };
+    const argsInvalidCause = argsInvalid
+      ? context.finishReason === "length" ? "length" : context.streamed ? "stream" : "json"
+      : "";
+    return { id: call.id, name, args, rawArguments, argsInvalid, argsInvalidCause, reason: args.reason || "AI 原生工具调用", native: true };
   }).filter(Boolean);
 }
 
@@ -281,7 +318,7 @@ export function buildToolResultMessages(toolCalls, results, reasoningContent = "
     type: "function",
     function: {
       name: String(call.name || "unknown").replace(".", "__"),
-      arguments: JSON.stringify(call.args || {}),
+      arguments: JSON.stringify({ ...(call.args || {}), reason: call.reason || "AI 原生工具调用" }),
     },
   }));
   const assistantMessage = { role: "assistant", content: null, tool_calls: calls };
@@ -297,7 +334,6 @@ export function buildToolResultMessages(toolCalls, results, reasoningContent = "
         content: JSON.stringify({ ok: result.ok, log: result.log, reason: result.reason || "", data: result.data || {} }),
       };
     }),
-    { role: "system", content: "【本地工具结果已返回】现在生成本轮最终剧情正文与恰好三个差异化行动选项。只确认 ok=true 的变化；对失败结果可自然描述为行动受阻，但不要重复工具调用。必须返回约定的合法 JSON 对象。" },
   ];
 }
 
@@ -343,15 +379,15 @@ function emptyResponseError(finishReason, hasReasoning = false, metadata = {}) {
   return error;
 }
 
-function normalizeChatCompletion(data) {
+function normalizeChatCompletion(data, requestMaxTokens = 0) {
   const choice = data?.choices?.[0] || {};
   const message = choice.message || {};
-  const nativeCalls = nativeCallsFromMessage(message);
+  const nativeCalls = nativeCallsFromMessage(message, { finishReason: choice.finish_reason, streamed: false });
   const payload = assistantPayload(data);
   if (!textFromContent(payload).trim() && !(payload && typeof payload === "object" && !Array.isArray(payload)) && !nativeCalls.length) {
-    throw emptyResponseError(choice.finish_reason, Boolean(reasoningFromMessage(message).trim()), responseMetadata(data));
+    throw emptyResponseError(choice.finish_reason, Boolean(reasoningFromMessage(message).trim()), { ...responseMetadata(data), requestMaxTokens });
   }
-  return { ...normalizeAIResponse(payload, nativeCalls), reasoningContent: reasoningFromMessage(message), responseMetadata: responseMetadata(data) };
+  return { ...normalizeAIResponse(payload, nativeCalls), reasoningContent: reasoningFromMessage(message), responseMetadata: { ...responseMetadata(data), requestMaxTokens } };
 }
 
 function reasoningFromMessage(message = {}) {
@@ -366,14 +402,38 @@ function responseMetadata(data = {}) {
   };
 }
 
-function appendToolCallFragments(calls, fragments = []) {
-  for (const call of fragments) {
-    const index = call.index ?? Object.keys(calls).length;
+function nextToolCallIndex(calls) {
+  return Math.max(-1, ...Object.keys(calls).map(Number).filter(Number.isFinite)) + 1;
+}
+
+function appendNameFragment(current, fragment) {
+  if (!fragment || current === fragment) return current;
+  return `${current}${fragment}`;
+}
+
+function appendToolCallFragments(calls, fragments = [], state = null) {
+  if (state && !state.toolCallPositions) state.toolCallPositions = {};
+  fragments.forEach((call, position) => {
+    let index = call.index;
+    if (index === undefined || index === null) {
+      const matchingId = call.id
+        ? Object.keys(calls).find((key) => calls[key]?.id === call.id)
+        : undefined;
+      if (matchingId !== undefined) index = matchingId;
+      else if (call.id) index = nextToolCallIndex(calls);
+      else if (state?.toolCallPositions[position] !== undefined) index = state.toolCallPositions[position];
+      else if (state?.lastToolCallIndex !== undefined) index = state.lastToolCallIndex;
+      else index = nextToolCallIndex(calls);
+    }
     calls[index] ||= { id: call.id, function: { name: "", arguments: "" } };
     if (call.id) calls[index].id = call.id;
-    if (call.function?.name) calls[index].function.name += call.function.name;
+    if (call.function?.name) calls[index].function.name = appendNameFragment(calls[index].function.name, call.function.name);
     if (call.function?.arguments) calls[index].function.arguments += call.function.arguments;
-  }
+    if (state) {
+      state.lastToolCallIndex = index;
+      state.toolCallPositions[position] = index;
+    }
+  });
 }
 
 function isOpenAIReasoningModel(model = "") {
@@ -386,7 +446,7 @@ function applyReasoningSettings(body, settings, options) {
   if (selectedMode === "auto") return;
   if (provider === "deepseek") {
     body.thinking = { type: selectedMode === "off" ? "disabled" : "enabled" };
-    if (selectedMode !== "off") body.reasoning_effort = "high";
+    if (selectedMode !== "off") body.reasoning_effort = selectedMode === "low" ? "low" : selectedMode === "max" ? "max" : "high";
     return;
   }
   if (provider === "openai" && !isOpenAIReasoningModel(settings.model)) return;
@@ -417,12 +477,16 @@ function estimatePromptTokens(messages = []) {
   return Math.ceil(serialized.length / 3);
 }
 
-function autoMaxTokens(settings, messages, options) {
+function availableMaxTokens(settings, messages = []) {
   const contextLength = Number(settings.contextLength);
   const contextLimit = Number.isFinite(contextLength) && contextLength > 0 ? contextLength : 12000;
   const promptTokens = estimatePromptTokens(messages);
   const safetyMargin = Math.max(512, Math.ceil(contextLimit * 0.08));
-  const available = Math.max(128, contextLimit - promptTokens - safetyMargin);
+  return Math.max(128, contextLimit - promptTokens - safetyMargin);
+}
+
+function autoMaxTokens(settings, messages, options) {
+  const available = availableMaxTokens(settings, messages);
   const requested = Number(options.maxTokensOverride);
   return Math.round(Math.min(Number.isFinite(requested) && requested > 0 ? requested : available, available));
 }
@@ -432,10 +496,30 @@ function safeMaxTokens(settings, options, messages = []) {
     || (options.maxTokensModeOverride !== "manual" && (settings.maxTokensMode === "auto" || settings.maxTokens === "auto"));
   if (auto) return autoMaxTokens(settings, messages, options);
   const requested = Number(options.maxTokensOverride ?? settings.maxTokens);
-  return Number.isFinite(requested) && requested > 0 ? Math.round(requested) : 1200;
+  const normalized = Number.isFinite(requested) && requested > 0 ? Math.round(requested) : 1200;
+  return Math.min(normalized, availableMaxTokens(settings, messages));
 }
 
-function parseStreamEventData(eventData, state, onChunk) {
+function reasoningHeadroom(settings, options) {
+  if (options.maxTokensOverride !== undefined && options.maxTokensOverride !== null) return 0;
+  const provider = settings.provider || inferApiProvider(settings.baseUrl);
+  const mode = options.forceDisableReasoning ? "off" : settings.reasoningMode || "auto";
+  if (provider !== "deepseek" || mode === "off") return 0;
+  return { low: 1024, medium: 2048, high: 4096, max: 8192, auto: 2048 }[mode] ?? 2048;
+}
+
+function requestMaxTokens(settings, options, messages = []) {
+  const base = safeMaxTokens(settings, options, messages);
+  return Math.min(base + reasoningHeadroom(settings, options), availableMaxTokens(settings, messages));
+}
+
+export function expandedMaxTokensForRetry(settings, messages = [], currentMax = 0) {
+  const current = Number(currentMax);
+  const baseline = Number.isFinite(current) && current > 0 ? Math.round(current) : requestMaxTokens(settings, {}, messages);
+  return Math.min(Math.max(baseline + 1600, Math.ceil(baseline * 2)), availableMaxTokens(settings, messages));
+}
+
+function parseStreamEventData(eventData, state, onChunk, onReasoningChunk) {
   const trimmed = eventData.trim();
   if (!trimmed || trimmed === "[DONE]") return;
   try {
@@ -447,9 +531,13 @@ function parseStreamEventData(eventData, state, onChunk) {
       state.content += chunk;
       onChunk?.(state.content);
     }
-    state.reasoningContent += reasoningFromMessage(delta);
+    const reasoningChunk = reasoningFromMessage(delta);
+    if (reasoningChunk) {
+      state.reasoningContent += reasoningChunk;
+      onReasoningChunk?.(state.reasoningContent);
+    }
     if (choice.finish_reason) state.finishReason = choice.finish_reason;
-    appendToolCallFragments(state.calls, delta.tool_calls);
+    appendToolCallFragments(state.calls, delta.tool_calls, state);
     if (packet.id) state.responseId = packet.id;
     if (packet.usage) state.usage = packet.usage;
   } catch {
@@ -457,7 +545,7 @@ function parseStreamEventData(eventData, state, onChunk) {
   }
 }
 
-async function readStreamResponse(response, onChunk) {
+async function readStreamResponse(response, onChunk, onReasoningChunk) {
   const reader = response.body?.getReader();
   if (!reader) return { content: "", calls: {}, finishReason: "", reasoningContent: "", responseId: "", usage: null, rawResponse: "" };
   const decoder = new TextDecoder();
@@ -467,7 +555,7 @@ async function readStreamResponse(response, onChunk) {
   const state = { content: "", calls: {}, finishReason: "", reasoningContent: "", responseId: "", usage: null };
   const consumeEvent = (event) => {
     const dataLines = event.split(/\r?\n/).filter((line) => line.trimStart().startsWith("data:"));
-    if (dataLines.length) parseStreamEventData(dataLines.map((line) => line.slice(line.indexOf(":") + 1).trimStart()).join("\n"), state, onChunk);
+    if (dataLines.length) parseStreamEventData(dataLines.map((line) => line.slice(line.indexOf(":") + 1).trimStart()).join("\n"), state, onChunk, onReasoningChunk);
   };
   const consumeBuffer = (flush = false) => {
     const hasLineBreak = /\r?\n/.test(buffer);
@@ -504,17 +592,21 @@ async function readStreamResponse(response, onChunk) {
 }
 
 export async function requestAI(settings, messages, signal, onChunk, options = {}) {
+  const maxTokens = requestMaxTokens(settings, options, messages);
   const body = {
     model: settings.model,
     messages: requestMessages(messages, options.forceDisableReasoning),
     temperature: Number(settings.temperature),
-    max_tokens: safeMaxTokens(settings, options, messages),
+    max_tokens: maxTokens,
     stream: options.streamOverride ?? Boolean(settings.stream),
   };
   applyReasoningSettings(body, settings, options);
   applyProviderCompatibility(body, settings);
   if (settings.jsonMode && !options.disableJsonMode) body.response_format = { type: "json_object" };
-  if (settings.nativeTools && !options.disableTools) body.tools = toolDefinitions();
+  if (settings.nativeTools && !options.disableTools) {
+    const definitions = toolDefinitions(options.toolSet || "state", options.allowedToolNames);
+    if (definitions.length) body.tools = definitions;
+  }
   const response = await fetch(endpoint(settings.baseUrl, "/chat/completions"), {
     method: "POST", signal,
     headers: requestHeaders(settings, true),
@@ -526,26 +618,26 @@ export async function requestAI(settings, messages, signal, onChunk, options = {
     const raw = await response.text();
     let data;
     try { data = JSON.parse(raw); } catch {
-      if (raw.trim()) return { ...normalizeAIResponse(raw), responseMetadata: { contentType, rawLength: raw.length } };
-      throw emptyResponseError("", false, { contentType, rawLength: raw.length });
+      if (raw.trim()) return { ...normalizeAIResponse(raw), responseMetadata: { contentType, rawLength: raw.length, requestMaxTokens: maxTokens } };
+      throw emptyResponseError("", false, { contentType, rawLength: raw.length, requestMaxTokens: maxTokens });
     }
-    return normalizeChatCompletion(data);
+    return normalizeChatCompletion(data, maxTokens);
   }
-  const streamed = await readStreamResponse(response, onChunk);
-  const nativeCalls = nativeCallsFromMessage({ tool_calls: Object.values(streamed.calls) });
+  const streamed = await readStreamResponse(response, onChunk, options.onReasoningChunk);
+  const nativeCalls = nativeCallsFromMessage({ tool_calls: Object.values(streamed.calls) }, { finishReason: streamed.finishReason, streamed: true });
   if (!streamed.content.trim() && !nativeCalls.length) {
     try {
       const parsed = JSON.parse(streamed.rawResponse.trim());
-      return normalizeChatCompletion(parsed);
+      return normalizeChatCompletion(parsed, maxTokens);
     } catch (error) {
       if (!(error instanceof SyntaxError)) throw error;
       const rawText = streamed.rawResponse.trim();
       const protocolOnly = rawText.split(/\r?\n/).every((line) => !line.trim() || /^(?:data:|event:|\[DONE\])/.test(line.trim()));
-      if (rawText && !protocolOnly) return { ...normalizeAIResponse(rawText), responseMetadata: { finishReason: streamed.finishReason, id: streamed.responseId, usage: streamed.usage, contentType, rawLength: streamed.rawResponse.length } };
-      throw emptyResponseError(streamed.finishReason, Boolean(streamed.reasoningContent.trim()), { finishReason: streamed.finishReason, id: streamed.responseId, usage: streamed.usage, contentType });
+      if (rawText && !protocolOnly) return { ...normalizeAIResponse(rawText), responseMetadata: { finishReason: streamed.finishReason, id: streamed.responseId, usage: streamed.usage, contentType, rawLength: streamed.rawResponse.length, requestMaxTokens: maxTokens } };
+      throw emptyResponseError(streamed.finishReason, Boolean(streamed.reasoningContent.trim()), { finishReason: streamed.finishReason, id: streamed.responseId, usage: streamed.usage, contentType, requestMaxTokens: maxTokens });
     }
   }
-  return { ...normalizeAIResponse(streamed.content, nativeCalls), reasoningContent: streamed.reasoningContent, responseMetadata: { finishReason: streamed.finishReason, id: streamed.responseId, usage: streamed.usage, contentType } };
+  return { ...normalizeAIResponse(streamed.content, nativeCalls), reasoningContent: streamed.reasoningContent, responseMetadata: { finishReason: streamed.finishReason, id: streamed.responseId, usage: streamed.usage, contentType, requestMaxTokens: maxTokens } };
 }
 
 export async function requestAIWithReasoningFallback(settings, messages, signal, onChunk, options = {}) {
@@ -556,18 +648,18 @@ export async function requestAIWithReasoningFallback(settings, messages, signal,
       && settings.autoRetryReasoning !== false
       && !options.forceDisableReasoning;
     if (!shouldRetry) throw error;
-    const currentMax = safeMaxTokens(settings, options, messages);
-    const expandedMax = Math.max(currentMax + 1600, Math.ceil(currentMax * 2));
+    const currentMax = error.metadata?.requestMaxTokens || requestMaxTokens(settings, options, messages);
+    const expandedMax = expandedMaxTokensForRetry(settings, messages, currentMax);
     options.onReasoningRecovery?.({ error, maxTokens: expandedMax });
     onChunk?.("");
     try {
-      return await requestAI(settings, messages, signal, onChunk, { ...options, maxTokensOverride: expandedMax, streamOverride: false, recoveryAttempt: 1 });
+      return await requestAI(settings, messages, signal, onChunk, { ...options, maxTokensOverride: expandedMax, recoveryAttempt: 1 });
     } catch (retryError) {
       if (retryError.name === "AbortError") throw retryError;
       options.onReasoningFallback?.();
       onChunk?.("");
       try {
-        return await requestAI(settings, messages, signal, onChunk, { ...options, forceDisableReasoning: true, streamOverride: false, disableTools: true, disableJsonMode: true, recoveryAttempt: 2 });
+        return await requestAI(settings, messages, signal, onChunk, { ...options, forceDisableReasoning: true, disableTools: true, disableJsonMode: true, recoveryAttempt: 2 });
       } catch (finalError) {
         if (finalError.name !== "AbortError") {
           finalError.message = `保留推理并自动补全后仍未完成：${finalError.message}`;

@@ -33,13 +33,15 @@ export const DEFAULT_SYSTEM_PROMPT = `你是《贝克兰德纪事》的叙事者
 8. 只有 occult.contact=1 后，才允许通过 occult.reveal 揭示神秘知识，或提出带有非凡依据的 character.update；普通人可以拒绝、推迟或离开入口。任何晋升仍必须经过知识、材料、引导、地点和代价的本地验证。
 9. 每轮给出三个真正不同的行动选项：谨慎调查、社交交涉、高风险行动，同时允许自由输入；选项应包含当前场景的多种可能，而非三个措辞不同的同一目标。
 10. 所有状态变化必须作为工具调用提议。不要在正文中伪造工具已经成功执行；等待本地引擎验证后再在后续叙事中确认。物品和资金是否获得或失去以本地审计结果为准，而不是以正文宣称为准。资金使用 money.add、money.remove，金额必须拆分为 pounds（镑）、solers（苏勒）、pence（便士）。
-11. 优先使用原生 tool calling；若使用 JSON 协议，返回 narrative、choices、toolCalls、memoryNotes、worldEvents。
+11. 支持原生工具时，状态变化只使用原生 tool calling，最终剧情放在 assistant.content，行动选项使用 ui.present_choices；只有不支持原生工具时才使用当前阶段指定的精简 JSON 兼容协议。
 12. narrative 使用克制、可读的中文，每轮约 250—600 字，不复述原著段落，不让原作角色抢占玩家中心位置。`;
 
 export function migrateSystemPrompt(prompt = "") {
   const legacyIntro = "你是《雾中纪事》的叙事者与世界模拟器。故事运行在一个受《诡秘之主》启发、但城市、人物、案件与主线均为原创的蒸汽时代神秘世界。";
   const nextIntro = "你是《贝克兰德纪事》的叙事者与世界模拟器。故事发生在鲁恩王国首都贝克兰德，以原创街巷、人物、案件与剧情为中心；原作主线和重要人物仅作为遥远背景，不得取代玩家成为故事中心。";
-  return String(prompt).replace(legacyIntro, nextIntro).replaceAll("《雾中纪事》", "《贝克兰德纪事》").replaceAll("灰檐港", "贝克兰德");
+  const legacyProtocol = "11. 优先使用原生 tool calling；若使用 JSON 协议，返回 narrative、choices、toolCalls、memoryNotes、worldEvents。";
+  const nextProtocol = "11. 支持原生工具时，状态变化只使用原生 tool calling，最终剧情放在 assistant.content，行动选项使用 ui.present_choices；只有不支持原生工具时才使用当前阶段指定的精简 JSON 兼容协议。";
+  return String(prompt).replace(legacyIntro, nextIntro).replace(legacyProtocol, nextProtocol).replaceAll("《雾中纪事》", "《贝克兰德纪事》").replaceAll("灰檐港", "贝克兰德");
 }
 
 export const DEFAULT_API_SETTINGS = {

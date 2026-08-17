@@ -1,42 +1,28 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createInitialGame, EMPTY_CHARACTER } from "../src/data/defaults.js";
-import { createContextualChoices, resolveChoices } from "../src/services/choices.js";
+import { hasUsableChoices, injectOccultEntryChoice } from "../src/services/choices.js";
 
-test("invalid model choices become contextual choices instead of fixed fallback text", () => {
-  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "选项测试员" });
-  const resolved = resolveChoices({ narrative: "车站的钟声再次响起。", choices: [
-    { label: "留在原地继续观察", intent: "investigate", risk: "low" },
-    { label: "向在场的人谨慎打听", intent: "social", risk: "medium" },
-    { label: "冒险追查最异常的迹象", intent: "dangerous", risk: "high" },
-  ], choiceMeta: { source: "fallback", fallback: true, reason: "missing_choices" } }, game, "观察站台");
-  assert.equal(resolved.choiceMeta.source, "local");
-  assert.notDeepEqual(resolved.choices.map((choice) => choice.label), ["留在原地继续观察", "向在场的人谨慎打听", "冒险追查最异常的迹象"]);
-  assert.equal(new Set(resolved.choices.map((choice) => choice.label)).size, 3);
+const choices = [
+  { label: "检查窗边残留的泥水", intent: "investigate", risk: "low" },
+  { label: "向值夜人询问访客记录", intent: "social", risk: "medium" },
+  { label: "冒险跟上刚离开的黑伞客", intent: "dangerous", risk: "high" },
+];
+
+test("choice validation requires exactly three distinct concrete labels", () => {
+  assert.equal(hasUsableChoices(choices), true);
+  assert.equal(hasUsableChoices(choices.slice(0, 2)), false);
+  assert.equal(hasUsableChoices([choices[0], choices[0], choices[2]]), false);
 });
 
-test("tool follow-up reuses the previous valid model choices when it omits choices", () => {
-  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "后续测试员" });
-  const previous = {
-    choices: createContextualChoices(game, "观察公告"),
-    meta: { source: "model", fallback: false },
-  };
-  const resolved = resolveChoices({ narrative: "本地规则已确认变化。", choices: [], choiceMeta: { source: "fallback", fallback: true, reason: "missing_choices" } }, game, "观察公告", previous);
-  assert.equal(resolved.choiceMeta.source, "reused");
-  assert.deepEqual(resolved.choices, previous.choices);
+test("a locally authorized occult entry replaces one valid high-risk option", () => {
+  const entry = { choice: { label: "追查这条非凡入口（可选）", intent: "occult", risk: "medium" } };
+  const injected = injectOccultEntryChoice(choices, entry);
+  assert.equal(injected.length, 3);
+  assert.equal(injected.some((choice) => choice.intent === "occult"), true);
+  assert.equal(injected.some((choice) => choice.intent === "investigate"), true);
 });
 
-test("contextual choices change with the current location", () => {
-  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "地点测试员" });
-  const stationChoices = createContextualChoices(game, "继续");
-  const bridgeGame = { ...game, location: { ...game.location, name: "桥区·雾鸦旅店" } };
-  const bridgeChoices = createContextualChoices(bridgeGame, "继续");
-  assert.notEqual(stationChoices[1].label, bridgeChoices[1].label);
-});
-
-test("local choices rotate with story turns instead of staying on one fixed trio", () => {
-  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "轮次测试员" });
-  const first = createContextualChoices(game, "继续");
-  const later = createContextualChoices({ ...game, turn: game.turn + 1 }, "继续");
-  assert.notDeepEqual(first.map((choice) => choice.label), later.map((choice) => choice.label));
+test("occult injection does not manufacture choices when AI choices are unavailable", () => {
+  const entry = { choice: { label: "追查这条非凡入口（可选）", intent: "occult", risk: "medium" } };
+  assert.deepEqual(injectOccultEntryChoice([], entry), []);
 });

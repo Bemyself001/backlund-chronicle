@@ -23,6 +23,18 @@ test("empty tool names are rejected as incomplete calls instead of unknown empty
   assert.doesNotMatch(execution.results[0].reason, /未知工具/);
 });
 
+test("invalid JSON arguments are distinguished from model-omitted parameters", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "参数诊断员" });
+  const malformed = normalizeToolCall({ name: "status.add", arguments: '{"name":"警' }, game);
+  assert.equal(malformed.argsInvalid, true);
+
+  const malformedExecution = executeToolCalls(game, [malformed]);
+  assert.match(malformedExecution.results[0].reason, /不是合法 JSON/);
+
+  const missingExecution = executeToolCalls(game, [{ name: "status.add", args: {}, reason: "尝试更新状态" }]);
+  assert.match(missingExecution.results[0].reason, /模型未提供/);
+});
+
 test("relationship updates repair a numeric alias and uniquely resolve an NPC", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "关系工具测试员" });
   game.relationships = [{ id: "npc-porter", name: "阿尔文", role: "搬运工", value: 0, note: "" }];

@@ -84,6 +84,7 @@ export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], 
   }
   return {
     elapsedMinutes,
+    dangerDelta,
     worldTime: advanceWorldTime(game.worldTime, elapsedMinutes),
     occult,
     occultEntry,
