@@ -1,6 +1,7 @@
 import { makeId } from "../utils/id.js";
 import { findTravelRoute, getMapLocation, MAP_LOCATIONS, normalizeLocationKnowledge } from "../data/map.js";
 import { amountToPence, formatMoney, moneyFromPence, moneyToPence } from "../data/money.js";
+import { normalizeInventoryItem, normalizeItemImportance } from "../data/items.js";
 
 export const TOOL_SCHEMAS = {
   "inventory.add": { required: ["item"], description: "新增或合并一个结构化物品实例" },
@@ -160,11 +161,12 @@ function repairToolArgs(name, rawArgs = {}, game = null) {
         weight: args.weight,
         rarity: args.rarity,
         condition: args.condition,
+        importance: args.importance,
         tags: args.tags,
         properties: args.properties,
         source: args.source,
       };
-      ["itemId", "name", "description", "detail", "category", "quantity", "weight", "rarity", "condition", "tags", "properties", "source"].forEach((key) => delete args[key]);
+      ["itemId", "name", "description", "detail", "category", "quantity", "weight", "rarity", "condition", "importance", "tags", "properties", "source"].forEach((key) => delete args[key]);
       repairNote = appendRepairNote(repairNote, "已将物品字段整理到 item 对象");
     }
     if (typeof args.item === "string" && args.item.trim()) {
@@ -335,22 +337,27 @@ function executeOne(game, call) {
       const projected = weightOf(game.inventory) + Number(source.weight || 0) * quantity;
       if (projected > game.capacity.maxWeight) return fail(call.name, `背包将超过 ${game.capacity.maxWeight}kg 容量`);
       const existing = game.inventory.find((item) => item.itemId === source.itemId && !item.equipped);
+      let changedItem;
       if (existing) {
         existing.quantity += quantity;
         existing.isNew = true;
+        existing.importance = normalizeItemImportance({ ...existing, importance: source.importance || existing.importance, tags: [...(existing.tags || []), ...(source.tags || [])] });
+        changedItem = existing;
       } else {
-        game.inventory.push({ instanceId: makeId("item"), category: "杂物", weight: 0, rarity: "普通", condition: "良好", equipped: false, tags: [], properties: {}, hiddenInfo: "", discoveredInfo: source.description, ...source, quantity, acquiredAt: turnLabel, source: source.source || call.reason, isNew: true });
+        changedItem = normalizeInventoryItem({ instanceId: makeId("item"), category: "杂物", weight: 0, rarity: "普通", condition: "良好", equipped: false, tags: [], properties: {}, hiddenInfo: "", discoveredInfo: source.description, ...source, quantity, acquiredAt: turnLabel, source: source.source || call.reason, isNew: true });
+        game.inventory.push(changedItem);
       }
-      return succeed(call.name, `${turnLabel}：获得「${source.name}」×${quantity}——${source.source || call.reason}。`);
+      return succeed(call.name, `${turnLabel}：获得「${source.name}」×${quantity}——${source.source || call.reason}。`, { inventoryChange: { ...changedItem, delta: quantity, reason: source.source || call.reason } });
     }
     case "inventory.remove": {
       const target = findItem();
       const quantity = Number(args.quantity);
       if (!target) return fail(call.name, "背包中不存在该物品实例");
       if (!Number.isInteger(quantity) || quantity < 1 || quantity > target.quantity) return fail(call.name, "移除数量无效或超过持有数量");
+      const change = { ...target, delta: -quantity, reason: call.reason, importance: normalizeItemImportance(target) };
       target.quantity -= quantity;
       if (target.quantity === 0) game.inventory = game.inventory.filter((item) => item.instanceId !== target.instanceId);
-      return succeed(call.name, `${turnLabel}：失去「${target.name}」×${quantity}——${call.reason}。`);
+      return succeed(call.name, `${turnLabel}：失去「${target.name}」×${quantity}——${call.reason}。`, { inventoryChange: change });
     }
     case "inventory.update": {
       const target = findItem();
@@ -388,8 +395,10 @@ function executeOne(game, call) {
       const target = findItem();
       if (!target) return fail(call.name, "找不到要使用的物品");
       if (target.tags.includes("消耗品")) {
+        const change = { ...target, delta: -1, reason: call.reason, importance: normalizeItemImportance(target) };
         target.quantity -= 1;
         if (target.quantity <= 0) game.inventory = game.inventory.filter((item) => item.instanceId !== target.instanceId);
+        return succeed(call.name, `${turnLabel}：使用「${target.name}」——${call.reason}。`, { inventoryChange: change });
       }
       return succeed(call.name, `${turnLabel}：使用「${target.name}」——${call.reason}。`);
     }
@@ -516,13 +525,18 @@ function executeOne(game, call) {
   }
 }
 
-export function executeToolCalls(currentGame, calls = []) {
+export function executeToolCalls(currentGame, calls = [], options = {}) {
   const game = structuredClone(currentGame);
   const processed = new Set(game.processedToolCalls || []);
   const results = [];
-  for (const call of normalizeToolCalls(calls, game).slice(0, 12)) {
+  for (const [index, call] of normalizeToolCalls(calls, game).slice(0, 12).entries()) {
     const callId = call.id || signature(game.turn + 1, call);
     if (processed.has(callId)) { results.push(fail(call.name, "重复工具调用已忽略")); continue; }
+    if (options.blockedCallIndexes?.includes(index)) {
+      results.push(fail(call.name, "玩家未确认这项重要物品变更"));
+      processed.add(callId);
+      continue;
+    }
     const validationError = validateCall(game, call);
     if (validationError) { results.push(fail(call.name, validationError)); continue; }
     const result = executeOne(game, call);

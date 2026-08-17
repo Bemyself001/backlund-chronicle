@@ -1,0 +1,27 @@
+.intro { display: grid; gap: .45rem; padding: .9rem 1rem; border-left: 3px solid var(--brass); background: #b18e5014; }
+.intro strong { color: #352d20; font: 600 .95rem var(--font-serif); }
+.intro p { margin: 0; color: #625b50; font: .78rem/1.65 var(--font-sans); }
+.list { display: grid; gap: .65rem; margin: 1.1rem 0 0; padding: 0; border: 0; }
+.list legend { margin-bottom: .55rem; color: #655945; font: 700 .65rem var(--font-sans); letter-spacing: .13em; text-transform: uppercase; }
+.change { display: grid; grid-template-columns: auto 2rem minmax(0, 1fr) auto; gap: .7rem; align-items: center; min-height: 4.5rem; padding: .75rem .85rem; border: 1px solid #9a8a6b66; background: #f2ead9; cursor: pointer; }
+.change:has(input:checked) { border-color: #867047; box-shadow: inset 3px 0 #867047; }
+.change input { width: 1.1rem; height: 1.1rem; margin: 0; accent-color: #6c5b3c; }
+.mark { display: grid; width: 2rem; height: 2rem; place-items: center; border: 1px solid #547969; color: #376653; font: 700 1rem var(--font-mono); }
+.change[data-direction="loss"] .mark { border-color: #9b5f57; color: #87463f; }
+.copy { min-width: 0; }
+.copy strong, .copy small { display: block; }
+.copy strong { color: #2d2a24; font: 600 .88rem var(--font-serif); }
+.copy small { margin-top: .25rem; color: #746b5e; font: .7rem/1.45 var(--font-sans); }
+.change em { padding: .25rem .4rem; border: 1px solid #9b7d46; color: #735a30; font: normal 700 .57rem var(--font-sans); white-space: nowrap; }
+.note { margin: .85rem 0 0; color: #786f62; font: .67rem/1.55 var(--font-sans); }
+.actions { display: grid; grid-template-columns: minmax(0, .75fr) minmax(0, 1.25fr); gap: .7rem; margin-top: 1.2rem; }
+.actions button { min-height: 3rem; padding: .65rem .85rem; font: 700 .72rem var(--font-sans); }
+.cancel { border: 1px solid #9d8570; background: transparent; color: #715f52; }
+.confirm { border: 1px solid #332d25; background: #24231f; color: #f1e6cf; }
+.actions button:hover { filter: brightness(1.1); }
+@media (max-width: 600px) {
+  .change { grid-template-columns: auto 1.8rem minmax(0, 1fr); align-items: start; padding: .75rem; }
+  .change em { grid-column: 3; justify-self: start; }
+  .actions { grid-template-columns: 1fr; }
+  .confirm { grid-row: 1; }
+}

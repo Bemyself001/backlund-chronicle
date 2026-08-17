@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createInitialGame, EMPTY_CHARACTER } from "../src/data/defaults.js";
-import { auditInventoryChanges, auditTurnChanges, createAuditBaseline } from "../src/engine/audit.js";
+import { auditInventoryChanges, auditTurnChanges, collectImportantItemConfirmations, createAuditBaseline } from "../src/engine/audit.js";
 import { executeToolCalls } from "../src/engine/tools.js";
 import { formatMoney, moneyFromPence } from "../src/data/money.js";
 
@@ -50,4 +50,28 @@ test("money tools keep currency separate and the audit reports denomination-awar
 test("starting money is capped at three pounds", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "上限测试员", startingMoneyPence: 9999 });
   assert.deepEqual(game.money, moneyFromPence(720));
+});
+
+test("important item confirmations ignore ordinary items and all money changes", () => {
+  const calls = [
+    { id: "important", name: "inventory.add", reason: "取得案件关键证据" },
+    { id: "ordinary", name: "inventory.add", reason: "拾取普通材料" },
+    { id: "money", name: "inventory.add", reason: "旧格式钱币" },
+  ];
+  const results = [
+    { ok: true, data: { inventoryChange: { name: "带血的账本", itemId: "ledger", category: "证据", importance: "important", delta: 1 } } },
+    { ok: true, data: { inventoryChange: { name: "棉布", itemId: "cloth", category: "材料", importance: "normal", delta: 2 } } },
+    { ok: true, data: { inventoryChange: { name: "铜便士", itemId: "copper-coins", category: "货币", importance: "important", delta: 12 } } },
+  ];
+  const confirmations = collectImportantItemConfirmations(calls, results);
+  assert.deepEqual(confirmations.map((change) => [change.key, change.name, change.quantity]), [["important", "带血的账本", 1]]);
+});
+
+test("important item losses are detected from local tool metadata", () => {
+  const confirmations = collectImportantItemConfirmations(
+    [{ id: "consume-key", name: "item.use", reason: "开启密室" }],
+    [{ ok: true, data: { inventoryChange: { name: "一次性密钥", itemId: "one-use-key", category: "任务物品", tags: ["任务物品"], delta: -1 } } }],
+  );
+  assert.equal(confirmations[0].direction, "loss");
+  assert.equal(confirmations[0].quantity, 1);
 });

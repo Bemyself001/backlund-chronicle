@@ -132,6 +132,7 @@ const TOOL_PARAMETER_SCHEMAS = {
           weight: { type: "number", minimum: 0 },
           rarity: { type: "string" },
           condition: { type: "string" },
+          importance: { type: "string", enum: ["normal", "important"], description: "仅任务、关键证据、身份、非凡能力或后续剧情入口相关物品使用 important；普通物品与货币使用 normal" },
           tags: { type: "array", items: { type: "string" } },
           properties: { type: "object" },
           source: { type: "string" },

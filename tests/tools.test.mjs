@@ -77,6 +77,25 @@ test("item tools repair flat item proposals and resolve unique inventory referen
   assert.equal(added.game.inventory.some((item) => item.name === "风化的铜哨" && item.itemId.startsWith("item-")), true);
 });
 
+test("important inventory changes expose confirmation metadata and can be blocked", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "重要物品测试员" });
+  const call = {
+    id: "add-evidence",
+    name: "inventory.add",
+    args: { item: { itemId: "sealed-ledger", name: "封蜡账本", description: "案件关键账册。", category: "证据", importance: "important" } },
+    reason: "从保险柜中取得关键证据",
+  };
+  const preview = executeToolCalls(game, [call]);
+  assert.equal(preview.results[0].data.inventoryChange.importance, "important");
+  assert.equal(preview.results[0].data.inventoryChange.delta, 1);
+  assert.equal(preview.game.inventory.some((item) => item.itemId === "sealed-ledger"), true);
+
+  const blocked = executeToolCalls(game, [call], { blockedCallIndexes: [0] });
+  assert.equal(blocked.results[0].ok, false);
+  assert.match(blocked.results[0].reason, /玩家未确认/);
+  assert.equal(blocked.game.inventory.some((item) => item.itemId === "sealed-ledger"), false);
+});
+
 test("ambiguous item names are rejected instead of changing the wrong instance", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "歧义测试员" });
   const duplicate = { ...game.inventory[0], instanceId: "item-duplicate-coat" };

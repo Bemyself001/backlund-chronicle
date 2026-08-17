@@ -2,8 +2,9 @@ import { makeId } from "../utils/id.js";
 import { withAdvancement } from "./character.js";
 import { MAX_STARTING_MONEY_PENCE, moneyFromPence } from "./money.js";
 import { initialDiscoveredLocations, normalizeLocationKnowledge } from "./map.js";
+import { ITEM_IMPORTANCE } from "./items.js";
 
-export const SAVE_VERSION = 6;
+export const SAVE_VERSION = 7;
 export const AI_SETTINGS_VERSION = "1.4";
 
 export const LOW_SEQUENCE_PATHWAYS = [
@@ -33,7 +34,7 @@ export const DEFAULT_SYSTEM_PROMPT = `你是《贝克兰德纪事》的叙事者
 7. 普通人的 occult.contact 初始为 0；在第 5、10、15 轮等每五轮节点，可出现一次非强制的非凡入口，直到玩家主动接触后变为 1。开局选择低序列非凡者的角色 occult.contact 初始为 1。contact=1 只代表接触过非凡世界，不代表获得力量。
 8. 只有 occult.contact=1 后，才允许通过 occult.reveal 揭示神秘知识，或提出带有非凡依据的 character.update；普通人可以拒绝、推迟或离开入口。任何晋升仍必须经过知识、材料、引导、地点和代价的本地验证。
 9. 每轮给出三个真正不同的行动选项：谨慎调查、社交交涉、高风险行动，同时允许自由输入；选项应包含当前场景的多种可能，而非三个措辞不同的同一目标。
-10. 所有状态变化必须作为工具调用提议。不要在正文中伪造工具已经成功执行；等待本地引擎验证后再在后续叙事中确认。物品和资金是否获得或失去以本地审计结果为准，而不是以正文宣称为准。资金使用 money.add、money.remove，金额必须拆分为 pounds（镑）、solers（苏勒）、pence（便士）。
+10. 所有状态变化必须作为工具调用提议。不要在正文中伪造工具已经成功执行；等待本地引擎验证后再在后续叙事中确认。物品和资金是否获得或失去以本地审计结果为准，而不是以正文宣称为准。新增物品只有在会影响任务、案件证据、身份、非凡能力或后续剧情入口时，才将 importance 设为 important；普通消耗品、生活用品、材料和货币必须使用 normal。资金使用 money.add、money.remove，金额必须拆分为 pounds（镑）、solers（苏勒）、pence（便士）。
 11. 支持原生工具时，状态变化只使用原生 tool calling，最终剧情放在 assistant.content，行动选项使用 ui.present_choices；只有不支持原生工具时才使用当前阶段指定的精简 JSON 兼容协议。
 12. narrative 使用克制、可读的中文，每轮约 250—600 字，不复述原著段落，不让原作角色抢占玩家中心位置。`;
 
@@ -42,7 +43,9 @@ export function migrateSystemPrompt(prompt = "") {
   const nextIntro = "你是《贝克兰德纪事》的叙事者与世界模拟器。故事发生在鲁恩王国首都贝克兰德，以原创街巷、人物、案件与剧情为中心；原作主线和重要人物仅作为遥远背景，不得取代玩家成为故事中心。";
   const legacyProtocol = "11. 优先使用原生 tool calling；若使用 JSON 协议，返回 narrative、choices、toolCalls、memoryNotes、worldEvents。";
   const nextProtocol = "11. 支持原生工具时，状态变化只使用原生 tool calling，最终剧情放在 assistant.content，行动选项使用 ui.present_choices；只有不支持原生工具时才使用当前阶段指定的精简 JSON 兼容协议。";
-  return String(prompt).replace(legacyIntro, nextIntro).replace(legacyProtocol, nextProtocol).replaceAll("《雾中纪事》", "《贝克兰德纪事》").replaceAll("灰檐港", "贝克兰德");
+  const migrated = String(prompt).replace(legacyIntro, nextIntro).replace(legacyProtocol, nextProtocol).replaceAll("《雾中纪事》", "《贝克兰德纪事》").replaceAll("灰檐港", "贝克兰德");
+  if (migrated.includes("importance 设为 important")) return migrated;
+  return migrated.replace("资金使用 money.add、money.remove", "新增物品只有在会影响任务、案件证据、身份、非凡能力或后续剧情入口时，才将 importance 设为 important；普通消耗品、生活用品、材料和货币必须使用 normal。资金使用 money.add、money.remove");
 }
 
 export const DEFAULT_API_SETTINGS = {
@@ -139,7 +142,7 @@ export function randomCharacter() {
 function item(itemId, name, category, description, quantity, weight, rarity, tags = []) {
   return {
     instanceId: makeId("item"), itemId, name, category, description, quantity, weight, rarity,
-    condition: "良好", equipped: false, tags, properties: {}, acquiredAt: "第 0 轮",
+    condition: "良好", equipped: false, tags, importance: ITEM_IMPORTANCE.NORMAL, properties: {}, acquiredAt: "第 0 轮",
     source: "角色随身物品", hiddenInfo: "", discoveredInfo: description, isNew: false,
   };
 }

@@ -1,5 +1,6 @@
 import { getAdvancement } from "../data/character.js";
 import { formatMoney, moneyFromPence, moneyToPence } from "../data/money.js";
+import { isImportantNonMoneyItem, normalizeItemImportance } from "../data/items.js";
 
 const ITEM_FIELDS = ["name", "category", "description", "weight", "rarity", "condition", "equipped", "tags", "properties", "discoveredInfo"];
 
@@ -16,7 +17,27 @@ function itemRecord(item, quantity) {
     condition: item.condition,
     equipped: Boolean(item.equipped),
     source: item.source,
+    category: item.category,
+    importance: normalizeItemImportance(item),
   };
+}
+
+export function collectImportantItemConfirmations(toolCalls = [], results = []) {
+  return results.flatMap((result, index) => {
+    const change = result?.data?.inventoryChange;
+    if (!result?.ok || !change || !Number(change.delta) || !isImportantNonMoneyItem(change)) return [];
+    const call = toolCalls[index] || {};
+    return [{
+      key: call.id || `${index}:${call.name || result.name || "inventory"}`,
+      callIndex: index,
+      toolName: call.name || result.name,
+      direction: change.delta > 0 ? "gain" : "loss",
+      name: change.name,
+      quantity: Math.abs(change.delta),
+      reason: change.reason || call.reason || "本轮状态变化",
+      importance: change.importance,
+    }];
+  });
 }
 
 export function auditInventoryChanges(before = [], after = []) {

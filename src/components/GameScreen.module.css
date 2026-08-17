@@ -160,9 +160,7 @@
 .auditHeading { display: flex; align-items: flex-start; justify-content: space-between; gap: .7rem; margin-bottom: 1rem; }
 .auditHeading .archiveTitle { margin-bottom: .25rem; }
 .auditHeading p { margin: 0; color: #77766f; font: .6rem/1.45 var(--font-sans); }
-.auditHeading button { min-height: 2.2rem; padding: 0 .65rem; border: 1px solid #94784a; background: #b18e5020; color: #c0a66d; font: 700 .58rem var(--font-sans); white-space: nowrap; }
-.auditHeading button:hover:not(:disabled) { background: #b18e5040; color: #e0c78a; }
-.auditHeading button:disabled { cursor: not-allowed; opacity: .4; }
+.auditAutomatic { padding: .28rem .5rem; border: 1px solid #94784a; color: #c0a66d; font: 700 .56rem var(--font-sans); letter-spacing: .1em; }
 .auditResult { display: grid; gap: .35rem; padding: .8rem; border-left: 2px solid #6c6558; background: #202625; }
 .auditResult.auditHasChanges { border-left-color: var(--brass); }
 .auditResult strong { color: #c2b8a4; font: 600 .72rem var(--font-serif); }

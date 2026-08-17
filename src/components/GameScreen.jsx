@@ -7,6 +7,7 @@ const RISK_LABEL = { low: "谨慎", medium: "交涉", high: "高风险" };
 const TURN_PHASES = [
   ["generating", "生成剧情"],
   ["validating", "校验状态"],
+  ["itemConfirmation", "核对物品"],
   ["finalizing", "确认结果"],
 ];
 const PHASE_MESSAGE = {
@@ -19,6 +20,7 @@ const PHASE_MESSAGE = {
   choiceRetry: "行动选项不完整，正在单独重新生成",
   reasoningRetry: "推理预算已耗尽，正在降低推理强度后重试",
   validating: "本地规则正在校验状态提议",
+  itemConfirmation: "等待你确认重要物品变更",
   finalizing: "叙事引擎正在确认校验结果",
 };
 
@@ -41,7 +43,7 @@ const CharacterPanel = memo(function CharacterPanel({ game }) {
   </div>;
 });
 
-const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, onAudit, disabled }) {
+const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, disabled }) {
   const [tab, setTab] = useState("inventory");
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("全部");
@@ -62,9 +64,9 @@ const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, onAudit
     {tab === "clues" && <div className={styles.panelContent}><h3 className={styles.archiveTitle}>已发现线索 <span>{game.clues.length}/3</span></h3>{game.clues.length ? game.clues.map((clue) => <article className={styles.record} key={clue.id}><span>CLUE</span><h4>{clue.title}</h4><p>{clue.detail}</p><small>{clue.discoveredAt}</small></article>) : <div className={styles.empty}>尚未确认任何线索。谨慎调查通常能得到最可靠的记录。</div>}</div>}
     {tab === "quests" && <div className={styles.panelContent}><h3 className={styles.archiveTitle}>案件任务 <span>{game.quests.length}</span></h3>{game.quests.map((quest) => <article className={styles.record} key={quest.id}><span>{quest.status}</span><h4>{quest.title}</h4><p>{quest.summary}</p></article>)}</div>}
     {tab === "log" && <div className={styles.panelContent}><h3 className={styles.archiveTitle}>变更记录 <span>{game.changeLog.length}</span></h3><ol className={styles.log}>{game.changeLog.slice().reverse().map((entry) => <li key={entry.id} className={entry.tone === "danger" ? styles.dangerLog : ""}><span>{String(entry.turn).padStart(2, "0")}</span><p>{entry.text}</p></li>)}</ol></div>}
-    {tab === "audit" && <AuditPanel game={game} disabled={disabled} onAudit={onAudit} />}
+    {tab === "audit" && <AuditPanel game={game} />}
   </div>;
-}, (previous, next) => previous.game === next.game && previous.disabled === next.disabled && previous.onAudit === next.onAudit);
+}, (previous, next) => previous.game === next.game && previous.disabled === next.disabled);
 
 function MoneyPanel({ game }) {
   const money = game.money || { pounds: 0, solers: 0, pence: 0 };
@@ -76,11 +78,12 @@ function MoneyPanel({ game }) {
   </div>;
 }
 
-function AuditPanel({ game, disabled, onAudit }) {
+function AuditPanel({ game }) {
   const audit = game.lastTurnAudit;
   const canAudit = Boolean(game.lastTurnBaseline);
   const inventory = audit?.inventory;
   const character = audit?.character;
+  const importantConfirmation = audit?.importantItemConfirmation;
   const changeRows = [
     ...(inventory?.gained || []).map((item) => ({ tone: "gain", text: `获得「${item.name}」×${item.quantity}` })),
     ...(inventory?.lost || []).map((item) => ({ tone: "loss", text: `失去「${item.name}」×${item.quantity}` })),
@@ -89,13 +92,14 @@ function AuditPanel({ game, disabled, onAudit }) {
     ...(inventory?.updated || []).map((item) => ({ tone: "update", text: `更新「${item.name}」：${item.fields.join("、")}` })),
   ];
   return <div className={`${styles.panelContent} ${styles.auditPanel}`}>
-    <div className={styles.auditHeading}><div><h3 className={styles.archiveTitle}>本轮状态审计 <span>{game.lastTurnBaseline ? `第 ${game.lastTurnBaseline.turn} 轮` : "等待行动"}</span></h3><p>只统计本地规则验证通过的状态变化。</p></div><button type="button" onClick={onAudit} disabled={disabled || !canAudit}>{audit ? "重新审计" : "开始审计"}</button></div>
+    <div className={styles.auditHeading}><div><h3 className={styles.archiveTitle}>本轮状态审计 <span>{game.lastTurnBaseline ? `第 ${game.lastTurnBaseline.turn} 轮` : "等待行动"}</span></h3><p>每轮自动比较本地验证前后的结构化状态。</p></div><span className={styles.auditAutomatic}>自动</span></div>
     {!canAudit && <div className={styles.empty}>完成一轮行动后，这里会保留一份可复核的前后状态快照。</div>}
-    {canAudit && !audit && <div className={styles.empty}>点击“开始审计”，核对本轮实际获得、失去或改变的物品。</div>}
+    {canAudit && !audit && <div className={styles.empty}>审计记录尚未生成；完成下一轮行动后会自动更新。</div>}
     {audit && <>
       <div className={`${styles.auditResult} ${audit.hasChanges ? styles.auditHasChanges : ""}`}><strong>{audit.hasChanges ? "发现已确认的状态变化" : "本轮没有已确认的物品或角色变化"}</strong><small>审计只比较本地执行前后的结构化数据，不把剧情正文当作事实。</small></div>
       {changeRows.length > 0 && <ul className={styles.auditList}>{changeRows.map((row, index) => <li key={`${row.text}-${index}`} data-tone={row.tone}><span>{row.tone === "gain" ? "+" : row.tone === "loss" ? "−" : "·"}</span><p>{row.text}</p></li>)}</ul>}
       {audit.money?.hasChanges && <div className={styles.moneyAudit}><strong>资金变化</strong><span>{formatMoney(audit.money.before)} → {formatMoney(audit.money.after)}</span><small>{audit.money.deltaPence > 0 ? "收入已确认" : "支出已确认"}</small></div>}
+      {importantConfirmation?.required && <div className={styles.auditNote}>重要物品确认：已确认 {importantConfirmation.confirmed} 项{importantConfirmation.rejected ? `，拒绝 ${importantConfirmation.rejected} 项` : ""}</div>}
       {character?.advancementChanged && <div className={styles.auditNote}>非凡档案：{character.beforeAdvancement.sequenceLabel} → {character.afterAdvancement.sequenceLabel}</div>}
     </>}
   </div>;
@@ -114,7 +118,7 @@ function TurnProgress({ phase }) {
   </div>;
 }
 
-export default function GameScreen({ game, loading, turnPhase, streamText, error, onAction, onAbort, onRetry, onRegenerateChoices, onLocalTool, onAudit, onOpenMap, onOpenApi, onOpenPrompt, onOpenSaves, onHome }) {
+export default function GameScreen({ game, loading, turnPhase, streamText, error, onAction, onAbort, onRetry, onRegenerateChoices, onLocalTool, onOpenMap, onOpenApi, onOpenPrompt, onOpenSaves, onHome }) {
   const [input, setInput] = useState("");
   const [mobilePanel, setMobilePanel] = useState(null);
   const [followingLatest, setFollowingLatest] = useState(true);
@@ -174,7 +178,7 @@ export default function GameScreen({ game, loading, turnPhase, streamText, error
           <div className={styles.composer}><textarea aria-label="自由输入行动" value={input} onChange={(e) => setInput(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); submit(); } }} placeholder="描述你的行动、问题或对话…" disabled={loading} /><div><span>Enter 发送 · Shift+Enter 换行</span>{loading ? <button className={styles.abort} type="button" onClick={onAbort}>中止生成</button> : <button className="button button--primary" type="button" onClick={submit} disabled={!input.trim()}>提交行动</button>}</div></div>
         </div>
       </section>
-      <aside className={`${styles.right} ${mobilePanel === "inventory" ? styles.drawerOpen : ""}`} aria-label="物品与档案"><div className={styles.drawerHeader}><span>物品与档案</span><button type="button" onClick={() => setMobilePanel(null)}>关闭</button></div><InventoryPanel game={game} onLocalTool={onLocalTool} onAudit={onAudit} disabled={loading} /></aside>
+      <aside className={`${styles.right} ${mobilePanel === "inventory" ? styles.drawerOpen : ""}`} aria-label="物品与档案"><div className={styles.drawerHeader}><span>物品与档案</span><button type="button" onClick={() => setMobilePanel(null)}>关闭</button></div><InventoryPanel game={game} onLocalTool={onLocalTool} disabled={loading} /></aside>
       {mobilePanel === "menu" && <div className={styles.settingsMenu} role="dialog" aria-label="游戏设置菜单"><div><span>游戏设置</span><button type="button" onClick={() => setMobilePanel(null)}>关闭</button></div><button type="button" onClick={() => { setMobilePanel(null); onOpenPrompt(); }}>查看与编辑提示词</button><button type="button" onClick={() => { setMobilePanel(null); onOpenApi(); }}>自定义 API</button><button type="button" onClick={() => { setMobilePanel(null); onOpenSaves(); }}>存档柜</button></div>}
       {mobilePanel && <button className={styles.scrim} type="button" aria-label="关闭抽屉" onClick={() => setMobilePanel(null)} />}
     </div>

@@ -8,9 +8,10 @@ import SaveManager from "./components/SaveManager.jsx";
 import UpdateDialog from "./components/UpdateDialog.jsx";
 import ChangelogDialog from "./components/ChangelogDialog.jsx";
 import WorldMap from "./components/WorldMap.jsx";
+import ImportantItemConfirmation from "./components/ImportantItemConfirmation.jsx";
 import { createInitialGame, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from "./data/defaults.js";
 import { buildRejectedToolNarrative, dedupeToolCalls, executeToolCalls, isRepairableToolError, normalizeToolCalls, validateToolCall } from "./engine/tools.js";
-import { auditTurnChanges, createAuditBaseline } from "./engine/audit.js";
+import { auditTurnChanges, collectImportantItemConfirmations, createAuditBaseline } from "./engine/audit.js";
 import { resolveTurnProgress } from "./engine/turn.js";
 import { loadApiSettings, requestAIWithReasoningFallback, saveApiSettings } from "./services/api.js";
 import { buildChoiceRegenerationContext, buildPlanningContext, buildRenderingContext, buildToolRepairContext, updateMemory } from "./services/memory.js";
@@ -50,7 +51,9 @@ export default function App() {
   const [streamText, setStreamText] = useState("");
   const [turnPhase, setTurnPhase] = useState("idle");
   const [error, setError] = useState("");
+  const [itemConfirmation, setItemConfirmation] = useState(null);
   const controllerRef = useRef(null);
+  const itemConfirmationResolverRef = useRef(null);
   const busyRef = useRef(false);
   const lastActionRef = useRef("");
   const streamTimerRef = useRef(null);
@@ -95,6 +98,21 @@ export default function App() {
   const handleImport = async (file) => { const imported = await importSave(file); setGame(imported); refreshSaves(); setScreen("game"); };
   const handleSettingsSave = (next) => { setSettings(saveApiSettings(next)); };
   const handlePromptSave = (next) => { localStorage.setItem("mist-system-prompt", next); setPrompt(next); };
+
+  const requestImportantItemConfirmation = (changes, signal) => new Promise((resolve) => {
+    const finish = (decision) => {
+      signal.removeEventListener("abort", handleAbort);
+      itemConfirmationResolverRef.current = null;
+      setItemConfirmation(null);
+      resolve(decision);
+    };
+    const handleAbort = () => finish({ cancelled: true, aborted: true });
+    itemConfirmationResolverRef.current = finish;
+    setItemConfirmation({ changes });
+    signal.addEventListener("abort", handleAbort, { once: true });
+  });
+
+  const settleImportantItemConfirmation = (decision) => itemConfirmationResolverRef.current?.(decision);
 
   const requestChoicesFromAI = (targetGame, action, narrative, validationError, signal) => {
     const messages = buildChoiceRegenerationContext(targetGame, action, narrative, validationError, prompt, { nativeTools: settings.nativeTools });
@@ -157,15 +175,45 @@ export default function App() {
       }
 
       setTurnPhase("validating");
-      const execution = executeToolCalls(game, proposedToolCalls);
-      const progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results);
-      const resolvedGame = {
+      let execution = executeToolCalls(game, proposedToolCalls);
+      let progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results);
+      let resolvedGame = {
         ...execution.game,
         turn: game.turn + 1,
         worldTime: progress.worldTime,
         occult: progress.occult,
         hiddenDanger: progress.hiddenDanger,
       };
+      const importantChanges = collectImportantItemConfirmations(proposedToolCalls, execution.results);
+      let confirmationStatus = { required: false, status: "not-required", confirmed: 0, rejected: 0 };
+      if (importantChanges.length) {
+        setTurnPhase("itemConfirmation");
+        const decision = await requestImportantItemConfirmation(importantChanges, controller.signal);
+        if (decision.cancelled) {
+          const abortError = new Error("玩家取消了重要物品确认");
+          abortError.name = "AbortError";
+          throw abortError;
+        }
+        const approvedKeys = new Set(decision.approvedKeys || []);
+        const blockedCallIndexes = importantChanges.filter((change) => !approvedKeys.has(change.key)).map((change) => change.callIndex);
+        confirmationStatus = {
+          required: true,
+          status: blockedCallIndexes.length ? (approvedKeys.size ? "partially-confirmed" : "rejected") : "confirmed",
+          confirmed: importantChanges.length - blockedCallIndexes.length,
+          rejected: blockedCallIndexes.length,
+        };
+        if (blockedCallIndexes.length) {
+          execution = executeToolCalls(game, proposedToolCalls, { blockedCallIndexes });
+          progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results);
+          resolvedGame = {
+            ...execution.game,
+            turn: game.turn + 1,
+            worldTime: progress.worldTime,
+            occult: progress.occult,
+            hiddenDanger: progress.hiddenDanger,
+          };
+        }
+      }
       const resolution = createTurnResolution(proposedToolCalls, execution.results, progress);
 
       let response = planningResponse;
@@ -211,19 +259,21 @@ export default function App() {
         ? injectOccultEntryChoice(choices, progress.occult.contact === 0 ? (progress.occultEntry || progress.occult.currentEntry) : null)
         : [];
       const nextMemory = updateMemory(execution.game, action, occultNarrative, resolution);
+      const auditBaseline = createAuditBaseline(game, game.turn + 1);
+      const automaticAudit = { ...auditTurnChanges(auditBaseline, resolvedGame), importantItemConfirmation: confirmationStatus };
       const next = {
         ...resolvedGame, ...nextMemory, choices: nextChoices, choiceMeta,
         worldEvents: [...game.worldEvents, ...(progress.occultEntry ? [{ id: makeId("event"), turn: game.turn + 1, text: `非凡入口出现：${progress.occultEntry.title}` }] : [])].slice(-40),
         changeLog: [...game.changeLog, ...execution.logs].slice(-100),
-        lastTurnBaseline: createAuditBaseline(game, game.turn + 1),
-        lastTurnAudit: null,
+        lastTurnBaseline: auditBaseline,
+        lastTurnAudit: automaticAudit,
       };
       resetStreamPreview(); commitGame(next);
       return true;
     } catch (err) {
       setError(err.name === "AbortError" ? "生成已由你中止；游戏状态没有改变。" : err.message || "未知错误，请重试本轮。");
       return false;
-    } finally { resetStreamPreview(); setTurnPhase("idle"); setLoading(false); busyRef.current = false; controllerRef.current = null; }
+    } finally { resetStreamPreview(); setItemConfirmation(null); itemConfirmationResolverRef.current = null; setTurnPhase("idle"); setLoading(false); busyRef.current = false; controllerRef.current = null; }
   };
 
   const regenerateChoices = async () => {
@@ -254,13 +304,10 @@ export default function App() {
 
   const runLocalTool = (name, args, reason) => {
     if (!game || loading) return;
+    const auditBaseline = createAuditBaseline(game, game.turn);
     const execution = executeToolCalls({ ...game, turn: game.turn - 1 }, [{ id: makeId("local"), name, args, reason }]);
-    commitGame({ ...execution.game, turn: game.turn, changeLog: [...game.changeLog, ...execution.logs].slice(-100), lastTurnBaseline: createAuditBaseline(game, game.turn), lastTurnAudit: null });
-  };
-  const auditCurrentTurn = () => {
-    if (!game?.lastTurnBaseline || loading) return;
-    const audit = auditTurnChanges(game.lastTurnBaseline, game);
-    commitGame({ ...game, lastTurnAudit: audit });
+    const next = { ...execution.game, turn: game.turn, changeLog: [...game.changeLog, ...execution.logs].slice(-100) };
+    commitGame({ ...next, lastTurnBaseline: auditBaseline, lastTurnAudit: { ...auditTurnChanges(auditBaseline, next), importantItemConfirmation: { required: false, status: "player-action", confirmed: 0, rejected: 0 } } });
   };
   const saveSlot = (slotId, label) => { if (game) saveGame(game, slotId, label); refreshSaves(); };
   const loadSlot = (slotId) => { const loaded = loadGame(slotId); if (loaded) { setGame(loaded); setScreen("game"); setModal(null); } };
@@ -270,7 +317,8 @@ export default function App() {
     <a className="skip-link" href="#main">跳到主要内容</a>
     {screen === "welcome" && <Welcome hasSave={saves.some((slot) => slot.slotId === "autosave")} apiSettings={settings} onNew={() => setScreen("create")} onContinue={handleContinue} onImport={handleImport} onApi={() => setModal("api")} onChangelog={() => setModal("changelog")} />}
     {screen === "create" && <CharacterCreation onBack={() => setScreen("welcome")} onCreate={handleCreate} />}
-    {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onRegenerateChoices={regenerateChoices} onLocalTool={runLocalTool} onAudit={auditCurrentTurn} onOpenMap={() => setModal("map")} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => setScreen("welcome")} />}
+    {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onRegenerateChoices={regenerateChoices} onLocalTool={runLocalTool} onOpenMap={() => setModal("map")} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => setScreen("welcome")} />}
+    {itemConfirmation && <ImportantItemConfirmation changes={itemConfirmation.changes} onConfirm={(approvedKeys) => settleImportantItemConfirmation({ approvedKeys })} onCancel={() => settleImportantItemConfirmation({ cancelled: true })} />}
     {modal === "map" && game && <WorldMap game={game} loading={loading} onClose={() => setModal(null)} onTravel={(location) => { setModal(null); return runTurn(`前往${location.name}`, { mapDestination: location }); }} onInvestigate={(location, knowledge) => { setModal(null); return runTurn(`根据地图上的传闻，调查${knowledge.note || location.district}。`, { mapInvestigation: { locationId: location.id, currentStatus: knowledge.status, rumor: knowledge.note || location.rumor } }); }} />}
     {modal === "api" && <ApiSettings settings={settings} onSave={handleSettingsSave} onCheckUpdate={() => setModal("update")} onClose={() => setModal(null)} />}
     {(modal === "update" || modal === "update-auto") && <UpdateDialog automatic={modal === "update-auto"} onClose={() => setModal(null)} />}

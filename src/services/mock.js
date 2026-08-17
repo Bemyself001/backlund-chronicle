@@ -10,7 +10,10 @@ export async function mockResponse(game, action, signal, onChunk) {
   const lower = action.toLowerCase();
   let narrative;
   let toolCalls = [];
-  if (game.occult?.entryAvailable && game.occult.currentEntry && includesAny(lower, ["非凡入口", "异常暗号", "接触", "追查这条"])) {
+  if (includesAny(lower, ["重要物品", "关键证据"])) {
+    narrative = "你在站台长椅下发现一本带有铁路行会封蜡的薄账册。页码与失踪启事上的日期彼此对应，它可能成为案件的关键证据；在把它正式收入档案前，本地审计会要求你确认。";
+    toolCalls = [{ id: makeId("mock"), name: "inventory.add", reason: "玩家主动检查现场并取得案件关键证据", args: { item: { itemId: "sealed-rail-ledger", name: "封蜡铁路账册", description: "记录着异常列车班次与数笔可疑支出。", category: "证据", quantity: 1, weight: 0.2, rarity: "少见", importance: "important", tags: ["关键证据"], source: "东区火车站长椅下" } } }];
+  } else if (game.occult?.entryAvailable && game.occult.currentEntry && includesAny(lower, ["非凡入口", "异常暗号", "接触", "追查这条"])) {
     narrative = "你没有贸然触碰那张收据，而是先沿着暗号留下的线索观察周围。确认没有普通人被卷入后，你选择记下入口位置，并向留下暗号的人传递一个谨慎的回应。这个决定只代表你愿意接触更深一层的信息，不代表你已经拥有任何非凡力量。";
     toolCalls = [{ id: makeId("mock"), name: "occult.contact", reason: "玩家主动追查并确认当前非凡入口", args: { entryId: game.occult.currentEntry.id } }];
   } else if (game.occult?.contact === 1 && includesAny(lower, ["揭示", "神秘知识", "非凡知识", "理解仪式"])) {

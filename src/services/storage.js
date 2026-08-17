@@ -1,4 +1,5 @@
 import { SAVE_VERSION } from "../data/defaults.js";
+import { isMoneyItem, normalizeInventoryItem } from "../data/items.js";
 import { withAdvancement } from "../data/character.js";
 import { moneyFromPence } from "../data/money.js";
 import { normalizeLocationKnowledge } from "../data/map.js";
@@ -53,8 +54,8 @@ export function migrateSave(raw) {
     return value;
   };
   const migrated = version < 2 ? migrateStoryValue(raw) : raw;
-  const legacyCoin = (migrated.inventory || []).find((item) => item?.itemId === "copper-coins" || item?.category === "货币");
-  const inventory = migrated.money ? migrated.inventory : (migrated.inventory || []).filter((item) => item !== legacyCoin);
+  const legacyCoin = (migrated.inventory || []).find((item) => isMoneyItem(item));
+  const inventory = (migrated.inventory || []).filter((item) => !isMoneyItem(item)).map(normalizeInventoryItem);
   const money = migrated.money || moneyFromPence(legacyCoin?.quantity || 0);
   const advancement = withAdvancement(migrated.character).advancement;
   const legacyContact = advancement?.type === "extraordinary" || migrated.character?.extraordinary === "low" ? 1 : 0;
@@ -80,7 +81,7 @@ export function migrateSave(raw) {
     occult,
     processedToolCalls: migrated.processedToolCalls || [],
     memoryNotes: migrated.memoryNotes || [],
-    lastTurnBaseline: migrated.lastTurnBaseline || null,
+    lastTurnBaseline: migrated.lastTurnBaseline ? { ...migrated.lastTurnBaseline, inventory: (migrated.lastTurnBaseline.inventory || []).filter((item) => !isMoneyItem(item)).map(normalizeInventoryItem) } : null,
     lastTurnAudit: migrated.lastTurnAudit || null,
   };
 }
