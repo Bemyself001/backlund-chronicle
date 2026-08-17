@@ -42,6 +42,16 @@
 .switch small { color: var(--ink-soft); font-size: .73rem; line-height: 1.4; }
 .dangerSwitch { border: 1px solid #7c2d2d66; background: #7c2d2d0d; }
 .status { margin: 0; padding: .7rem; background: #111817; color: #d8c69f; font: .82rem/1.5 var(--font-mono); }
+.releaseCard { display: grid; gap: .72rem; padding: 1rem; background: linear-gradient(135deg, #1f554711, #b8893b12 70%); border: 1px solid #8b7a5a66; border-left: 3px solid var(--brass); }
+.releaseHeading { display: flex; align-items: end; justify-content: space-between; gap: .8rem; padding-bottom: .68rem; border-bottom: 1px solid #8b7a5a42; }
+.releaseHeading div { display: grid; gap: .18rem; min-width: 0; }
+.releaseHeading span { color: var(--ink-soft); font: 700 .68rem/1.2 var(--font-sans); letter-spacing: .12em; text-transform: uppercase; }
+.releaseHeading h3 { margin: 0; color: var(--ink); font-family: var(--font-display); font-size: 1.05rem; letter-spacing: .04em; }
+.releaseHeading time { flex: 0 0 auto; color: var(--verdigris); font: 700 .75rem/1.2 var(--font-mono); letter-spacing: .04em; }
+.releaseCard p { margin: 0; color: #3f3a30; font-size: .86rem; line-height: 1.6; }
+.releaseCard ul { display: grid; gap: .42rem; margin: 0; padding: 0; color: var(--ink-soft); font-size: .8rem; line-height: 1.55; list-style: none; }
+.releaseCard li { position: relative; padding-left: 1rem; }
+.releaseCard li::before { position: absolute; top: .62em; left: .08rem; width: .38rem; height: 1px; background: var(--brass); content: ""; }
 .actions { display: flex; justify-content: flex-end; gap: .7rem; padding-top: .25rem; }
 .prompt { min-height: 25rem !important; font-family: var(--font-mono) !important; font-size: .82rem !important; line-height: 1.65 !important; }
-@media (max-width: 650px) { .providerGrid, .modelResults, .twoCol, .threeCol, .switches { grid-template-columns: minmax(0, 1fr); } .modelPanelHeading { align-items: stretch; flex-direction: column; } .inlineActions > button { flex: 1 1 9rem; } .actions { flex-wrap: wrap; } .actions > * { flex: 1; } .prompt { min-height: 19rem !important; } }
+@media (max-width: 650px) { .providerGrid, .modelResults, .twoCol, .threeCol, .switches { grid-template-columns: minmax(0, 1fr); } .modelPanelHeading, .releaseHeading { align-items: stretch; flex-direction: column; } .inlineActions > button { flex: 1 1 9rem; } .actions { flex-wrap: wrap; } .actions > * { flex: 1; } .prompt { min-height: 19rem !important; } }

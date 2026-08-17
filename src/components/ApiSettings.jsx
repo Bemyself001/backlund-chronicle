@@ -4,6 +4,7 @@ import styles from "./Forms.module.css";
 import { listApiModels, testApiConnection } from "../services/api.js";
 import { API_PROVIDER_PRESETS, createProviderProfile, getApiProvider } from "../services/apiProviders.js";
 import { isNativeAndroid } from "../services/updates.js";
+import { LATEST_UPDATE } from "../data/changelog.js";
 
 function captureProfile(settings) {
   return {
@@ -234,6 +235,21 @@ export default function ApiSettings({ settings, onSave, onClose, onCheckUpdate }
             ["autoRetryReasoning", "推理耗尽自动恢复", "先保留推理并增加输出预算；仍失败时才降低推理并使用兼容模式"],
           ].map(([key, label, hint]) => <label key={key} className={styles.switch}><input type="checkbox" checked={draft[key]} onChange={(event) => update(key, event.target.checked)} /><span><strong>{label}</strong><small>{hint}</small></span></label>)}
         </fieldset>
+
+        <section className={styles.releaseCard} aria-labelledby="latest-update-title">
+          <div className={styles.releaseHeading}>
+            <div>
+              <span>Latest dispatch</span>
+              <h3 id="latest-update-title">{LATEST_UPDATE.title}</h3>
+            </div>
+            <time dateTime={LATEST_UPDATE.date}>{LATEST_UPDATE.dateLabel}</time>
+          </div>
+          <p>{LATEST_UPDATE.summary}</p>
+          <ul>
+            {LATEST_UPDATE.changes.map((change) => <li key={change}>{change}</li>)}
+          </ul>
+        </section>
+
         {status && <p className={styles.status} role="status">{status}</p>}
         <div className={styles.actions}>
           <button className="button button--ghost" type="button" onClick={onCheckUpdate}>检查版本状态</button>
