@@ -12,7 +12,7 @@ test("version 1 saves migrate from Grayharbor to Backlund without losing progres
     inventory: [{ instanceId: "item-1", name: "旧呢外套" }],
     recentDialogues: [{ role: "assistant", content: "灰檐港市档案馆已经关门。" }],
   });
-  assert.equal(migrated.version, 5);
+  assert.equal(migrated.version, 6);
   assert.equal(migrated.turn, 8);
   assert.equal(migrated.title, "艾琳的贝克兰德档案");
   assert.equal(migrated.location.district, "贝克兰德桥区·旧钟街");
@@ -21,6 +21,8 @@ test("version 1 saves migrate from Grayharbor to Backlund without losing progres
   assert.equal(migrated.character.advancement.sequenceLabel, "普通人");
   assert.equal(migrated.occult.contact, 0);
   assert.equal(migrated.lastTurnAudit, null);
+  assert.deepEqual(migrated.discoveredLocations, []);
+  assert.equal(migrated.locationKnowledge["queen-archive"].status, "rumored");
 });
 
 test("legacy copper coin items migrate into the separate money wallet", () => {

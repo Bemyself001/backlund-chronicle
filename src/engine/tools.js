@@ -1,5 +1,5 @@
 import { makeId } from "../utils/id.js";
-import { findTravelRoute, getMapLocation } from "../data/map.js";
+import { findTravelRoute, getMapLocation, MAP_LOCATIONS, normalizeLocationKnowledge } from "../data/map.js";
 import { amountToPence, formatMoney, moneyFromPence, moneyToPence } from "../data/money.js";
 
 export const TOOL_SCHEMAS = {
@@ -19,6 +19,7 @@ export const TOOL_SCHEMAS = {
   "status.add": { required: ["status"], description: "添加状态效果" },
   "status.remove": { required: ["statusId"], description: "移除状态效果" },
   "relationship.update": { required: ["npcId", "delta"], description: "更新已知 NPC 关系" },
+  "location.discover": { required: ["locationId", "status", "note"], description: "记录地点传闻或确认发现地点" },
   "location.move": { required: ["locationId"], description: "移动到已发现地点" },
   "clue.add": { required: ["clue"], description: "添加一条新线索" },
   "quest.add": { required: ["quest"], description: "添加任务" },
@@ -108,6 +109,27 @@ function resolveRelationshipReference(game, args = {}) {
   if (unique.length === 1) return { npc: unique[0] };
   if (unique.length > 1) return { npc: null, resolutionError: `NPC 标识「${candidates[0]}」对应多个对象，请改用 npcId` };
   return { npc: null, resolutionError: `找不到 NPC「${candidates[0]}」` };
+}
+
+function locationCandidates(args = {}) {
+  const nested = [args.location, args.destination, args.target].filter((value) => value && typeof value === "object");
+  return [
+    args.locationId,
+    args.id,
+    args.locationName,
+    args.name,
+    ...nested.flatMap((value) => [value.id, value.locationId, value.name]),
+  ].map((value) => String(value || "").trim()).filter(Boolean);
+}
+
+function resolveLocationReference(args = {}) {
+  const candidates = locationCandidates(args);
+  if (!candidates.length) return { location: null, resolutionError: "缺少地点标识：请提供地图目录中的 locationId" };
+  const matches = MAP_LOCATIONS.filter((location) => candidates.some((candidate) => [location.id, location.name].includes(candidate)));
+  const unique = [...new Map(matches.map((location) => [location.id, location])).values()];
+  if (unique.length === 1) return { location: unique[0] };
+  if (unique.length > 1) return { location: null, resolutionError: `地点标识「${candidates[0]}」对应多个地点，请改用 locationId` };
+  return { location: null, resolutionError: `地图目录中找不到地点「${candidates[0]}」` };
 }
 
 function repairToolArgs(name, rawArgs = {}, game = null) {
@@ -207,6 +229,24 @@ function repairToolArgs(name, rawArgs = {}, game = null) {
         repairNote = appendRepairNote(repairNote, `已根据「${resolved.npc.name}」匹配 NPC`);
       } else {
         resolutionError = resolved.resolutionError;
+      }
+    }
+  }
+  if (["location.discover", "location.move"].includes(name)) {
+    const resolved = resolveLocationReference(args);
+    if (!args.locationId && resolved.location) {
+      args.locationId = resolved.location.id;
+      repairNote = appendRepairNote(repairNote, `已根据「${resolved.location.name}」匹配地图地点`);
+    } else if (!resolved.location) {
+      resolutionError = resolved.resolutionError;
+    }
+    if (name === "location.discover") {
+      const statusAliases = { rumor: "rumored", rumoured: "rumored", known: "discovered", 听闻: "rumored", 传闻: "rumored", 已发现: "discovered" };
+      const sourceStatus = args.status ?? args.level ?? args.knowledgeStatus;
+      if (statusAliases[sourceStatus]) args.status = statusAliases[sourceStatus];
+      if (!args.note && resolved.location && ["rumored", "discovered"].includes(args.status)) {
+        args.note = args.status === "rumored" ? resolved.location.rumor : resolved.location.description;
+        repairNote = appendRepairNote(repairNote, "已根据地图目录补充地点记录");
       }
     }
   }
@@ -415,7 +455,26 @@ function executeOne(game, call) {
       if (args.note) npc.note = String(args.note);
       return succeed(call.name, `${turnLabel}：${npc.name}的关系${delta >= 0 ? "提升" : "下降"}${Math.abs(delta)}。`);
     }
+    case "location.discover": {
+      const location = getMapLocation(args.locationId);
+      if (!location) return fail(call.name, "地点不在本地地图目录中");
+      if (!["rumored", "discovered"].includes(args.status)) return fail(call.name, "地点状态只能是 rumored 或 discovered");
+      if (String(args.note || "").trim().length < 4) return fail(call.name, "地点记录必须说明玩家实际听闻或确认的信息");
+      game.discoveredLocations = Array.isArray(game.discoveredLocations) ? game.discoveredLocations : [];
+      game.locationKnowledge = normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location?.id);
+      const currentStatus = game.locationKnowledge[location.id]?.status || "unknown";
+      if (currentStatus === "discovered") return fail(call.name, "该地点已经发现，无需重复记录");
+      if (currentStatus === "rumored" && args.status === "rumored") return fail(call.name, "该地点传闻已经记录，无需重复添加");
+      const record = { status: args.status, note: String(args.note).trim(), discoveredAt: turnLabel, source: call.reason };
+      game.locationKnowledge[location.id] = record;
+      if (args.status === "discovered" && !game.discoveredLocations.some((entry) => entry.id === location.id)) {
+        game.discoveredLocations.push({ id: location.id, name: location.name, note: record.note });
+      }
+      const action = args.status === "rumored" ? "记录地点传闻" : "确认发现地点";
+      return succeed(call.name, `${turnLabel}：${action}「${location.name}」——${call.reason}。`, { locationId: location.id, status: args.status });
+    }
     case "location.move": {
+      game.discoveredLocations = Array.isArray(game.discoveredLocations) ? game.discoveredLocations : [];
       const location = game.discoveredLocations.find((entry) => entry.id === args.locationId);
       if (!location) return fail(call.name, "目的地尚未发现，不能直接移动");
       if (location.id === game.location.id) return fail(call.name, "角色已经位于该地点");

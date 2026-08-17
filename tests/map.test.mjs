@@ -1,12 +1,47 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createInitialGame, EMPTY_CHARACTER } from "../src/data/defaults.js";
-import { findTravelRoute, MAP_LOCATIONS } from "../src/data/map.js";
+import { findTravelRoute, MAP_LOCATIONS, normalizeLocationKnowledge } from "../src/data/map.js";
 import { executeToolCalls } from "../src/engine/tools.js";
 import { minutesForTurn } from "../src/engine/turn.js";
-import { ensureMapMoveToolCall } from "../src/services/mapTravel.js";
+import { ensureMapMoveToolCall, ensureMockMapDiscoveryToolCall } from "../src/services/mapTravel.js";
 
 const known = ["east-station", "iron-gate", "soot-lamp", "queen-library"];
+
+test("initial map knowledge separates unknown, rumored, and discovered locations", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "地图测试员" });
+  const knowledge = normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location.id);
+  assert.equal(knowledge["east-station"].status, "discovered");
+  assert.equal(knowledge["queen-archive"].status, "rumored");
+  assert.equal(knowledge["north-flats"].status, "unknown");
+});
+
+test("location discovery records a rumor before confirming the full place", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "地图测试员" });
+  const execution = executeToolCalls(game, [{
+    id: "rumor-north-flats",
+    name: "location.discover",
+    args: { locationId: "north-flats", status: "rumored", note: "搬运工提到北区有不查来历的廉租公寓。" },
+    reason: "玩家向搬运工打听北区住处",
+  }]);
+  assert.equal(execution.results[0].ok, true);
+  assert.equal(execution.game.locationKnowledge["north-flats"].status, "rumored");
+  assert.equal(execution.game.discoveredLocations.some((location) => location.id === "north-flats"), false);
+});
+
+test("confirmed location discovery unlocks the place and its route", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "地图测试员" });
+  const execution = executeToolCalls(game, [{
+    id: "discover-queen-archive",
+    name: "location.discover",
+    args: { locationId: "queen-archive", status: "discovered", note: "从市政目录确认了档案馆的地址和开放时间。" },
+    reason: "玩家查阅了火车站的市政目录",
+  }]);
+  assert.equal(execution.results[0].ok, true);
+  assert.equal(execution.game.locationKnowledge["queen-archive"].status, "discovered");
+  assert.equal(execution.game.discoveredLocations.some((location) => location.id === "queen-archive"), true);
+  assert.ok(findTravelRoute("east-station", "queen-archive", execution.game.discoveredLocations.map((location) => location.id)));
+});
 
 test("map exposes connected routes without crossing undiscovered locations", () => {
   assert.equal(MAP_LOCATIONS.length, 9);
@@ -53,4 +88,14 @@ test("map selection repairs an AI movement call without duplicating it", () => {
   assert.equal(calls[0].args.locationId, "queen-library");
   assert.equal(calls[0].args.district, undefined);
   assert.equal(calls[0].id, "map-move-5-queen-library");
+});
+
+test("Mock map investigation supplies a deterministic discovery call", () => {
+  const calls = ensureMockMapDiscoveryToolCall([], { locationId: "queen-archive" }, 6);
+  assert.equal(calls[0].name, "location.discover");
+  assert.deepEqual(calls[0].args, {
+    locationId: "queen-archive",
+    status: "discovered",
+    note: "保存旧地契、人口登记与部分封存案卷的石砌建筑。",
+  });
 });

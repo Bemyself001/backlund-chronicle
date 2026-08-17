@@ -389,3 +389,21 @@ test("targeted tool repair sends only the failing state tool schema", async (con
   await requestAI({ ...settings, nativeTools: true }, [{ role: "user", content: "修复参数" }], undefined, undefined, { toolSet: "state", allowedToolNames: ["status.add"] });
   assert.deepEqual(requestBody.tools.map((tool) => tool.function.name), ["status__add"]);
 });
+
+test("map state tools expose strict discovery and movement parameters", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  let requestBody;
+  globalThis.fetch = async (_url, init) => {
+    requestBody = JSON.parse(init.body);
+    return new Response(JSON.stringify({ choices: [{ message: { content: "NO_STATE_CHANGE" } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+
+  await requestAI({ ...settings, nativeTools: true }, [{ role: "user", content: "检查地图工具" }], undefined, undefined, { toolSet: "state", allowedToolNames: ["location.discover", "location.move"] });
+  const definitions = Object.fromEntries(requestBody.tools.map((tool) => [tool.function.name, tool.function.parameters]));
+  assert.deepEqual(definitions.location__discover.required, ["locationId", "status", "note", "reason"]);
+  assert.equal(definitions.location__discover.properties.status.additionalProperties, undefined);
+  assert.deepEqual(definitions.location__discover.properties.status.enum, ["rumored", "discovered"]);
+  assert.deepEqual(definitions.location__move.required, ["locationId", "reason"]);
+  assert.equal(definitions.location__move.additionalProperties, false);
+});

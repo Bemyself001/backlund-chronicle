@@ -1,8 +1,9 @@
 import { makeId } from "../utils/id.js";
 import { withAdvancement } from "./character.js";
 import { MAX_STARTING_MONEY_PENCE, moneyFromPence } from "./money.js";
+import { initialDiscoveredLocations, normalizeLocationKnowledge } from "./map.js";
 
-export const SAVE_VERSION = 5;
+export const SAVE_VERSION = 6;
 export const AI_SETTINGS_VERSION = "1.4";
 
 export const LOW_SEQUENCE_PATHWAYS = [
@@ -188,12 +189,8 @@ export function createInitialGame(character) {
       { id: "duplicate-tag", title: "重复的行李牌", detail: "两件来自不同列车的行李使用了完全相同的黄铜编号牌。" },
     ],
     relationships: [],
-    discoveredLocations: [
-      { id: "east-station", name: "东区·贝克兰德火车站", note: "通往雾都各区的交通节点；公告栏上贴着招工、租房与失踪启事。" },
-      { id: "iron-gate", name: "东区·铁门街", note: "廉价旅店、工棚、诊所与小酒馆密集，适合寻找住处和零工。" },
-      { id: "soot-lamp", name: "桥区·雾鸦旅店", note: "一间价格尚可的旅店，也接受替客人打听消息的委托。" },
-      { id: "queen-library", name: "皇后区·公共图书馆", note: "白天对公众开放，可查阅报纸、地图与部分城市档案。" },
-    ],
+    discoveredLocations: initialDiscoveredLocations(),
+    locationKnowledge: normalizeLocationKnowledge({}, initialDiscoveredLocations(), "east-station"),
     worldEvents: [{ id: makeId("event"), turn: 0, text: "贝克兰德连续第九日降雨；东区铁路因浓雾出现大面积晚点。" }],
     recentDialogues: [{ id: makeId("msg"), role: "assistant", turn: 0, content: "列车在一阵尖锐的刹车声中驶入贝克兰德东区火车站。铸铁穹顶下，煤烟、湿羊毛和热蒸汽混成一层低垂的雾；搬运工推着行李车穿过人群，报童高声兜售晚报，远处的马车夫则为最后几位体面乘客争吵。\n\n你带着自己的行李踏上站台。没有人在这里等你，也没有一封命令替你安排未来。售票厅外的城市地图标出通往桥区、皇后区与北区的线路；公告栏上同时贴着廉价房间、短工招聘、教会布告和几张边角卷起的失踪启事。若你愿意，今夜可以先找住处、谋一份工作、认识这座城市，或登上下一班车离开东区。\n\n只有一件小事略显不协调：封闭的第七码头旁停着一辆无人看管的行李车，最上方那只黑色皮箱正以稳定的七秒间隔，发出极轻的金属碰撞声。它没有拦住你的路。贝克兰德向四面八方展开，等待你自己决定第一步。" }],
     longTermSummary: "玩家刚刚抵达鲁恩王国首都贝克兰德，身处东区火车站，尚未接受任何委托或选定目标，可以自由探索城市。",

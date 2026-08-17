@@ -15,6 +15,8 @@ test("planning context injects private simulation data only as untrusted turn da
   assert.equal(data.role, "user");
   assert.match(data.content, /privateSimulationState/);
   assert.match(data.content, /hiddenDanger/);
+  assert.match(data.content, /mapDiscoveryCandidates/);
+  assert.match(data.content, /queen-archive/);
 });
 
 test("rendering context contains the authoritative resolution but excludes private danger state", () => {

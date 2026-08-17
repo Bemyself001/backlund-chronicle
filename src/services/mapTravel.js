@@ -1,3 +1,5 @@
+import { getMapLocation } from "../data/map.js";
+
 export function ensureMapMoveToolCall(toolCalls = [], destination, turn) {
   if (!destination?.id) return Array.isArray(toolCalls) ? toolCalls : [];
 
@@ -19,5 +21,20 @@ export function ensureMapMoveToolCall(toolCalls = [], destination, turn) {
 
   if (existingIndex >= 0) calls[existingIndex] = normalized;
   else calls.push(normalized);
+  return calls;
+}
+
+export function ensureMockMapDiscoveryToolCall(toolCalls = [], target, turn) {
+  if (!target?.locationId) return Array.isArray(toolCalls) ? toolCalls : [];
+  const calls = Array.isArray(toolCalls) ? [...toolCalls] : [];
+  if (calls.some((call) => call?.name === "location.discover")) return calls;
+  const location = getMapLocation(target.locationId);
+  if (!location) return calls;
+  calls.push({
+    id: `map-discover-${turn}-${location.id}`,
+    name: "location.discover",
+    args: { locationId: location.id, status: "discovered", note: location.description },
+    reason: `玩家沿地图传闻调查并确认了${location.name}`,
+  });
   return calls;
 }

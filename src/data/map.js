@@ -1,14 +1,40 @@
 export const MAP_LOCATIONS = [
-  { id: "north-flats", name: "北区·灰墙公寓", district: "北区", x: 49, y: 13, code: "N1", description: "租金低廉的连排公寓，住户大多不愿过问邻居的来历。" },
-  { id: "queen-archive", name: "皇后区·市政档案馆", district: "皇后区", x: 31, y: 27, code: "Q1", description: "保存旧地契、人口登记与部分封存案卷的石砌建筑。" },
-  { id: "queen-library", name: "皇后区·公共图书馆", district: "皇后区", x: 49, y: 35, code: "Q2", description: "白天对公众开放，可查阅报纸、地图与部分城市档案。" },
-  { id: "east-industry", name: "东区·烟囱街", district: "东区", x: 83, y: 43, code: "E1", description: "工厂、仓库与临时劳工聚集的街区，日落后仍有机器运转。" },
-  { id: "hillston-market", name: "希尔斯顿区·商会街", district: "希尔斯顿区", x: 22, y: 54, code: "H1", description: "银行、商会与体面店铺沿宽阔街道排列，巡警也格外警觉。" },
-  { id: "east-station", name: "东区·贝克兰德火车站", district: "东区", x: 78, y: 62, code: "E2", description: "通往雾都各区的交通节点，公告栏上总有新的招工与失踪启事。" },
-  { id: "iron-gate", name: "东区·铁门街", district: "东区", x: 79, y: 79, code: "E3", description: "廉价旅店、工棚、诊所与小酒馆密集，适合寻找住处和零工。" },
-  { id: "soot-lamp", name: "桥区·雾鸦旅店", district: "桥区", x: 55, y: 72, code: "B1", description: "一间价格尚可的旅店，也接受替客人打听消息的委托。" },
-  { id: "bridge-docks", name: "桥区·南岸货栈", district: "桥区", x: 54, y: 89, code: "B2", description: "驳船、货栈和夜班搬运工构成了另一套城市时钟。" },
+  { id: "north-flats", name: "北区·灰墙公寓", district: "北区", x: 49, y: 13, code: "N1", rumor: "北区似乎有一片不查问来历的廉租公寓。", description: "租金低廉的连排公寓，住户大多不愿过问邻居的来历。" },
+  { id: "queen-archive", name: "皇后区·市政档案馆", district: "皇后区", x: 31, y: 27, code: "Q1", rumor: "有人提到皇后区保存着旧地契与人口登记。", description: "保存旧地契、人口登记与部分封存案卷的石砌建筑。" },
+  { id: "queen-library", name: "皇后区·公共图书馆", district: "皇后区", x: 49, y: 35, code: "Q2", rumor: "报童说皇后区有一座对公众开放的图书馆。", description: "白天对公众开放，可查阅报纸、地图与部分城市档案。" },
+  { id: "east-industry", name: "东区·烟囱街", district: "东区", x: 83, y: 43, code: "E1", rumor: "东区深处的烟囱直到入夜仍不会熄灭。", description: "工厂、仓库与临时劳工聚集的街区，日落后仍有机器运转。" },
+  { id: "hillston-market", name: "希尔斯顿区·商会街", district: "希尔斯顿区", x: 22, y: 54, code: "H1", rumor: "体面的商行和银行大多集中在希尔斯顿一带。", description: "银行、商会与体面店铺沿宽阔街道排列，巡警也格外警觉。" },
+  { id: "east-station", name: "东区·贝克兰德火车站", district: "东区", x: 78, y: 62, code: "E2", rumor: "铁路把东区火车站与雾都各区连接起来。", description: "通往雾都各区的交通节点，公告栏上总有新的招工与失踪启事。" },
+  { id: "iron-gate", name: "东区·铁门街", district: "东区", x: 79, y: 79, code: "E3", rumor: "铁门街有不少廉价住处和临时工作。", description: "廉价旅店、工棚、诊所与小酒馆密集，适合寻找住处和零工。" },
+  { id: "soot-lamp", name: "桥区·雾鸦旅店", district: "桥区", x: 55, y: 72, code: "B1", rumor: "桥区有家旅店愿意替客人打听消息。", description: "一间价格尚可的旅店，也接受替客人打听消息的委托。" },
+  { id: "bridge-docks", name: "桥区·南岸货栈", district: "桥区", x: 54, y: 89, code: "B2", rumor: "夜班搬运工常提到桥区南岸的一片货栈。", description: "驳船、货栈和夜班搬运工构成了另一套城市时钟。" },
 ];
+
+export const INITIAL_DISCOVERED_LOCATION_IDS = ["east-station", "iron-gate", "soot-lamp", "queen-library"];
+export const INITIAL_RUMORED_LOCATION_IDS = ["queen-archive", "bridge-docks"];
+export const LOCATION_KNOWLEDGE_STATUSES = ["unknown", "rumored", "discovered"];
+
+export function initialDiscoveredLocations() {
+  return INITIAL_DISCOVERED_LOCATION_IDS.map((id) => {
+    const location = getMapLocation(id);
+    return { id: location.id, name: location.name, note: location.description };
+  });
+}
+
+export function normalizeLocationKnowledge(knowledge = {}, discoveredLocations = [], currentId = "") {
+  const discoveredById = new Map((Array.isArray(discoveredLocations) ? discoveredLocations : []).filter((entry) => entry?.id).map((entry) => [entry.id, entry]));
+  return Object.fromEntries(MAP_LOCATIONS.map((location) => {
+    const existing = knowledge?.[location.id];
+    const existingStatus = typeof existing === "string" ? existing : existing?.status;
+    const defaultStatus = INITIAL_RUMORED_LOCATION_IDS.includes(location.id) ? "rumored" : "unknown";
+    const discovered = discoveredById.get(location.id);
+    const status = discovered || location.id === currentId
+      ? "discovered"
+      : LOCATION_KNOWLEDGE_STATUSES.includes(existingStatus) ? existingStatus : defaultStatus;
+    const note = discovered?.note || existing?.note || (status === "rumored" ? location.rumor : "");
+    return [location.id, { ...(typeof existing === "object" ? existing : {}), status, note }];
+  }));
+}
 
 export const MAP_ROUTES = [
   { from: "north-flats", to: "queen-library", minutes: 24, transport: "步行与公共马车" },

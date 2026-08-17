@@ -1,13 +1,16 @@
 import { useMemo, useState } from "react";
 import Modal from "./Modal.jsx";
-import { findTravelRoute, getMapLocation, MAP_LOCATIONS, MAP_ROUTES } from "../data/map.js";
+import { findTravelRoute, getMapLocation, MAP_LOCATIONS, MAP_ROUTES, normalizeLocationKnowledge } from "../data/map.js";
 import styles from "./WorldMap.module.css";
 
-export default function WorldMap({ game, loading, onClose, onTravel }) {
+export default function WorldMap({ game, loading, onClose, onTravel, onInvestigate }) {
   const discoveredIds = useMemo(() => new Set([...game.discoveredLocations.map((location) => location.id), game.location.id]), [game.discoveredLocations, game.location.id]);
+  const knowledgeById = useMemo(() => normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location.id), [game.locationKnowledge, game.discoveredLocations, game.location.id]);
   const [selectedId, setSelectedId] = useState(game.location.id);
   const selected = getMapLocation(selectedId);
-  const discovered = selected && discoveredIds.has(selected.id);
+  const selectedKnowledge = selected ? knowledgeById[selected.id] || { status: "unknown", note: "" } : { status: "unknown", note: "" };
+  const discovered = selected && selectedKnowledge.status === "discovered";
+  const rumored = selected && selectedKnowledge.status === "rumored";
   const route = selected && discovered ? findTravelRoute(game.location.id, selected.id, discoveredIds) : null;
   const current = selected?.id === game.location.id;
   const routeNames = route?.path.map((id) => getMapLocation(id)?.name || id).join(" → ");
@@ -15,7 +18,7 @@ export default function WorldMap({ game, loading, onClose, onTravel }) {
   return <Modal title="贝克兰德交通图" eyebrow="Municipal route dossier" onClose={onClose} wide>
     <div className={styles.layout}>
       <section className={styles.mapSection} aria-label="贝克兰德地点地图">
-        <div className={styles.legend}><span><i data-kind="current" />当前位置</span><span><i data-kind="known" />已发现</span><span><i data-kind="unknown" />未知</span></div>
+        <div className={styles.legend}><span><i data-kind="current" />当前位置</span><span><i data-kind="known" />已发现</span><span><i data-kind="rumored" />听闻</span><span><i data-kind="unknown" />未知</span></div>
         <div className={styles.mapCanvas}>
           <div className={styles.districtLabels} aria-hidden="true"><span className={styles.north}>北区</span><span className={styles.queen}>皇后区</span><span className={styles.hillston}>希尔斯顿</span><span className={styles.east}>东区</span><span className={styles.bridge}>桥区</span></div>
           <svg className={styles.routes} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
@@ -27,7 +30,8 @@ export default function WorldMap({ game, loading, onClose, onTravel }) {
             })}
           </svg>
           {MAP_LOCATIONS.map((location) => {
-            const isKnown = discoveredIds.has(location.id);
+            const status = knowledgeById[location.id]?.status || "unknown";
+            const isKnown = status === "discovered";
             const isCurrent = game.location.id === location.id;
             return <button
               key={location.id}
@@ -35,19 +39,19 @@ export default function WorldMap({ game, loading, onClose, onTravel }) {
               style={{ left: `${location.x}%`, top: `${location.y}%` }}
               type="button"
               data-current={isCurrent}
-              data-known={isKnown}
+              data-status={status}
               aria-pressed={selectedId === location.id}
-              aria-label={isKnown ? `${location.name}${isCurrent ? "，玩家当前位置" : ""}` : `${location.district}的未知地点`}
+              aria-label={isKnown ? `${location.name}${isCurrent ? "，玩家当前位置" : ""}` : status === "rumored" ? `${location.district}的地点传闻` : `${location.district}的雾中区域`}
               onClick={() => setSelectedId(location.id)}
-            >{isCurrent && <i className={styles.playerMarker} aria-hidden="true" />}<b>{isKnown ? location.code : "?"}</b><span>{isKnown ? location.name.replace(`${location.district}·`, "") : "未知地点"}</span></button>;
+            >{isCurrent && <i className={styles.playerMarker} aria-hidden="true" />}<b>{isKnown ? location.code : status === "rumored" ? "?" : "·"}</b><span>{isKnown ? location.name.replace(`${location.district}·`, "") : status === "rumored" ? "地点传闻" : "雾中区域"}</span></button>;
           })}
           <div className={styles.scale} aria-hidden="true"><i /><span>城区示意 · 非精确比例</span></div>
         </div>
       </section>
       <aside className={styles.detail} aria-live="polite">
-        <p>{discovered ? selected.district : "未归档区域"}</p>
-        <h3>{discovered ? selected.name : "尚未发现的地点"}</h3>
-        <span>{discovered ? selected.description : "继续探索、打听消息或取得相关线索后，这里才会显示详细资料。"}</span>
+        <p>{discovered || rumored ? selected.district : "未归档区域"}</p>
+        <h3>{discovered ? selected.name : rumored ? "地图上的地点传闻" : "雾中区域"}</h3>
+        <span>{discovered ? selected.description : rumored ? selectedKnowledge.note || selected.rumor : "这里还没有可供追查的传闻。继续探索、交谈或取得相关线索后，地图会补充记录。"}</span>
         {discovered && <dl>
           <div><dt>Location ID</dt><dd><code>{selected.id}</code></dd></div>
           <div><dt>档案状态</dt><dd>{current ? "当前位置" : "已发现"}</dd></div>
@@ -55,8 +59,12 @@ export default function WorldMap({ game, loading, onClose, onTravel }) {
           <div><dt>建议交通</dt><dd>{current ? "—" : route ? [...new Set(route.transports)].join("、") : "—"}</dd></div>
         </dl>}
         {routeNames && !current && <p className={styles.routeText}>推荐路线：{routeNames}</p>}
-        <button className="button button--primary" type="button" disabled={!discovered || current || !route || loading} onClick={() => onTravel(selected)}>{current ? "你正在这里" : loading ? "本轮处理中" : "前往此处"}</button>
-        <small>地图会携带 Location ID 提交目的地；移动成功后，玩家标记会立即更新。</small>
+        {discovered
+          ? <button className="button button--primary" type="button" disabled={current || !route || loading} onClick={() => onTravel(selected)}>{current ? "你正在这里" : loading ? "本轮处理中" : route ? "前往此处" : "暂无可用路线"}</button>
+          : rumored
+            ? <button className="button button--primary" type="button" disabled={loading} onClick={() => onInvestigate(selected, selectedKnowledge)}>{loading ? "本轮处理中" : "调查该区域"}</button>
+            : <button className="button button--primary" type="button" disabled>尚无线索</button>}
+        <small>{discovered ? "地图会携带 Location ID 提交目的地；移动成功后，玩家标记会立即更新。" : rumored ? "调查会进入正常回合；只有本地确认成功后，地点才会正式解锁。" : "未知区域不会提前泄露名称与详情。"}</small>
       </aside>
     </div>
   </Modal>;

@@ -239,6 +239,26 @@ const TOOL_PARAMETER_SCHEMAS = {
       reason: { type: "string", description: "与本轮玩家行动对应的关系变化理由" },
     },
   },
+  "location.discover": {
+    type: "object",
+    additionalProperties: false,
+    required: ["locationId", "status", "note", "reason"],
+    properties: {
+      locationId: { type: "string", description: "必须复制规划上下文中地图候选地点的精确 ID" },
+      status: { type: "string", enum: ["rumored", "discovered"], description: "仅听闻线索时使用 rumored；亲自确认或获得可靠资料时使用 discovered" },
+      note: { type: "string", description: "玩家本轮实际听闻或确认的地点信息" },
+      reason: { type: "string", description: "本轮行动为何足以改变地点知识状态" },
+    },
+  },
+  "location.move": {
+    type: "object",
+    additionalProperties: false,
+    required: ["locationId", "reason"],
+    properties: {
+      locationId: { type: "string", description: "必须复制当前 discoveredLocations 中的精确地点 ID" },
+      reason: { type: "string", description: "玩家本轮为何前往该地点" },
+    },
+  },
   "clue.add": {
     type: "object",
     additionalProperties: false,
@@ -259,7 +279,7 @@ const TOOL_PARAMETER_SCHEMAS = {
   },
 };
 
-const STATE_TOOL_NAMES = ["inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "occult.reveal", "character.update", "status.add", "status.remove", "relationship.update", "location.move", "clue.add", "quest.add", "quest.update", "dice.check"];
+const STATE_TOOL_NAMES = ["inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "occult.reveal", "character.update", "status.add", "status.remove", "relationship.update", "location.discover", "location.move", "clue.add", "quest.add", "quest.update", "dice.check"];
 
 const CHOICE_TOOL_SCHEMA = {
   type: "object",

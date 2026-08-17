@@ -17,7 +17,7 @@ import { buildChoiceRegenerationContext, buildPlanningContext, buildRenderingCon
 import { mockResponse } from "./services/mock.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
 import { extractNarrativePreview } from "./services/streamPreview.js";
-import { ensureMapMoveToolCall } from "./services/mapTravel.js";
+import { ensureMapMoveToolCall, ensureMockMapDiscoveryToolCall } from "./services/mapTravel.js";
 import { hasUsableChoices, injectOccultEntryChoice } from "./services/choices.js";
 import { createTurnResolution } from "./services/turnResolution.js";
 import { makeId } from "./utils/id.js";
@@ -120,11 +120,12 @@ export default function App() {
         onReasoningFallback: () => { if (preview) resetStreamPreview(); setTurnPhase("reasoningRetry"); },
       });
 
-      const planningMessages = settings.mockMode ? [] : buildPlanningContext(game, action, prompt, { nativeTools: settings.nativeTools });
+      const planningMessages = settings.mockMode ? [] : buildPlanningContext(game, action, prompt, { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation });
       const planningResponse = settings.mockMode
         ? await mockResponse(game, action, controller.signal, queueStreamPreview)
         : await requestModel(planningMessages, { toolSet: "state", disableJsonMode: Boolean(settings.nativeTools) });
-      let proposedToolCalls = dedupeToolCalls(normalizeToolCalls(ensureMapMoveToolCall(planningResponse.toolCalls, options.mapDestination, game.turn + 1), game));
+      const discoveryAdjustedCalls = settings.mockMode ? ensureMockMapDiscoveryToolCall(planningResponse.toolCalls, options.mapInvestigation, game.turn + 1) : planningResponse.toolCalls;
+      let proposedToolCalls = dedupeToolCalls(normalizeToolCalls(ensureMapMoveToolCall(discoveryAdjustedCalls, options.mapDestination, game.turn + 1), game));
 
       if (!settings.mockMode) {
         const repairedCalls = [];
@@ -270,7 +271,7 @@ export default function App() {
     {screen === "welcome" && <Welcome hasSave={saves.some((slot) => slot.slotId === "autosave")} apiSettings={settings} onNew={() => setScreen("create")} onContinue={handleContinue} onImport={handleImport} onApi={() => setModal("api")} onChangelog={() => setModal("changelog")} />}
     {screen === "create" && <CharacterCreation onBack={() => setScreen("welcome")} onCreate={handleCreate} />}
     {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onRegenerateChoices={regenerateChoices} onLocalTool={runLocalTool} onAudit={auditCurrentTurn} onOpenMap={() => setModal("map")} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => setScreen("welcome")} />}
-    {modal === "map" && game && <WorldMap game={game} loading={loading} onClose={() => setModal(null)} onTravel={(location) => runTurn(`前往${location.name}`, { mapDestination: location })} />}
+    {modal === "map" && game && <WorldMap game={game} loading={loading} onClose={() => setModal(null)} onTravel={(location) => { setModal(null); return runTurn(`前往${location.name}`, { mapDestination: location }); }} onInvestigate={(location, knowledge) => { setModal(null); return runTurn(`根据地图上的传闻，调查${knowledge.note || location.district}。`, { mapInvestigation: { locationId: location.id, currentStatus: knowledge.status, rumor: knowledge.note || location.rumor } }); }} />}
     {modal === "api" && <ApiSettings settings={settings} onSave={handleSettingsSave} onCheckUpdate={() => setModal("update")} onClose={() => setModal(null)} />}
     {(modal === "update" || modal === "update-auto") && <UpdateDialog automatic={modal === "update-auto"} onClose={() => setModal(null)} />}
     {modal === "changelog" && <ChangelogDialog onClose={() => setModal(null)} />}

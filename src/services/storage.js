@@ -1,6 +1,7 @@
 import { SAVE_VERSION } from "../data/defaults.js";
 import { withAdvancement } from "../data/character.js";
 import { moneyFromPence } from "../data/money.js";
+import { normalizeLocationKnowledge } from "../data/map.js";
 
 const SAVES_KEY = "mist-chronicle-saves-v1";
 const AUTOSAVE_ID = "autosave";
@@ -58,6 +59,8 @@ export function migrateSave(raw) {
   const advancement = withAdvancement(migrated.character).advancement;
   const legacyContact = advancement?.type === "extraordinary" || migrated.character?.extraordinary === "low" ? 1 : 0;
   const contact = migrated.occult?.contact === 1 || legacyContact === 1 ? 1 : 0;
+  const discoveredLocations = Array.isArray(migrated.discoveredLocations) ? migrated.discoveredLocations.filter((location) => location?.id) : [];
+  const locationKnowledge = normalizeLocationKnowledge(migrated.locationKnowledge, discoveredLocations, migrated.location?.id);
   const occult = {
     contact,
     revealLevel: Math.max(0, Number(migrated.occult?.revealLevel || 0)),
@@ -72,6 +75,8 @@ export function migrateSave(raw) {
     character: { ...withAdvancement(migrated.character), advancement },
     inventory,
     money,
+    discoveredLocations,
+    locationKnowledge,
     occult,
     processedToolCalls: migrated.processedToolCalls || [],
     memoryNotes: migrated.memoryNotes || [],
