@@ -1,7 +1,7 @@
 import { useRef, useState } from "react";
 import styles from "./Welcome.module.css";
 
-export default function Welcome({ hasSave, apiSettings, onNew, onContinue, onImport, onApi }) {
+export default function Welcome({ hasSave, apiSettings, onNew, onContinue, onImport, onApi, onChangelog }) {
   const inputRef = useRef(null);
   const [importError, setImportError] = useState("");
   const chooseFile = async (event) => {
@@ -17,7 +17,10 @@ export default function Welcome({ hasSave, apiSettings, onNew, onContinue, onImp
       <header className={styles.masthead}>
         <div className={styles.brandMark} aria-hidden="true"><span>BC</span></div>
         <p>贝克兰德私人调查档案 · 1349</p>
-        <button className={styles.apiStatus} type="button" onClick={onApi}><span className={apiSettings.mockMode ? styles.ready : styles.live} />{apiSettings.mockMode ? "Mock 模式" : `${apiSettings.model || "未配置模型"}`}</button>
+        <div className={styles.mastheadActions}>
+          <button className={styles.changelogLink} type="button" onClick={onChangelog}><span aria-hidden="true" />更新日志</button>
+          <button className={styles.apiStatus} type="button" onClick={onApi}><span className={apiSettings.mockMode ? styles.ready : styles.live} />{apiSettings.mockMode ? "Mock 模式" : `${apiSettings.model || "未配置模型"}`}</button>
+        </div>
       </header>
       <section className={styles.hero} aria-labelledby="welcome-title">
         <div className={styles.registry}><span>案卷编号</span><strong>BK—1107</strong></div>

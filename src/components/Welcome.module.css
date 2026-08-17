@@ -6,7 +6,11 @@
 .brandMark { display: grid; width: 2.45rem; aspect-ratio: 1; place-items: center; border: 1px solid var(--brass); transform: rotate(45deg); }
 .brandMark span { color: var(--brass-light); font: 700 .62rem var(--font-serif); transform: rotate(-45deg); }
 .masthead > p { color: #b8ad95; font: 600 .66rem var(--font-sans); letter-spacing: .18em; text-transform: uppercase; }
-.apiStatus { display: flex; min-height: 2.5rem; align-items: center; gap: .55rem; margin-left: auto; border: 0; background: transparent; color: #c9bea7; font: .74rem var(--font-sans); }
+.mastheadActions { display: flex; align-items: center; gap: clamp(.35rem, 1.4vw, 1.1rem); margin-left: auto; }
+.changelogLink, .apiStatus { display: flex; min-height: 2.5rem; align-items: center; gap: .55rem; border: 0; background: transparent; color: #c9bea7; font: .74rem var(--font-sans); }
+.changelogLink { padding-inline: .6rem; letter-spacing: .08em; }
+.changelogLink span { width: .34rem; aspect-ratio: 1; background: var(--brass-light); transform: rotate(45deg); box-shadow: 0 0 0 3px #b8935620; }
+.changelogLink:hover, .changelogLink:focus-visible { color: var(--brass-light); }
 .apiStatus:hover { color: var(--paper-pale); }
 .ready, .live { width: .46rem; aspect-ratio: 1; border-radius: 50%; background: var(--brass); box-shadow: 0 0 0 3px #b8935630; }
 .live { background: #5e9f88; box-shadow: 0 0 0 3px #5e9f8830; }
@@ -32,4 +36,4 @@
 .caseNote span { color: var(--brass); font: .65rem var(--font-mono); }
 .caseNote p { margin: 0; font: .75rem/1.7 var(--font-serif); letter-spacing: .05em; }
 .footer { position: absolute; inset: auto 0 0; display: flex; justify-content: center; gap: clamp(1rem, 5vw, 4rem); padding: 1.1rem; border-top: 1px solid #bc9a611c; color: #746f64; font: .6rem var(--font-sans); letter-spacing: .14em; text-transform: uppercase; }
-@media (max-width: 700px) { .masthead { min-height: 4.6rem; padding: 0 1rem; } .masthead > p { display: none; } .hero { width: calc(100% - 2rem); margin-top: 4.5rem; } .hero h1 { font-size: clamp(2.65rem, 12.5vw, 3.85rem); letter-spacing: .025em; } .registry, .caseNote { display: none; } .actions { flex-direction: column; align-items: stretch; width: min(100%, 21rem); margin: 0 auto; } .footer { justify-content: space-around; gap: .5rem; } .footer span:nth-child(2) { display: none; } }
+@media (max-width: 700px) { .masthead { min-height: 4.6rem; padding: 0 1rem; } .masthead > p { display: none; } .mastheadActions { gap: .1rem; } .changelogLink, .apiStatus { padding-inline: .45rem; font-size: .7rem; } .hero { width: calc(100% - 2rem); margin-top: 4.5rem; } .hero h1 { font-size: clamp(2.65rem, 12.5vw, 3.85rem); letter-spacing: .025em; } .registry, .caseNote { display: none; } .actions { flex-direction: column; align-items: stretch; width: min(100%, 21rem); margin: 0 auto; } .footer { justify-content: space-around; gap: .5rem; } .footer span:nth-child(2) { display: none; } }

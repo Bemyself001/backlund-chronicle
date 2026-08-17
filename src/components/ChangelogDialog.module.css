@@ -1,0 +1,10 @@
+.entry { position: relative; display: grid; gap: 1rem; padding: 1.1rem 1.15rem 1.2rem; overflow: hidden; border: 1px solid #8b7a5a66; border-left: 3px solid var(--brass); background: linear-gradient(135deg, #1f554711, #b8893b12 70%); }
+.entry::after { position: absolute; top: -3rem; right: -3rem; width: 8rem; aspect-ratio: 1; border: 1px solid #8b7a5a22; border-radius: 50%; content: ""; }
+.meta { position: relative; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding-bottom: .75rem; border-bottom: 1px solid #8b7a5a44; color: var(--verdigris); font: 700 .68rem var(--font-mono); letter-spacing: .14em; text-transform: uppercase; }
+.entry h3 { position: relative; z-index: 1; margin: 0; color: var(--ink); font: 600 1.45rem/1.25 var(--font-serif); letter-spacing: .04em; }
+.summary { position: relative; z-index: 1; margin: 0; color: #3f3a30; font-size: .92rem; line-height: 1.7; }
+.changes { position: relative; z-index: 1; display: grid; gap: .7rem; margin: 0; padding: 0; color: var(--ink-soft); font-size: .86rem; line-height: 1.65; list-style: none; }
+.changes li { position: relative; padding-left: 1.1rem; }
+.changes li::before { position: absolute; top: .7em; left: .08rem; width: .42rem; height: 1px; background: var(--brass); content: ""; }
+.actions { display: flex; justify-content: flex-end; margin-top: 1rem; }
+@media (max-width: 600px) { .entry { padding: 1rem; } .meta { align-items: flex-start; flex-direction: column; gap: .35rem; } .entry h3 { font-size: 1.25rem; } .actions button { width: 100%; } }
