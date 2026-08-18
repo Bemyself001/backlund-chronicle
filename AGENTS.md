@@ -10,3 +10,4 @@
 - Run targeted checks during iteration and run lint plus the production build once at final handoff.
 - Keep API transport, AI protocol parsing, local tool validation, memory, save data, and UI in separate modules.
 - Never persist API keys inside game state or exported save files.
+- After every fix or feature change, update `src/data/changelog.js` (`LATEST_UPDATE`) before committing.
