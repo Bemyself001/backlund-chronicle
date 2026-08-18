@@ -45,10 +45,20 @@ const baseGame = createInitialGame({
 
 async function runTurnOnce(game, action, fastMode) {
   const controller = new AbortController();
-  const metric = { action, firstChunkMs: null, planningMs: 0, renderMs: 0, totalMs: 0, repairs: 0, narrativeChars: 0, choices: 0, fallback: false };
+  const metric = { action, firstChunkMs: null, planningMs: 0, renderMs: 0, totalMs: 0, repairs: 0, narrativeChars: 0, choices: 0, fallback: false, promptTokens: 0, cacheHitTokens: 0 };
   const t0 = performance.now();
   const onChunk = () => { if (metric.firstChunkMs === null) metric.firstChunkMs = performance.now() - t0; };
-  const request = (messages, options) => requestAIWithReasoningFallback(settings, messages, controller.signal, onChunk, options);
+  const addUsage = (response) => {
+    const usage = response?.responseMetadata?.usage;
+    if (!usage) return;
+    metric.promptTokens += Number(usage.prompt_tokens) || 0;
+    metric.cacheHitTokens += Number(usage.prompt_cache_hit_tokens) || 0;
+  };
+  const request = async (messages, options) => {
+    const response = await requestAIWithReasoningFallback(settings, messages, controller.signal, onChunk, options);
+    addUsage(response);
+    return response;
+  };
 
   const planningMessages = fastMode
     ? buildUnifiedContext(game, action, DEFAULT_SYSTEM_PROMPT, { nativeTools: settings.nativeTools })
@@ -94,7 +104,7 @@ async function runMode(fastMode) {
       const result = await runTurnOnce(game, action, fastMode);
       game = result.nextGame;
       metrics.push(result.metric);
-      console.log(`  第${index + 1}轮  总耗时 ${(result.metric.totalMs / 1000).toFixed(1)}s  首字 ${result.metric.firstChunkMs === null ? "—" : `${(result.metric.firstChunkMs / 1000).toFixed(1)}s`}  规划 ${(result.metric.planningMs / 1000).toFixed(1)}s  渲染 ${(result.metric.renderMs / 1000).toFixed(1)}s  剧情 ${result.metric.narrativeChars} 字  选项 ${result.metric.choices}${result.metric.fallback ? "  (回退两段式)" : ""}`);
+      console.log(`  第${index + 1}轮  总耗时 ${(result.metric.totalMs / 1000).toFixed(1)}s  首字 ${result.metric.firstChunkMs === null ? "—" : `${(result.metric.firstChunkMs / 1000).toFixed(1)}s`}  规划 ${(result.metric.planningMs / 1000).toFixed(1)}s  渲染 ${(result.metric.renderMs / 1000).toFixed(1)}s  剧情 ${result.metric.narrativeChars} 字  选项 ${result.metric.choices}${result.metric.fallback ? "  (回退两段式)" : ""}  缓存命中 ${result.metric.promptTokens ? `${result.metric.cacheHitTokens}/${result.metric.promptTokens}` : "—"}`);
     } catch (error) {
       console.log(`  第${index + 1}轮  失败：${error.message}`);
       metrics.push({ action, failed: true, totalMs: 0, planningMs: 0, renderMs: 0, firstChunkMs: null, repairs: 0, narrativeChars: 0, choices: 0 });
@@ -140,3 +150,7 @@ console.log(`规划阶段      两段式 ${fmt(average(standard, "planningMs"))}
 console.log(`渲染阶段      两段式 ${fmt(average(standard, "renderMs"))}   快速 ${fmt(average(fast, "renderMs"))}`);
 console.log(`失败轮数      两段式 ${standard.filter((m) => m.failed).length}   快速 ${fast.filter((m) => m.failed).length}`);
 console.log(`工具校验失败  两段式 ${standard.reduce((a, m) => a + m.repairs, 0)} 次   快速 ${fast.reduce((a, m) => a + m.repairs, 0)} 次（真实流程中每次对应一次修复请求）`);
+const sumCache = (metrics) => metrics.reduce((acc, m) => ({ hit: acc.hit + (m.cacheHitTokens || 0), total: acc.total + (m.promptTokens || 0) }), { hit: 0, total: 0 });
+const sCache = sumCache(standard);
+const fCache = sumCache(fast);
+console.log(`上下文缓存    两段式 ${sCache.total ? `${sCache.hit}/${sCache.total} tokens（${Math.round((sCache.hit / sCache.total) * 100)}%）` : "—"}   快速 ${fCache.total ? `${fCache.hit}/${fCache.total} tokens（${Math.round((fCache.hit / fCache.total) * 100)}%）` : "—"}`);

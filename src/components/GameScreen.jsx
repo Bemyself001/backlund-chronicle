@@ -103,7 +103,7 @@ function AuditPanel({ game }) {
       {importantConfirmation?.required && <div className={styles.auditNote}>重要物品确认：已确认 {importantConfirmation.confirmed} 项{importantConfirmation.rejected ? `，拒绝 ${importantConfirmation.rejected} 项` : ""}</div>}
       {character?.advancementChanged && <div className={styles.auditNote}>非凡档案：{character.beforeAdvancement.sequenceLabel} → {character.afterAdvancement.sequenceLabel}</div>}
     </>}
-    {metrics && <div className={styles.performanceCard}><div><strong>最近 AI 回合性能</strong><small>本地计时</small></div><dl><div><dt>状态规划</dt><dd>{metrics.planningMs} ms</dd></div><div><dt>首段正文</dt><dd>{metrics.firstNarrativeMs === null ? "—" : `${metrics.firstNarrativeMs} ms`}</dd></div><div><dt>整轮完成</dt><dd>{metrics.totalMs} ms</dd></div><div><dt>模型请求</dt><dd>{metrics.modelRequests}</dd></div></dl>{metrics.confirmationWaitMs > 0 && <small>其中等待重要物品确认 {metrics.confirmationWaitMs} ms</small>}</div>}
+    {metrics && <div className={styles.performanceCard}><div><strong>最近 AI 回合性能</strong><small>本地计时</small></div><dl><div><dt>状态规划</dt><dd>{metrics.planningMs} ms</dd></div><div><dt>首段正文</dt><dd>{metrics.firstNarrativeMs === null ? "—" : `${metrics.firstNarrativeMs} ms`}</dd></div><div><dt>整轮完成</dt><dd>{metrics.totalMs} ms</dd></div><div><dt>模型请求</dt><dd>{metrics.modelRequests}</dd></div>{metrics.cacheHitRate !== null && metrics.cacheHitRate !== undefined && <div><dt>上下文缓存命中</dt><dd>{metrics.cacheHitRate}%</dd></div>}</dl>{metrics.cacheHitTokens > 0 && <small>输入 {metrics.promptTokens} tokens，其中 {metrics.cacheHitTokens} 命中服务商缓存（更快且计费更低）</small>}{metrics.confirmationWaitMs > 0 && <small>其中等待重要物品确认 {metrics.confirmationWaitMs} ms</small>}</div>}
   </div>;
 }
 

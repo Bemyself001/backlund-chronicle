@@ -146,14 +146,15 @@ export default function App() {
       if (hasPreview) markTurnMetric(metrics, "firstNarrativeAt");
     };
     try {
-      const requestModel = (requestMessages, requestOptions = {}, preview = false) => {
-        recordModelRequest(metrics);
-        return requestAIWithReasoningFallback(settings, requestMessages, controller.signal, preview ? handleTurnPreview : undefined, {
+      const requestModel = async (requestMessages, requestOptions = {}, preview = false) => {
+        const response = await requestAIWithReasoningFallback(settings, requestMessages, controller.signal, preview ? handleTurnPreview : undefined, {
         ...requestOptions,
         onReasoningChunk: () => { armWatchdog(); setTurnPhase((current) => ["generating", "manualRetry", "finalizing"].includes(current) ? "thinking" : current); },
         onReasoningRecovery: () => { if (preview) resetStreamPreview(); setTurnPhase("budgetRecovery"); },
         onReasoningFallback: () => { if (preview) resetStreamPreview(); setTurnPhase("reasoningRetry"); },
         });
+        recordModelRequest(metrics, response);
+        return response;
       };
 
       let fastMode = Boolean(settings.fastMode) && !settings.mockMode;
@@ -287,8 +288,8 @@ export default function App() {
       if (!settings.mockMode && !choices.length) {
         setTurnPhase("choiceRetry");
         try {
-          recordModelRequest(metrics);
           const choiceResponse = await requestChoicesFromAI(resolvedGame, action, response.narrative, choiceMeta.reason, controller.signal);
+          recordModelRequest(metrics, choiceResponse);
           if (hasValidModelChoices(choiceResponse)) {
             choices = choiceResponse.choices;
             choiceMeta = { ...choiceResponse.choiceMeta, source: "regenerated" };
