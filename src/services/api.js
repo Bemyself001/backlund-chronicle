@@ -1,4 +1,5 @@
 import { DEFAULT_API_SETTINGS } from "../data/defaults.js";
+import { PATHWAYS } from "../data/pathways.js";
 import { createProviderProfile, inferApiProvider } from "./apiProviders.js";
 import { normalizeAIResponse, textFromContent } from "./protocol.js";
 
@@ -125,8 +126,8 @@ const TOOL_PARAMETER_SCHEMAS = {
         required: ["itemId", "name", "description"],
         properties: {
           itemId: { type: "string", description: "稳定且可去重的物品 ID" },
-          name: { type: "string", description: "物品名称" },
-          description: { type: "string", description: "物品描述" },
+          name: { type: "string", description: "玩家可见的物品外观名称；未鉴定魔药不得在这里写真实途径或序列" },
+          description: { type: "string", description: "玩家可见的外观描述；未鉴定魔药不得泄露真实身份" },
           category: { type: "string" },
           quantity: { type: "integer", minimum: 1, maximum: 10 },
           weight: { type: "number", minimum: 0 },
@@ -135,6 +136,16 @@ const TOOL_PARAMETER_SCHEMAS = {
           importance: { type: "string", enum: ["normal", "important"], description: "仅任务、关键证据、身份、非凡能力或后续剧情入口相关物品使用 important；普通物品与货币使用 normal" },
           tags: { type: "array", items: { type: "string" } },
           properties: { type: "object" },
+          potion: {
+            type: "object",
+            additionalProperties: false,
+            required: ["pathwayId", "sequence", "identified"],
+            properties: {
+              pathwayId: { type: "string", enum: PATHWAYS.map((pathway) => pathway.id), description: "本地登记的规范途径 ID" },
+              sequence: { type: "integer", minimum: 0, maximum: 9 },
+              identified: { type: "boolean", description: "只有玩家已有可靠配方或同途径知识时才为 true；否则为 false" },
+            },
+          },
           source: { type: "string" },
         },
       },
@@ -229,6 +240,19 @@ const TOOL_PARAMETER_SCHEMAS = {
       reason: { type: "string", description: "本轮行动为何足以揭示该信息" },
     },
   },
+  "advancement.promote": {
+    type: "object",
+    additionalProperties: false,
+    required: ["pathwayId", "sequence", "potionInstanceId", "recipeClueId", "evidence", "reason"],
+    properties: {
+      pathwayId: { type: "string", enum: PATHWAYS.map((pathway) => pathway.id), description: "目标途径的规范 ID" },
+      sequence: { type: "integer", minimum: 0, maximum: 9, description: "普通人只能填 9；非凡者只能填当前序列减 1" },
+      potionInstanceId: { type: "string", description: "背包中已鉴定且完全匹配的魔药 instanceId" },
+      recipeClueId: { type: "string", description: "已记录的对应魔药配方线索 ID" },
+      evidence: { type: "string", description: "本轮剧情中实际完成的准备、服用与引导条件" },
+      reason: { type: "string", description: "玩家主动晋升的原因" },
+    },
+  },
   "relationship.update": {
     type: "object",
     additionalProperties: false,
@@ -273,6 +297,9 @@ const TOOL_PARAMETER_SCHEMAS = {
           id: { type: "string", description: "稳定且可去重的线索 ID" },
           title: { type: "string", description: "线索标题" },
           detail: { type: "string", description: "玩家已经确认的线索细节" },
+          kind: { type: "string", enum: ["evidence", "potion_recipe"], description: "魔药配方必须使用 potion_recipe" },
+          pathwayId: { type: "string", enum: PATHWAYS.map((pathway) => pathway.id), description: "仅魔药配方填写" },
+          sequence: { type: "integer", minimum: 0, maximum: 9, description: "仅魔药配方填写" },
         },
       },
       reason: { type: "string", description: "与本轮玩家行动对应的发现理由" },
@@ -280,7 +307,7 @@ const TOOL_PARAMETER_SCHEMAS = {
   },
 };
 
-const STATE_TOOL_NAMES = ["inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "occult.reveal", "character.update", "status.add", "status.remove", "relationship.update", "location.discover", "location.move", "clue.add", "quest.add", "quest.update", "dice.check"];
+const STATE_TOOL_NAMES = ["inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.discover", "location.move", "clue.add", "quest.add", "quest.update", "dice.check"];
 
 const CHOICE_TOOL_SCHEMA = {
   type: "object",

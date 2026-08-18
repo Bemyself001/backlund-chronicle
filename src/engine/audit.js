@@ -2,7 +2,7 @@ import { getAdvancement } from "../data/character.js";
 import { formatMoney, moneyFromPence, moneyToPence } from "../data/money.js";
 import { isImportantNonMoneyItem, normalizeItemImportance } from "../data/items.js";
 
-const ITEM_FIELDS = ["name", "category", "description", "weight", "rarity", "condition", "equipped", "tags", "properties", "discoveredInfo"];
+const ITEM_FIELDS = ["name", "category", "description", "weight", "rarity", "condition", "equipped", "tags", "properties", "discoveredInfo", "potion"];
 
 function equalValue(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);

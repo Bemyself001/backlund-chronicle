@@ -19,6 +19,21 @@ export async function mockResponse(game, action, signal, onChunk) {
   } else if (game.occult?.contact === 1 && includesAny(lower, ["揭示", "神秘知识", "非凡知识", "理解仪式"])) {
     narrative = "你把已经掌握的碎片与手边证据逐一对照，没有急于把猜测当成真相。某个有限的关联终于变得清晰，但它只解释了眼前现象的一小部分，更多内容仍需要材料、引导与代价。";
     toolCalls = [{ id: makeId("mock"), name: "occult.reveal", reason: "玩家基于已接触的证据主动整理神秘信息", args: { topic: "非凡入口的暗号规律", evidence: "入口收据上的重复符号与现场记录" } }];
+  } else if (game.occult?.contact === 1 && includesAny(lower, ["寻找配方", "查找配方", "占卜家配方", "序列9配方"])) {
+    narrative = "你没有把一段含混的传闻当成配方，而是把材料比例、调制顺序和可靠来源逐项核对。几处彼此独立的记录终于相互印证：这是一份能够被本地档案确认的占卜家序列9魔药配方。它提供知识，却不会凭空提供成品或替你承担服用的风险。";
+    toolCalls = [{ id: makeId("mock"), name: "clue.add", reason: "玩家在非凡接触后核对了完整且可靠的配方资料", args: { clue: { id: "recipe-seer-9", title: "占卜家序列9魔药配方", detail: "已核对材料比例、调制顺序与两个独立来源。", kind: "potion_recipe", pathwayId: "seer", sequence: 9 } } }];
+  } else if (game.occult?.contact === 1 && includesAny(lower, ["寻找魔药", "取得魔药", "获得魔药", "序列9魔药"])) {
+    narrative = "你经由已经建立的隐秘联系取得一只封口严密的深色玻璃瓶。卖方只保证它与低序列晋升有关，却没有给出足以信任的身份说明。瓶中液体在暗处缓慢旋转；在玩家确认将它收入背包后，它仍会保持未鉴定状态，直到可靠配方完成比对。";
+    toolCalls = [{ id: makeId("mock"), name: "inventory.add", reason: "玩家通过已接触的隐秘渠道取得一份待鉴定魔药", args: { item: { itemId: "unknown-seer-9-potion", name: "深靛色玻璃瓶", description: "瓶中液体在暗处形成缓慢旋涡，标签已经脱落。", category: "非凡物品", quantity: 1, weight: 0.2, rarity: "稀有", condition: "密封", importance: "important", tags: ["非凡物品"], source: "经隐秘渠道取得", potion: { pathwayId: "seer", sequence: 9, identified: false } } } }];
+  } else if (game.occult?.contact === 1 && includesAny(lower, ["鉴定魔药", "检查魔药", "核对魔药"])) {
+    const potion = game.inventory.find((item) => item.potion && !item.potion.identified);
+    narrative = potion ? "你把瓶中液体的颜色、分层与灵性反应逐项同已知资料比对，不凭标签或卖方说辞下结论。最终身份是否成立，将由本地配方与途径知识验证。" : "你检查了背包和现有记录，却没有找到一份尚待鉴定的魔药。";
+    if (potion) toolCalls = [{ id: makeId("mock"), name: "item.inspect", reason: "玩家主动用已确认知识核对未知魔药", args: { instanceId: potion.instanceId } }];
+  } else if (game.occult?.contact === 1 && includesAny(lower, ["服用魔药", "正式晋升", "开始晋升"])) {
+    const potion = game.inventory.find((item) => item.potion?.identified);
+    const recipe = potion && game.clues.find((clue) => clue.kind === "potion_recipe" && clue.pathwayId === potion.potion.pathwayId && Number(clue.sequence) === potion.potion.sequence);
+    narrative = potion && recipe ? "你再次核对配方、魔药身份与现场准备，明确这是自己要承担的选择。魔药的消耗和非凡档案的改变会作为同一项重要变更等待确认；只有确认后，服用与序列9晋升才会同时生效。" : "你还没有同时具备一份已鉴定的序列9魔药和与之匹配的可靠配方。贸然服用不会被本地规则接受。";
+    if (potion && recipe) toolCalls = [{ id: makeId("mock"), name: "advancement.promote", reason: "玩家在完成剧情接触、配方核对与安全准备后主动服用魔药", args: { pathwayId: potion.potion.pathwayId, sequence: potion.potion.sequence, potionInstanceId: potion.instanceId, recipeClueId: recipe.id, evidence: "已核对配方、完成现场准备并由玩家明确决定服用" } }];
   } else if (includesAny(lower, ["地图", "公告", "招工", "租房", "观察", "查看车站"])) {
     narrative = "你先把行李放在脚边，逐栏读完站内公告。城市地图把贝克兰德切成彼此相连又截然不同的区域：东区有最便宜的床位和最多的临时工作；桥区的旅店与小商行需要识字的帮工；皇后区的公共图书馆在白天允许访客查阅旧报。你可以先解决生计，也可以只选一条看顺眼的街道走下去。\n\n公告栏右下角压着几则互不相干的消息：钟表铺招聘学徒、教会施粥点征求登记员、货运公司寻找丢失账箱。最底下是一张三日前的失踪启事，照片中的夜班文员与第七码头黑色皮箱上的行李牌同姓。那也可能只是巧合。没有人注意你读到了这里，更没有人要求你负责。";
   } else if (includesAny(lower, ["搬运工", "询问", "打听", "交涉", "住宿", "工作", "茶摊"])) {

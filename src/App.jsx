@@ -23,6 +23,7 @@ import { hasUsableChoices, injectOccultEntryChoice } from "./services/choices.js
 import { createTurnResolution } from "./services/turnResolution.js";
 import { makeId } from "./utils/id.js";
 import { checkForUpdate, isNativeAndroid } from "./services/updates.js";
+import { finishTurnMetrics, markTurnMetric, recordModelRequest, startTurnMetrics } from "./services/turnMetrics.js";
 
 function hasValidModelChoices(response) {
   return response?.choiceMeta?.source === "model"
@@ -81,11 +82,12 @@ export default function App() {
     const preview = extractNarrativePreview(rawContent);
     pendingStreamRef.current = preview;
     if (preview) setTurnPhase((current) => ["generating", "manualRetry", "thinking", "budgetRecovery", "toolRetry", "reasoningRetry", "finalizing"].includes(current) ? "streaming" : current);
-    if (streamTimerRef.current) return;
+    if (streamTimerRef.current) return Boolean(preview);
     streamTimerRef.current = setTimeout(() => {
       setStreamText(pendingStreamRef.current);
       streamTimerRef.current = null;
     }, 40);
+    return Boolean(preview);
   };
 
   const commitGame = (next) => {
@@ -130,17 +132,25 @@ export default function App() {
     const selectedRisk = (Array.isArray(game.choices) ? game.choices : []).find((choice) => choice.label === action)?.risk;
     busyRef.current = true; lastActionRef.current = action; setLoading(true); setTurnPhase(options.manualRetry ? "manualRetry" : "generating"); setError(""); resetStreamPreview();
     const controller = new AbortController(); controllerRef.current = controller;
+    const metrics = startTurnMetrics();
+    const handleTurnPreview = (rawContent) => {
+      const hasPreview = queueStreamPreview(rawContent);
+      if (hasPreview) markTurnMetric(metrics, "firstNarrativeAt");
+    };
     try {
-      const requestModel = (requestMessages, requestOptions = {}, preview = false) => requestAIWithReasoningFallback(settings, requestMessages, controller.signal, preview ? queueStreamPreview : undefined, {
+      const requestModel = (requestMessages, requestOptions = {}, preview = false) => {
+        recordModelRequest(metrics);
+        return requestAIWithReasoningFallback(settings, requestMessages, controller.signal, preview ? handleTurnPreview : undefined, {
         ...requestOptions,
         onReasoningChunk: () => setTurnPhase((current) => ["generating", "manualRetry", "finalizing"].includes(current) ? "thinking" : current),
         onReasoningRecovery: () => { if (preview) resetStreamPreview(); setTurnPhase("budgetRecovery"); },
         onReasoningFallback: () => { if (preview) resetStreamPreview(); setTurnPhase("reasoningRetry"); },
-      });
+        });
+      };
 
       const planningMessages = settings.mockMode ? [] : buildPlanningContext(game, action, prompt, { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation });
       const planningResponse = settings.mockMode
-        ? await mockResponse(game, action, controller.signal, queueStreamPreview)
+        ? await mockResponse(game, action, controller.signal, handleTurnPreview)
         : await requestModel(planningMessages, { toolSet: "state", disableJsonMode: Boolean(settings.nativeTools) });
       const discoveryAdjustedCalls = settings.mockMode ? ensureMockMapDiscoveryToolCall(planningResponse.toolCalls, options.mapInvestigation, game.turn + 1) : planningResponse.toolCalls;
       let proposedToolCalls = dedupeToolCalls(normalizeToolCalls(ensureMapMoveToolCall(discoveryAdjustedCalls, options.mapDestination, game.turn + 1), game));
@@ -173,6 +183,7 @@ export default function App() {
         }
         proposedToolCalls = dedupeToolCalls(repairedCalls);
       }
+      markTurnMetric(metrics, "planningCompletedAt");
 
       setTurnPhase("validating");
       let execution = executeToolCalls(game, proposedToolCalls);
@@ -188,7 +199,9 @@ export default function App() {
       let confirmationStatus = { required: false, status: "not-required", confirmed: 0, rejected: 0 };
       if (importantChanges.length) {
         setTurnPhase("itemConfirmation");
+        markTurnMetric(metrics, "confirmationStartedAt");
         const decision = await requestImportantItemConfirmation(importantChanges, controller.signal);
+        markTurnMetric(metrics, "confirmationCompletedAt");
         if (decision.cancelled) {
           const abortError = new Error("玩家取消了重要物品确认");
           abortError.name = "AbortError";
@@ -241,6 +254,7 @@ export default function App() {
       if (!settings.mockMode && !choices.length) {
         setTurnPhase("choiceRetry");
         try {
+          recordModelRequest(metrics);
           const choiceResponse = await requestChoicesFromAI(resolvedGame, action, response.narrative, choiceMeta.reason, controller.signal);
           if (hasValidModelChoices(choiceResponse)) {
             choices = choiceResponse.choices;
@@ -267,6 +281,7 @@ export default function App() {
         changeLog: [...game.changeLog, ...execution.logs].slice(-100),
         lastTurnBaseline: auditBaseline,
         lastTurnAudit: automaticAudit,
+        lastTurnMetrics: finishTurnMetrics(metrics),
       };
       resetStreamPreview(); commitGame(next);
       return true;

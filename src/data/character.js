@@ -1,17 +1,4 @@
-const PATHWAY_IDS = {
-  "占卜家": "seer",
-  "学徒": "apprentice",
-  "观众": "spectator",
-  "水手": "sailor",
-  "歌颂者": "bard",
-  "阅读者": "reader",
-  "不眠者": "sleepless",
-  "收尸人": "corpse_collector",
-  "战士": "warrior",
-  "窥秘人": "mystery_pryer",
-  "通识者": "generalist",
-  "猎人": "hunter",
-};
+import { pathwayIdForName, pathwayNameForId } from "./pathways.js";
 
 export function createAdvancement(character = {}) {
   if (character.extraordinary !== "low") {
@@ -31,7 +18,7 @@ export function createAdvancement(character = {}) {
   const sequence = Number(match?.[2] || 9);
   return {
     type: "extraordinary",
-    pathwayId: PATHWAY_IDS[pathwayName] || pathwayName.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "unknown",
+    pathwayId: pathwayIdForName(pathwayName) || pathwayName.toLowerCase().replace(/[^a-z0-9]+/g, "-") || "unknown",
     pathwayName,
     sequence,
     sequenceLabel: `序列${sequence}`,
@@ -46,4 +33,31 @@ export function withAdvancement(character = {}) {
 
 export function getAdvancement(character = {}) {
   return character.advancement ? { ...createAdvancement(character), ...character.advancement } : createAdvancement(character);
+}
+
+export function applyAdvancement(character = {}, pathwayId, sequence, acquiredAt) {
+  const pathwayName = pathwayNameForId(pathwayId);
+  if (!pathwayName || !Number.isInteger(sequence) || sequence < 0 || sequence > 9) return null;
+  const previous = getAdvancement(character);
+  const spiritualGrowth = { 9: 3, 8: 1, 7: 1, 6: 1, 5: 2, 4: 2, 3: 2, 2: 3, 1: 3, 0: 4 }[sequence];
+  const stats = { ...(character.stats || {}) };
+  const previousMax = Number(stats.maxSpirituality || 0);
+  stats.maxSpirituality = previousMax + spiritualGrowth;
+  stats.spirituality = Math.min(stats.maxSpirituality, Number(stats.spirituality || 0) + spiritualGrowth);
+  return {
+    ...character,
+    extraordinary: "low",
+    pathway: `${pathwayName}（序列${sequence}）`,
+    stats,
+    advancement: {
+      type: "extraordinary",
+      pathwayId,
+      pathwayName,
+      sequence,
+      sequenceLabel: `序列${sequence}`,
+      status: "newly_promoted",
+      acquiredAt,
+      previousSequence: previous.sequence,
+    },
+  };
 }

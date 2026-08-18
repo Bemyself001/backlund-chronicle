@@ -1,3 +1,10 @@
+import { playerVisibleItem } from "../data/items.js";
+
+function playerVisibleResultData(data = {}) {
+  if (!data.inventoryChange) return data;
+  return { ...data, inventoryChange: playerVisibleItem(data.inventoryChange) };
+}
+
 export function createTurnResolution(toolCalls = [], results = [], progress = {}) {
   const entries = toolCalls.map((call, index) => {
     const result = results[index] || { ok: false, reason: "本地引擎没有返回执行结果" };
@@ -7,7 +14,7 @@ export function createTurnResolution(toolCalls = [], results = [], progress = {}
       ok: Boolean(result.ok),
       log: result.log || "",
       rejectionReason: result.ok ? "" : result.reason || "未知校验错误",
-      data: result.data || {},
+      data: playerVisibleResultData(result.data || {}),
     };
   });
   return {

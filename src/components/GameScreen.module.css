@@ -142,6 +142,11 @@
 .itemDetail > p { margin: 2.5rem 0 .3rem; color: var(--brass); font: 700 .58rem var(--font-sans); letter-spacing: .12em; text-transform: uppercase; }
 .itemDetail h3 { margin: 0 0 1rem; color: #d0c5af; font: 500 1.35rem var(--font-serif); }
 .itemDetail > span { color: #918d83; font: .75rem/1.65 var(--font-sans); }
+.potionRecord { display: grid; gap: .28rem; margin-top: 1rem; padding: .7rem; border: 1px solid #715149; background: #4e27221f; }
+.potionRecord strong { color: #bd8e80; font: 600 .7rem var(--font-serif); }
+.potionRecord small { color: #947d76; font: .6rem/1.5 var(--font-sans); }
+.potionIdentified { border-color: #8f7548; background: #ad894d14; }
+.potionIdentified strong { color: #c5ac78; }
 .itemDetail dl { display: grid; gap: .5rem; margin: 1.2rem 0; padding: .8rem 0; border-block: 1px solid #73664d4d; }
 .itemDetail dl div { display: flex; justify-content: space-between; }
 .itemDetail dt, .itemDetail dd { margin: 0; color: #7b7972; font: .62rem var(--font-sans); }
@@ -172,6 +177,15 @@
 .auditList li[data-tone="loss"] > span { border-color: #87423b; color: #c78379; }
 .auditList p { margin: 0; color: #aaa393; font: .63rem/1.45 var(--font-sans); }
 .auditNote { margin-top: .8rem; padding: .55rem .65rem; border-left: 2px solid var(--verdigris); color: #9eafa6; font: .62rem var(--font-sans); }
+.performanceCard { display: grid; gap: .65rem; margin-top: .9rem; padding: .75rem; border: 1px solid #5f665f66; background: #121918; }
+.performanceCard > div { display: flex; align-items: center; justify-content: space-between; }
+.performanceCard > div strong { color: #aeb9b1; font: 600 .7rem var(--font-serif); }
+.performanceCard > div small, .performanceCard > small { color: #737f78; font: .57rem/1.45 var(--font-sans); }
+.performanceCard dl { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .45rem; margin: 0; }
+.performanceCard dl div { display: grid; gap: .15rem; padding: .45rem; background: #d7e3db08; }
+.performanceCard dt, .performanceCard dd { margin: 0; font: .58rem var(--font-sans); }
+.performanceCard dt { color: #777e79; }
+.performanceCard dd { color: #b7c3bb; font-family: var(--font-mono); }
 .moneyAudit { display: grid; gap: .28rem; margin-top: .8rem; padding: .7rem; border-left: 2px solid var(--brass); background: #b18e5014; }
 .moneyAudit strong { color: #c7b78f; font: 600 .72rem var(--font-serif); }
 .moneyAudit span { color: #d1bd8b; font: 700 .7rem var(--font-mono); }
