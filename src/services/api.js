@@ -699,7 +699,8 @@ export async function requestAIWithReasoningFallback(settings, messages, signal,
   } catch (error) {
     const shouldRetry = ["REASONING_EXHAUSTED", "EMPTY_RESPONSE"].includes(error.code)
       && settings.autoRetryReasoning !== false
-      && !options.forceDisableReasoning;
+      && !options.forceDisableReasoning
+      && !options.skipReasoningRetry;
     if (!shouldRetry) throw error;
     const currentMax = error.metadata?.requestMaxTokens || requestMaxTokens(settings, options, messages);
     const expandedMax = expandedMaxTokensForRetry(settings, messages, currentMax);

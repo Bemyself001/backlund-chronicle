@@ -114,9 +114,16 @@ const StoryHistory = memo(function StoryHistory({ messages }) {
 function TurnProgress({ phase }) {
   const matchedIndex = TURN_PHASES.findIndex(([id]) => id === phase);
   const currentIndex = matchedIndex >= 0 ? matchedIndex : 0;
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+  useEffect(() => {
+    const startedAt = Date.now();
+    const timer = setInterval(() => setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000)), 1000);
+    return () => clearInterval(timer);
+  }, []);
+  const waiting = ["thinking", "budgetRecovery", "reasoningRetry", "toolRetry", "choiceRetry"].includes(phase) && elapsedSeconds >= 5;
   return <div className={styles.turnStatus}>
     <ol aria-label="本轮处理进度">{TURN_PHASES.map(([id, label], index) => <li key={id} data-state={index < currentIndex ? "done" : index === currentIndex ? "current" : "pending"}><span>{index + 1}</span>{label}</li>)}</ol>
-    <p role="status" aria-live="polite">{PHASE_MESSAGE[phase] || PHASE_MESSAGE.generating}<span>···</span></p>
+    <p role="status" aria-live="polite">{PHASE_MESSAGE[phase] || PHASE_MESSAGE.generating}{waiting ? `（已等待 ${elapsedSeconds} 秒）` : ""}<span>···</span></p>
   </div>;
 }
 

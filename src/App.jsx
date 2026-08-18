@@ -133,7 +133,15 @@ export default function App() {
     busyRef.current = true; lastActionRef.current = action; setLoading(true); setTurnPhase(options.manualRetry ? "manualRetry" : "generating"); setError(""); resetStreamPreview();
     const controller = new AbortController(); controllerRef.current = controller;
     const metrics = startTurnMetrics();
+    let timedOut = false;
+    let watchdogTimer = null;
+    const armWatchdog = () => {
+      clearTimeout(watchdogTimer);
+      watchdogTimer = setTimeout(() => { timedOut = true; controller.abort(); }, 150000);
+    };
+    armWatchdog();
     const handleTurnPreview = (rawContent) => {
+      armWatchdog();
       const hasPreview = queueStreamPreview(rawContent);
       if (hasPreview) markTurnMetric(metrics, "firstNarrativeAt");
     };
@@ -142,21 +150,38 @@ export default function App() {
         recordModelRequest(metrics);
         return requestAIWithReasoningFallback(settings, requestMessages, controller.signal, preview ? handleTurnPreview : undefined, {
         ...requestOptions,
-        onReasoningChunk: () => setTurnPhase((current) => ["generating", "manualRetry", "finalizing"].includes(current) ? "thinking" : current),
+        onReasoningChunk: () => { armWatchdog(); setTurnPhase((current) => ["generating", "manualRetry", "finalizing"].includes(current) ? "thinking" : current); },
         onReasoningRecovery: () => { if (preview) resetStreamPreview(); setTurnPhase("budgetRecovery"); },
         onReasoningFallback: () => { if (preview) resetStreamPreview(); setTurnPhase("reasoningRetry"); },
         });
       };
 
-      const fastMode = Boolean(settings.fastMode) && !settings.mockMode;
-      const planningMessages = settings.mockMode ? [] : fastMode
-        ? buildUnifiedContext(game, action, prompt, { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation })
-        : buildPlanningContext(game, action, prompt, { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation });
-      const planningResponse = settings.mockMode
-        ? await mockResponse(game, action, controller.signal, handleTurnPreview)
-        : await requestModel(planningMessages, fastMode
-          ? { toolSet: "unified", disableJsonMode: Boolean(settings.nativeTools) }
-          : { toolSet: "state", disableJsonMode: Boolean(settings.nativeTools) }, fastMode);
+      let fastMode = Boolean(settings.fastMode) && !settings.mockMode;
+      let planningResponse;
+      if (settings.mockMode) {
+        planningResponse = await mockResponse(game, action, controller.signal, handleTurnPreview);
+      } else if (fastMode) {
+        try {
+          planningResponse = await requestModel(
+            buildUnifiedContext(game, action, prompt, { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation }),
+            { toolSet: "unified", disableJsonMode: Boolean(settings.nativeTools), maxTokensModeOverride: "manual", maxTokensOverride: 6000, skipReasoningRetry: true },
+            true,
+          );
+        } catch (unifiedError) {
+          if (unifiedError.name === "AbortError") throw unifiedError;
+          if (!["REASONING_EXHAUSTED", "EMPTY_RESPONSE"].includes(unifiedError.code)) throw unifiedError;
+          // 合并请求推理耗尽/空响应时不再原样重试，直接降级为两段式完成本轮
+          fastMode = false;
+          resetStreamPreview();
+          setTurnPhase("reasoningRetry");
+        }
+      }
+      if (!settings.mockMode && !fastMode) {
+        planningResponse = await requestModel(
+          buildPlanningContext(game, action, prompt, { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation }),
+          { toolSet: "state", disableJsonMode: Boolean(settings.nativeTools) },
+        );
+      }
       const discoveryAdjustedCalls = settings.mockMode ? ensureMockMapDiscoveryToolCall(planningResponse.toolCalls, options.mapInvestigation, game.turn + 1) : planningResponse.toolCalls;
       let proposedToolCalls = dedupeToolCalls(normalizeToolCalls(ensureMapMoveToolCall(discoveryAdjustedCalls, options.mapDestination, game.turn + 1), game));
 
@@ -294,9 +319,11 @@ export default function App() {
       resetStreamPreview(); commitGame(next);
       return true;
     } catch (err) {
-      setError(err.name === "AbortError" ? "生成已由你中止；游戏状态没有改变。" : err.message || "未知错误，请重试本轮。");
+      setError(err.name === "AbortError"
+        ? (timedOut ? "等待模型响应超过 150 秒，本轮已自动中止；游戏状态没有改变，可直接重试。" : "生成已由你中止；游戏状态没有改变。")
+        : err.message || "未知错误，请重试本轮。");
       return false;
-    } finally { resetStreamPreview(); setItemConfirmation(null); itemConfirmationResolverRef.current = null; setTurnPhase("idle"); setLoading(false); busyRef.current = false; controllerRef.current = null; }
+    } finally { clearTimeout(watchdogTimer); resetStreamPreview(); setItemConfirmation(null); itemConfirmationResolverRef.current = null; setTurnPhase("idle"); setLoading(false); busyRef.current = false; controllerRef.current = null; }
   };
 
   const regenerateChoices = async () => {
