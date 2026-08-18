@@ -66,6 +66,7 @@ export const DEFAULT_API_SETTINGS = {
   nativeTools: true,
   jsonMode: true,
   mockMode: true,
+  fastMode: false,
   persistKey: false,
   profiles: {},
   savedModels: {},

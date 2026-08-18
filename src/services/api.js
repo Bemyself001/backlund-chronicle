@@ -336,6 +336,11 @@ function toolDefinitions(toolSet = "state", allowedToolNames = null) {
   if (toolSet === "choices") {
     return [{ type: "function", function: { name: "ui__present_choices", description: "提交本轮三个真正不同的玩家行动选项。", parameters: CHOICE_TOOL_SCHEMA } }];
   }
+  if (toolSet === "unified") {
+    const stateDefs = toolDefinitions("state", allowedToolNames);
+    const choiceDefs = toolDefinitions("choices");
+    return [...stateDefs, ...choiceDefs];
+  }
   const allowed = Array.isArray(allowedToolNames) && allowedToolNames.length ? new Set(allowedToolNames) : null;
   const names = STATE_TOOL_NAMES.filter((name) => !allowed || allowed.has(name));
   return names.map((name) => ({ type: "function", function: { name: name.replace(".", "__"), description: `提议执行 ${name}；本地引擎将验证。`, parameters: TOOL_PARAMETER_SCHEMAS[name] || { type: "object", additionalProperties: true } } }));

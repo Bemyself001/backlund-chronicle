@@ -14,7 +14,7 @@ import { buildRejectedToolNarrative, dedupeToolCalls, executeToolCalls, isRepair
 import { auditTurnChanges, collectImportantItemConfirmations, createAuditBaseline } from "./engine/audit.js";
 import { resolveTurnProgress } from "./engine/turn.js";
 import { loadApiSettings, requestAIWithReasoningFallback, saveApiSettings } from "./services/api.js";
-import { buildChoiceRegenerationContext, buildPlanningContext, buildRenderingContext, buildToolRepairContext, updateMemory } from "./services/memory.js";
+import { buildChoiceRegenerationContext, buildPlanningContext, buildRenderingContext, buildToolRepairContext, buildUnifiedContext, updateMemory } from "./services/memory.js";
 import { mockResponse } from "./services/mock.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
 import { extractNarrativePreview } from "./services/streamPreview.js";
@@ -148,10 +148,15 @@ export default function App() {
         });
       };
 
-      const planningMessages = settings.mockMode ? [] : buildPlanningContext(game, action, prompt, { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation });
+      const fastMode = Boolean(settings.fastMode) && !settings.mockMode;
+      const planningMessages = settings.mockMode ? [] : fastMode
+        ? buildUnifiedContext(game, action, prompt, { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation })
+        : buildPlanningContext(game, action, prompt, { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation });
       const planningResponse = settings.mockMode
         ? await mockResponse(game, action, controller.signal, handleTurnPreview)
-        : await requestModel(planningMessages, { toolSet: "state", disableJsonMode: Boolean(settings.nativeTools) });
+        : await requestModel(planningMessages, fastMode
+          ? { toolSet: "unified", disableJsonMode: Boolean(settings.nativeTools) }
+          : { toolSet: "state", disableJsonMode: Boolean(settings.nativeTools) }, fastMode);
       const discoveryAdjustedCalls = settings.mockMode ? ensureMockMapDiscoveryToolCall(planningResponse.toolCalls, options.mapInvestigation, game.turn + 1) : planningResponse.toolCalls;
       let proposedToolCalls = dedupeToolCalls(normalizeToolCalls(ensureMapMoveToolCall(discoveryAdjustedCalls, options.mapDestination, game.turn + 1), game));
 
@@ -230,7 +235,11 @@ export default function App() {
       const resolution = createTurnResolution(proposedToolCalls, execution.results, progress);
 
       let response = planningResponse;
-      if (!settings.mockMode) {
+      const rejectedNarrativeSuffix = () => {
+        const rejectionNarrative = buildRejectedToolNarrative(action, execution.results);
+        return execution.results.some((result) => result.ok) ? `${response.narrative}\n\n${rejectionNarrative}` : rejectionNarrative;
+      };
+      if (!settings.mockMode && !(fastMode && response.hasNarrative)) {
         resetStreamPreview();
         setTurnPhase("finalizing");
         const renderMessages = buildRenderingContext(game, resolvedGame, action, prompt, resolution, { nativeTools: settings.nativeTools });
@@ -245,8 +254,7 @@ export default function App() {
         }
         if (!response.hasNarrative) throw new Error("模型没有返回最终剧情正文，请重试本轮。");
       } else if (execution.results.some((result) => !result.ok)) {
-        const rejectionNarrative = buildRejectedToolNarrative(action, execution.results);
-        response = { ...response, narrative: execution.results.some((result) => result.ok) ? `${response.narrative}\n\n${rejectionNarrative}` : rejectionNarrative, hasNarrative: true };
+        response = { ...response, narrative: rejectedNarrativeSuffix(), hasNarrative: true };
       }
 
       let choices = hasValidModelChoices(response) ? response.choices : [];
