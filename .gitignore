@@ -6,3 +6,4 @@ dist
 *.local
 *.log
 .signing/
+scripts/bench-settings.json

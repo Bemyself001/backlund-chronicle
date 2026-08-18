@@ -119,7 +119,7 @@ export function buildRenderingContinuation(gameBefore, gameAfter, action, resolu
 
 function unifiedProtocol(nativeTools) {
   return nativeTools
-    ? "一次完成本轮全部工作：需要状态变化时调用原生状态工具提议；在 assistant.content 中写入约 250—600 字的最终中文剧情（纯文本，不含 JSON）；并调用一次 ui.present_choices 提交恰好三个真正不同的行动选项。状态变化必须等本地验证，不要在剧情中宣称未验证的结果。"
+    ? "一次完成本轮全部工作，三项产出缺一不可：1) 需要状态变化时调用原生状态工具提议；2) 无论是否调用工具，都必须在 assistant.content 中直接写入约 250—600 字的最终中文剧情（纯文本，不含 JSON），content 留空等于任务失败；3) 调用一次 ui.present_choices 提交恰好三个真正不同的行动选项。先写剧情再调用工具。状态变化必须等本地验证，不要在剧情中宣称未验证的结果。"
     : "一次完成本轮全部工作，并只返回精简 JSON：{\"narrative\":\"最终剧情\",\"choices\":[{\"label\":\"行动\",\"intent\":\"investigate\",\"risk\":\"low\"},{\"label\":\"行动\",\"intent\":\"social\",\"risk\":\"medium\"},{\"label\":\"行动\",\"intent\":\"dangerous\",\"risk\":\"high\"}],\"toolCalls\":[]}。状态变化必须等本地验证，不要在剧情中宣称未验证的结果。";
 }
 

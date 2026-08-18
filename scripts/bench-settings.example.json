@@ -1,0 +1,13 @@
+{
+  "provider": "deepseek",
+  "baseUrl": "https://api.deepseek.com/v1",
+  "apiKey": "在此填入你的密钥",
+  "model": "deepseek-chat",
+  "reasoningMode": "auto",
+  "stream": true,
+  "nativeTools": true,
+  "jsonMode": true,
+  "temperature": 0.8,
+  "maxTokensMode": "auto",
+  "contextLength": 12000
+}
