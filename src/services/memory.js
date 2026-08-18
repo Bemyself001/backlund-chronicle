@@ -58,12 +58,26 @@ export function visibleGameState(game) {
   };
 }
 
+const MAP_ACTION_HINT = /哪里|哪儿|哪处|去|前往|出发|路|打听|寻找|找一?找|地点|地图|街区|租|搬|住|码头|车站|市场|教堂|医院|警|酒馆|酒吧/;
+
+function shouldExposeMapCandidates(game, options = {}) {
+  if (options.mapInvestigation || options.mapDestination) return true;
+  const action = String(options.playerAction || "");
+  if (MAP_ACTION_HINT.test(action)) return true;
+  const knowledge = mapKnowledge(game);
+  return MAP_LOCATIONS.some((location) => {
+    if (knowledge[location.id]?.status === "discovered") return false;
+    const fragments = [location.district, ...location.name.split("·")];
+    return fragments.some((fragment) => fragment && fragment.length >= 2 && action.includes(fragment));
+  });
+}
+
 function privatePlanningState(game, options = {}) {
   return {
     hiddenDanger: game.hiddenDanger,
     occultEntryAvailable: Boolean(game.occult?.entryAvailable),
     currentOccultEntry: game.occult?.currentEntry || null,
-    mapDiscoveryCandidates: privateMapCandidates(game),
+    mapDiscoveryCandidates: shouldExposeMapCandidates(game, options) ? privateMapCandidates(game) : undefined,
     requestedMapInvestigation: options.mapInvestigation || null,
     potionFacts: (game.inventory || []).filter((item) => item.potion).map((item) => ({
       instanceId: item.instanceId,
@@ -89,7 +103,7 @@ export function buildPlanningContext(game, action, systemPrompt, options = {}) {
   const nativeTools = options.nativeTools !== false;
   const data = {
     playerVisibleState: visibleGameState(game),
-    privateSimulationState: privatePlanningState(game, options),
+    privateSimulationState: privatePlanningState(game, { ...options, playerAction: action }),
     longTermSummary: game.longTermSummary || "",
     playerAction: action,
   };
@@ -127,7 +141,7 @@ export function buildUnifiedContext(game, action, systemPrompt, options = {}) {
   const nativeTools = options.nativeTools !== false;
   const data = {
     playerVisibleState: visibleGameState(game),
-    privateSimulationState: privatePlanningState(game, options),
+    privateSimulationState: privatePlanningState(game, { ...options, playerAction: action }),
     longTermSummary: game.longTermSummary || "",
     playerAction: action,
   };

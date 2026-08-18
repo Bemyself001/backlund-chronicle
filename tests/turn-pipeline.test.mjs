@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createInitialGame, DEFAULT_SYSTEM_PROMPT, EMPTY_CHARACTER } from "../src/data/defaults.js";
-import { buildChoiceRegenerationContext, buildPlanningContext, buildRenderingContext, updateMemory } from "../src/services/memory.js";
+import { buildChoiceRegenerationContext, buildPlanningContext, buildRenderingContext, buildUnifiedContext, updateMemory } from "../src/services/memory.js";
 import { createTurnResolution } from "../src/services/turnResolution.js";
 
 test("planning context injects private simulation data only as untrusted turn data", () => {
@@ -15,8 +15,24 @@ test("planning context injects private simulation data only as untrusted turn da
   assert.equal(data.role, "user");
   assert.match(data.content, /privateSimulationState/);
   assert.match(data.content, /hiddenDanger/);
-  assert.match(data.content, /mapDiscoveryCandidates/);
-  assert.match(data.content, /queen-archive/);
+  // 普通观察回合不注入地图候选清单，节省输入 token
+  assert.doesNotMatch(data.content, /mapDiscoveryCandidates/);
+});
+
+test("planning context exposes map candidates only for map-related turns", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "地图测试员" });
+  const byOption = buildPlanningContext(game, "继续调查", DEFAULT_SYSTEM_PROMPT, { nativeTools: true, mapInvestigation: "queen-archive" }).at(-1).content;
+  assert.match(byOption, /mapDiscoveryCandidates/);
+  assert.match(byOption, /queen-archive/);
+
+  const byKeyword = buildPlanningContext(game, "打听一下哪里能租到便宜的公寓", DEFAULT_SYSTEM_PROMPT, { nativeTools: true }).at(-1).content;
+  assert.match(byKeyword, /mapDiscoveryCandidates/);
+
+  const byName = buildPlanningContext(game, "我想去市政档案馆碰碰运气", DEFAULT_SYSTEM_PROMPT, { nativeTools: true }).at(-1).content;
+  assert.match(byName, /queen-archive/);
+
+  const unified = buildUnifiedContext(game, "在房间里整理线索", DEFAULT_SYSTEM_PROMPT, { nativeTools: true }).at(-1).content;
+  assert.doesNotMatch(unified, /mapDiscoveryCandidates/);
 });
 
 test("rendering context contains the authoritative resolution but excludes private danger state", () => {
