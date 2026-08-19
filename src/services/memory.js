@@ -205,7 +205,8 @@ export function buildContext(game, action, systemPrompt) {
   return buildPlanningContext(game, action, systemPrompt, { nativeTools: true });
 }
 
-export function updateMemory(game, action, narrative, resolution = null) {
+// 拆分归档计划：updates 立即写入回合；archived 供回合后异步 AI 摘要重写
+export function computeMemoryUpdate(game, action, narrative, resolution = null) {
   const dialogues = [...(game.recentDialogues || []),
     { id: `msg-user-${Date.now()}`, role: "user", turn: game.turn + 1, content: action },
     { id: `msg-ai-${Date.now()}`, role: "assistant", turn: game.turn + 1, content: narrative },
@@ -218,5 +219,23 @@ export function updateMemory(game, action, narrative, resolution = null) {
   const accepted = (resolution?.accepted || []).map((entry) => entry.name).filter(Boolean);
   const rejected = (resolution?.rejected || []).map((entry) => entry.name).filter(Boolean);
   const localNote = `第${game.turn + 1}轮：玩家选择“${action.slice(0, 40)}”${accepted.length ? `；确认 ${accepted.join("、")}` : ""}${rejected.length ? `；拒绝 ${rejected.join("、")}` : ""}。`;
-  return { recentDialogues, longTermSummary: compact, memoryNotes: [...(game.memoryNotes || []), localNote].slice(-20) };
+  return {
+    updates: { recentDialogues, longTermSummary: compact, memoryNotes: [...(game.memoryNotes || []), localNote].slice(-20) },
+    archived,
+    previousSummary: game.longTermSummary || "",
+  };
+}
+
+export function updateMemory(game, action, narrative, resolution = null) {
+  return computeMemoryUpdate(game, action, narrative, resolution).updates;
+}
+
+// AI 滚动摘要：旧摘要 + 刚归档的对话 → 一段连贯的新长期记忆
+export function buildSummaryContext(previousSummary, archivedMessages, systemPrompt) {
+  const transcript = archivedMessages.map((message) => `${message.role === "user" ? "玩家" : "旁白"}：${message.content}`).join("\n");
+  return [
+    { role: "system", content: systemPrompt },
+    { role: "system", content: "【长期记忆归纳】把旧摘要与刚归档的对话压缩成一段连贯的中文长期记忆，不超过 600 字。只归纳已经发生的事实与剧情，不得新增、推测或预告未来情节；优先保留人物姓名与承诺、地点、案件线索、伏笔与未解决的悬念，舍弃一次性琐碎细节。assistant.content 只输出摘要正文，纯文本，不要 JSON。" },
+    { role: "user", content: `【旧摘要】\n${previousSummary || "（空）"}\n\n【刚归档的对话】\n${transcript}\n\n【任务】输出新的长期记忆正文。` },
+  ];
 }

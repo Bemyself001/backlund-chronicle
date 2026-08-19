@@ -14,7 +14,7 @@ import { buildRejectedToolNarrative, dedupeToolCalls, executeToolCalls, isRepair
 import { auditTurnChanges, collectImportantItemConfirmations, createAuditBaseline } from "./engine/audit.js";
 import { resolveTurnProgress } from "./engine/turn.js";
 import { loadApiSettings, requestAIWithReasoningFallback, saveApiSettings } from "./services/api.js";
-import { buildChoiceRegenerationContext, buildPlanningContext, buildRenderingContext, buildToolRepairContext, buildUnifiedContext, updateMemory } from "./services/memory.js";
+import { buildChoiceRegenerationContext, buildPlanningContext, buildRenderingContext, buildSummaryContext, buildToolRepairContext, buildUnifiedContext, computeMemoryUpdate } from "./services/memory.js";
 import { mockResponse } from "./services/mock.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
 import { extractNarrativePreview } from "./services/streamPreview.js";
@@ -125,6 +125,30 @@ export default function App() {
       maxTokensModeOverride: "manual",
       maxTokensOverride: 1200,
     });
+  };
+
+  // 回合提交后异步让模型重写长期摘要；失败或玩家已开始新回合则保留截断版
+  const scheduleSummaryRewrite = (memoryPlan, gameId, turn) => {
+    if (settings.mockMode || !memoryPlan.archived.length) return;
+    const summaryController = new AbortController();
+    (async () => {
+      try {
+        const response = await requestAIWithReasoningFallback(settings, buildSummaryContext(memoryPlan.previousSummary, memoryPlan.archived, prompt), summaryController.signal, undefined, {
+          disableTools: true,
+          disableJsonMode: true,
+          forceDisableReasoning: true,
+          skipReasoningRetry: true,
+          maxTokensModeOverride: "manual",
+          maxTokensOverride: 1200,
+        });
+        const summary = String(response.narrative || "").trim().replace(/\s+/g, " ").slice(-1800);
+        if (!summary) return;
+        setGame((current) => {
+          if (!current || current.id !== gameId || current.turn !== turn) return current;
+          return saveGame({ ...current, longTermSummary: summary });
+        });
+      } catch { /* 截断版摘要已随回合写入，静默降级 */ }
+    })();
   };
 
   const runTurn = async (action, options = {}) => {
@@ -308,11 +332,11 @@ export default function App() {
       const nextChoices = choices.length === 3
         ? injectOccultEntryChoice(choices, progress.occult.contact === 0 ? (progress.occultEntry || progress.occult.currentEntry) : null)
         : [];
-      const nextMemory = updateMemory(execution.game, action, occultNarrative, resolution);
+      const memoryPlan = computeMemoryUpdate(execution.game, action, occultNarrative, resolution);
       const auditBaseline = createAuditBaseline(game, game.turn + 1);
       const automaticAudit = { ...auditTurnChanges(auditBaseline, resolvedGame), importantItemConfirmation: confirmationStatus };
       const next = {
-        ...resolvedGame, ...nextMemory, choices: nextChoices, choiceMeta,
+        ...resolvedGame, ...memoryPlan.updates, choices: nextChoices, choiceMeta,
         worldEvents: [...game.worldEvents, ...(progress.occultEntry ? [{ id: makeId("event"), turn: game.turn + 1, text: `非凡入口出现：${progress.occultEntry.title}` }] : [])].slice(-40),
         changeLog: [...game.changeLog, ...execution.logs].slice(-100),
         lastTurnBaseline: auditBaseline,
@@ -320,6 +344,7 @@ export default function App() {
         lastTurnMetrics: finishTurnMetrics(metrics),
       };
       resetStreamPreview(); commitGame(next);
+      scheduleSummaryRewrite(memoryPlan, next.id, next.turn);
       return true;
     } catch (err) {
       setError(err.name === "AbortError"
