@@ -189,9 +189,11 @@ export default function App() {
         planningResponse = await mockResponse(game, action, controller.signal, handleTurnPreview);
       } else if (fastMode) {
         try {
+          // 快速模式固定使用 JSON 协议：narrative 是首个字段，剧情必然最先逐字流出，
+          // 不受模型「先出工具调用再写正文」的原生通道顺序影响
           planningResponse = await requestModel(
-            buildUnifiedContext(game, action, prompt, { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation }),
-            { toolSet: "unified", disableJsonMode: Boolean(settings.nativeTools), maxTokensModeOverride: "manual", maxTokensOverride: 6000, skipReasoningRetry: true },
+            buildUnifiedContext(game, action, prompt, { nativeTools: false, mapInvestigation: options.mapInvestigation }),
+            { disableTools: true, maxTokensModeOverride: "manual", maxTokensOverride: 6000, skipReasoningRetry: true },
             true,
           );
         } catch (unifiedError) {

@@ -61,12 +61,11 @@ async function runTurnOnce(game, action, fastMode) {
   };
 
   const planningMessages = fastMode
-    ? buildUnifiedContext(game, action, DEFAULT_SYSTEM_PROMPT, { nativeTools: settings.nativeTools })
+    ? buildUnifiedContext(game, action, DEFAULT_SYSTEM_PROMPT, { nativeTools: false })
     : buildPlanningContext(game, action, DEFAULT_SYSTEM_PROMPT, { nativeTools: settings.nativeTools });
-  const planningResponse = await request(planningMessages, {
-    toolSet: fastMode ? "unified" : "state",
-    disableJsonMode: Boolean(settings.nativeTools),
-  });
+  const planningResponse = await request(planningMessages, fastMode
+    ? { disableTools: true, maxTokensModeOverride: "manual", maxTokensOverride: 6000, skipReasoningRetry: true }
+    : { toolSet: "state", disableJsonMode: Boolean(settings.nativeTools) });
   metric.planningMs = performance.now() - t0;
 
   const proposedToolCalls = dedupeToolCalls(normalizeToolCalls(planningResponse.toolCalls, game));
