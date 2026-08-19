@@ -186,7 +186,8 @@ export default function App() {
       const discoveryAdjustedCalls = settings.mockMode ? ensureMockMapDiscoveryToolCall(planningResponse.toolCalls, options.mapInvestigation, game.turn + 1) : planningResponse.toolCalls;
       let proposedToolCalls = dedupeToolCalls(normalizeToolCalls(ensureMapMoveToolCall(discoveryAdjustedCalls, options.mapDestination, game.turn + 1), game));
 
-      if (!settings.mockMode) {
+      if (!settings.mockMode && !fastMode) {
+        // 工具修复重试仅在严格模式保留；快速模式下缺参/无效调用直接拒绝，由下一轮叙事找补
         const repairedCalls = [];
         let repairCount = 0;
         for (const proposedCall of proposedToolCalls) {
@@ -279,7 +280,8 @@ export default function App() {
           response = { ...narrativeResponse, ...originalChoices };
         }
         if (!response.hasNarrative) throw new Error("模型没有返回最终剧情正文，请重试本轮。");
-      } else if (execution.results.some((result) => !result.ok)) {
+      } else if (settings.mockMode && execution.results.some((result) => !result.ok)) {
+        // 仅 Mock 模式把拒绝说明拼进正文；快速模式的拒绝记录经 changeLog 与下一轮上下文回填
         response = { ...response, narrative: rejectedNarrativeSuffix(), hasNarrative: true };
       }
 
