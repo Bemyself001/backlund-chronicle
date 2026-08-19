@@ -130,3 +130,12 @@ test("occult contact gates reveal and occult character updates", () => {
   assert.equal(blockedUpdate.results[0].ok, false);
   assert.match(blockedUpdate.results[0].reason, /尚未接触/);
 });
+
+test("money tools accept flat denomination args by folding them into amount", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "金额测试员" });
+  const flat = normalizeToolCall({ name: "money.add", args: { pounds: 1, solers: 2, reason: "完成抄录工作获得报酬" } }, game);
+  assert.deepEqual(flat.args.amount, { pounds: 1, solers: 2, pence: 0 });
+  assert.equal(flat.args.pounds, undefined);
+  const nested = normalizeToolCall({ name: "money.remove", args: { amount: { pence: 6 }, reason: "购买黑啤酒" } }, game);
+  assert.deepEqual(nested.args.amount, { pence: 6 });
+});

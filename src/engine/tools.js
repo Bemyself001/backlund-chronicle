@@ -292,6 +292,13 @@ export function normalizeToolCall(call = {}, game = null) {
   const reason = call.reason || rawArgs.reason || `AI 提议执行 ${name || "未知工具"}`;
   delete rawArgs.reason;
   const repaired = repairToolArgs(name, rawArgs, game);
+  // 兼容模型把金额平铺为顶层 pounds/solers/pence 的写法，折叠进 amount 再校验
+  if (["money.add", "money.remove"].includes(name) && repaired.args && repaired.args.amount === undefined) {
+    const { pounds, solers, pence, ...rest } = repaired.args;
+    if (pounds !== undefined || solers !== undefined || pence !== undefined) {
+      repaired.args = { ...rest, amount: { pounds: pounds || 0, solers: solers || 0, pence: pence || 0 } };
+    }
+  }
   return { ...call, name, args: repaired.args, reason: String(reason).trim() || `AI 提议执行 ${name}`, repairNote: repaired.repairNote, resolutionError: repaired.resolutionError, argsInvalid, argsInvalidCause };
 }
 

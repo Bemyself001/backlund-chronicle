@@ -305,6 +305,142 @@ const TOOL_PARAMETER_SCHEMAS = {
       reason: { type: "string", description: "与本轮玩家行动对应的发现理由" },
     },
   },
+  "money.add": {
+    type: "object",
+    additionalProperties: false,
+    required: ["amount", "reason"],
+    properties: {
+      amount: {
+        type: "object",
+        additionalProperties: false,
+        description: "获得的金额，按镑、苏勒、便士拆分；至少一项为正整数",
+        properties: {
+          pounds: { type: "integer", minimum: 0, description: "镑" },
+          solers: { type: "integer", minimum: 0, description: "苏勒，1 镑 = 20 苏勒" },
+          pence: { type: "integer", minimum: 0, description: "便士，1 苏勒 = 12 便士" },
+        },
+      },
+      reason: { type: "string", description: "与本轮玩家行动对应的资金来源" },
+    },
+  },
+  "money.remove": {
+    type: "object",
+    additionalProperties: false,
+    required: ["amount", "reason"],
+    properties: {
+      amount: {
+        type: "object",
+        additionalProperties: false,
+        description: "支付的金额，按镑、苏勒、便士拆分；至少一项为正整数",
+        properties: {
+          pounds: { type: "integer", minimum: 0, description: "镑" },
+          solers: { type: "integer", minimum: 0, description: "苏勒，1 镑 = 20 苏勒" },
+          pence: { type: "integer", minimum: 0, description: "便士，1 苏勒 = 12 便士" },
+        },
+      },
+      reason: { type: "string", description: "与本轮玩家行动对应的支付去向" },
+    },
+  },
+  "money.inspect": {
+    type: "object",
+    additionalProperties: false,
+    properties: {
+      reason: { type: "string" },
+    },
+  },
+  "character.update": {
+    type: "object",
+    additionalProperties: false,
+    required: ["patch", "reason"],
+    properties: {
+      patch: {
+        type: "object",
+        additionalProperties: false,
+        description: "受限角色数值的目标值，只允许生命、理智、灵性",
+        properties: {
+          health: { type: "integer", minimum: 0 },
+          sanity: { type: "integer", minimum: 0 },
+          spirituality: { type: "integer", minimum: 0 },
+        },
+      },
+      requiresOccult: { type: "boolean", description: "仅非凡相关变化为 true，需已接触非凡世界" },
+      reason: { type: "string" },
+    },
+  },
+  "status.add": {
+    type: "object",
+    additionalProperties: false,
+    required: ["status", "reason"],
+    properties: {
+      status: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "name"],
+        properties: {
+          id: { type: "string", description: "稳定且可去重的状态 ID" },
+          name: { type: "string" },
+          kind: { type: "string", enum: ["neutral", "danger", "positive"] },
+          description: { type: "string" },
+        },
+      },
+      reason: { type: "string" },
+    },
+  },
+  "status.remove": {
+    type: "object",
+    additionalProperties: false,
+    required: ["statusId", "reason"],
+    properties: {
+      statusId: { type: "string", description: "当前状态效果中的精确 ID" },
+      reason: { type: "string" },
+    },
+  },
+  "quest.add": {
+    type: "object",
+    additionalProperties: false,
+    required: ["quest", "reason"],
+    properties: {
+      quest: {
+        type: "object",
+        additionalProperties: false,
+        required: ["id", "title"],
+        properties: {
+          id: { type: "string", description: "稳定且可去重的任务 ID" },
+          title: { type: "string" },
+          summary: { type: "string" },
+          status: { type: "string" },
+        },
+      },
+      reason: { type: "string" },
+    },
+  },
+  "quest.update": {
+    type: "object",
+    additionalProperties: false,
+    required: ["questId", "patch", "reason"],
+    properties: {
+      questId: { type: "string", description: "当前任务列表中的精确 ID" },
+      patch: {
+        type: "object",
+        additionalProperties: false,
+        properties: {
+          status: { type: "string" },
+          summary: { type: "string" },
+        },
+      },
+      reason: { type: "string" },
+    },
+  },
+  "dice.check": {
+    type: "object",
+    additionalProperties: false,
+    required: ["difficulty", "reason"],
+    properties: {
+      difficulty: { type: "integer", minimum: 2, maximum: 20, description: "1d20 检定难度" },
+      modifier: { type: "integer", description: "正负修正值" },
+      reason: { type: "string", description: "本次检定对应的行动" },
+    },
+  },
 };
 
 const STATE_TOOL_NAMES = ["inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.discover", "location.move", "clue.add", "quest.add", "quest.update", "dice.check"];
