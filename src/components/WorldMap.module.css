@@ -47,3 +47,10 @@
 @media (max-width: 760px) { .layout { grid-template-columns: minmax(0, 1fr); } .mapCanvas { min-height: min(58svh, 30rem); } .detail { min-height: 15rem; } }
 @media (max-width: 460px) { .mapCanvas { min-height: 24rem; } .node { grid-template-columns: 1.65rem; padding: .2rem; } .node b { width: 1.55rem; height: 1.55rem; } .node span { position: absolute; top: calc(100% + .18rem); left: 50%; max-width: 5.5rem; padding: .12rem .25rem; background: #e5d8bfdb; font-size: .5rem; transform: translateX(-50%); } .node[data-status="unknown"] span { display: none; } .districtLabels span { font-size: .55rem; } }
 @media (prefers-reduced-motion: reduce) { .node { transition: none; } }
+.relations { display: grid; gap: .7rem; margin: 0 0 1rem; padding: .7rem .8rem; border: 1px solid #7f6d4e40; background: #e8dcc580; }
+.relations section { display: grid; gap: .3rem; }
+.relations h4 { margin: 0; color: #786f60; font: 800 .58rem var(--font-sans); letter-spacing: .12em; }
+.relations ul { display: grid; gap: .25rem; margin: 0; padding: 0; list-style: none; }
+.relations li { display: flex; align-items: baseline; justify-content: space-between; gap: .8rem; font: .68rem/1.5 var(--font-sans); }
+.relations li strong { color: #3f554c; font-weight: 700; }
+.relations li small { overflow: hidden; color: #777064; text-overflow: ellipsis; white-space: nowrap; }

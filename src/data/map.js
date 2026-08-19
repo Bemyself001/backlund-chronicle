@@ -100,3 +100,20 @@ export function findTravelRoute(fromId, toId, allowedIds = MAP_LOCATIONS.map((lo
   }
   return { minutes: distances.get(toId), path, transports };
 }
+
+// 地点关联内容：按地点名称片段匹配任务、线索与 NPC，供地图详情面板展示
+export function locationNameFragments(location) {
+  if (!location) return [];
+  return [...new Set([location.name, ...location.name.split("·")].filter((fragment) => fragment && fragment.length >= 2))];
+}
+
+export function findLocationRelations(game, location) {
+  const fragments = locationNameFragments(location);
+  if (!fragments.length) return { quests: [], clues: [], npcs: [] };
+  const mentions = (text) => fragments.some((fragment) => String(text || "").includes(fragment));
+  return {
+    quests: (game.quests || []).filter((quest) => mentions(`${quest.title} ${quest.summary}`)),
+    clues: (game.clues || []).filter((clue) => mentions(`${clue.title} ${clue.detail}`)),
+    npcs: (game.relationships || []).filter((npc) => mentions(`${npc.name} ${npc.role} ${npc.note}`)),
+  };
+}

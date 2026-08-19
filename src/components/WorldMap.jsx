@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import Modal from "./Modal.jsx";
-import { findTravelRoute, getMapLocation, MAP_LOCATIONS, MAP_ROUTES, normalizeLocationKnowledge } from "../data/map.js";
+import { findLocationRelations, findTravelRoute, getMapLocation, MAP_LOCATIONS, MAP_ROUTES, normalizeLocationKnowledge } from "../data/map.js";
 import styles from "./WorldMap.module.css";
 
 export default function WorldMap({ game, loading, onClose, onTravel, onInvestigate }) {
@@ -14,6 +14,8 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
   const route = selected && discovered ? findTravelRoute(game.location.id, selected.id, discoveredIds) : null;
   const current = selected?.id === game.location.id;
   const routeNames = route?.path.map((id) => getMapLocation(id)?.name || id).join(" → ");
+  const relations = discovered ? findLocationRelations(game, selected) : null;
+  const hasRelations = relations && (relations.quests.length || relations.clues.length || relations.npcs.length);
 
   return <Modal title="贝克兰德交通图" eyebrow="Municipal route dossier" onClose={onClose} wide>
     <div className={styles.layout}>
@@ -59,6 +61,11 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
           <div><dt>建议交通</dt><dd>{current ? "—" : route ? [...new Set(route.transports)].join("、") : "—"}</dd></div>
         </dl>}
         {routeNames && !current && <p className={styles.routeText}>推荐路线：{routeNames}</p>}
+        {discovered && hasRelations && <div className={styles.relations} aria-label="与该地点相关的档案">
+          {relations.quests.length > 0 && <section><h4>相关任务</h4><ul>{relations.quests.slice(0, 3).map((quest) => <li key={quest.id}><strong>{quest.title}</strong><small>{quest.status}</small></li>)}</ul></section>}
+          {relations.clues.length > 0 && <section><h4>相关线索</h4><ul>{relations.clues.slice(0, 3).map((clue) => <li key={clue.id}><strong>{clue.title}</strong>{clue.detail && <small>{clue.detail.slice(0, 40)}</small>}</li>)}</ul></section>}
+          {relations.npcs.length > 0 && <section><h4>相关人物</h4><ul>{relations.npcs.slice(0, 3).map((npc) => <li key={npc.id}><strong>{npc.name}</strong><small>{npc.role}</small></li>)}</ul></section>}
+        </div>}
         {discovered
           ? <button className="button button--primary" type="button" disabled={current || !route || loading} onClick={() => onTravel(selected)}>{current ? "你正在这里" : loading ? "本轮处理中" : route ? "前往此处" : "暂无可用路线"}</button>
           : rumored

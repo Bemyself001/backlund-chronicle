@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createInitialGame, EMPTY_CHARACTER } from "../src/data/defaults.js";
-import { findTravelRoute, MAP_LOCATIONS, normalizeLocationKnowledge } from "../src/data/map.js";
+import { findLocationRelations, findTravelRoute, MAP_LOCATIONS, normalizeLocationKnowledge } from "../src/data/map.js";
 import { executeToolCalls } from "../src/engine/tools.js";
 import { minutesForTurn } from "../src/engine/turn.js";
 import { ensureMapMoveToolCall, ensureMockMapDiscoveryToolCall } from "../src/services/mapTravel.js";
@@ -98,4 +98,18 @@ test("Mock map investigation supplies a deterministic discovery call", () => {
     status: "discovered",
     note: "保存旧地契、人口登记与部分封存案卷的石砌建筑。",
   });
+});
+
+test("location relations match quests, clues and NPCs by name fragments", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "关联测试员" });
+  game.quests.push({ id: "q1", title: "调查市政档案馆的失窃案", summary: "有人潜入档案馆", status: "进行中" });
+  game.clues.push({ id: "c1", title: "半张货运单", detail: "收货方是市政档案馆" });
+  game.relationships.push({ id: "n1", name: "老周", role: "火车站看守", value: 1, note: "在贝克兰德火车站工作多年" });
+  const archive = MAP_LOCATIONS.find((location) => location.id === "queen-archive");
+  const relations = findLocationRelations(game, archive);
+  assert.equal(relations.quests.length, 1);
+  assert.equal(relations.clues.length, 1);
+  assert.equal(relations.npcs.length, 0);
+  const station = MAP_LOCATIONS.find((location) => location.id === "east-station");
+  assert.equal(findLocationRelations(game, station).npcs.length, 1);
 });
