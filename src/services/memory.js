@@ -230,12 +230,49 @@ export function updateMemory(game, action, narrative, resolution = null) {
   return computeMemoryUpdate(game, action, narrative, resolution).updates;
 }
 
-// AI 滚动摘要：旧摘要 + 刚归档的对话 → 一段连贯的新长期记忆
+// 长期记忆分区：案件/人物/伏笔独立保留，日常琐事单独滚动，避免重要伏笔被挤掉
+export const MEMORY_SECTIONS = [
+  ["cases", "案件与调查"],
+  ["people", "人物与关系"],
+  ["hooks", "承诺与伏笔"],
+  ["daily", "居住与日常"],
+];
+
+const SECTION_LIMIT = 800;
+
+export function composeSummary(sections) {
+  if (!sections || typeof sections !== "object") return "";
+  return MEMORY_SECTIONS
+    .map(([key, label]) => ({ label, text: String(sections[key] || "").trim() }))
+    .filter((entry) => entry.text)
+    .map((entry) => `【${entry.label}】${entry.text}`)
+    .join("\n")
+    .slice(-1800);
+}
+
+// 解析模型输出的分区摘要；找不到任何分区标记时返回 null，由调用方降级
+export function parseSectionedSummary(text) {
+  const source = String(text || "");
+  const markers = MEMORY_SECTIONS.map(([key, label]) => ({ key, label, index: source.indexOf(`【${label}】`) }));
+  if (markers.every((marker) => marker.index === -1)) return null;
+  const present = markers.filter((marker) => marker.index >= 0).sort((a, b) => a.index - b.index);
+  const sections = {};
+  present.forEach((marker, position) => {
+    const start = marker.index + marker.label.length + 2;
+    const end = position + 1 < present.length ? present[position + 1].index : source.length;
+    const content = source.slice(start, end).trim();
+    sections[marker.key] = content === "无" ? "" : content.slice(-SECTION_LIMIT);
+  });
+  return sections;
+}
+
+// AI 滚动摘要：旧摘要 + 刚归档的对话 → 分区长期记忆
 export function buildSummaryContext(previousSummary, archivedMessages, systemPrompt) {
   const transcript = archivedMessages.map((message) => `${message.role === "user" ? "玩家" : "旁白"}：${message.content}`).join("\n");
+  const sectionGuide = MEMORY_SECTIONS.map(([, label]) => `【${label}】`).join("");
   return [
     { role: "system", content: systemPrompt },
-    { role: "system", content: "【长期记忆归纳】把旧摘要与刚归档的对话压缩成一段连贯的中文长期记忆，不超过 600 字。只归纳已经发生的事实与剧情，不得新增、推测或预告未来情节；优先保留人物姓名与承诺、地点、案件线索、伏笔与未解决的悬念，舍弃一次性琐碎细节。assistant.content 只输出摘要正文，纯文本，不要 JSON。" },
-    { role: "user", content: `【旧摘要】\n${previousSummary || "（空）"}\n\n【刚归档的对话】\n${transcript}\n\n【任务】输出新的长期记忆正文。` },
+    { role: "system", content: `【长期记忆归纳】把旧摘要与刚归档的对话压缩成连贯的中文长期记忆。严格按四个分区输出，每个分区以标记开头：${sectionGuide}。某分区没有内容时写「无」。只归纳已经发生的事实与剧情，不得新增、推测或预告未来情节；优先保留人物姓名与承诺、地点、案件线索、伏笔与未解决的悬念，一次性琐碎细节归入居住与日常或舍弃。assistant.content 只输出带分区标记的摘要，纯文本，不要 JSON。` },
+    { role: "user", content: `【旧摘要】\n${previousSummary || "（空）"}\n\n【刚归档的对话】\n${transcript}\n\n【任务】输出新的四分区长期记忆。` },
   ];
 }

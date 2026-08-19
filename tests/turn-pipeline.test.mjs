@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createInitialGame, DEFAULT_SYSTEM_PROMPT, EMPTY_CHARACTER } from "../src/data/defaults.js";
-import { buildChoiceRegenerationContext, buildPlanningContext, buildRenderingContext, buildUnifiedContext, updateMemory } from "../src/services/memory.js";
+import { buildChoiceRegenerationContext, buildPlanningContext, buildRenderingContext, buildUnifiedContext, composeSummary, parseSectionedSummary, updateMemory } from "../src/services/memory.js";
 import { createTurnResolution } from "../src/services/turnResolution.js";
 
 test("planning context injects private simulation data only as untrusted turn data", () => {
@@ -69,4 +69,20 @@ test("turn resolution and memory are derived from local execution results", () =
   assert.deepEqual(resolution.rejected.map((entry) => entry.name), ["money.add"]);
   assert.match(memory.memoryNotes.at(-1), /确认 status\.add/);
   assert.match(memory.memoryNotes.at(-1), /拒绝 money\.add/);
+});
+
+test("sectioned summary parses markers, drops empty sections and round-trips", () => {
+  const text = "【案件与调查】黑函的笔迹指向市政档案馆。\n【人物与关系】售票员答应留意灰呢帽男人。\n【承诺与伏笔】无\n【居住与日常】租下灰墙公寓单间。";
+  const sections = parseSectionedSummary(text);
+  assert.deepEqual(sections, {
+    cases: "黑函的笔迹指向市政档案馆。",
+    people: "售票员答应留意灰呢帽男人。",
+    hooks: "",
+    daily: "租下灰墙公寓单间。",
+  });
+  const composed = composeSummary(sections);
+  assert.match(composed, /【案件与调查】黑函/);
+  assert.match(composed, /【居住与日常】租下/);
+  assert.doesNotMatch(composed, /【承诺与伏笔】/);
+  assert.equal(parseSectionedSummary("没有分区标记的普通摘要"), null);
 });

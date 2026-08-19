@@ -14,7 +14,7 @@ import { buildRejectedToolNarrative, dedupeToolCalls, executeToolCalls, isRepair
 import { auditTurnChanges, collectImportantItemConfirmations, createAuditBaseline } from "./engine/audit.js";
 import { resolveTurnProgress } from "./engine/turn.js";
 import { loadApiSettings, requestAIWithReasoningFallback, saveApiSettings } from "./services/api.js";
-import { buildChoiceRegenerationContext, buildPlanningContext, buildRenderingContext, buildSummaryContext, buildToolRepairContext, buildUnifiedContext, computeMemoryUpdate } from "./services/memory.js";
+import { buildChoiceRegenerationContext, buildPlanningContext, buildRenderingContext, buildSummaryContext, buildToolRepairContext, buildUnifiedContext, computeMemoryUpdate, composeSummary, parseSectionedSummary } from "./services/memory.js";
 import { mockResponse } from "./services/mock.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
 import { extractNarrativePreview } from "./services/streamPreview.js";
@@ -141,11 +141,13 @@ export default function App() {
           maxTokensModeOverride: "manual",
           maxTokensOverride: 1200,
         });
-        const summary = String(response.narrative || "").trim().replace(/\s+/g, " ").slice(-1800);
+        const summary = String(response.narrative || "").trim().slice(-1800);
         if (!summary) return;
+        const sections = parseSectionedSummary(summary);
         setGame((current) => {
           if (!current || current.id !== gameId || current.turn !== turn) return current;
-          return saveGame({ ...current, longTermSummary: summary });
+          if (!sections) return saveGame({ ...current, longTermSummary: summary.replace(/\s+/g, " ") });
+          return saveGame({ ...current, memorySections: sections, longTermSummary: composeSummary(sections) });
         });
       } catch { /* 截断版摘要已随回合写入，静默降级 */ }
     })();
