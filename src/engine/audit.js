@@ -36,6 +36,8 @@ export function collectImportantItemConfirmations(toolCalls = [], results = []) 
       quantity: Math.abs(change.delta),
       reason: change.reason || call.reason || "本轮状态变化",
       importance: change.importance,
+      confirmationKind: result.data?.advancement ? "advancement" : "item",
+      advancement: result.data?.advancement || null,
     }];
   });
 }

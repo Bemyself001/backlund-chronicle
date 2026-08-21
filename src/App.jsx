@@ -24,6 +24,8 @@ import { createTurnResolution } from "./services/turnResolution.js";
 import { makeId } from "./utils/id.js";
 import { checkForUpdate, isNativeAndroid } from "./services/updates.js";
 import { finishTurnMetrics, markTurnMetric, recordModelRequest, startTurnMetrics } from "./services/turnMetrics.js";
+import { isExplicitAdvancementIntent } from "./data/character.js";
+import { ensureRequestedAdvancementToolCall } from "./services/advancement.js";
 
 function hasValidModelChoices(response) {
   return response?.choiceMeta?.source === "model"
@@ -183,7 +185,8 @@ export default function App() {
         return response;
       };
 
-      let fastMode = Boolean(settings.fastMode) && !settings.mockMode;
+      const advancementIntent = isExplicitAdvancementIntent(action) && game.inventory.some((item) => item.potion);
+      let fastMode = Boolean(settings.fastMode) && !settings.mockMode && !advancementIntent;
       let planningResponse;
       if (settings.mockMode) {
         planningResponse = await mockResponse(game, action, controller.signal, handleTurnPreview);
@@ -212,7 +215,8 @@ export default function App() {
         );
       }
       const discoveryAdjustedCalls = settings.mockMode ? ensureMockMapDiscoveryToolCall(planningResponse.toolCalls, options.mapInvestigation, game.turn + 1, game) : planningResponse.toolCalls;
-      let proposedToolCalls = dedupeToolCalls(normalizeToolCalls(ensureMapMoveToolCall(discoveryAdjustedCalls, options.mapDestination, game.turn + 1), game));
+      const advancementAdjustedCalls = ensureRequestedAdvancementToolCall(discoveryAdjustedCalls, options.advancementRequest, game.turn + 1, game);
+      let proposedToolCalls = dedupeToolCalls(normalizeToolCalls(ensureMapMoveToolCall(advancementAdjustedCalls, options.mapDestination, game.turn + 1), game));
 
       if (!settings.mockMode && !fastMode) {
         // 工具修复重试仅在严格模式保留；快速模式下缺参/无效调用直接拒绝，由下一轮叙事找补
@@ -243,10 +247,12 @@ export default function App() {
         }
         proposedToolCalls = dedupeToolCalls(repairedCalls);
       }
+      const advancementProposed = proposedToolCalls.some((call) => call.name === "advancement.promote");
+      if (advancementProposed) resetStreamPreview();
       markTurnMetric(metrics, "planningCompletedAt");
 
       setTurnPhase("validating");
-      let execution = executeToolCalls(game, proposedToolCalls);
+      let execution = executeToolCalls(game, proposedToolCalls, { playerAction: action });
       let progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results);
       let resolvedGame = {
         ...execution.game,
@@ -268,15 +274,20 @@ export default function App() {
           throw abortError;
         }
         const approvedKeys = new Set(decision.approvedKeys || []);
+        const advancementChange = importantChanges.find((change) => change.confirmationKind === "advancement");
         const blockedCallIndexes = importantChanges.filter((change) => !approvedKeys.has(change.key)).map((change) => change.callIndex);
         confirmationStatus = {
           required: true,
           status: blockedCallIndexes.length ? (approvedKeys.size ? "partially-confirmed" : "rejected") : "confirmed",
           confirmed: importantChanges.length - blockedCallIndexes.length,
           rejected: blockedCallIndexes.length,
+          advancement: advancementChange ? {
+            status: blockedCallIndexes.includes(advancementChange.callIndex) ? "declined" : "confirmed",
+            target: advancementChange.advancement.after,
+          } : null,
         };
         if (blockedCallIndexes.length) {
-          execution = executeToolCalls(game, proposedToolCalls, { blockedCallIndexes });
+          execution = executeToolCalls(game, proposedToolCalls, { blockedCallIndexes, playerAction: action });
           progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results);
           resolvedGame = {
             ...execution.game,
@@ -294,7 +305,7 @@ export default function App() {
         const rejectionNarrative = buildRejectedToolNarrative(action, execution.results);
         return execution.results.some((result) => result.ok) ? `${response.narrative}\n\n${rejectionNarrative}` : rejectionNarrative;
       };
-      if (!settings.mockMode && !(fastMode && response.hasNarrative)) {
+      if (!settings.mockMode && (!(fastMode && response.hasNarrative) || advancementProposed)) {
         resetStreamPreview();
         setTurnPhase("finalizing");
         const renderMessages = buildRenderingContext(game, resolvedGame, action, prompt, resolution, { nativeTools: settings.nativeTools });
@@ -311,6 +322,9 @@ export default function App() {
       } else if (settings.mockMode && execution.results.some((result) => !result.ok)) {
         // 仅 Mock 模式把拒绝说明拼进正文；快速模式的拒绝记录经 changeLog 与下一轮上下文回填
         response = { ...response, narrative: rejectedNarrativeSuffix(), hasNarrative: true };
+      } else if (settings.mockMode && advancementProposed) {
+        const confirmedAdvancement = execution.results.find((result) => result.ok && result.data?.advancement)?.data.advancement.after;
+        if (confirmedAdvancement) response = { ...response, narrative: `${response.narrative}\n\n你作出最终确认后服下魔药。本地档案同步记录了灵性的变化：你已经不再是普通人，而是${confirmedAdvancement.pathwayName}途径的${confirmedAdvancement.sequenceLabel}非凡者。`, hasNarrative: true };
       }
 
       let choices = hasValidModelChoices(response) ? response.choices : [];

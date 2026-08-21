@@ -12,7 +12,7 @@ test("version 1 saves migrate from Grayharbor to Backlund without losing progres
     inventory: [{ instanceId: "item-1", name: "旧呢外套", tags: ["任务物品"] }],
     recentDialogues: [{ role: "assistant", content: "灰檐港市档案馆已经关门。" }],
   });
-  assert.equal(migrated.version, 9);
+  assert.equal(migrated.version, 10);
   assert.equal(migrated.turn, 8);
   assert.equal(migrated.title, "艾琳的贝克兰德档案");
   assert.equal(migrated.location.district, "贝克兰德桥区·旧钟街");
@@ -40,10 +40,28 @@ test("dynamic map nodes survive save migration with routes and knowledge intact"
       routes: [{ from: "iron-gate", to: "dyn-shop", minutes: 11, transport: "步行", source: "dynamic" }],
     },
   });
-  assert.equal(migrated.version, 9);
+  assert.equal(migrated.version, 10);
   assert.equal(migrated.mapExtensions.locations[0].id, "dyn-shop");
   assert.equal(migrated.mapExtensions.routes[0].to, "dyn-shop");
   assert.equal(migrated.locationKnowledge["dyn-shop"].status, "discovered");
+});
+
+test("structured advancement repairs contradictory legacy ordinary fields", () => {
+  const migrated = migrateSave({
+    version: 9,
+    character: {
+      name: "档案同步员",
+      extraordinary: "ordinary",
+      pathway: "无",
+      stats: { health: 10, maxHealth: 10, sanity: 9, maxSanity: 10, spirituality: 7, maxSpirituality: 8 },
+      advancement: { type: "extraordinary", pathwayId: "seer", pathwayName: "占卜家", sequence: 9, sequenceLabel: "序列9", status: "newly_promoted" },
+    },
+    inventory: [],
+  });
+  assert.equal(migrated.version, 10);
+  assert.equal(migrated.character.extraordinary, "low");
+  assert.equal(migrated.character.pathway, "占卜家（序列9）");
+  assert.equal(migrated.character.advancement.unlockedAbilities.length, 3);
 });
 
 test("legacy copper coin items migrate into the separate money wallet", () => {

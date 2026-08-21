@@ -10,6 +10,7 @@ test("system prompt map rules migrate idempotently", () => {
   const previousRule = DEFAULT_SYSTEM_PROMPT.replace("仅当 temporary=true 的地点在剧情中确认失效且没有关联档案时，才使用 location.archive。", "");
   const migrated = migrateSystemPrompt(previousRule);
   assert.match(migrated, /location\.archive/);
+  assert.match(migrated, /本轮明确决定服用魔药/);
   assert.equal((migrated.match(/location\.grow/g) || []).length, 1);
 });
 

@@ -2,7 +2,7 @@ import { makeId } from "../utils/id.js";
 import { findLocationRelations, findTravelRoute, getMapLocation, getMapLocations, isDiscoveredLocationStatus, normalizeLocationKnowledge, normalizeMapExtensions, planDynamicLocation } from "../data/map.js";
 import { amountToPence, formatMoney, moneyFromPence, moneyToPence } from "../data/money.js";
 import { normalizeInventoryItem, normalizeItemImportance } from "../data/items.js";
-import { applyAdvancement, getAdvancement } from "../data/character.js";
+import { applyAdvancement, getAdvancement, isExplicitAdvancementIntent } from "../data/character.js";
 import { getPathway } from "../data/pathways.js";
 
 export const TOOL_SCHEMAS = {
@@ -361,7 +361,7 @@ function amountArg(args) {
   return args.amount || { pounds: args.pounds, solers: args.solers, pence: args.pence };
 }
 
-function executeOne(game, call) {
+function executeOne(game, call, options = {}) {
   const args = call.args;
   const turnLabel = `第 ${game.turn + 1} 轮`;
   const findItem = () => game.inventory.find((item) => item.instanceId === args.instanceId);
@@ -393,6 +393,7 @@ function executeOne(game, call) {
       const target = findItem();
       const quantity = Number(args.quantity);
       if (!target) return fail(call.name, "背包中不存在该物品实例");
+      if (target.potion && /服用|喝下|饮下|吞下|摄入|晋升|消耗/.test(call.reason)) return fail(call.name, "魔药不能通过普通物品移除来服用；必须经过晋升确认");
       if (!Number.isInteger(quantity) || quantity < 1 || quantity > target.quantity) return fail(call.name, "移除数量无效或超过持有数量");
       const change = { ...target, delta: -quantity, reason: call.reason, importance: normalizeItemImportance(target) };
       target.quantity -= quantity;
@@ -485,6 +486,7 @@ function executeOne(game, call) {
       return succeed(call.name, `${turnLabel}：你从「${args.evidence}」中确认了关于「${args.topic}」的有限神秘信息——${call.reason}。`, { revealLevel: 1 });
     }
     case "advancement.promote": {
+      if (options.playerAction !== undefined && !isExplicitAdvancementIntent(options.playerAction)) return fail(call.name, "玩家本轮没有明确表示服用魔药或开始晋升");
       if (Number(game.occult?.contact) !== 1) return fail(call.name, "尚未完成剧情中的非凡接触，不能晋升");
       const pathway = getPathway(String(args.pathwayId || ""));
       const sequence = Number(args.sequence);
@@ -504,12 +506,24 @@ function executeOne(game, call) {
       const consumed = { ...potion, delta: -1, reason: call.reason, importance: normalizeItemImportance(potion) };
       potion.quantity -= 1;
       if (potion.quantity <= 0) game.inventory = game.inventory.filter((item) => item.instanceId !== potion.instanceId);
+      const beforeStats = { spirituality: Number(game.character.stats.spirituality), maxSpirituality: Number(game.character.stats.maxSpirituality) };
       const nextCharacter = applyAdvancement(game.character, pathway.id, sequence, turnLabel);
       if (!nextCharacter) return fail(call.name, "本地引擎无法建立晋升后的角色档案");
       game.character = nextCharacter;
+      const after = getAdvancement(game.character);
+      const previouslyUnlockedIds = new Set((before.unlockedAbilities || []).map((ability) => ability.id));
       return succeed(call.name, `${turnLabel}：服用已鉴定的${pathway.name}途径序列${sequence}魔药，完成晋升——${call.reason}。`, {
         inventoryChange: consumed,
-        advancement: { before, after: getAdvancement(game.character), recipeClueId: recipe.id },
+        advancement: {
+          before,
+          after,
+          newlyUnlockedAbilities: (after.unlockedAbilities || []).filter((ability) => !previouslyUnlockedIds.has(ability.id)),
+          recipeClueId: recipe.id,
+          statChanges: {
+            spirituality: { before: beforeStats.spirituality, after: Number(game.character.stats.spirituality) },
+            maxSpirituality: { before: beforeStats.maxSpirituality, after: Number(game.character.stats.maxSpirituality) },
+          },
+        },
       });
     }
     case "character.update": {
@@ -660,13 +674,13 @@ export function executeToolCalls(currentGame, calls = [], options = {}) {
     const callId = call.id || signature(game.turn + 1, call);
     if (processed.has(callId)) { results.push(fail(call.name, "重复工具调用已忽略")); continue; }
     if (options.blockedCallIndexes?.includes(index)) {
-      results.push(fail(call.name, "玩家未确认这项重要物品变更"));
+      results.push(fail(call.name, call.name === "advancement.promote" ? "玩家选择暂不服用魔药，本次晋升没有发生" : "玩家未确认这项重要物品变更"));
       processed.add(callId);
       continue;
     }
     const validationError = validateCall(game, call);
     if (validationError) { results.push(fail(call.name, validationError)); continue; }
-    const result = executeOne(game, call);
+    const result = executeOne(game, call, options);
     if (call.repairNote) {
       result.repairNote = call.repairNote;
       result.log = `${result.log}（${call.repairNote}）`;

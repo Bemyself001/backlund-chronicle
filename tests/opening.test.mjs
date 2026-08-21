@@ -31,6 +31,7 @@ test("low sequence characters keep a structured pathway and sequence record", ()
   assert.equal(game.character.advancement.pathwayName, "窥秘人");
   assert.equal(game.character.advancement.sequence, 9);
   assert.equal(game.character.advancement.sequenceLabel, "序列9");
+  assert.equal(game.character.advancement.unlockedAbilities.length, 3);
 });
 
 test("AI context treats mysteries as optional world threads", () => {
