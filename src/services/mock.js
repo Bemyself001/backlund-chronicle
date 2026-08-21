@@ -34,6 +34,13 @@ export async function mockResponse(game, action, signal, onChunk) {
     const recipe = potion && game.clues.find((clue) => clue.kind === "potion_recipe" && clue.pathwayId === potion.potion.pathwayId && Number(clue.sequence) === potion.potion.sequence);
     narrative = potion && recipe ? "你再次核对配方、魔药身份与现场准备，明确这是自己要承担的选择。魔药的消耗和非凡档案的改变会作为同一项重要变更等待确认；只有确认后，服用与序列9晋升才会同时生效。" : "你还没有同时具备一份已鉴定的序列9魔药和与之匹配的可靠配方。贸然服用不会被本地规则接受。";
     if (potion && recipe) toolCalls = [{ id: makeId("mock"), name: "advancement.promote", reason: "玩家在完成剧情接触、配方核对与安全准备后主动服用魔药", args: { pathwayId: potion.potion.pathwayId, sequence: potion.potion.sequence, potionInstanceId: potion.instanceId, recipeClueId: recipe.id, evidence: "已核对配方、完成现场准备并由玩家明确决定服用" } }];
+  } else if (includesAny(lower, ["发现地下室", "内部地点", "子地点"])) {
+    const currentDistrict = String(game.location?.district || "贝克兰德东区").replace(/^贝克兰德/, "").split("·")[0];
+    narrative = "你在当前地点的后廊尽头确认了一道向下的窄门。它不是城市交通图上的独立街区，而是附属于这里的内部地点：门后石阶通向一间堆放旧木箱的地下室。地图会把它收进当前地点的档案，不会额外挤占城市节点。";
+    toolCalls = [{ id: makeId("mock"), name: "location.grow", reason: "玩家亲自确认了当前地点内可反复进入的地下空间", args: { location: { name: "旧木箱地下室", district: currentDistrict, kind: "interior", scope: "interior", anchorId: game.location.id, rumor: "这栋建筑内部似乎还有一层未登记的地下空间。", description: "石阶尽头是一间低矮地下室，墙边堆着带编号的旧木箱。", status: "discovered", temporary: false } } }];
+  } else if (includesAny(lower, ["新地点", "药材铺", "动态地图", "新的店铺"])) {
+    narrative = "你从几名互不相识的跑腿人口中听到同一个说法：铁门街深处有一家只在傍晚开门的药材铺，门楣上总冒着淡红色烟气。没人能给出完整门牌，因此它现在只够成为一条地图传闻；本地地图会把它接在铁门街附近，等待你进一步调查。";
+    toolCalls = [{ id: makeId("mock"), name: "location.grow", reason: "玩家从多个来源听到一处可长期复用的新店铺传闻", args: { location: { name: "红烟囱药材铺", district: "东区", kind: "shop", scope: "landmark", anchorId: "iron-gate", rumor: "铁门街深处据说有一家只在傍晚开门、门楣冒着红烟的药材铺。", description: "一间门面狭窄的药材铺，红铜烟管从二楼窗沿伸出，傍晚才会亮灯营业。", status: "rumored", temporary: false } } }];
   } else if (includesAny(lower, ["地图", "公告", "招工", "租房", "观察", "查看车站"])) {
     narrative = "你先把行李放在脚边，逐栏读完站内公告。城市地图把贝克兰德切成彼此相连又截然不同的区域：东区有最便宜的床位和最多的临时工作；桥区的旅店与小商行需要识字的帮工；皇后区的公共图书馆在白天允许访客查阅旧报。你可以先解决生计，也可以只选一条看顺眼的街道走下去。\n\n公告栏右下角压着几则互不相干的消息：钟表铺招聘学徒、教会施粥点征求登记员、货运公司寻找丢失账箱。最底下是一张三日前的失踪启事，照片中的夜班文员与第七码头黑色皮箱上的行李牌同姓。那也可能只是巧合。没有人注意你读到了这里，更没有人要求你负责。";
   } else if (includesAny(lower, ["搬运工", "询问", "打听", "交涉", "住宿", "工作", "茶摊"])) {

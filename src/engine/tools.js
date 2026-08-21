@@ -1,5 +1,5 @@
 import { makeId } from "../utils/id.js";
-import { findTravelRoute, getMapLocation, MAP_LOCATIONS, normalizeLocationKnowledge } from "../data/map.js";
+import { findLocationRelations, findTravelRoute, getMapLocation, getMapLocations, isDiscoveredLocationStatus, normalizeLocationKnowledge, normalizeMapExtensions, planDynamicLocation } from "../data/map.js";
 import { amountToPence, formatMoney, moneyFromPence, moneyToPence } from "../data/money.js";
 import { normalizeInventoryItem, normalizeItemImportance } from "../data/items.js";
 import { applyAdvancement, getAdvancement } from "../data/character.js";
@@ -23,8 +23,10 @@ export const TOOL_SCHEMAS = {
   "status.add": { required: ["status"], description: "添加状态效果" },
   "status.remove": { required: ["statusId"], description: "移除状态效果" },
   "relationship.update": { required: ["npcId", "delta"], description: "更新已知 NPC 关系" },
+  "location.grow": { required: ["location"], description: "把剧情中新出现的可复用地点登记到动态地图" },
   "location.discover": { required: ["locationId", "status", "note"], description: "记录地点传闻或确认发现地点" },
   "location.move": { required: ["locationId"], description: "移动到已发现地点" },
+  "location.archive": { required: ["locationId", "evidence"], description: "归档不再使用且无关联档案的临时动态地点" },
   "clue.add": { required: ["clue"], description: "添加一条新线索" },
   "quest.add": { required: ["quest"], description: "添加任务" },
   "quest.update": { required: ["questId", "patch"], description: "更新任务进度" },
@@ -126,10 +128,10 @@ function locationCandidates(args = {}) {
   ].map((value) => String(value || "").trim()).filter(Boolean);
 }
 
-function resolveLocationReference(args = {}) {
+function resolveLocationReference(game, args = {}) {
   const candidates = locationCandidates(args);
   if (!candidates.length) return { location: null, resolutionError: "缺少地点标识：请提供地图目录中的 locationId" };
-  const matches = MAP_LOCATIONS.filter((location) => candidates.some((candidate) => [location.id, location.name].includes(candidate)));
+  const matches = getMapLocations(game, { includeArchived: true }).filter((location) => candidates.some((candidate) => [location.id, location.name].includes(candidate)));
   const unique = [...new Map(matches.map((location) => [location.id, location])).values()];
   if (unique.length === 1) return { location: unique[0] };
   if (unique.length > 1) return { location: null, resolutionError: `地点标识「${candidates[0]}」对应多个地点，请改用 locationId` };
@@ -247,8 +249,23 @@ function repairToolArgs(name, rawArgs = {}, game = null) {
       }
     }
   }
-  if (["location.discover", "location.move"].includes(name)) {
-    const resolved = resolveLocationReference(args);
+  if (name === "location.grow" && !args.location && (args.name || args.locationName)) {
+    args.location = {
+      name: args.name || args.locationName,
+      district: args.district,
+      kind: args.kind,
+      scope: args.scope,
+      anchorId: args.anchorId,
+      rumor: args.rumor,
+      description: args.description,
+      status: args.status,
+      temporary: args.temporary,
+    };
+    ["name", "locationName", "district", "kind", "scope", "anchorId", "rumor", "description", "status", "temporary"].forEach((key) => delete args[key]);
+    repairNote = appendRepairNote(repairNote, "已将动态地点字段整理到 location 对象");
+  }
+  if (["location.discover", "location.move", "location.archive"].includes(name)) {
+    const resolved = resolveLocationReference(game, args);
     if (!args.locationId && resolved.location) {
       args.locationId = resolved.location.id;
       repairNote = appendRepairNote(repairNote, `已根据「${resolved.location.name}」匹配地图地点`);
@@ -525,15 +542,40 @@ function executeOne(game, call) {
       if (args.note) npc.note = String(args.note);
       return succeed(call.name, `${turnLabel}：${npc.name}的关系${delta >= 0 ? "提升" : "下降"}${Math.abs(delta)}。`);
     }
+    case "location.grow": {
+      const planned = planDynamicLocation(game, args.location, game.turn + 1);
+      if (!planned.ok) return fail(call.name, planned.error);
+      game.mapExtensions = normalizeMapExtensions(game.mapExtensions);
+      if (!planned.reused) {
+        game.mapExtensions.locations.push(planned.location);
+        game.mapExtensions.routes.push(planned.route);
+        game.mapExtensions = normalizeMapExtensions(game.mapExtensions);
+      } else if (planned.location.source === "dynamic") {
+        const existing = game.mapExtensions.locations.find((location) => location.id === planned.location.id);
+        if (existing) { existing.lifecycle = "active"; existing.archivedTurn = null; }
+      }
+      game.discoveredLocations = Array.isArray(game.discoveredLocations) ? game.discoveredLocations : [];
+      game.locationKnowledge = normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location?.id, game);
+      const currentStatus = game.locationKnowledge[planned.location.id]?.status || "unknown";
+      const targetStatus = isDiscoveredLocationStatus(currentStatus) ? currentStatus : planned.status;
+      const note = targetStatus === "rumored" ? planned.location.rumor : planned.location.description;
+      game.locationKnowledge[planned.location.id] = { ...game.locationKnowledge[planned.location.id], status: targetStatus, note, discoveredAt: turnLabel, source: call.reason };
+      if (isDiscoveredLocationStatus(targetStatus) && !game.discoveredLocations.some((entry) => entry.id === planned.location.id)) {
+        game.discoveredLocations.push({ id: planned.location.id, name: planned.location.name, note: planned.location.description });
+      }
+      const action = planned.reused ? "沿用地图中的地点" : planned.location.scope === "interior" ? "登记子地点" : "地图生长出新地点";
+      const publicLabel = targetStatus === "rumored" ? `${planned.location.district}的一处地点传闻` : `「${planned.location.name}」`;
+      return succeed(call.name, `${turnLabel}：${action}${publicLabel}，当前状态为${targetStatus === "rumored" ? "传闻" : "已发现"}——${call.reason}。`, { locationId: planned.location.id, status: targetStatus, scope: planned.location.scope, reused: planned.reused });
+    }
     case "location.discover": {
-      const location = getMapLocation(args.locationId);
+      const location = getMapLocation(args.locationId, game);
       if (!location) return fail(call.name, "地点不在本地地图目录中");
       if (!["rumored", "discovered"].includes(args.status)) return fail(call.name, "地点状态只能是 rumored 或 discovered");
       if (String(args.note || "").trim().length < 4) return fail(call.name, "地点记录必须说明玩家实际听闻或确认的信息");
       game.discoveredLocations = Array.isArray(game.discoveredLocations) ? game.discoveredLocations : [];
-      game.locationKnowledge = normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location?.id);
+      game.locationKnowledge = normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location?.id, game);
       const currentStatus = game.locationKnowledge[location.id]?.status || "unknown";
-      if (currentStatus === "discovered") return fail(call.name, "该地点已经发现，无需重复记录");
+      if (isDiscoveredLocationStatus(currentStatus)) return fail(call.name, "该地点已经发现，无需重复记录");
       if (currentStatus === "rumored" && args.status === "rumored") return fail(call.name, "该地点传闻已经记录，无需重复添加");
       const record = { status: args.status, note: String(args.note).trim(), discoveredAt: turnLabel, source: call.reason };
       game.locationKnowledge[location.id] = record;
@@ -541,21 +583,41 @@ function executeOne(game, call) {
         game.discoveredLocations.push({ id: location.id, name: location.name, note: record.note });
       }
       const action = args.status === "rumored" ? "记录地点传闻" : "确认发现地点";
-      return succeed(call.name, `${turnLabel}：${action}「${location.name}」——${call.reason}。`, { locationId: location.id, status: args.status });
+      const publicLabel = args.status === "rumored" ? `${location.district}的一处地点` : `「${location.name}」`;
+      return succeed(call.name, `${turnLabel}：${action}${publicLabel}——${call.reason}。`, { locationId: location.id, status: args.status });
     }
     case "location.move": {
       game.discoveredLocations = Array.isArray(game.discoveredLocations) ? game.discoveredLocations : [];
       const location = game.discoveredLocations.find((entry) => entry.id === args.locationId);
       if (!location) return fail(call.name, "目的地尚未发现，不能直接移动");
       if (location.id === game.location.id) return fail(call.name, "角色已经位于该地点");
-      const mappedOrigin = getMapLocation(game.location.id);
-      const mappedTarget = getMapLocation(location.id);
+      const mappedOrigin = getMapLocation(game.location.id, game);
+      const mappedTarget = getMapLocation(location.id, game);
       const discoveredIds = game.discoveredLocations.map((entry) => entry.id);
-      const route = mappedOrigin && mappedTarget ? findTravelRoute(game.location.id, location.id, discoveredIds) : null;
+      const route = mappedOrigin && mappedTarget ? findTravelRoute(game.location.id, location.id, discoveredIds, game) : null;
       if (mappedOrigin && mappedTarget && !route) return fail(call.name, "当前已知交通图中没有通往该地点的可用路线");
       const mappedDistrict = mappedTarget?.district ? `贝克兰德${mappedTarget.district}` : null;
       game.location = { id: location.id, name: location.name, district: mappedDistrict || args.district || location.district || "贝克兰德" };
+      game.locationKnowledge = normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location.id, game);
+      game.locationKnowledge[location.id] = { ...game.locationKnowledge[location.id], status: "visited", visitedAt: turnLabel };
       return succeed(call.name, `${turnLabel}：前往「${location.name}」——${call.reason}。`, { travelMinutes: route?.minutes || 35, path: route?.path || [location.id] });
+    }
+    case "location.archive": {
+      const location = getMapLocation(args.locationId, game, { includeArchived: true });
+      if (!location || location.source !== "dynamic") return fail(call.name, "只能归档动态生成的地点");
+      if (!location.temporary) return fail(call.name, "永久地点不能归档");
+      if (location.lifecycle === "archived") return fail(call.name, "该地点已经归档");
+      if (game.location?.id === location.id) return fail(call.name, "不能归档玩家当前所在地点");
+      if (String(args.evidence || "").trim().length < 4) return fail(call.name, "归档必须说明地点为何不再可用");
+      const relations = findLocationRelations(game, location);
+      if (relations.quests.length || relations.clues.length || relations.npcs.length) return fail(call.name, "该地点仍有关联任务、线索或人物，不能归档");
+      if (getMapLocations(game).some((entry) => entry.anchorId === location.id)) return fail(call.name, "该地点仍连接着活跃的动态地点，不能归档");
+      game.mapExtensions = normalizeMapExtensions(game.mapExtensions);
+      const target = game.mapExtensions.locations.find((entry) => entry.id === location.id);
+      target.lifecycle = "archived";
+      target.archivedTurn = game.turn + 1;
+      game.discoveredLocations = (game.discoveredLocations || []).filter((entry) => entry.id !== location.id);
+      return succeed(call.name, `${turnLabel}：归档临时地点「${location.name}」——${args.evidence}。`, { locationId: location.id, archived: true });
     }
     case "clue.add": {
       if (!args.clue?.id || !args.clue?.title) return fail(call.name, "线索必须包含 id 与 title");

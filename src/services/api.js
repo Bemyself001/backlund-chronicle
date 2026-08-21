@@ -1,5 +1,6 @@
 import { DEFAULT_API_SETTINGS } from "../data/defaults.js";
 import { PATHWAYS } from "../data/pathways.js";
+import { DYNAMIC_LOCATION_KINDS, DYNAMIC_LOCATION_SCOPES, MAP_DISTRICTS } from "../data/map.js";
 import { createProviderProfile, inferApiProvider } from "./apiProviders.js";
 import { normalizeAIResponse, textFromContent } from "./protocol.js";
 
@@ -264,6 +265,30 @@ const TOOL_PARAMETER_SCHEMAS = {
       reason: { type: "string", description: "与本轮玩家行动对应的关系变化理由" },
     },
   },
+  "location.grow": {
+    type: "object",
+    additionalProperties: false,
+    required: ["location", "reason"],
+    properties: {
+      location: {
+        type: "object",
+        additionalProperties: false,
+        required: ["name", "district", "kind", "scope", "anchorId", "rumor", "description", "status"],
+        properties: {
+          name: { type: "string", description: "会长期复用的新地点名称；不要包含不存在于剧情中的秘密" },
+          district: { type: "string", enum: MAP_DISTRICTS },
+          kind: { type: "string", enum: DYNAMIC_LOCATION_KINDS },
+          scope: { type: "string", enum: DYNAMIC_LOCATION_SCOPES, description: "城市地图节点用 landmark；建筑内部的房间或密室用 interior" },
+          anchorId: { type: "string", description: "必须复制一个已发现地点的精确 ID；本地会自动安排坐标和路线" },
+          rumor: { type: "string", description: "玩家仅听闻时可以看到的有限信息，不得泄露未确认真相" },
+          description: { type: "string", description: "地点被可靠确认后可见的客观描述" },
+          status: { type: "string", enum: ["rumored", "discovered"], description: "只听闻使用 rumored；取得可靠地址或亲自确认使用 discovered" },
+          temporary: { type: "boolean", description: "只对随剧情结束会消失的临时场所设为 true" },
+        },
+      },
+      reason: { type: "string", description: "本轮剧情为何足以让地图生长这个地点" },
+    },
+  },
   "location.discover": {
     type: "object",
     additionalProperties: false,
@@ -282,6 +307,16 @@ const TOOL_PARAMETER_SCHEMAS = {
     properties: {
       locationId: { type: "string", description: "必须复制当前 discoveredLocations 中的精确地点 ID" },
       reason: { type: "string", description: "玩家本轮为何前往该地点" },
+    },
+  },
+  "location.archive": {
+    type: "object",
+    additionalProperties: false,
+    required: ["locationId", "evidence", "reason"],
+    properties: {
+      locationId: { type: "string", description: "仅限 temporary=true 且无任务、线索或人物关联的动态地点" },
+      evidence: { type: "string", description: "剧情中确认该临时地点已经关闭、消失或失效的依据" },
+      reason: { type: "string", description: "本轮为何需要归档该地点" },
     },
   },
   "clue.add": {
@@ -443,7 +478,7 @@ const TOOL_PARAMETER_SCHEMAS = {
   },
 };
 
-const STATE_TOOL_NAMES = ["inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.discover", "location.move", "clue.add", "quest.add", "quest.update", "dice.check"];
+const STATE_TOOL_NAMES = ["inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.grow", "location.discover", "location.move", "location.archive", "clue.add", "quest.add", "quest.update", "dice.check"];
 
 const CHOICE_TOOL_SCHEMA = {
   type: "object",

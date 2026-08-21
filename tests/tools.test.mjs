@@ -15,6 +15,18 @@ test("tool normalization moves reason out of args and repairs a flat clue propos
   assert.match(call.args.clue.id, /^clue-/);
 });
 
+test("tool normalization repairs a flat dynamic location proposal", () => {
+  const call = normalizeToolCall({
+    id: "grow-flat",
+    name: "location.grow",
+    args: { name: "红烟囱药材铺", district: "东区", kind: "shop", scope: "landmark", anchorId: "iron-gate", rumor: "有人提到铁门街的药材铺。", description: "一间傍晚营业的狭窄药材铺。", status: "rumored", temporary: false },
+    reason: "玩家听到多个相符说法",
+  });
+  assert.equal(call.args.location.name, "红烟囱药材铺");
+  assert.equal(call.args.location.anchorId, "iron-gate");
+  assert.match(call.repairNote, /location/);
+});
+
 test("empty tool names are rejected as incomplete calls instead of unknown empty tools", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "空工具测试员" });
   const execution = executeToolCalls(game, [{ id: "empty-tool", args: {} }]);

@@ -211,7 +211,7 @@ export default function App() {
           { toolSet: "state", disableJsonMode: Boolean(settings.nativeTools) },
         );
       }
-      const discoveryAdjustedCalls = settings.mockMode ? ensureMockMapDiscoveryToolCall(planningResponse.toolCalls, options.mapInvestigation, game.turn + 1) : planningResponse.toolCalls;
+      const discoveryAdjustedCalls = settings.mockMode ? ensureMockMapDiscoveryToolCall(planningResponse.toolCalls, options.mapInvestigation, game.turn + 1, game) : planningResponse.toolCalls;
       let proposedToolCalls = dedupeToolCalls(normalizeToolCalls(ensureMapMoveToolCall(discoveryAdjustedCalls, options.mapDestination, game.turn + 1), game));
 
       if (!settings.mockMode && !fastMode) {

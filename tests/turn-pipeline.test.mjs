@@ -1,8 +1,17 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { createInitialGame, DEFAULT_SYSTEM_PROMPT, EMPTY_CHARACTER } from "../src/data/defaults.js";
-import { buildChoiceRegenerationContext, buildPlanningContext, buildRenderingContext, buildUnifiedContext, composeSummary, parseSectionedSummary, updateMemory } from "../src/services/memory.js";
+import { createInitialGame, DEFAULT_SYSTEM_PROMPT, EMPTY_CHARACTER, migrateSystemPrompt } from "../src/data/defaults.js";
+import { executeToolCalls } from "../src/engine/tools.js";
+import { buildChoiceRegenerationContext, buildPlanningContext, buildRenderingContext, buildUnifiedContext, composeSummary, parseSectionedSummary, updateMemory, visibleGameState } from "../src/services/memory.js";
 import { createTurnResolution } from "../src/services/turnResolution.js";
+
+test("system prompt map rules migrate idempotently", () => {
+  assert.equal(migrateSystemPrompt(DEFAULT_SYSTEM_PROMPT), DEFAULT_SYSTEM_PROMPT);
+  const previousRule = DEFAULT_SYSTEM_PROMPT.replace("仅当 temporary=true 的地点在剧情中确认失效且没有关联档案时，才使用 location.archive。", "");
+  const migrated = migrateSystemPrompt(previousRule);
+  assert.match(migrated, /location\.archive/);
+  assert.equal((migrated.match(/location\.grow/g) || []).length, 1);
+});
 
 test("planning context injects private simulation data only as untrusted turn data", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "上下文测试员" });
@@ -27,12 +36,33 @@ test("planning context exposes map candidates only for map-related turns", () =>
 
   const byKeyword = buildPlanningContext(game, "打听一下哪里能租到便宜的公寓", DEFAULT_SYSTEM_PROMPT, { nativeTools: true }).at(-1).content;
   assert.match(byKeyword, /mapDiscoveryCandidates/);
+  assert.match(byKeyword, /mapGrowthAnchors/);
+  assert.match(byKeyword, /east-station/);
 
   const byName = buildPlanningContext(game, "我想去市政档案馆碰碰运气", DEFAULT_SYSTEM_PROMPT, { nativeTools: true }).at(-1).content;
   assert.match(byName, /queen-archive/);
 
   const unified = buildUnifiedContext(game, "在房间里整理线索", DEFAULT_SYSTEM_PROMPT, { nativeTools: true }).at(-1).content;
   assert.doesNotMatch(unified, /mapDiscoveryCandidates/);
+  assert.doesNotMatch(unified, /mapGrowthAnchors/);
+});
+
+test("rumored dynamic places stay private during rendering but remain available to planning", () => {
+  const before = createInitialGame({ ...EMPTY_CHARACTER, name: "传闻隐私测试员" });
+  const call = {
+    id: "grow-private-rumor", name: "location.grow", reason: "不同跑腿人提到同一处传闻",
+    args: { location: { name: "红烟囱药材铺", district: "东区", kind: "shop", scope: "landmark", anchorId: "iron-gate", rumor: "铁门街深处据说有一家傍晚开门的药材铺。", description: "一间门面狭窄、装有红铜烟管的药材铺。", status: "rumored", temporary: false } },
+  };
+  const execution = executeToolCalls(before, [call]);
+  const visible = JSON.stringify(visibleGameState(execution.game));
+  assert.doesNotMatch(visible, /红烟囱药材铺|红铜烟管/);
+
+  const planning = buildPlanningContext(execution.game, "调查地图上的药材铺传闻", DEFAULT_SYSTEM_PROMPT, { nativeTools: true }).at(-1).content;
+  assert.match(planning, /红烟囱药材铺/);
+
+  const resolution = createTurnResolution([call], execution.results, { elapsedMinutes: 10 });
+  const rendering = buildRenderingContext(before, execution.game, "打听新的店铺", DEFAULT_SYSTEM_PROMPT, resolution, { nativeTools: true }).map((message) => message.content).join("\n");
+  assert.doesNotMatch(rendering, /红烟囱药材铺|红铜烟管/);
 });
 
 test("rendering context contains the authoritative resolution but excludes private danger state", () => {

@@ -12,7 +12,7 @@ test("version 1 saves migrate from Grayharbor to Backlund without losing progres
     inventory: [{ instanceId: "item-1", name: "旧呢外套", tags: ["任务物品"] }],
     recentDialogues: [{ role: "assistant", content: "灰檐港市档案馆已经关门。" }],
   });
-  assert.equal(migrated.version, 8);
+  assert.equal(migrated.version, 9);
   assert.equal(migrated.turn, 8);
   assert.equal(migrated.title, "艾琳的贝克兰德档案");
   assert.equal(migrated.location.district, "贝克兰德桥区·旧钟街");
@@ -24,6 +24,26 @@ test("version 1 saves migrate from Grayharbor to Backlund without losing progres
   assert.equal(migrated.lastTurnAudit, null);
   assert.deepEqual(migrated.discoveredLocations, []);
   assert.equal(migrated.locationKnowledge["queen-archive"].status, "rumored");
+  assert.deepEqual(migrated.mapExtensions, { locations: [], routes: [] });
+});
+
+test("dynamic map nodes survive save migration with routes and knowledge intact", () => {
+  const migrated = migrateSave({
+    version: 8,
+    character: { name: "动态地图迁移员" },
+    inventory: [],
+    location: { id: "east-station", name: "东区·贝克兰德火车站", district: "贝克兰德东区" },
+    discoveredLocations: [{ id: "dyn-shop", name: "东区·晚钟书店", note: "已经确认地址。" }],
+    locationKnowledge: { "dyn-shop": { status: "discovered", note: "已经确认地址。" } },
+    mapExtensions: {
+      locations: [{ id: "dyn-shop", name: "东区·晚钟书店", district: "东区", x: 73, y: 74, code: "E4", rumor: "有人听说过这家店。", description: "一家只在夜间营业的书店。", source: "dynamic", scope: "landmark", kind: "shop", anchorId: "iron-gate", temporary: false, lifecycle: "active", createdTurn: 4 }],
+      routes: [{ from: "iron-gate", to: "dyn-shop", minutes: 11, transport: "步行", source: "dynamic" }],
+    },
+  });
+  assert.equal(migrated.version, 9);
+  assert.equal(migrated.mapExtensions.locations[0].id, "dyn-shop");
+  assert.equal(migrated.mapExtensions.routes[0].to, "dyn-shop");
+  assert.equal(migrated.locationKnowledge["dyn-shop"].status, "discovered");
 });
 
 test("legacy copper coin items migrate into the separate money wallet", () => {

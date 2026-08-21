@@ -1,17 +1,28 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createInitialGame, EMPTY_CHARACTER } from "../src/data/defaults.js";
-import { findLocationRelations, findTravelRoute, MAP_LOCATIONS, normalizeLocationKnowledge } from "../src/data/map.js";
+import { findLocationRelations, findTravelRoute, getChildLocations, getMapLocation, getMapLocations, MAP_LOCATIONS, normalizeLocationKnowledge, planDynamicLocation } from "../src/data/map.js";
 import { executeToolCalls } from "../src/engine/tools.js";
 import { minutesForTurn } from "../src/engine/turn.js";
 import { ensureMapMoveToolCall, ensureMockMapDiscoveryToolCall } from "../src/services/mapTravel.js";
 
 const known = ["east-station", "iron-gate", "soot-lamp", "queen-library"];
+const apothecary = {
+  name: "红烟囱药材铺",
+  district: "东区",
+  kind: "shop",
+  scope: "landmark",
+  anchorId: "iron-gate",
+  rumor: "铁门街深处据说有一家只在傍晚开门的药材铺。",
+  description: "门面狭窄的药材铺，红铜烟管从二楼窗沿伸出。",
+  status: "rumored",
+  temporary: false,
+};
 
 test("initial map knowledge separates unknown, rumored, and discovered locations", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "地图测试员" });
-  const knowledge = normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location.id);
-  assert.equal(knowledge["east-station"].status, "discovered");
+  const knowledge = normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location.id, game);
+  assert.equal(knowledge["east-station"].status, "visited");
   assert.equal(knowledge["queen-archive"].status, "rumored");
   assert.equal(knowledge["north-flats"].status, "unknown");
 });
@@ -61,7 +72,72 @@ test("validated map travel updates location and supplies exact elapsed time", ()
   assert.equal(execution.results[0].ok, true);
   assert.equal(execution.results[0].data.travelMinutes, 28);
   assert.equal(execution.game.location.id, "soot-lamp");
+  assert.equal(execution.game.locationKnowledge["soot-lamp"].status, "visited");
   assert.equal(minutesForTurn("前往桥区·雾鸦旅店", [call], execution.results), 28);
+});
+
+test("story growth creates a persistent local node without exposing a rumored true name", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "地图生长测试员" });
+  const execution = executeToolCalls(game, [{ id: "grow-shop", name: "location.grow", args: { location: apothecary }, reason: "多个来源提到同一间店" }]);
+  const result = execution.results[0];
+  assert.equal(result.ok, true);
+  assert.equal(execution.game.mapExtensions.locations.length, 1);
+  assert.equal(execution.game.mapExtensions.routes.length, 1);
+  assert.equal(execution.game.locationKnowledge[result.data.locationId].status, "rumored");
+  assert.equal(execution.game.discoveredLocations.some((entry) => entry.id === result.data.locationId), false);
+  assert.equal(Object.hasOwn(result.data, "name"), false);
+  assert.doesNotMatch(result.log, /红烟囱药材铺/);
+});
+
+test("dynamic locations deduplicate deterministically and become traversable after confirmation", () => {
+  const firstGame = createInitialGame({ ...EMPTY_CHARACTER, name: "去重测试员" });
+  const secondGame = createInitialGame({ ...EMPTY_CHARACTER, name: "坐标测试员" });
+  const firstPlan = planDynamicLocation(firstGame, apothecary, 1);
+  const secondPlan = planDynamicLocation(secondGame, apothecary, 1);
+  assert.equal(firstPlan.location.id, secondPlan.location.id);
+  assert.deepEqual({ x: firstPlan.location.x, y: firstPlan.location.y }, { x: secondPlan.location.x, y: secondPlan.location.y });
+
+  const grown = executeToolCalls(firstGame, [{ id: "grow-shop", name: "location.grow", args: { location: apothecary }, reason: "听到店铺传闻" }]);
+  const repeated = executeToolCalls(grown.game, [{ id: "grow-shop-again", name: "location.grow", args: { location: { ...apothecary, status: "discovered" } }, reason: "找到了准确门牌" }]);
+  const locationId = repeated.results[0].data.locationId;
+  assert.equal(repeated.results[0].data.reused, true);
+  assert.equal(repeated.game.mapExtensions.locations.length, 1);
+  assert.equal(repeated.game.locationKnowledge[locationId].status, "discovered");
+  assert.ok(findTravelRoute("east-station", locationId, repeated.game.discoveredLocations.map((entry) => entry.id), repeated.game));
+
+  const moved = executeToolCalls(repeated.game, [{ id: "move-dynamic", name: "location.move", args: { locationId }, reason: "从地图选择新地点" }]);
+  assert.equal(moved.results[0].ok, true);
+  assert.equal(moved.game.location.id, locationId);
+  assert.equal(moved.game.locationKnowledge[locationId].status, "visited");
+});
+
+test("interiors remain child locations and temporary unused places can be archived", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "子地点测试员" });
+  const proposal = {
+    name: "旧木箱地下室", district: "东区", kind: "interior", scope: "interior", anchorId: "east-station",
+    rumor: "站房内部似乎还有一层未登记的地下空间。", description: "石阶尽头是一间低矮地下室，墙边堆着旧木箱。",
+    status: "discovered", temporary: true,
+  };
+  const grown = executeToolCalls(game, [{ id: "grow-cellar", name: "location.grow", args: { location: proposal }, reason: "亲自确认地下室入口" }]);
+  const locationId = grown.results[0].data.locationId;
+  assert.equal(getChildLocations(grown.game, "east-station").some((location) => location.id === locationId), true);
+  assert.equal(getMapLocations(grown.game, { includeInteriors: false }).some((location) => location.id === locationId), false);
+
+  const archived = executeToolCalls(grown.game, [{ id: "archive-cellar", name: "location.archive", args: { locationId, evidence: "施工队已经永久封死入口" }, reason: "该临时空间不再可用" }]);
+  assert.equal(archived.results[0].ok, true);
+  assert.equal(getMapLocation(locationId, archived.game), null);
+  assert.equal(getMapLocation(locationId, archived.game, { includeArchived: true }).lifecycle, "archived");
+  assert.equal(archived.game.discoveredLocations.some((location) => location.id === locationId), false);
+});
+
+test("dynamic growth rejects anchors that the player has not discovered", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "锚点测试员" });
+  const execution = executeToolCalls(game, [{
+    id: "grow-hidden-anchor", name: "location.grow", reason: "没有可靠路线",
+    args: { location: { ...apothecary, district: "北区", anchorId: "north-flats", name: "蓝门诊所" } },
+  }]);
+  assert.equal(execution.results[0].ok, false);
+  assert.match(execution.results[0].reason, /已经发现|到访/);
 });
 
 test("map travel refuses moving to the current place", () => {

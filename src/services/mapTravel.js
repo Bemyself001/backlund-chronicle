@@ -24,11 +24,11 @@ export function ensureMapMoveToolCall(toolCalls = [], destination, turn) {
   return calls;
 }
 
-export function ensureMockMapDiscoveryToolCall(toolCalls = [], target, turn) {
+export function ensureMockMapDiscoveryToolCall(toolCalls = [], target, turn, game = {}) {
   if (!target?.locationId) return Array.isArray(toolCalls) ? toolCalls : [];
   const calls = Array.isArray(toolCalls) ? [...toolCalls] : [];
   if (calls.some((call) => call?.name === "location.discover")) return calls;
-  const location = getMapLocation(target.locationId);
+  const location = getMapLocation(target.locationId, game);
   if (!location) return calls;
   calls.push({
     id: `map-discover-${turn}-${location.id}`,

@@ -390,7 +390,7 @@ test("targeted tool repair sends only the failing state tool schema", async (con
   assert.deepEqual(requestBody.tools.map((tool) => tool.function.name), ["status__add"]);
 });
 
-test("map state tools expose strict discovery and movement parameters", async (context) => {
+test("map state tools expose strict growth, discovery, movement and archive parameters", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });
   let requestBody;
@@ -399,11 +399,17 @@ test("map state tools expose strict discovery and movement parameters", async (c
     return new Response(JSON.stringify({ choices: [{ message: { content: "NO_STATE_CHANGE" } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
   };
 
-  await requestAI({ ...settings, nativeTools: true }, [{ role: "user", content: "检查地图工具" }], undefined, undefined, { toolSet: "state", allowedToolNames: ["location.discover", "location.move"] });
+  await requestAI({ ...settings, nativeTools: true }, [{ role: "user", content: "检查地图工具" }], undefined, undefined, { toolSet: "state", allowedToolNames: ["location.grow", "location.discover", "location.move", "location.archive"] });
   const definitions = Object.fromEntries(requestBody.tools.map((tool) => [tool.function.name, tool.function.parameters]));
+  assert.deepEqual(definitions.location__grow.required, ["location", "reason"]);
+  assert.equal(definitions.location__grow.properties.location.additionalProperties, false);
+  assert.deepEqual(definitions.location__grow.properties.location.properties.district.enum, ["北区", "皇后区", "希尔斯顿区", "东区", "桥区"]);
+  assert.deepEqual(definitions.location__grow.properties.location.properties.scope.enum, ["landmark", "interior"]);
   assert.deepEqual(definitions.location__discover.required, ["locationId", "status", "note", "reason"]);
   assert.equal(definitions.location__discover.properties.status.additionalProperties, undefined);
   assert.deepEqual(definitions.location__discover.properties.status.enum, ["rumored", "discovered"]);
   assert.deepEqual(definitions.location__move.required, ["locationId", "reason"]);
   assert.equal(definitions.location__move.additionalProperties, false);
+  assert.deepEqual(definitions.location__archive.required, ["locationId", "evidence", "reason"]);
+  assert.equal(definitions.location__archive.additionalProperties, false);
 });
