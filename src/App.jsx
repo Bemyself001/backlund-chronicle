@@ -10,7 +10,7 @@ import ChangelogDialog from "./components/ChangelogDialog.jsx";
 import WorldMap from "./components/WorldMap.jsx";
 import ImportantItemConfirmation from "./components/ImportantItemConfirmation.jsx";
 import { createInitialGame, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from "./data/defaults.js";
-import { buildRejectedToolNarrative, dedupeToolCalls, executeToolCalls, isRepairableToolError, normalizeToolCalls, validateToolCall } from "./engine/tools.js";
+import { buildRejectedToolNarrative, dedupeToolCalls, executeToolCalls, normalizeToolCalls } from "./engine/tools.js";
 import { auditTurnChanges, collectImportantItemConfirmations, createAuditBaseline } from "./engine/audit.js";
 import { resolveTurnProgress } from "./engine/turn.js";
 import { loadApiSettings, requestAIWithReasoningFallback, saveApiSettings } from "./services/api.js";
@@ -26,6 +26,7 @@ import { checkForUpdate, isNativeAndroid } from "./services/updates.js";
 import { finishTurnMetrics, markTurnMetric, recordModelRequest, startTurnMetrics } from "./services/turnMetrics.js";
 import { isExplicitAdvancementIntent } from "./data/character.js";
 import { ensureRequestedAdvancementToolCall } from "./services/advancement.js";
+import { repairToolCallsConcurrently } from "./services/toolRepair.js";
 
 function hasValidModelChoices(response) {
   return response?.choiceMeta?.source === "model"
@@ -220,32 +221,22 @@ export default function App() {
 
       if (!settings.mockMode && !fastMode) {
         // 工具修复重试仅在严格模式保留；快速模式下缺参/无效调用直接拒绝，由下一轮叙事找补
-        const repairedCalls = [];
-        let repairCount = 0;
-        for (const proposedCall of proposedToolCalls) {
-          let checked = validateToolCall(game, proposedCall);
-          if (checked.error && isRepairableToolError(checked.call, checked.error) && repairCount < 3) {
-            repairCount += 1;
-            setTurnPhase("toolRetry");
-            const repairMessages = buildToolRepairContext(game, action, checked.call, checked.error, prompt, { nativeTools: settings.nativeTools });
-            try {
-              const repairResponse = await requestModel(repairMessages, {
-                toolSet: "state",
-                allowedToolNames: [checked.call.name],
-                disableJsonMode: Boolean(settings.nativeTools),
-                forceDisableReasoning: true,
-                maxTokensModeOverride: "manual",
-                maxTokensOverride: 1600,
-              });
-              const repaired = normalizeToolCalls(repairResponse.toolCalls, game).find((call) => call.name === checked.call.name);
-              if (repaired) checked = validateToolCall(game, repaired);
-            } catch (repairError) {
-              if (repairError.name === "AbortError") throw repairError;
-            }
-          }
-          repairedCalls.push(checked.call);
-        }
-        proposedToolCalls = dedupeToolCalls(repairedCalls);
+        const repairPlan = await repairToolCallsConcurrently(game, proposedToolCalls, async ({ call, error }) => {
+          const repairMessages = buildToolRepairContext(game, action, call, error, prompt, { nativeTools: settings.nativeTools });
+          const repairResponse = await requestModel(repairMessages, {
+            toolSet: "state",
+            allowedToolNames: [call.name],
+            disableJsonMode: Boolean(settings.nativeTools),
+            forceDisableReasoning: true,
+            maxTokensModeOverride: "manual",
+            maxTokensOverride: 1600,
+          });
+          return repairResponse.toolCalls;
+        }, {
+          maxRepairs: 3,
+          onRepairsStarted: () => setTurnPhase("toolRetry"),
+        });
+        proposedToolCalls = repairPlan.calls;
       }
       const advancementProposed = proposedToolCalls.some((call) => call.name === "advancement.promote");
       if (advancementProposed) resetStreamPreview();
