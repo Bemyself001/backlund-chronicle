@@ -14,7 +14,7 @@ import { buildRejectedToolNarrative, dedupeToolCalls, executeToolCalls, normaliz
 import { auditTurnChanges, collectImportantItemConfirmations, createAuditBaseline } from "./engine/audit.js";
 import { resolveTurnProgress } from "./engine/turn.js";
 import { loadApiSettings, requestAIWithReasoningFallback, saveApiSettings } from "./services/api.js";
-import { buildChoiceRegenerationContext, buildPlanningContext, buildRenderingContext, buildSummaryContext, buildToolRepairContext, buildUnifiedContext, computeMemoryUpdate, composeSummary, parseSectionedSummary } from "./services/memory.js";
+import { buildChoiceRegenerationContext, buildFastNarrativeContinuationContext, buildFastPresentationContext, buildPlanningContext, buildRenderingContext, buildSummaryContext, buildToolRepairContext, computeMemoryUpdate, composeSummary, parseSectionedSummary } from "./services/memory.js";
 import { mockResponse } from "./services/mock.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
 import { extractNarrativePreview } from "./services/streamPreview.js";
@@ -26,6 +26,7 @@ import { checkForUpdate, isNativeAndroid } from "./services/updates.js";
 import { finishTurnMetrics, markTurnMetric, recordModelRequest, startTurnMetrics } from "./services/turnMetrics.js";
 import { isExplicitAdvancementIntent } from "./data/character.js";
 import { ensureRequestedAdvancementToolCall } from "./services/advancement.js";
+import { launchFastModeTasks, throwIfFastTaskAborted } from "./services/fastMode.js";
 import { repairToolCallsConcurrently } from "./services/toolRepair.js";
 
 function hasValidModelChoices(response) {
@@ -119,8 +120,8 @@ export default function App() {
 
   const settleImportantItemConfirmation = (decision) => itemConfirmationResolverRef.current?.(decision);
 
-  const requestChoicesFromAI = (targetGame, action, narrative, validationError, signal) => {
-    const messages = buildChoiceRegenerationContext(targetGame, action, narrative, validationError, prompt, { nativeTools: settings.nativeTools });
+  const requestChoicesFromAI = (targetGame, action, narrative, validationError, signal, options = {}) => {
+    const messages = buildChoiceRegenerationContext(targetGame, action, narrative, validationError, prompt, { nativeTools: settings.nativeTools, ...options });
     return requestAIWithReasoningFallback(settings, messages, signal, undefined, {
       toolSet: "choices",
       disableJsonMode: Boolean(settings.nativeTools),
@@ -187,27 +188,29 @@ export default function App() {
       };
 
       const advancementIntent = isExplicitAdvancementIntent(action) && game.inventory.some((item) => item.potion);
-      let fastMode = Boolean(settings.fastMode) && !settings.mockMode && !advancementIntent;
+      const fastMode = Boolean(settings.fastMode) && !settings.mockMode && !advancementIntent;
       let planningResponse;
+      let fastPresentationTask = null;
       if (settings.mockMode) {
         planningResponse = await mockResponse(game, action, controller.signal, handleTurnPreview);
       } else if (fastMode) {
-        try {
-          // 快速模式固定使用 JSON 协议：narrative 是首个字段，剧情必然最先逐字流出，
-          // 不受模型「先出工具调用再写正文」的原生通道顺序影响
-          planningResponse = await requestModel(
-            buildUnifiedContext(game, action, prompt, { nativeTools: false, mapInvestigation: options.mapInvestigation }),
-            { disableTools: true, maxTokensModeOverride: "manual", maxTokensOverride: 6000, skipReasoningRetry: true },
+        // 状态规划与剧情呈现同时启动；规划一完成即可继续校验、修复和结算，
+        // 不必等待仍在流式输出的剧情草稿。
+        const fastTasks = launchFastModeTasks({
+          planning: () => requestModel(
+            buildPlanningContext(game, action, prompt, { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation }),
+            { toolSet: "state", disableJsonMode: Boolean(settings.nativeTools) },
+          ),
+          presentation: () => requestModel(
+            buildFastPresentationContext(game, action, prompt),
+            { disableTools: true, maxTokensModeOverride: "manual", maxTokensOverride: 5200, skipReasoningRetry: true },
             true,
-          );
-        } catch (unifiedError) {
-          if (unifiedError.name === "AbortError") throw unifiedError;
-          if (!["REASONING_EXHAUSTED", "EMPTY_RESPONSE"].includes(unifiedError.code)) throw unifiedError;
-          // 合并请求推理耗尽/空响应时不再原样重试，直接降级为两段式完成本轮
-          fastMode = false;
-          resetStreamPreview();
-          setTurnPhase("reasoningRetry");
-        }
+          ),
+        });
+        fastPresentationTask = fastTasks.presentation;
+        const planningOutcome = await fastTasks.planning;
+        throwIfFastTaskAborted(planningOutcome);
+        planningResponse = planningOutcome.value || { toolCalls: [], narrative: "", hasNarrative: false };
       }
       if (!settings.mockMode && !fastMode) {
         planningResponse = await requestModel(
@@ -219,8 +222,8 @@ export default function App() {
       const advancementAdjustedCalls = ensureRequestedAdvancementToolCall(discoveryAdjustedCalls, options.advancementRequest, game.turn + 1, game);
       let proposedToolCalls = dedupeToolCalls(normalizeToolCalls(ensureMapMoveToolCall(advancementAdjustedCalls, options.mapDestination, game.turn + 1), game));
 
-      if (!settings.mockMode && !fastMode) {
-        // 工具修复重试仅在严格模式保留；快速模式下缺参/无效调用直接拒绝，由下一轮叙事找补
+      if (!settings.mockMode) {
+        // 两种模式都并发修复最多三条独立参数错误；修复完成后仍按原顺序进入串行状态执行。
         const repairPlan = await repairToolCallsConcurrently(game, proposedToolCalls, async ({ call, error }) => {
           const repairMessages = buildToolRepairContext(game, action, call, error, prompt, { nativeTools: settings.nativeTools });
           const repairResponse = await requestModel(repairMessages, {
@@ -291,12 +294,58 @@ export default function App() {
       }
       const resolution = createTurnResolution(proposedToolCalls, execution.results, progress);
 
-      let response = planningResponse;
+      let fastPresentationResponse = null;
+      if (fastPresentationTask) {
+        const presentationOutcome = await fastPresentationTask;
+        throwIfFastTaskAborted(presentationOutcome);
+        fastPresentationResponse = presentationOutcome.value;
+        if (!fastPresentationResponse?.hasNarrative) resetStreamPreview();
+      }
+
+      let response = fastPresentationResponse || planningResponse;
       const rejectedNarrativeSuffix = () => {
         const rejectionNarrative = buildRejectedToolNarrative(action, execution.results);
         return execution.results.some((result) => result.ok) ? `${response.narrative}\n\n${rejectionNarrative}` : rejectionNarrative;
       };
-      if (!settings.mockMode && (!(fastMode && response.hasNarrative) || advancementProposed)) {
+      let needsFullRendering = !settings.mockMode && (!fastMode || !fastPresentationResponse?.hasNarrative || advancementProposed);
+
+      if (!settings.mockMode && fastMode && fastPresentationResponse?.hasNarrative && proposedToolCalls.length && !advancementProposed) {
+        setTurnPhase("finalizing");
+        const finalTasks = launchFastModeTasks({
+          continuation: () => requestModel(
+            buildFastNarrativeContinuationContext(game, resolvedGame, action, fastPresentationResponse.narrative, prompt, resolution),
+            { disableTools: true, disableJsonMode: true, forceDisableReasoning: true, maxTokensModeOverride: "manual", maxTokensOverride: 1400 },
+          ),
+          choices: async () => {
+            const choiceResponse = await requestChoicesFromAI(
+              resolvedGame,
+              action,
+              fastPresentationResponse.narrative,
+              "根据本地权威结算生成后续行动",
+              controller.signal,
+              { narrativeStatus: "draft", turnResolution: resolution },
+            );
+            recordModelRequest(metrics, choiceResponse);
+            return choiceResponse;
+          },
+        });
+        const [continuationOutcome, choicesOutcome] = await Promise.all([finalTasks.continuation, finalTasks.choices]);
+        throwIfFastTaskAborted(continuationOutcome, choicesOutcome);
+
+        if (continuationOutcome.value?.hasNarrative) {
+          response = {
+            ...fastPresentationResponse,
+            narrative: `${fastPresentationResponse.narrative.trim()}\n\n${continuationOutcome.value.narrative.trim()}`,
+            hasNarrative: true,
+            choices: hasValidModelChoices(choicesOutcome.value) ? choicesOutcome.value.choices : [],
+            choiceMeta: hasValidModelChoices(choicesOutcome.value) ? choicesOutcome.value.choiceMeta : { source: "unavailable", fallback: false, reason: choicesOutcome.error?.message || choiceValidationError(choicesOutcome.value) },
+          };
+        } else {
+          needsFullRendering = true;
+        }
+      }
+
+      if (needsFullRendering) {
         resetStreamPreview();
         setTurnPhase("finalizing");
         const renderMessages = buildRenderingContext(game, resolvedGame, action, prompt, resolution, { nativeTools: settings.nativeTools });
@@ -311,7 +360,6 @@ export default function App() {
         }
         if (!response.hasNarrative) throw new Error("模型没有返回最终剧情正文，请重试本轮。");
       } else if (settings.mockMode && execution.results.some((result) => !result.ok)) {
-        // 仅 Mock 模式把拒绝说明拼进正文；快速模式的拒绝记录经 changeLog 与下一轮上下文回填
         response = { ...response, narrative: rejectedNarrativeSuffix(), hasNarrative: true };
       } else if (settings.mockMode && advancementProposed) {
         const confirmedAdvancement = execution.results.find((result) => result.ok && result.data?.advancement)?.data.advancement.after;

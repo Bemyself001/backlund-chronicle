@@ -232,7 +232,7 @@ export default function ApiSettings({ settings, onSave, onClose, onCheckUpdate }
           {[
             ["mockMode", "Mock 模式", "无需 API 也能完整体验"], ["stream", "流式输出", "逐步呈现模型回复"],
             ["nativeTools", "原生 Tool Calling", "优先接收函数调用提议"], ["jsonMode", "JSON 兼容模式", "使用结构化回退协议"],
-            ["fastMode", "快速模式", "单次请求完成状态、剧情与选项；适合网络延迟高或推理模型，快模型上两段式更稳"],
+            ["fastMode", "快速模式", "并发生成状态规划与剧情；需要结算时再并发补写结果和选项，以更短等待换取更多请求"],
             ["autoRetryReasoning", "推理耗尽自动恢复", "先保留推理并增加输出预算；仍失败时才降低推理并使用兼容模式"],
           ].map(([key, label, hint]) => <label key={key} className={styles.switch}><input type="checkbox" checked={draft[key]} onChange={(event) => update(key, event.target.checked)} /><span><strong>{label}</strong><small>{hint}</small></span></label>)}
         </fieldset>

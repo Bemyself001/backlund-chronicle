@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createInitialGame, DEFAULT_SYSTEM_PROMPT, EMPTY_CHARACTER, migrateSystemPrompt } from "../src/data/defaults.js";
 import { executeToolCalls } from "../src/engine/tools.js";
-import { buildChoiceRegenerationContext, buildPlanningContext, buildRenderingContext, buildUnifiedContext, composeSummary, parseSectionedSummary, updateMemory, visibleGameState } from "../src/services/memory.js";
+import { buildChoiceRegenerationContext, buildFastNarrativeContinuationContext, buildFastPresentationContext, buildPlanningContext, buildRenderingContext, composeSummary, parseSectionedSummary, updateMemory, visibleGameState } from "../src/services/memory.js";
 import { createTurnResolution } from "../src/services/turnResolution.js";
 
 test("system prompt map rules migrate idempotently", () => {
@@ -43,9 +43,6 @@ test("planning context exposes map candidates only for map-related turns", () =>
   const byName = buildPlanningContext(game, "我想去市政档案馆碰碰运气", DEFAULT_SYSTEM_PROMPT, { nativeTools: true }).at(-1).content;
   assert.match(byName, /queen-archive/);
 
-  const unified = buildUnifiedContext(game, "在房间里整理线索", DEFAULT_SYSTEM_PROMPT, { nativeTools: true }).at(-1).content;
-  assert.doesNotMatch(unified, /mapDiscoveryCandidates/);
-  assert.doesNotMatch(unified, /mapGrowthAnchors/);
 });
 
 test("rumored dynamic places stay private during rendering but remain available to planning", () => {
@@ -79,12 +76,54 @@ test("rendering context contains the authoritative resolution but excludes priva
   assert.doesNotMatch(messages.at(-1).content, /hiddenDanger/);
 });
 
+test("fast presentation can stream in parallel without receiving private or authoritative outcomes", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "快速呈现测试员" });
+  const messages = buildFastPresentationContext(game, "检查站台下的皮箱", DEFAULT_SYSTEM_PROMPT);
+  const protocol = messages.find((message) => message.content.startsWith("【快速模式：并发剧情呈现"));
+  const data = messages.at(-1).content;
+
+  assert.match(protocol.content, /narrative 必须是第一个字段/);
+  assert.match(protocol.content, /不得宣称物品、金钱、属性、关系、任务、地点发现、检定或晋升已经改变/);
+  assert.doesNotMatch(data, /privateSimulationState|hiddenDanger|mapDiscoveryCandidates/);
+  assert.match(data, /playerVisibleState/);
+});
+
+test("fast continuation receives only the draft and authoritative local resolution", () => {
+  const before = createInitialGame({ ...EMPTY_CHARACTER, name: "快速收束测试员" });
+  const after = { ...before, turn: 1, worldTime: "1349年 10月17日 · 周二 · 18:35" };
+  const resolution = { accepted: [{ name: "status.add", ok: true, log: "获得警觉" }], rejected: [], derivedEffects: { elapsedMinutes: 15 } };
+  const messages = buildFastNarrativeContinuationContext(before, after, "观察四周", "你压低帽檐，留意站台上的动静。", DEFAULT_SYSTEM_PROMPT, resolution);
+  const serialized = messages.map((message) => message.content).join("\n");
+
+  assert.match(serialized, /快速模式：权威结果补写/);
+  assert.match(serialized, /narrativeDraft/);
+  assert.match(serialized, /turnResolution/);
+  assert.match(serialized, /status\.add/);
+  assert.doesNotMatch(messages.at(-1).content, /hiddenDanger/);
+});
+
 test("choice regeneration receives final narrative and cannot change state", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "选项重试员" });
   const messages = buildChoiceRegenerationContext(game, "检查门锁", "门锁没有被打开。", "选项重复", DEFAULT_SYSTEM_PROMPT, { nativeTools: true });
   assert.match(messages[1].content, /ui\.present_choices/);
   assert.match(messages[1].content, /不得改变游戏状态/);
   assert.match(messages.at(-1).content, /门锁没有被打开/);
+});
+
+test("fast choices use the shared draft and authoritative resolution", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "快速选项测试员" });
+  const resolution = { accepted: [], rejected: [{ name: "inventory.add", rejectionReason: "来源不足" }], derivedEffects: {} };
+  const messages = buildChoiceRegenerationContext(game, "搜索房间", "你翻开了积灰的抽屉。", "快速模式并发生成", DEFAULT_SYSTEM_PROMPT, {
+    nativeTools: true,
+    narrativeStatus: "draft",
+    turnResolution: resolution,
+  });
+
+  assert.match(messages[1].content, /快速模式：并发行动选项/);
+  assert.match(messages.at(-1).content, /narrativeDraft/);
+  assert.match(messages.at(-1).content, /turnResolution/);
+  assert.match(messages.at(-1).content, /inventory\.add/);
+  assert.doesNotMatch(messages.at(-1).content, /finalNarrative/);
 });
 
 test("turn resolution and memory are derived from local execution results", () => {
