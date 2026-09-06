@@ -95,7 +95,7 @@ export function exportSave(game) {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
   anchor.href = url;
-  anchor.download = `贝克兰德纪事-${game.character.name}-第${game.turn}轮.json`;
+  anchor.download = `诡秘之主：贝克兰德纪事-${game.character.name}-第${game.turn}轮.json`;
   anchor.click();
   URL.revokeObjectURL(url);
 }

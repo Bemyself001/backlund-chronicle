@@ -51,7 +51,7 @@ jobs:
       - name: Prepare Pages artifact
         run: |
           mkdir pages
-          cp "dist/贝克兰德纪事-离线版.html" pages/index.html
+          cp "dist/诡秘之主：贝克兰德纪事-离线版.html" pages/index.html
 
       - name: Write update manifest (latest.json)
         continue-on-error: true

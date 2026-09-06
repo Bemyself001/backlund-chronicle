@@ -84,6 +84,6 @@ jobs:
             backlund-chronicle.apk.sha256 \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "贝克兰德纪事 ${APP_VERSION_NAME}" \
+            --title "诡秘之主：贝克兰德纪事 ${APP_VERSION_NAME}" \
             --notes "正式签名的 Android 版本。应用会自动检查后续更新；安装仍需由你在 Android 系统界面确认。首次从旧调试版迁移前请导出存档并卸载旧版。" \
             --latest
