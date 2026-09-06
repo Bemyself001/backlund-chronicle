@@ -2,8 +2,16 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 
 const REPOSITORY = "Bemyself001/backlund-chronicle";
 const RELEASE_API = `https://api.github.com/repos/${REPOSITORY}/releases/latest`;
+const PAGES_MANIFEST = "https://bemyself001.github.io/backlund-chronicle/latest.json";
+const CHECK_TIMEOUT = 8000;
 const CHECKED_AT_KEY = "backlund-update-checked-at";
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000;
+
+// 公共加速镜像随时可能失效，仅作为直连失败后的备选；顺序即优先级。
+const MIRROR_PREFIXES = [
+  "https://ghproxy.net/",
+  "https://gh-proxy.com/",
+];
 
 export const APP_VERSION = import.meta.env?.VITE_APP_VERSION || "1.1.0";
 export const WEB_BUILD = (import.meta.env?.VITE_APP_BUILD || "local").slice(0, 7);
@@ -29,6 +37,63 @@ export function isNativeAndroid() {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
 }
 
+async function fetchJsonWithTimeout(url, timeoutMs = CHECK_TIMEOUT) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const response = await fetch(url, {
+      headers: { Accept: "application/vnd.github+json" },
+      signal: controller.signal,
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    return await response.json();
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function pickApkAsset(assets) {
+  return assets?.find((asset) => asset.name === "backlund-chronicle.apk")
+    || assets?.find((asset) => asset.name?.endsWith(".apk"));
+}
+
+function shapeGitHubRelease(release) {
+  const apk = pickApkAsset(release.assets);
+  return {
+    latestVersion: String(release.tag_name || "").replace(/^v/i, ""),
+    downloadUrl: apk?.browser_download_url || release.html_url,
+    releaseUrl: release.html_url,
+    notes: release.body || "本次发布未提供更新说明。",
+  };
+}
+
+function shapePagesManifest(manifest) {
+  if (!manifest?.version) throw new Error("备用清单缺少版本信息");
+  return {
+    latestVersion: String(manifest.version).replace(/^v/i, ""),
+    downloadUrl: manifest.apkUrl || manifest.releaseUrl,
+    releaseUrl: manifest.releaseUrl,
+    notes: manifest.notes || "本次发布未提供更新说明。",
+  };
+}
+
+export function getDownloadOptions(result) {
+  const options = [];
+  const directUrl = result?.downloadUrl;
+  if (directUrl) {
+    options.push({ key: "direct", label: "直接下载", url: directUrl, primary: true });
+    if (directUrl.startsWith("https://github.com/")) {
+      for (const [index, prefix] of MIRROR_PREFIXES.entries()) {
+        options.push({ key: `mirror-${index}`, label: `镜像加速下载 ${index + 1}`, url: `${prefix}${directUrl}` });
+      }
+    }
+  }
+  if (result?.releaseUrl) {
+    options.push({ key: "release-page", label: "打开发布页手动下载", url: result.releaseUrl });
+  }
+  return options;
+}
+
 export async function checkForUpdate({ force = false } = {}) {
   if (!isNativeAndroid()) {
     return {
@@ -42,22 +107,28 @@ export async function checkForUpdate({ force = false } = {}) {
   const lastCheckedAt = Number(localStorage.getItem(CHECKED_AT_KEY) || 0);
   if (!force && Date.now() - lastCheckedAt < CHECK_INTERVAL) return { skipped: true, reason: "recent" };
 
-  const response = await fetch(RELEASE_API, {
-    headers: { Accept: "application/vnd.github+json" },
-  });
-  if (!response.ok) throw new Error(`检查更新失败（HTTP ${response.status}）`);
-  const release = await response.json();
-  const apk = release.assets?.find((asset) => asset.name === "backlund-chronicle.apk")
-    || release.assets?.find((asset) => asset.name?.endsWith(".apk"));
+  let release;
+  let source;
+  try {
+    release = shapeGitHubRelease(await fetchJsonWithTimeout(RELEASE_API));
+    source = "github";
+  } catch (primaryError) {
+    try {
+      release = shapePagesManifest(await fetchJsonWithTimeout(PAGES_MANIFEST));
+      source = "pages";
+    } catch {
+      throw new Error(`检查更新失败：发布服务器与备用通道均无法连接（${primaryError.message || "网络错误"}）`);
+    }
+  }
   localStorage.setItem(CHECKED_AT_KEY, String(Date.now()));
-  const latestVersion = String(release.tag_name || "").replace(/^v/i, "");
   return {
     currentVersion: APP_VERSION,
-    latestVersion,
-    hasUpdate: Boolean(apk) && compareVersions(latestVersion, APP_VERSION) > 0,
-    downloadUrl: apk?.browser_download_url || release.html_url,
-    releaseUrl: release.html_url,
-    notes: release.body || "本次发布未提供更新说明。",
+    latestVersion: release.latestVersion,
+    hasUpdate: Boolean(release.downloadUrl) && compareVersions(release.latestVersion, APP_VERSION) > 0,
+    downloadUrl: release.downloadUrl,
+    releaseUrl: release.releaseUrl,
+    notes: release.notes,
+    source,
   };
 }
 

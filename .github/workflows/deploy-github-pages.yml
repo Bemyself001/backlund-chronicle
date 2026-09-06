@@ -53,6 +53,27 @@ jobs:
           mkdir pages
           cp "dist/贝克兰德纪事-离线版.html" pages/index.html
 
+      - name: Write update manifest (latest.json)
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh api "repos/$GITHUB_REPOSITORY/releases/latest" > /tmp/release.json
+          node -e '
+            const fs = require("fs");
+            const release = JSON.parse(fs.readFileSync("/tmp/release.json", "utf8"));
+            const assets = release.assets || [];
+            const apk = assets.find((a) => a.name === "backlund-chronicle.apk") || assets.find((a) => a.name && a.name.endsWith(".apk"));
+            const manifest = {
+              version: String(release.tag_name || "").replace(/^v/i, ""),
+              apkUrl: apk ? apk.browser_download_url : null,
+              releaseUrl: release.html_url,
+              notes: release.body || "",
+              publishedAt: new Date().toISOString(),
+            };
+            fs.writeFileSync("pages/latest.json", JSON.stringify(manifest, null, 2));
+          '
+
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5
 

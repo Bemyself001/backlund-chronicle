@@ -7,3 +7,4 @@
 .notes p { max-height: 9rem; margin: 0; overflow: auto; color: var(--ink-soft); line-height: 1.65; white-space: pre-wrap; }
 .hint { margin: 0; color: var(--danger); font-size: .82rem; line-height: 1.55; }
 .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .65rem; }
+.mirrorHint { margin: 0; color: var(--ink-soft); font-size: .82rem; line-height: 1.55; }

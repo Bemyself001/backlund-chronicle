@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import Modal from "./Modal.jsx";
 import styles from "./UpdateDialog.module.css";
-import { APP_VERSION, WEB_BUILD, checkForUpdate, openUpdateDownload } from "../services/updates.js";
+import { APP_VERSION, WEB_BUILD, checkForUpdate, getDownloadOptions, openUpdateDownload } from "../services/updates.js";
 
 export default function UpdateDialog({ onClose, automatic = false }) {
   const [result, setResult] = useState(null);
@@ -16,7 +16,8 @@ export default function UpdateDialog({ onClose, automatic = false }) {
         if (next.autoUpdated) {
           setStatus("网页版会随每次发布自动更新；当前页面已是最新部署版本。若页面一直开着，刷新即可载入新版本。");
         } else {
-          setStatus(next.hasUpdate ? `发现新版本 ${next.latestVersion}` : `当前 ${APP_VERSION} 已是最新版。`);
+          const channel = next.source === "pages" ? "（经备用通道获取）" : "";
+          setStatus(next.hasUpdate ? `发现新版本 ${next.latestVersion}${channel}` : `当前 ${APP_VERSION} 已是最新版。${channel}`);
         }
       })
       .catch((error) => active && setStatus(error.message || "暂时无法检查更新。"));
@@ -38,8 +39,16 @@ export default function UpdateDialog({ onClose, automatic = false }) {
         </>}
         <div className={styles.actions}>
           <button className="button button--ghost" type="button" onClick={onClose}>稍后</button>
-          {result?.hasUpdate && <button className="button button--primary" type="button" onClick={() => openUpdateDownload(result.downloadUrl)}>下载并更新</button>}
+          {result?.hasUpdate && <>
+            {getDownloadOptions(result).filter((option) => !option.primary).map((option) => (
+              <button key={option.key} className="button button--ghost" type="button" onClick={() => openUpdateDownload(option.url)}>
+                {option.label}
+              </button>
+            ))}
+            <button className="button button--primary" type="button" onClick={() => openUpdateDownload(result.downloadUrl)}>下载并更新</button>
+          </>}
         </div>
+        {result?.hasUpdate && <p className={styles.mirrorHint}>若直接下载失败或速度过慢，可改用镜像加速下载，或到发布页手动获取安装包。</p>}
       </div>
     </Modal>
   );
