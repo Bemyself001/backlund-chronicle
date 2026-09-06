@@ -71,6 +71,7 @@
 .sceneMeta i { flex: 1; height: 1px; background: #6f624b55; }
 .sceneMeta strong { color: #725d37; font-weight: 700; }
 .narrative { position: relative; max-width: 46rem; margin: 0 auto 2rem; padding-left: 2.6rem; font: 400 1rem/1.9 var(--font-serif); letter-spacing: .025em; }
+.aiTag { display: block; margin-top: .9rem; color: var(--ink-soft); font-size: .72rem; letter-spacing: .18em; opacity: .75; }
 .narrative p { margin: 0 0 1.05em; }
 .dropcap { position: absolute; top: .1rem; left: 0; display: grid; width: 1.9rem; aspect-ratio: 1; place-items: center; border: 1px solid #806b46; color: #654d28; font: 600 1rem var(--font-serif); transform: rotate(45deg); }
 .dropcap::first-letter { transform: rotate(-45deg); }

@@ -111,7 +111,7 @@ function AuditPanel({ game }) {
 }
 
 const StoryHistory = memo(function StoryHistory({ messages }) {
-  return messages.map((message) => message.role === "assistant" ? <article className={styles.narrative} key={message.id}><span className={styles.dropcap}>叙</span>{message.content.split("\n").filter(Boolean).map((paragraph, index) => <p key={`${message.id}-${index}`}>{paragraph}</p>)}</article> : <blockquote className={styles.playerLine} key={message.id}><span>你的行动</span>{message.content}</blockquote>);
+  return messages.map((message) => message.role === "assistant" ? <article className={styles.narrative} key={message.id}><span className={styles.dropcap}>叙</span>{message.content.split("\n").filter(Boolean).map((paragraph, index) => <p key={`${message.id}-${index}`}>{paragraph}</p>)}<small className={styles.aiTag}>含AI生成内容</small></article> : <blockquote className={styles.playerLine} key={message.id}><span>你的行动</span>{message.content}</blockquote>);
 });
 
 function TurnProgress({ phase }) {
@@ -179,7 +179,7 @@ export default function GameScreen({ game, loading, turnPhase, streamText, error
         <div className={styles.storyScroll} ref={storyRef} onScroll={handleStoryScroll}>
           <div className={styles.sceneMeta}><span>第 {game.turn + 1} 幕</span><i /><strong>{game.location.name}</strong></div>
           <StoryHistory messages={game.recentDialogues} />
-          {loading && <article className={`${styles.narrative} ${styles.streaming}`} aria-busy="true"><span className={styles.dropcap}>雾</span><TurnProgress phase={turnPhase} />{streamText && <div className={styles.streamCopy}>{streamText.split("\n").filter(Boolean).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>}</article>}
+          {loading && <article className={`${styles.narrative} ${styles.streaming}`} aria-busy="true"><span className={styles.dropcap}>雾</span><TurnProgress phase={turnPhase} />{streamText && <div className={styles.streamCopy}>{streamText.split("\n").filter(Boolean).map((paragraph, index) => <p key={index}>{paragraph}</p>)}</div>}<small className={styles.aiTag}>含AI生成内容</small></article>}
           {error && <div className={styles.error} role="alert"><strong>本轮未能完成</strong><span>{error}</span><button type="button" onClick={retry}>重试本轮</button></div>}
         </div>
         {!followingLatest && <button className={styles.jumpLatest} type="button" onClick={jumpToLatest}>回到最新</button>}
