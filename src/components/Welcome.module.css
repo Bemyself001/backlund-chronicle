@@ -29,8 +29,8 @@
 .actions button { min-width: 11rem; }
 .actions small { display: block; margin-left: .5rem; opacity: .65; font-size: .65rem; }
 .minorActions { display: flex; align-items: center; justify-content: center; gap: 1rem; margin-top: 1.2rem; }
-.minorActions button { min-height: 2.5rem; border: 0; background: transparent; color: #9f9787; font: .75rem var(--font-sans); letter-spacing: .1em; }
-.minorActions button:hover { color: var(--brass-light); }
+.minorActions button, .minorActions a { display: inline-flex; align-items: center; min-height: 2.5rem; border: 0; background: transparent; color: #9f9787; font: .75rem var(--font-sans); letter-spacing: .1em; text-decoration: none; cursor: pointer; }
+.minorActions button:hover, .minorActions a:hover { color: var(--brass-light); }
 .minorActions span { width: 1px; height: 1rem; background: #a58b5b4d; }
 .error { display: inline-block; margin: 1rem auto 0; padding: .6rem .8rem; border-left: 2px solid var(--danger); background: #4a151533; color: #e2b6ad; font: .78rem var(--font-sans); }
 .caseNote { position: absolute; right: clamp(1rem, 4vw, 4rem); bottom: 6rem; display: grid; grid-template-columns: auto 1fr; gap: .8rem; width: min(19rem, 34vw); padding-top: .8rem; border-top: 1px solid #ad90504d; color: #898274; }

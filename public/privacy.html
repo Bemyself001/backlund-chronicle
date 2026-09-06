@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<meta name="description" content="《诡秘之主：贝克兰德纪事》隐私政策" />
+<title>隐私政策 · 诡秘之主：贝克兰德纪事</title>
+<style>
+  :root { --bg: #14100c; --panel: #1d1712; --ink: #e8dfc9; --ink-soft: #b3a88f; --brass: #c9a35c; --line: #8b7a5a55; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { background: var(--bg); color: var(--ink); font: 400 1rem/1.9 "Songti SC", "STSong", "SimSun", serif; letter-spacing: .02em; }
+  main { max-width: 44rem; margin: 0 auto; padding: 3rem 1.25rem 5rem; }
+  header { margin-bottom: 2.5rem; padding-bottom: 1.5rem; border-bottom: 1px solid var(--line); }
+  .series { color: var(--ink-soft); font-size: .8rem; letter-spacing: .5em; }
+  h1 { margin-top: .6rem; color: var(--brass); font-size: 2rem; letter-spacing: .12em; }
+  .updated { margin-top: .8rem; color: var(--ink-soft); font-size: .8rem; }
+  h2 { margin: 2.2rem 0 .8rem; color: var(--brass); font-size: 1.15rem; letter-spacing: .1em; }
+  p, li { color: var(--ink); }
+  ul { padding-left: 1.4rem; }
+  li { margin: .35rem 0; }
+  strong { color: var(--brass); font-weight: 700; }
+  a { color: var(--brass); }
+  .card { margin: 1rem 0; padding: 1rem 1.2rem; background: var(--panel); border-left: 3px solid var(--brass); }
+  footer { margin-top: 3rem; padding-top: 1.2rem; border-top: 1px solid var(--line); color: var(--ink-soft); font-size: .78rem; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <p class="series">诡 秘 之 主</p>
+    <h1>贝克兰德纪事 · 隐私政策</h1>
+    <p class="updated">更新日期：2026 年 9 月 6 日 · 生效日期：2026 年 9 月 6 日</p>
+  </header>
+
+  <p>《诡秘之主：贝克兰德纪事》（以下简称「本游戏」）是一款单机运行的 AI 文字冒险沙盒。我们按「最小化收集」原则设计：本游戏<strong>没有账号体系、没有服务器端存档、不主动收集任何个人身份信息</strong>。本政策说明游戏运行中涉及的数据及其去向。</p>
+
+  <h2>一、我们处理的数据</h2>
+  <div class="card">
+    <ul>
+      <li><strong>游戏存档</strong>：角色、物品、剧情进度等仅保存在你设备浏览器的 LocalStorage（网页版）或应用私有目录（安卓版）中，不会上传到我们的服务器——我们也没有用于接收存档的服务器。</li>
+      <li><strong>API Key</strong>：你在设置中填写的大模型 API Key 默认仅保存在当前会话（sessionStorage）；只有你主动开启「跨会话保存」时才会写入本设备的本地存储。API Key 绝不会被写入游戏存档或导出的存档文件。</li>
+      <li><strong>导出的存档文件</strong>：由你主动导出，保存在你选择的位置，由你自行管理。</li>
+    </ul>
+  </div>
+
+  <h2>二、对话内容的去向（请重点阅读）</h2>
+  <p>本游戏的剧情由你<strong>自行配置</strong>的第三方大语言模型服务生成。每次行动时，你的输入、必要的剧情上下文和游戏状态会通过网络请求发送给你所选择的服务商（如 OpenAI、DeepSeek、Google Gemini、OpenRouter，或你本机运行的 Ollama）。</p>
+  <ul>
+    <li>该请求由你的设备直接发往对应服务商，<strong>不经过本游戏作者的任何中转服务器</strong>。</li>
+    <li>这些服务商对请求内容的保存与使用受其各自隐私政策约束，请在填写 API Key 前查阅对应服务商的政策。</li>
+    <li>选择本机 Ollama 等本地模型时，对话内容不离开你的设备。</li>
+  </ul>
+
+  <h2>三、网络与权限</h2>
+  <ul>
+    <li><strong>网络访问</strong>：仅用于调用你配置的模型接口、检查应用更新（访问 GitHub Releases 及备用清单）与下载更新包。</li>
+    <li>本游戏不申请通讯录、定位、相册、麦克风等敏感权限，不包含广告 SDK，不嵌入第三方统计或行为追踪组件。</li>
+  </ul>
+
+  <h2>四、未成年人</h2>
+  <p>本游戏不向未成年人定向收集任何信息。由于剧情由第三方大模型实时生成，内容存在不确定性，建议未成年人在监护人陪同下游玩。</p>
+
+  <h2>五、你的控制权</h2>
+  <ul>
+    <li>清除浏览器站点数据或卸载应用即可删除全部本地存档与设置；游戏内也提供存档删除功能。</li>
+    <li>你可以随时更换、删除已保存的 API Key，或完全使用无需联网的 Mock 模式体验核心流程。</li>
+  </ul>
+
+  <h2>六、政策变更与联系我们</h2>
+  <p>本政策如有更新，将在本页面公布并更新顶部日期。如对本政策或数据处理有疑问，请通过 GitHub Issues 联系：<a href="https://github.com/Bemyself001/backlund-chronicle/issues">github.com/Bemyself001/backlund-chronicle/issues</a>。</p>
+
+  <footer>
+    <p>本游戏为非官方同人创作，与《诡秘之主》原作者及权利人无隶属或授权关系。程序代码以 MIT License 开源。</p>
+  </footer>
+</main>
+</body>
+</html>

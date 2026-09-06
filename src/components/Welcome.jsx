@@ -34,7 +34,8 @@ export default function Welcome({ hasSave, apiSettings, onNew, onContinue, onImp
         </div>
         <div className={styles.minorActions}>
           <button type="button" onClick={() => inputRef.current?.click()}>导入存档</button><span />
-          <button type="button" onClick={onApi}>API 设置</button>
+          <button type="button" onClick={onApi}>API 设置</button><span />
+          <a href="https://bemyself001.github.io/backlund-chronicle/privacy.html" target="_blank" rel="noreferrer">隐私政策</a>
           <input ref={inputRef} className="sr-only" type="file" accept="application/json,.json" onChange={chooseFile} />
         </div>
         {importError && <p className={styles.error} role="alert">{importError}</p>}
