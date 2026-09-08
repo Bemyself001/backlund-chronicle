@@ -22,6 +22,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -61,14 +63,16 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api "repos/$GITHUB_REPOSITORY/releases/latest" > /tmp/release.json
+          gh api "repos/$GITHUB_REPOSITORY/releases/latest" > /tmp/release.json || echo '{}' > /tmp/release.json
           node -e '
             const fs = require("fs");
             const release = JSON.parse(fs.readFileSync("/tmp/release.json", "utf8"));
             const assets = release.assets || [];
             const apk = assets.find((a) => a.name === "backlund-chronicle.apk") || assets.find((a) => a.name && a.name.endsWith(".apk"));
+            // 版本号与 APK 工作流共用同一规则（提交计数），保证清单版本始终等于本次部署的内容版本
+            const commitCount = Number(require("child_process").execSync("git rev-list --count HEAD").toString().trim());
             const manifest = {
-              version: String(release.tag_name || "").replace(/^v/i, ""),
+              version: `1.2.${commitCount}`,
               apkUrl: apk ? apk.browser_download_url : null,
               bundleUrl: "https://bemyself001.github.io/backlund-chronicle/web-bundle.zip",
               bundleSha256: fs.readFileSync("/tmp/web-bundle.sha256", "utf8").trim(),

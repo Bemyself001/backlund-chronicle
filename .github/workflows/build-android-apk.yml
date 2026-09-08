@@ -16,6 +16,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -44,9 +46,10 @@ jobs:
         run: |
           test -n "$ANDROID_KEYSTORE_BASE64" || { echo "Missing ANDROID_KEYSTORE_BASE64 repository secret"; exit 1; }
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/backlund-release.jks"
-          echo "APP_VERSION_NAME=1.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
-          echo "APP_VERSION_CODE=$((10000 + GITHUB_RUN_NUMBER))" >> "$GITHUB_ENV"
-          echo "VITE_APP_VERSION=1.1.${GITHUB_RUN_NUMBER}" >> "$GITHUB_ENV"
+          COMMIT_COUNT=$(git rev-list --count HEAD)
+          echo "APP_VERSION_NAME=1.2.${COMMIT_COUNT}" >> "$GITHUB_ENV"
+          echo "APP_VERSION_CODE=$((20000 + COMMIT_COUNT))" >> "$GITHUB_ENV"
+          echo "VITE_APP_VERSION=1.2.${COMMIT_COUNT}" >> "$GITHUB_ENV"
           echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/backlund-release.jks" >> "$GITHUB_ENV"
           echo "ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
           echo "ANDROID_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
