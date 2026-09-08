@@ -30,6 +30,8 @@
 .hexCell[role="button"]:hover polygon { fill: #f1e5cd; }
 .hexCell[role="button"]:focus-visible polygon { stroke: #8b6930; stroke-width: 2.4; }
 .hexCell[data-current="true"]:hover polygon { fill: #493b28; }
+.hexCell[data-explorable="true"] polygon { stroke: #7a6427; stroke-dasharray: 5 3; stroke-width: 1.6; }
+.hexCell[data-explorable="true"]:hover polygon, .hexCell[data-explorable="true"][data-selected="true"] polygon { fill: #f3e6c2; stroke: #8b6930; stroke-width: 2.2; }
 .currentRing { fill: none !important; stroke: #e8c87a !important; stroke-width: 1.6; stroke-dasharray: 3 2; }
 .hexCode { fill: #244f43; font: 700 9px var(--font-mono); letter-spacing: .04em; text-anchor: middle; pointer-events: none; }
 .hexName { fill: #3f554c; font: 700 8.5px var(--font-serif); text-anchor: middle; pointer-events: none; }

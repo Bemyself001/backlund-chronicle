@@ -7,6 +7,7 @@
  */
 import { areaWithin, createWorld, distance as engineDistance, key as hexKey, neighbors, revealArea, stableHash, terrainAt } from "../../hex-world-engine/src/index.mjs";
 import { getMapLocations, hexForLocation, isDiscoveredLocationStatus, normalizeLocationKnowledge } from "./map.js";
+import { advanceWorldTime } from "../engine/turn.js";
 
 /** 城市语境下的地形展示名（引擎自然地形 → 雾都地貌） */
 export const CITY_TERRAIN_LABELS = {
@@ -152,7 +153,55 @@ export function hexContext(game) {
   ].join("\n");
 }
 
-/** —— 以下为地图 UI 用的几何助手（平顶六边形） —— */
+/** —— 探索模式：相邻无地点格子的本地探索（不消耗 AI 回合） —— */
+
+const SCENERY = {
+  plain: [
+    "你沿街走了一段，煤气灯在湿石板路上投下长长的光晕。橱窗、门牌与行人的斗篷都寻常得近乎乏味——但这一带的门牌号、岔路与守夜人的巡逻节奏，你已经记在了心里。",
+    "这一片街区没什么值得一提的地标，只有晾衣绳、煤烟味和远处教堂的钟声。你绕了两条巷子，确认了几条能快走脱身的小路。",
+  ],
+  forest: [
+    "林荫区的树木在雾里显得格外高。你在长椅与铸铁围栏之间走了一圈，除了几只乌鸦和一位遛狗的老妇人，什么也没发现——但树篱后那条隐蔽小径的位置，你记下了。",
+    "落叶在靴底发出潮湿的声响。这片林荫区白日里大概很体面，入夜后却静得能听见煤气灯的电流声。你确认了这里的出入口与视线死角。",
+  ],
+  hill: [
+    "坡地的石阶比看起来更耗体力。站在高处，你能越过屋顶望见邻近街区的烟囱与塔尖——视野本身就有价值。这一带的坡道与阶梯走向，你已经摸清。",
+    "你沿着坡道上下走了一遭。街面随高度错层排列，门牌顺序颇为古怪；好在现在你不需要再依赖猜测了。",
+  ],
+};
+
+/** 判断格子是否可徒步探索（邻格、可通行、非剧情地点） */
+export function canExploreHex(game, q, r) {
+  const world = ensureWorld(game);
+  if (engineDistance(world.player, { q, r }) !== 1) return { ok: false, reason: "只能探索相邻的街区" };
+  const tile = world.tiles[hexKey(q, r)] || terrainAt(world, q, r);
+  if (tile.locationId) return { ok: false, reason: "该处有已登记的地点，请使用前往或调查" };
+  if (tile.terrain === "mountain" || tile.terrain === "river") return { ok: false, reason: `${cityTerrainLabel(tile.terrain)}无法徒步穿过` };
+  return { ok: true, tile };
+}
+
+/**
+ * 探索相邻的空格子：移动、揭开迷雾、推进时间，并生成一段本地景色描写。
+ * 不调用 AI；返回 { narrative, minutes, tile }。
+ */
+export function exploreHex(game, q, r) {
+  const check = canExploreHex(game, q, r);
+  if (!check.ok) return check;
+  const world = ensureWorld(game);
+  const tile = check.tile;
+  world.player = { q, r };
+  const stored = world.tiles[hexKey(q, r)] || { ...tile };
+  stored.discovered = true;
+  world.tiles[hexKey(q, r)] = stored;
+  revealArea(world, q, r, 1);
+  const variant = stableHash(world.seed, "scenery", q, r) % (SCENERY[tile.terrain]?.length || 1);
+  const narrative = (SCENERY[tile.terrain] || SCENERY.plain)[variant];
+  game.location = { id: `hex:${q},${r}`, name: `未登记的${cityTerrainLabel(tile.terrain)}`, district: "贝克兰德城区" };
+  game.worldTime = advanceWorldTime(game.worldTime, EXPLORE_MINUTES);
+  return { ok: true, narrative, minutes: EXPLORE_MINUTES, tile: stored };
+}
+
+export const EXPLORE_MINUTES = 13;
 
 export function hexToPixel(q, r, size) {
   return { x: size * 1.5 * q, y: size * Math.sqrt(3) * (r + q / 2) };

@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import Modal from "./Modal.jsx";
 import { findLocationRelations, findTravelRoute, getChildLocations, getMapLocation, getMapLocations, isDiscoveredLocationStatus, normalizeLocationKnowledge } from "../data/map.js";
-import { cityTerrainLabel, hexPolygonPoints, hexToPixel, visibleHexes } from "../data/hexworld.js";
+import { cityTerrainLabel, canExploreHex, hexPolygonPoints, hexToPixel, visibleHexes } from "../data/hexworld.js";
 import styles from "./WorldMap.module.css";
 
 const KIND_LABELS = {
@@ -9,7 +9,7 @@ const KIND_LABELS = {
   station: "交通点", institution: "机构", hideout: "隐秘据点", interior: "内部地点", other: "地点", landmark: "地标",
 };
 
-export default function WorldMap({ game, loading, onClose, onTravel, onInvestigate }) {
+export default function WorldMap({ game, loading, onClose, onTravel, onInvestigate, onExplore }) {
   const discoveredIds = useMemo(() => new Set([...game.discoveredLocations.map((location) => location.id), game.location.id]), [game.discoveredLocations, game.location.id]);
   const knowledgeById = useMemo(() => normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location.id, game), [game]);
   const allLocations = useMemo(() => getMapLocations(game), [game]);
@@ -17,7 +17,8 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
   const hexCells = useMemo(() => visibleHexes(game, 4).map((cell) => {
     const location = cell.tile.locationId ? locationById.get(cell.tile.locationId) : null;
     const status = location ? knowledgeById[location.id]?.status || "unknown" : null;
-    return { ...cell, location, status };
+    const explorable = !location && canExploreHex(game, cell.q, cell.r).ok;
+    return { ...cell, location, status, explorable };
   }), [game, locationById, knowledgeById]);
   const hexLayout = useMemo(() => {
     const size = 34;
@@ -31,6 +32,9 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
   }, [hexCells]);
   const currentRecord = getMapLocation(game.location.id, game);
   const [selectedId, setSelectedId] = useState(currentRecord?.scope === "interior" ? currentRecord.parentId : game.location.id);
+  const [selectedHex, setSelectedHex] = useState(null);
+  const playerHex = game.world?.player || null;
+  const exploreCell = selectedHex ? hexCells.find((cell) => cell.q === selectedHex.q && cell.r === selectedHex.r) : null;
   const selected = getMapLocation(selectedId, game);
   const selectedKnowledge = selected ? knowledgeById[selected.id] || { status: "unknown", note: "" } : { status: "unknown", note: "" };
   const discovered = selected && isDiscoveredLocationStatus(selectedKnowledge.status);
@@ -53,19 +57,23 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
             {hexLayout.points.map(({ cell, x, y }) => {
               const known = cell.location && isDiscoveredLocationStatus(cell.status);
               const rumored = cell.location && cell.status === "rumored";
-              const isCurrent = cell.location && (game.location.id === cell.location.id || (currentRecord?.scope === "interior" && currentRecord.parentId === cell.location.id));
+              const isCurrent = playerHex && cell.q === playerHex.q && cell.r === playerHex.r;
+              const interactive = Boolean(cell.location || cell.explorable);
+              const pick = () => { if (cell.location) { setSelectedHex(null); setSelectedId(cell.location.id); } else if (cell.explorable) { setSelectedId(null); setSelectedHex({ q: cell.q, r: cell.r }); } };
               return <g
                 key={`${cell.q},${cell.r}`}
                 className={styles.hexCell}
                 data-terrain={cell.discovered ? cell.tile.terrain : "fog"}
                 data-status={cell.status || (cell.discovered ? "open" : "unknown")}
                 data-current={isCurrent || null}
+                data-explorable={cell.explorable || null}
+                data-selected={selectedHex && selectedHex.q === cell.q && selectedHex.r === cell.r ? true : null}
                 data-dynamic={cell.location?.source === "dynamic" || null}
-                role={cell.location ? "button" : undefined}
-                tabIndex={cell.location ? 0 : undefined}
-                aria-label={cell.location ? (known ? `${cell.location.name}${isCurrent ? "，玩家当前位置" : ""}` : rumored ? `${cell.location.district}的地点传闻` : `${cell.location.district}的雾中区域`) : (cell.discovered ? cityTerrainLabel(cell.tile.terrain) : "迷雾区域")}
-                onClick={cell.location ? () => setSelectedId(cell.location.id) : undefined}
-                onKeyDown={cell.location ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedId(cell.location.id); } } : undefined}
+                role={interactive ? "button" : undefined}
+                tabIndex={interactive ? 0 : undefined}
+                aria-label={cell.location ? (known ? `${cell.location.name}${isCurrent ? "，玩家当前位置" : ""}` : rumored ? `${cell.location.district}的地点传闻` : `${cell.location.district}的雾中区域`) : cell.explorable ? `可探索的${cityTerrainLabel(cell.tile.terrain)}` : (cell.discovered ? cityTerrainLabel(cell.tile.terrain) : "迷雾区域")}
+                onClick={interactive ? pick : undefined}
+                onKeyDown={interactive ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); pick(); } } : undefined}
               >
                 <polygon points={hexPolygonPoints(x, y, hexLayout.size - 1.5)} />
                 {isCurrent && <polygon className={styles.currentRing} points={hexPolygonPoints(x, y, hexLayout.size - 7)} />}
@@ -80,6 +88,18 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
         </div>
       </section>
       <aside className={styles.detail} aria-live="polite">
+        {selectedHex && exploreCell ? <>
+          <p>未归档区域</p>
+          <h3>未登记的{cityTerrainLabel(exploreCell.tile.terrain)}</h3>
+          <span>这片{cityTerrainLabel(exploreCell.tile.terrain)}尚无档案记录，离你的位置只有一街之隔。走上前去，看看雾后藏着什么。</span>
+          <dl>
+            <div><dt>行动</dt><dd>步行探索</dd></div>
+            <div><dt>预计耗时</dt><dd>约 13 分钟</dd></div>
+            <div><dt>说明</dt><dd>探索即刻完成，不占用回合</dd></div>
+          </dl>
+          <button className="button button--primary" type="button" disabled={loading} onClick={() => onExplore(selectedHex)}>{loading ? "本轮处理中" : "探索这一带"}</button>
+          <small>探索由本地完成：揭开周边迷雾并留下一段沿途见闻。若发现值得记录的地点，地图会另作归档。</small>
+        </> : <>
         <p>{discovered || rumored ? selected.district : "未归档区域"}</p>
         <h3>{discovered ? selected.name : rumored ? "地图上的地点传闻" : "雾中区域"}</h3>
         {discovered && <div className={styles.locationBadges}><span>{KIND_LABELS[selected.kind] || "地点"}</span><span>{selected.source === "dynamic" ? "剧情生长" : "城市档案"}</span>{selectedKnowledge.status === "visited" && <span>已到访</span>}</div>}
@@ -106,6 +126,7 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
             ? <button className="button button--primary" type="button" disabled={loading} onClick={() => onInvestigate(selected, selectedKnowledge)}>{loading ? "本轮处理中" : "调查该区域"}</button>
             : <button className="button button--primary" type="button" disabled>尚无线索</button>}
         <small>{discovered ? "新地点会连接已知锚点并由本地计算路线；到访后状态会永久记录。" : rumored ? "调查会进入正常回合；只有本地确认成功后，地点才会正式解锁。" : "未知区域不会提前泄露名称与详情。"}</small>
+        </>}
       </aside>
     </div>
   </Modal>;

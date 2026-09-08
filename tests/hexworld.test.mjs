@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 
 import { createInitialGame, EMPTY_CHARACTER } from "../src/data/defaults.js";
 import { MAP_LOCATIONS, hexDistance, hexForLocation } from "../src/data/map.js";
-import { buildWorld, ensureWorld, hexContext, travelToLocation, visibleHexes, worldSeedFor } from "../src/data/hexworld.js";
+import { buildWorld, canExploreHex, ensureWorld, exploreHex, hexContext, travelToLocation, visibleHexes, worldSeedFor } from "../src/data/hexworld.js";
 import { migrateSave } from "../src/services/storage.js";
 
 test("static landmarks occupy distinct passable hexes", () => {
@@ -63,4 +63,43 @@ test("legacy saves without a world rebuild one during migration", () => {
   assert.ok(migrated.world?.tiles);
   const station = hexForLocation(MAP_LOCATIONS.find((location) => location.id === "east-station"));
   assert.equal(migrated.world.tiles[`${station.q},${station.r}`].discovered, true);
+});
+
+test("exploration moves the player to an adjacent empty hex, reveals fog and advances 13 minutes", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "探索测试员" });
+  ensureWorld(game);
+  const start = game.world.player;
+  const target = visibleHexes(game, 1).find((cell) => canExploreHex(game, cell.q, cell.r).ok && canExploreHex(game, cell.q, cell.r).tile && ["plain", "forest", "hill"].includes(canExploreHex(game, cell.q, cell.r).tile.terrain));
+  assert.ok(target, "should find an explorable adjacent hex");
+  const toMinutes = (value) => { const m = String(value).match(/(\d{1,2}):(\d{2})/); return m ? Number(m[1]) * 60 + Number(m[2]) : NaN; };
+  const minutesBefore = toMinutes(game.worldTime);
+  const result = exploreHex(game, target.q, target.r);
+  assert.equal(result.ok, true);
+  assert.equal(result.minutes, 13);
+  assert.ok(result.narrative.length > 0);
+  assert.deepEqual(game.world.player, { q: target.q, r: target.r });
+  assert.equal(game.world.tiles[`${target.q},${target.r}`].discovered, true);
+  const minutesAfter = toMinutes(game.worldTime);
+  assert.equal(minutesAfter - minutesBefore, 13);
+  assert.match(game.location.id, /^hex:/);
+  assert.match(game.location.name, /^未登记的/);
+  void start;
+});
+
+test("exploration rejects distant, occupied and impassable hexes", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "拒绝测试员" });
+  ensureWorld(game);
+  const distant = canExploreHex(game, game.world.player.q + 3, game.world.player.r);
+  assert.equal(distant.ok, false);
+  const station = hexForLocation(MAP_LOCATIONS.find((location) => location.id === "east-station"));
+  const occupied = canExploreHex(game, station.q, station.r);
+  assert.equal(occupied.ok, false);
+  // 山地与河流不可通行：在世界中寻找此类格子验证
+  const world = game.world;
+  const blocked = Object.entries(world.tiles).find(([, tile]) => ["mountain", "river"].includes(tile.terrain));
+  if (blocked) {
+    const [q, r] = blocked[0].split(",").map(Number);
+    const refusal = canExploreHex(game, q, r);
+    assert.equal(refusal.ok, false);
+  }
 });

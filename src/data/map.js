@@ -249,7 +249,10 @@ export function planDynamicLocation(game, proposal = {}, turn = game?.turn + 1) 
 export function hexForLocation(location) {
   if (!location) return null;
   if (Number.isInteger(location.q) && Number.isInteger(location.r)) return { q: location.q, r: location.r };
-  return { q: Math.round((Number(location.x) - 50) / 7), r: Math.round((Number(location.y) - 50) / 7) };
+  const x = Number(location.x);
+  const y = Number(location.y);
+  if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
+  return { q: Math.round((x - 50) / 7), r: Math.round((y - 50) / 7) };
 }
 
 /** 六边形格数距离 */
