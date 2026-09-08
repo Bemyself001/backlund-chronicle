@@ -18,7 +18,7 @@
 /* 档案开箱：左侧卷宗标题，右侧档案柜 */
 .desk { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(20rem, .85fr); gap: clamp(2rem, 5vw, 5rem); width: min(92%, 76rem); margin: 0 auto; padding: clamp(2.5rem, 7vh, 5.5rem) 0 6rem; }
 .folio { margin: 0 0 1.1rem; color: #8d816b; font: 600 .6rem var(--font-mono); letter-spacing: .28em; text-transform: uppercase; }
-.hero h1 { margin: 0; font: 400 clamp(3.4rem, 7.5vw, 6.4rem)/.95 var(--font-serif); letter-spacing: .07em; text-shadow: 0 8px 40px #000; white-space: nowrap; }
+.hero h1 { margin: 0; font: 400 clamp(3.4rem, 7.5vw, 6.4rem)/.95 var(--font-display); letter-spacing: .07em; text-shadow: 0 8px 40px #000; white-space: nowrap; }
 .hero h1 span { color: var(--brass-light); }
 .subtitle { margin: 1.8rem 0; color: #c4b9a2; font: 400 clamp(.95rem, 1.8vw, 1.15rem)/1.9 var(--font-serif); letter-spacing: .14em; }
 .rule { display: flex; align-items: center; gap: .8rem; width: min(22rem, 90%); margin: 1.8rem 0; color: var(--brass); font-size: .55rem; }
@@ -35,7 +35,7 @@
 
 /* 档案柜：分类账式存档列表 */
 .shelf { align-self: start; padding: 1.3rem 1.4rem 1.2rem; border: 1px dashed #a7875055; background: #efe4ce0d; }
-.shelf h2 { margin: 0 0 .9rem; color: var(--paper-pale); font: 500 1.5rem var(--font-serif); letter-spacing: .1em; }
+.shelf h2 { margin: 0 0 .9rem; color: var(--paper-pale); font: 500 1.5rem var(--font-display); letter-spacing: .1em; }
 .emptyShelf { margin: 0; color: #898274; font: .8rem/1.8 var(--font-serif); }
 .ledger { margin: 0; padding: 0; list-style: none; }
 .ledger li { border-bottom: 1px solid #a5875c2e; }
