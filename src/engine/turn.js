@@ -1,4 +1,18 @@
+import { applyStatDelta } from "./statChanges.js";
+
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
+
+// 每轮结算：所有带 tick 的状态对角色数值生效（截断与归零联动由 applyStatDelta 统一处理）。
+export function settleStatusTicks(game) {
+  const ticks = [];
+  for (const status of game.statusEffects || []) {
+    for (const [stat, delta] of Object.entries(status.tick || {})) {
+      const change = applyStatDelta(game, stat, delta);
+      if (change) ticks.push({ status: status.name, ...change });
+    }
+  }
+  return ticks;
+}
 
 const DANGEROUS_ACTION = /(?:强行|闯入|破门|袭击|搏斗|开枪|追逐|追踪|尾随|冒险|仪式|召唤|通灵|窥探|潜入|偷窃|威胁|独自进入|不顾危险)/i;
 const OVERNIGHT_ACTION = /(?:过夜|睡到天亮|整夜休息|一觉睡到)/i;
@@ -66,6 +80,8 @@ export function occultEntryForTurn(game, nextTurn) {
 export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], toolResults = []) {
   const elapsedMinutes = minutesForTurn(action, toolCalls, toolResults);
   const dangerDelta = dangerDeltaForTurn({ action, selectedRisk, toolCalls, toolResults });
+  const statusTicks = settleStatusTicks(game);
+  const statusTickLogs = statusTicks.map((tick) => `状态「${tick.status}」结算：${tick.label} ${tick.before}→${tick.after}（${tick.delta > 0 ? "+" : ""}${tick.delta}）${tick.autoStatus ? `；${tick.autoStatus}` : ""}`);
   const nextTurn = Number(game.turn || 0) + 1;
   const occultEntry = occultEntryForTurn(game, nextTurn);
   const occult = {
@@ -85,6 +101,8 @@ export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], 
   return {
     elapsedMinutes,
     dangerDelta,
+    statusTicks,
+    statusTickLogs,
     worldTime: advanceWorldTime(game.worldTime, elapsedMinutes),
     occult,
     occultEntry,

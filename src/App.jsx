@@ -396,7 +396,7 @@ export default function App() {
       const next = {
         ...resolvedGame, ...memoryPlan.updates, choices: nextChoices, choiceMeta,
         worldEvents: [...game.worldEvents, ...(progress.occultEntry ? [{ id: makeId("event"), turn: game.turn + 1, text: `非凡入口出现：${progress.occultEntry.title}` }] : [])].slice(-40),
-        changeLog: [...game.changeLog, ...execution.logs].slice(-100),
+        changeLog: [...game.changeLog, ...execution.logs, ...(progress.statusTickLogs || [])].slice(-100),
         lastTurnBaseline: auditBaseline,
         lastTurnAudit: automaticAudit,
         lastTurnMetrics: finishTurnMetrics(metrics),

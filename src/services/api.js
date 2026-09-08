@@ -416,6 +416,16 @@ const TOOL_PARAMETER_SCHEMAS = {
           name: { type: "string" },
           kind: { type: "string", enum: ["neutral", "danger", "positive"] },
           description: { type: "string" },
+          tick: {
+            type: "object",
+            additionalProperties: false,
+            description: "可选：该状态存在期间每轮结算的数值增减（引擎截断到单项 ±3 与 0 至上限），例如 {\"health\":-1}",
+            properties: {
+              health: { type: "integer" },
+              sanity: { type: "integer" },
+              spirituality: { type: "integer" },
+            },
+          },
         },
       },
       reason: { type: "string" },

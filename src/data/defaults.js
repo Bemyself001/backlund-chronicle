@@ -1,4 +1,5 @@
 import { makeId } from "../utils/id.js";
+import { applyTalent, talentMoneyBonus } from "./talents.js";
 import { withAdvancement } from "./character.js";
 import { MAX_STARTING_MONEY_PENCE, moneyFromPence } from "./money.js";
 import { initialDiscoveredLocations, normalizeLocationKnowledge } from "./map.js";
@@ -35,7 +36,7 @@ export const DEFAULT_SYSTEM_PROMPT = `你是《贝克兰德纪事》的叙事者
 7. 普通人的 occult.contact 初始为 0；在第 5、10、15 轮等每五轮节点，可出现一次非强制的非凡入口，直到玩家主动接触后变为 1。开局选择低序列非凡者的角色 occult.contact 初始为 1。contact=1 只代表接触过非凡世界，不代表获得力量。
 8. 只有 occult.contact=1 后，才允许登记非凡知识。获得可靠魔药配方时用 clue.add 并填写 kind=potion_recipe、pathwayId 和 sequence；获得魔药时用 inventory.add 的 potion 字段保存真实途径、序列与鉴定状态，未鉴定时 name 和 description 只能描述外观。普通人只有在剧情中主动接触非凡世界、持有对应配方和已鉴定的序列9魔药，并在本轮明确决定服用魔药时，才能调用 advancement.promote 正式成为非凡者；后续晋升也必须沿当前途径逐级验证，不能用 character.update、item.use 或 inventory.remove 代替晋升。晋升结果必须等待本地确认后才能写成既成事实。
 9. 每轮给出三个真正不同的行动选项：谨慎调查、社交交涉、高风险行动，同时允许自由输入；选项应包含当前场景的多种可能，而非三个措辞不同的同一目标。
-10. 所有状态变化必须作为工具调用提议。不要在正文中伪造工具已经成功执行；等待本地引擎验证后再在后续叙事中确认。物品和资金是否获得或失去以本地审计结果为准，而不是以正文宣称为准。新增物品只有在会影响任务、案件证据、身份、非凡能力或后续剧情入口时，才将 importance 设为 important；普通消耗品、生活用品、材料和货币必须使用 normal。资金使用 money.add、money.remove，金额必须放在 amount 对象中并拆分为 pounds（镑）、solers（苏勒）、pence（便士），例如 {"amount":{"solers":2,"pence":6}}。角色数值使用 character.update 调整，patch 填写增减量而非目标值（例如 {"sanity":-2} 表示理智减少 2 点），本地引擎会把结果截断到 0 至上限，并在数值归零或恢复时自动维护对应状态。
+10. 所有状态变化必须作为工具调用提议。不要在正文中伪造工具已经成功执行；等待本地引擎验证后再在后续叙事中确认。物品和资金是否获得或失去以本地审计结果为准，而不是以正文宣称为准。新增物品只有在会影响任务、案件证据、身份、非凡能力或后续剧情入口时，才将 importance 设为 important；普通消耗品、生活用品、材料和货币必须使用 normal。资金使用 money.add、money.remove，金额必须放在 amount 对象中并拆分为 pounds（镑）、solers（苏勒）、pence（便士），例如 {"amount":{"solers":2,"pence":6}}。角色数值使用 character.update 调整，patch 填写增减量而非目标值（例如 {"sanity":-2} 表示理智减少 2 点），本地引擎会把结果截断到 0 至上限，并在数值归零或恢复时自动维护对应状态。status.add 可通过 tick 字段声明该状态存在期间每轮的数值增减（例如持续伤害 {"health":-1}，单项 ±3），由本地引擎逐轮结算。
 11. 支持原生工具时，状态变化只使用原生 tool calling，最终剧情放在 assistant.content，行动选项使用 ui.present_choices；只有不支持原生工具时才使用当前阶段指定的精简 JSON 兼容协议。
 12. narrative 使用克制、可读的中文，每轮约 250—600 字，不复述原著段落，不让原作角色抢占玩家中心位置。`;
 
@@ -56,7 +57,8 @@ export function migrateSystemPrompt(prompt = "") {
   if (!migrated.includes("本轮明确决定服用魔药")) migrated = migrated.includes(previousAdvancement) ? migrated.replace(previousAdvancement, nextAdvancement) : migrated.replace(legacyAdvancement, nextAdvancement);
   if (!migrated.includes("location.archive")) migrated = migrated.includes(previousMap) ? migrated.replace(previousMap, nextMap) : migrated.replace(legacyMap, nextMap);
   if (!migrated.includes("importance 设为 important")) migrated = migrated.replace("资金使用 money.add、money.remove", "新增物品只有在会影响任务、案件证据、身份、非凡能力或后续剧情入口时，才将 importance 设为 important；普通消耗品、生活用品、材料和货币必须使用 normal。资金使用 money.add、money.remove");
-  if (!migrated.includes("增减量而非目标值")) migrated = migrated.replace("例如 {\"amount\":{\"solers\":2,\"pence\":6}}。", "例如 {\"amount\":{\"solers\":2,\"pence\":6}}。角色数值使用 character.update 调整，patch 填写增减量而非目标值（例如 {\"sanity\":-2} 表示理智减少 2 点），本地引擎会把结果截断到 0 至上限，并在数值归零或恢复时自动维护对应状态。");
+  if (!migrated.includes("增减量而非目标值")) migrated = migrated.replace("例如 {\"amount\":{\"solers\":2,\"pence\":6}}。", "例如 {\"amount\":{\"solers\":2,\"pence\":6}}。角色数值使用 character.update 调整，patch 填写增减量而非目标值（例如 {\"sanity\":-2} 表示理智减少 2 点），本地引擎会把结果截断到 0 至上限，并在数值归零或恢复时自动维护对应状态。status.add 可通过 tick 字段声明该状态存在期间每轮的数值增减（例如持续伤害 {\"health\":-1}，单项 ±3），由本地引擎逐轮结算。");
+  if (!migrated.includes("status.add 可通过 tick 字段")) migrated = migrated.replace("并在数值归零或恢复时自动维护对应状态。", "并在数值归零或恢复时自动维护对应状态。status.add 可通过 tick 字段声明该状态存在期间每轮的数值增减（例如持续伤害 {\"health\":-1}，单项 ±3），由本地引擎逐轮结算。");
   return migrated;
 }
 
@@ -98,6 +100,7 @@ export const EMPTY_CHARACTER = {
   background: "在贝克兰德生活三年，靠处理夜班稿件维持体面的贫穷。",
   extraordinary: "ordinary",
   pathway: "无",
+  talent: "none",
   startingMoneyPence: 240,
 };
 
@@ -164,7 +167,8 @@ function item(itemId, name, category, description, quantity, weight, rarity, tag
 export function createInitialGame(character) {
   const normalizedCharacter = withAdvancement(character);
   const { startingMoneyPence = 240, ...characterProfile } = normalizedCharacter;
-  const initialMoneyPence = Math.max(0, Math.min(MAX_STARTING_MONEY_PENCE, Number(startingMoneyPence) || 0));
+  const initialMoneyPence = Math.max(0, Math.min(MAX_STARTING_MONEY_PENCE, Number(startingMoneyPence) || 0)) + talentMoneyBonus(normalizedCharacter.talent);
+  const baseStats = { health: 10, maxHealth: 10, sanity: 9, maxSanity: 10, spirituality: normalizedCharacter.extraordinary === "low" ? 7 : 4, maxSpirituality: normalizedCharacter.extraordinary === "low" ? 8 : 5 };
   const game = {
     version: SAVE_VERSION,
     id: makeId("game"),
@@ -175,7 +179,7 @@ export function createInitialGame(character) {
     character: {
       ...characterProfile,
       portraitSeed: Math.floor(Math.random() * 4),
-      stats: { health: 10, maxHealth: 10, sanity: 9, maxSanity: 10, spirituality: normalizedCharacter.extraordinary === "low" ? 7 : 4, maxSpirituality: normalizedCharacter.extraordinary === "low" ? 8 : 5 },
+      stats: applyTalent(baseStats, normalizedCharacter.talent),
     },
     location: { id: "east-station", name: "东区·贝克兰德火车站", district: "贝克兰德东区" },
     worldTime: "1349年 10月17日 · 周二 · 18:20",
@@ -197,7 +201,7 @@ export function createInitialGame(character) {
     money: moneyFromPence(initialMoneyPence),
     capacity: { maxWeight: 12 },
     equipment: {},
-    statusEffects: [{ id: "rain-chill", name: "雨夜寒意", kind: "neutral", description: "手指略显僵硬，离开雨水后会逐渐恢复。" }],
+    statusEffects: [],
     quests: [],
     clues: [],
     availableClues: [

@@ -1,6 +1,8 @@
 import { memo, useEffect, useRef, useState } from "react";
 import styles from "./GameScreen.module.css";
 import { getAdvancement } from "../data/character.js";
+import { getTalent } from "../data/talents.js";
+import { STAT_LABELS } from "../engine/statChanges.js";
 import { formatMoney } from "../data/money.js";
 import { getPotionAdvancementEligibility } from "../services/advancement.js";
 
@@ -34,10 +36,14 @@ const CharacterPanel = memo(function CharacterPanel({ game }) {
   const { character } = game;
   const advancement = getAdvancement(character);
   return <div className={styles.panelContent}>
-    <div className={styles.profile}><div className={styles.avatar}>{character.avatar ? <img src={character.avatar} alt={`${character.name}的头像`} /> : <><i /><b /></>}</div><div><p data-extraordinary={advancement.type === "extraordinary"}>{advancement.type === "extraordinary" ? `非凡者 · ${advancement.pathwayName} · ${advancement.sequenceLabel}` : "普通人"}</p><h2>{character.name}</h2><span>{character.occupation} · {character.age}岁</span></div></div>
+    <div className={styles.profile}><div className={styles.avatar}>{character.avatar ? <img src={character.avatar} alt={`${character.name}的头像`} /> : <><i /><b /></>}</div><div><p data-extraordinary={advancement.type === "extraordinary"}>{advancement.type === "extraordinary" ? `非凡者 · ${advancement.pathwayName} · ${advancement.sequenceLabel}` : "普通人"}</p><h2>{character.name}</h2><span>{character.occupation} · {character.age}岁{getTalent(character.talent).id !== "none" ? ` · ${getTalent(character.talent).name}` : ""}</span></div></div>
     <div className={styles.metaGrid}><div><span>世界时间</span><strong>{game.worldTime.split("·")[0]}</strong><small>{game.worldTime.split("·").slice(1).join("·")}</small></div><div><span>当前位置</span><strong>{game.location.name}</strong><small>{game.location.district}</small></div></div>
     <section><h3>角色状态 <small>STATUS</small></h3><div className={styles.stats}><StatBar label="生命" value={character.stats.health} max={character.stats.maxHealth} /><StatBar label="理智" value={character.stats.sanity} max={character.stats.maxSanity} /><StatBar label="灵性" value={character.stats.spirituality} max={character.stats.maxSpirituality} /></div></section>
-    <section><h3>当前影响 <small>EFFECTS</small></h3><div className={styles.tags}>{game.statusEffects.length ? game.statusEffects.map((status) => <span key={status.id} className={status.kind === "danger" ? styles.dangerTag : ""} title={status.description}>{status.name}</span>) : <em>状态稳定</em>}</div></section>
+    <section><h3>当前影响 <small>EFFECTS</small></h3><div className={styles.tags}>{game.statusEffects.length ? game.statusEffects.map((status) => {
+      const tickText = status.tick ? `每轮：${Object.entries(status.tick).map(([stat, delta]) => `${STAT_LABELS[stat]}${delta > 0 ? "+" : ""}${delta}`).join("，")}` : "";
+      const title = [status.description, tickText].filter(Boolean).join("\n");
+      return <span key={status.id} className={status.kind === "danger" ? styles.dangerTag : ""} title={title}>{status.name}{tickText && <small className={styles.tickTag}>{tickText}</small>}</span>;
+    }) : <em>状态稳定</em>}</div></section>
     <section><h3>非凡档案 <small>PATHWAY</small></h3><div className={styles.advancementCard}><strong>{advancement.pathwayName || "普通人"}</strong><span>{advancement.sequenceLabel}</span><small>状态：{advancement.status === "stable" ? "稳定" : advancement.status === "none" ? "未接触" : advancement.status === "newly_promoted" ? "刚完成晋升" : advancement.status}</small><small>世界接触：{game.occult?.contact === 1 ? "已接触" : "尚未接触"}{game.occult?.entryAvailable ? " · 有入口可选" : ""}</small>{advancement.unlockedAbilities?.length > 0 && <ul className={styles.abilityList}>{advancement.unlockedAbilities.map((ability) => <li key={ability.id} title={ability.description}><strong>{ability.name}</strong><span>{ability.description}</span></li>)}</ul>}</div></section>
     <section><h3>人物关系 <small>CONTACTS</small></h3>{game.relationships.map((npc) => <div className={styles.relationship} key={npc.id}><div><strong>{npc.name}</strong><span>{npc.role}</span></div><b>{npc.value >= 0 ? "+" : ""}{npc.value}</b><p>{npc.note}</p></div>)}</section>
     <section><h3>已知地点 <small>{game.discoveredLocations.length}</small></h3><ul className={styles.locationList}>{game.discoveredLocations.map((place) => <li key={place.id} className={place.id === game.location.id ? styles.current : ""}><span>{place.name}</span><small>{place.note}</small></li>)}</ul></section>

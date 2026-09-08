@@ -43,6 +43,8 @@
 .stat > i b, .capacity > i b { display: block; height: 100%; background: linear-gradient(90deg, #557d70, #9c8557); transition: width .25s ease; }
 .tags { display: flex; flex-wrap: wrap; gap: .35rem; }
 .tags span { padding: .35rem .5rem; border: 1px solid #67756c; color: #aeb9b2; font: .6rem var(--font-sans); }
+.tickTag { display: block; margin-top: .12rem; color: #8b8574; font-size: .55rem; }
+.tags .dangerTag .tickTag { color: #a06a62; }
 .tags .dangerTag { border-color: #7c3b37; color: #c4877e; }
 .tags em { color: #6f736e; font: italic .7rem var(--font-serif); }
 .advancementCard { display: grid; grid-template-columns: 1fr auto; gap: .25rem .6rem; padding: .7rem; border-left: 2px solid var(--brass); background: #b18e5014; }
