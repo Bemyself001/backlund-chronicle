@@ -136,10 +136,13 @@ function TurnProgress({ phase }) {
   </div>;
 }
 
-export default function GameScreen({ game, loading, turnPhase, streamText, error, onAction, onAbort, onRetry, onRegenerateChoices, onLocalTool, onOpenMap, onOpenApi, onOpenPrompt, onOpenSaves, onHome }) {
+export default function GameScreen({ game, loading, turnPhase, streamText, error, mockMode, onAction, onAbort, onRetry, onRegenerateChoices, onLocalTool, onOpenMap, onOpenApi, onOpenPrompt, onOpenSaves, onHome }) {
   const [input, setInput] = useState("");
   const [mobilePanel, setMobilePanel] = useState(null);
   const [followingLatest, setFollowingLatest] = useState(true);
+  const [mockTipDismissed, setMockTipDismissed] = useState(() => localStorage.getItem("mist-tutorial-mock-dismissed") === "1");
+  const dismissMockTip = () => { localStorage.setItem("mist-tutorial-mock-dismissed", "1"); setMockTipDismissed(true); };
+  const showMockTip = Boolean(mockMode) && game.turn === 0 && !mockTipDismissed;
   const storyRef = useRef(null);
   const followRef = useRef(true);
   useEffect(() => {
@@ -181,6 +184,11 @@ export default function GameScreen({ game, loading, turnPhase, streamText, error
     <div className={styles.workspace}>
       <aside className={`${styles.left} ${mobilePanel === "character" ? styles.drawerOpen : ""}`} aria-label="角色状态"><div className={styles.drawerHeader}><span>角色状态</span><button type="button" onClick={() => setMobilePanel(null)}>关闭</button></div><CharacterPanel game={game} /></aside>
       <section className={styles.story} aria-label="剧情与行动">
+        {showMockTip && <div className={styles.mockTip} role="note">
+          <strong>当前为 Mock 演示模式</strong>
+          <span>剧情由本地脚本生成，不消耗 API。配置自己的模型服务（OpenAI / DeepSeek / Gemini / Ollama 等）后关闭 Mock 模式，即可获得真正由 AI 驱动的沙盒体验。</span>
+          <div><button type="button" className="button button--primary" onClick={() => { dismissMockTip(); onOpenApi(); }}>去配置 API</button><button type="button" onClick={dismissMockTip}>先用 Mock 试试</button></div>
+        </div>}
         <div className={styles.storyViewport}>
         <div className={styles.storyScroll} ref={storyRef} onScroll={handleStoryScroll}>
           <div className={styles.sceneMeta}><span>第 {game.turn + 1} 幕</span><i /><strong>{game.location.name}</strong></div>

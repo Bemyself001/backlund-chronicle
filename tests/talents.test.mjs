@@ -55,3 +55,12 @@ test("status ticks settle every turn through resolveTurnProgress and respect bou
   assert.ok(game.statusEffects.some((status) => status.id === "collapse-health"));
   assert.match(finalProgress.statusTickLogs[0], /自动附加状态「濒危」/);
 });
+
+test("heirloom-watch talent grants a checkable watch with hidden info", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "怀表测试员", talent: "heirloom-watch" });
+  const watch = game.inventory.find((entry) => entry.itemId === "heirloom-watch");
+  assert.ok(watch, "inventory should contain the heirloom watch");
+  assert.ok(watch.tags.includes("可检查"));
+  assert.match(watch.hiddenInfo, /纸条/);
+  assert.equal(game.character.stats.maxHealth, 10); // 不影响数值
+});

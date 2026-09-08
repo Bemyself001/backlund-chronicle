@@ -1,5 +1,5 @@
 import { makeId } from "../utils/id.js";
-import { applyTalent, talentMoneyBonus } from "./talents.js";
+import { applyTalent, talentItemSpec, talentMoneyBonus } from "./talents.js";
 import { withAdvancement } from "./character.js";
 import { MAX_STARTING_MONEY_PENCE, moneyFromPence } from "./money.js";
 import { initialDiscoveredLocations, normalizeLocationKnowledge } from "./map.js";
@@ -169,6 +169,8 @@ export function createInitialGame(character) {
   const { startingMoneyPence = 240, ...characterProfile } = normalizedCharacter;
   const initialMoneyPence = Math.max(0, Math.min(MAX_STARTING_MONEY_PENCE, Number(startingMoneyPence) || 0)) + talentMoneyBonus(normalizedCharacter.talent);
   const baseStats = { health: 10, maxHealth: 10, sanity: 9, maxSanity: 10, spirituality: normalizedCharacter.extraordinary === "low" ? 7 : 4, maxSpirituality: normalizedCharacter.extraordinary === "low" ? 8 : 5 };
+  const talentSpec = talentItemSpec(normalizedCharacter.talent);
+  const talentItem = talentSpec ? { ...item(talentSpec.itemId, talentSpec.name, talentSpec.category, talentSpec.description, 1, talentSpec.weight, talentSpec.rarity, talentSpec.tags), hiddenInfo: talentSpec.hiddenInfo || "" } : null;
   const game = {
     version: SAVE_VERSION,
     id: makeId("game"),
@@ -197,6 +199,7 @@ export function createInitialGame(character) {
       item("brass-compass", "黄铜罗盘", "工具", "指针偶尔会避开正北方，原因未知。", 1, 0.3, "少见", ["可检查"]),
       item("pocket-notebook", "袖珍笔记本", "文书", "夹着几张速记纸，尚有二十余页空白。", 1, 0.2, "普通", ["线索工具"]),
       item("matchbox", "防潮火柴", "消耗品", "还剩十二根，硫磺气味明显。", 1, 0.1, "普通", ["消耗品"]),
+      ...(talentItem ? [talentItem] : []),
     ],
     money: moneyFromPence(initialMoneyPence),
     capacity: { maxWeight: 12 },
