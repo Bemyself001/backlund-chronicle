@@ -1,5 +1,6 @@
 import { makeId } from "../utils/id.js";
-import { findLocationRelations, findTravelRoute, getMapLocation, getMapLocations, isDiscoveredLocationStatus, normalizeLocationKnowledge, normalizeMapExtensions, planDynamicLocation } from "../data/map.js";
+import { findLocationRelations, getMapLocation, getMapLocations, isDiscoveredLocationStatus, normalizeLocationKnowledge, normalizeMapExtensions, planDynamicLocation } from "../data/map.js";
+import { ensureWorld, travelToLocation } from "../data/hexworld.js";
 import { amountToPence, formatMoney, moneyFromPence, moneyToPence } from "../data/money.js";
 import { normalizeInventoryItem, normalizeItemImportance } from "../data/items.js";
 import { applyAdvancement, getAdvancement, isExplicitAdvancementIntent } from "../data/character.js";
@@ -577,6 +578,7 @@ function executeOne(game, call, options = {}) {
       if (isDiscoveredLocationStatus(targetStatus) && !game.discoveredLocations.some((entry) => entry.id === planned.location.id)) {
         game.discoveredLocations.push({ id: planned.location.id, name: planned.location.name, note: planned.location.description });
       }
+      ensureWorld(game);
       const action = planned.reused ? "沿用地图中的地点" : planned.location.scope === "interior" ? "登记子地点" : "地图生长出新地点";
       const publicLabel = targetStatus === "rumored" ? `${planned.location.district}的一处地点传闻` : `「${planned.location.name}」`;
       return succeed(call.name, `${turnLabel}：${action}${publicLabel}，当前状态为${targetStatus === "rumored" ? "传闻" : "已发现"}——${call.reason}。`, { locationId: planned.location.id, status: targetStatus, scope: planned.location.scope, reused: planned.reused });
@@ -596,6 +598,7 @@ function executeOne(game, call, options = {}) {
       if (args.status === "discovered" && !game.discoveredLocations.some((entry) => entry.id === location.id)) {
         game.discoveredLocations.push({ id: location.id, name: location.name, note: record.note });
       }
+      ensureWorld(game);
       const action = args.status === "rumored" ? "记录地点传闻" : "确认发现地点";
       const publicLabel = args.status === "rumored" ? `${location.district}的一处地点` : `「${location.name}」`;
       return succeed(call.name, `${turnLabel}：${action}${publicLabel}——${call.reason}。`, { locationId: location.id, status: args.status });
@@ -605,16 +608,14 @@ function executeOne(game, call, options = {}) {
       const location = game.discoveredLocations.find((entry) => entry.id === args.locationId);
       if (!location) return fail(call.name, "目的地尚未发现，不能直接移动");
       if (location.id === game.location.id) return fail(call.name, "角色已经位于该地点");
-      const mappedOrigin = getMapLocation(game.location.id, game);
       const mappedTarget = getMapLocation(location.id, game);
-      const discoveredIds = game.discoveredLocations.map((entry) => entry.id);
-      const route = mappedOrigin && mappedTarget ? findTravelRoute(game.location.id, location.id, discoveredIds, game) : null;
-      if (mappedOrigin && mappedTarget && !route) return fail(call.name, "当前已知交通图中没有通往该地点的可用路线");
+      const travel = mappedTarget ? travelToLocation(game, location.id) : null;
+      if (mappedTarget && !travel) return fail(call.name, "当前六边形城区图中没有通往该地点的可用路径");
       const mappedDistrict = mappedTarget?.district ? `贝克兰德${mappedTarget.district}` : null;
       game.location = { id: location.id, name: location.name, district: mappedDistrict || args.district || location.district || "贝克兰德" };
       game.locationKnowledge = normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location.id, game);
       game.locationKnowledge[location.id] = { ...game.locationKnowledge[location.id], status: "visited", visitedAt: turnLabel };
-      return succeed(call.name, `${turnLabel}：前往「${location.name}」——${call.reason}。`, { travelMinutes: route?.minutes || 35, path: route?.path || [location.id] });
+      return succeed(call.name, `${turnLabel}：前往「${location.name}」——${call.reason}。`, { travelMinutes: travel?.minutes || 35, travelGrids: travel?.grids ?? null, path: travel?.path || [location.id] });
     }
     case "location.archive": {
       const location = getMapLocation(args.locationId, game, { includeArchived: true });

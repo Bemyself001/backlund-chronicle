@@ -1,4 +1,5 @@
 import { getMapLocations, isDiscoveredLocationStatus, normalizeLocationKnowledge } from "../data/map.js";
+import { hexContext } from "../data/hexworld.js";
 import { playerVisibleItem } from "../data/items.js";
 
 const SCENARIO_RULES = "【当前剧本】这是从贝克兰德东区火车站开始的开放世界沙盒。玩家可自由选择居所、职业、人脉、旅行方向与调查目标；没有寄件人的黑函、失踪文员和站台异响只是可选世界线，不是必须完成的主线。玩家未明确接受前，不得自动添加任务、安排 NPC 催促或用突发事件强迫回轨。普通角色从第 5 轮开始每五轮最多出现一个可拒绝的非凡入口，直到 occult.contact=1。原作主线仅为遥远背景；隐藏危险不得无铺垫直接揭露。";
@@ -44,6 +45,7 @@ export function visibleGameState(game) {
     chapter: game.chapter,
     worldTime: game.worldTime,
     location: game.location,
+    surroundings: hexContext(game),
     discoveredLocations: game.discoveredLocations,
     mapRumors: visibleMapRumors(game),
     character: game.character,

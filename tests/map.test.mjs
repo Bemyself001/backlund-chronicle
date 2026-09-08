@@ -57,11 +57,13 @@ test("confirmed location discovery unlocks the place and its route", () => {
 test("map exposes connected routes without crossing undiscovered locations", () => {
   assert.equal(MAP_LOCATIONS.length, 9);
   const direct = findTravelRoute("east-station", "soot-lamp", known);
-  assert.equal(direct.minutes, 28);
+  assert.equal(direct.minutes, 27);
+  assert.equal(direct.grids, 3);
   assert.deepEqual(direct.path, ["east-station", "soot-lamp"]);
   const crossDistrict = findTravelRoute("queen-library", "iron-gate", known);
-  assert.equal(crossDistrict.minutes, 50);
-  assert.deepEqual(crossDistrict.path, ["queen-library", "east-station", "iron-gate"]);
+  assert.equal(crossDistrict.minutes, 76);
+  assert.equal(crossDistrict.grids, 10);
+  assert.deepEqual(crossDistrict.path, ["queen-library", "iron-gate"]);
   assert.equal(findTravelRoute("east-station", "bridge-docks", known), null);
 });
 
@@ -70,10 +72,10 @@ test("validated map travel updates location and supplies exact elapsed time", ()
   const call = { id: "move-map-test", name: "location.move", args: { locationId: "soot-lamp" }, reason: "玩家从地图选择目的地" };
   const execution = executeToolCalls(game, [call]);
   assert.equal(execution.results[0].ok, true);
-  assert.equal(execution.results[0].data.travelMinutes, 28);
+  assert.equal(execution.results[0].data.travelMinutes, 27);
   assert.equal(execution.game.location.id, "soot-lamp");
   assert.equal(execution.game.locationKnowledge["soot-lamp"].status, "visited");
-  assert.equal(minutesForTurn("前往桥区·雾鸦旅店", [call], execution.results), 28);
+  assert.equal(minutesForTurn("前往桥区·雾鸦旅店", [call], execution.results), 27);
 });
 
 test("story growth creates a persistent local node without exposing a rumored true name", () => {

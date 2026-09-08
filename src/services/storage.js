@@ -3,6 +3,7 @@ import { isMoneyItem, normalizeInventoryItem } from "../data/items.js";
 import { withAdvancement } from "../data/character.js";
 import { moneyFromPence } from "../data/money.js";
 import { getMapLocations, normalizeLocationKnowledge, normalizeMapExtensions } from "../data/map.js";
+import { buildWorld, reconcileWorld } from "../data/hexworld.js";
 
 const SAVES_KEY = "mist-chronicle-saves-v1";
 const AUTOSAVE_ID = "autosave";
@@ -72,7 +73,7 @@ export function migrateSave(raw) {
     lastEntryTurn: migrated.occult?.lastEntryTurn ?? null,
     entryHistory: Array.isArray(migrated.occult?.entryHistory) ? migrated.occult.entryHistory : [],
   };
-  return {
+  const result = {
     ...migrated,
     version: SAVE_VERSION,
     character: { ...withAdvancement(migrated.character), advancement },
@@ -87,6 +88,13 @@ export function migrateSave(raw) {
     lastTurnBaseline: migrated.lastTurnBaseline ? { ...migrated.lastTurnBaseline, inventory: (migrated.lastTurnBaseline.inventory || []).filter((item) => !isMoneyItem(item)).map(normalizeInventoryItem) } : null,
     lastTurnAudit: migrated.lastTurnAudit || null,
   };
+  // 六边形世界：旧存档保留已有迷雾进度，再以注册表对齐；无 world 字段时现场重建
+  if (result.world && typeof result.world.seed === "number" && result.world.tiles) {
+    reconcileWorld(result.world, result);
+  } else {
+    result.world = buildWorld(result);
+  }
+  return result;
 }
 
 export function exportSave(game) {

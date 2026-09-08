@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import Modal from "./Modal.jsx";
-import { findLocationRelations, findTravelRoute, getChildLocations, getMapLocation, getMapLocations, getMapRoutes, isDiscoveredLocationStatus, normalizeLocationKnowledge } from "../data/map.js";
+import { findLocationRelations, findTravelRoute, getChildLocations, getMapLocation, getMapLocations, isDiscoveredLocationStatus, normalizeLocationKnowledge } from "../data/map.js";
+import { cityTerrainLabel, hexPolygonPoints, hexToPixel, visibleHexes } from "../data/hexworld.js";
 import styles from "./WorldMap.module.css";
 
 const KIND_LABELS = {
@@ -12,9 +13,22 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
   const discoveredIds = useMemo(() => new Set([...game.discoveredLocations.map((location) => location.id), game.location.id]), [game.discoveredLocations, game.location.id]);
   const knowledgeById = useMemo(() => normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location.id, game), [game]);
   const allLocations = useMemo(() => getMapLocations(game), [game]);
-  const mapLocations = useMemo(() => allLocations.filter((location) => location.scope !== "interior" && (location.source === "static" || knowledgeById[location.id]?.status !== "unknown")), [allLocations, knowledgeById]);
-  const mapLocationIds = useMemo(() => new Set(mapLocations.map((location) => location.id)), [mapLocations]);
-  const routes = useMemo(() => getMapRoutes(game).filter((route) => mapLocationIds.has(route.from) && mapLocationIds.has(route.to)), [game, mapLocationIds]);
+  const locationById = useMemo(() => new Map(allLocations.map((location) => [location.id, location])), [allLocations]);
+  const hexCells = useMemo(() => visibleHexes(game, 4).map((cell) => {
+    const location = cell.tile.locationId ? locationById.get(cell.tile.locationId) : null;
+    const status = location ? knowledgeById[location.id]?.status || "unknown" : null;
+    return { ...cell, location, status };
+  }), [game, locationById, knowledgeById]);
+  const hexLayout = useMemo(() => {
+    const size = 34;
+    const points = hexCells.map((cell) => ({ cell, ...hexToPixel(cell.q, cell.r, size) }));
+    const xs = points.map((point) => point.x);
+    const ys = points.map((point) => point.y);
+    const pad = size * 1.6;
+    const minX = Math.min(...xs) - pad;
+    const minY = Math.min(...ys) - pad;
+    return { size, points, minX, minY, width: Math.max(...xs) - minX + pad, height: Math.max(...ys) - minY + pad };
+  }, [hexCells]);
   const currentRecord = getMapLocation(game.location.id, game);
   const [selectedId, setSelectedId] = useState(currentRecord?.scope === "interior" ? currentRecord.parentId : game.location.id);
   const selected = getMapLocation(selectedId, game);
@@ -29,39 +43,40 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
   const children = selected ? getChildLocations(game, selected.id).filter((location) => knowledgeById[location.id]?.status !== "unknown") : [];
   const dynamicCount = (game.mapExtensions?.locations || []).filter((location) => location.lifecycle !== "archived").length;
 
-  return <Modal title="贝克兰德交通图" eyebrow="Municipal route dossier" onClose={onClose} wide>
+  return <Modal title="贝克兰德城区图" eyebrow="Hex borough atlas" onClose={onClose} wide>
     <div className={styles.layout}>
-      <section className={styles.mapSection} aria-label="贝克兰德地点地图">
-        <div className={styles.mapSummary}><span>固定地标 {allLocations.filter((location) => location.source === "static").length}</span><span>剧情生长 {dynamicCount}</span><small>地图只在剧情产生可复用地点时扩展</small></div>
-        <div className={styles.legend}><span><i data-kind="current" />当前位置</span><span><i data-kind="known" />已发现</span><span><i data-kind="rumored" />听闻</span><span><i data-kind="dynamic" />剧情地点</span><span><i data-kind="unknown" />未知</span></div>
+      <section className={styles.mapSection} aria-label="贝克兰德六边形城区图">
+        <div className={styles.mapSummary}><span>固定地标 {allLocations.filter((location) => location.source === "static").length}</span><span>剧情生长 {dynamicCount}</span><small>移动到新区块会揭开周边迷雾</small></div>
+        <div className={styles.legend}><span><i data-kind="current" />当前位置</span><span><i data-kind="known" />已发现</span><span><i data-kind="rumored" />听闻</span><span><i data-kind="unknown" />迷雾</span></div>
         <div className={styles.mapCanvas}>
-          <div className={styles.districtLabels} aria-hidden="true"><span className={styles.north}>北区</span><span className={styles.queen}>皇后区</span><span className={styles.hillston}>希尔斯顿</span><span className={styles.east}>东区</span><span className={styles.bridge}>桥区</span></div>
-          <svg className={styles.routes} viewBox="0 0 100 100" preserveAspectRatio="none" aria-hidden="true">
-            {routes.map((entry) => {
-              const from = getMapLocation(entry.from, game);
-              const to = getMapLocation(entry.to, game);
-              const known = discoveredIds.has(entry.from) && discoveredIds.has(entry.to);
-              return <line key={`${entry.from}-${entry.to}`} x1={from.x} y1={from.y} x2={to.x} y2={to.y} data-known={known} data-dynamic={entry.source === "dynamic"} />;
+          <svg className={styles.hexGrid} viewBox={`${hexLayout.minX} ${hexLayout.minY} ${hexLayout.width} ${hexLayout.height}`} role="img" aria-label="六边形城区格网">
+            {hexLayout.points.map(({ cell, x, y }) => {
+              const known = cell.location && isDiscoveredLocationStatus(cell.status);
+              const rumored = cell.location && cell.status === "rumored";
+              const isCurrent = cell.location && (game.location.id === cell.location.id || (currentRecord?.scope === "interior" && currentRecord.parentId === cell.location.id));
+              return <g
+                key={`${cell.q},${cell.r}`}
+                className={styles.hexCell}
+                data-terrain={cell.discovered ? cell.tile.terrain : "fog"}
+                data-status={cell.status || (cell.discovered ? "open" : "unknown")}
+                data-current={isCurrent || null}
+                data-dynamic={cell.location?.source === "dynamic" || null}
+                role={cell.location ? "button" : undefined}
+                tabIndex={cell.location ? 0 : undefined}
+                aria-label={cell.location ? (known ? `${cell.location.name}${isCurrent ? "，玩家当前位置" : ""}` : rumored ? `${cell.location.district}的地点传闻` : `${cell.location.district}的雾中区域`) : (cell.discovered ? cityTerrainLabel(cell.tile.terrain) : "迷雾区域")}
+                onClick={cell.location ? () => setSelectedId(cell.location.id) : undefined}
+                onKeyDown={cell.location ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); setSelectedId(cell.location.id); } } : undefined}
+              >
+                <polygon points={hexPolygonPoints(x, y, hexLayout.size - 1.5)} />
+                {isCurrent && <polygon className={styles.currentRing} points={hexPolygonPoints(x, y, hexLayout.size - 7)} />}
+                {known && <text x={x} y={y - 3} className={styles.hexCode}>{cell.location.code}</text>}
+                {known && <text x={x} y={y + 13} className={styles.hexName}>{cell.tile.name || cell.location.name.replace(`${cell.location.district}·`, "")}</text>}
+                {rumored && <text x={x} y={y + 6} className={styles.hexRumor}>?</text>}
+                {!cell.location && cell.discovered && <text x={x} y={y + 4} className={styles.hexTerrain}>{cityTerrainLabel(cell.tile.terrain)}</text>}
+              </g>;
             })}
           </svg>
-          {mapLocations.map((location) => {
-            const status = knowledgeById[location.id]?.status || "unknown";
-            const isKnown = isDiscoveredLocationStatus(status);
-            const isCurrent = game.location.id === location.id || (currentRecord?.scope === "interior" && currentRecord.parentId === location.id);
-            return <button
-              key={location.id}
-              className={styles.node}
-              style={{ left: `${location.x}%`, top: `${location.y}%` }}
-              type="button"
-              data-current={isCurrent}
-              data-status={status}
-              data-dynamic={location.source === "dynamic"}
-              aria-pressed={selectedId === location.id}
-              aria-label={isKnown ? `${location.name}${isCurrent ? "，玩家当前位置" : ""}${location.source === "dynamic" ? "，剧情生长地点" : ""}` : status === "rumored" ? `${location.district}的地点传闻` : `${location.district}的雾中区域`}
-              onClick={() => setSelectedId(location.id)}
-            >{isCurrent && <i className={styles.playerMarker} aria-hidden="true" />}<b>{isKnown ? location.code : status === "rumored" ? "?" : "·"}</b><span>{isKnown ? location.name.replace(`${location.district}·`, "") : status === "rumored" ? "地点传闻" : "雾中区域"}</span></button>;
-          })}
-          <div className={styles.scale} aria-hidden="true"><i /><span>城区示意 · 动态节点由本地自动排布</span></div>
+          <div className={styles.scale} aria-hidden="true"><i /><span>六边形城区格网 · 地形与距离由本地引擎确定</span></div>
         </div>
       </section>
       <aside className={styles.detail} aria-live="polite">

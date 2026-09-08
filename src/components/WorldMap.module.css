@@ -15,10 +15,27 @@
 .mapCanvas::before, .mapCanvas::after { position: absolute; content: ""; pointer-events: none; }
 .mapCanvas::before { inset: 5%; border: 1px solid #75624725; }
 .mapCanvas::after { right: -10%; bottom: -20%; width: 65%; height: 33%; border: 1px solid #315c674f; border-radius: 50%; background: #315c670d; transform: rotate(-6deg); }
-.routes { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
-.routes line { stroke: #75674f55; stroke-width: .42; vector-effect: non-scaling-stroke; stroke-dasharray: 2 2; }
-.routes line[data-known="true"] { stroke: #5f5039b0; stroke-width: .75; stroke-dasharray: none; }
-.routes line[data-dynamic="true"] { stroke: #98753f; stroke-dasharray: 1.5 1; }
+.hexGrid { position: absolute; inset: 0; width: 100%; height: 100%; }
+.hexCell polygon { fill: #d7c9af66; stroke: #766b5850; stroke-width: 1; transition: fill .15s ease; }
+.hexCell[data-terrain="plain"] polygon { fill: #e6d9c1; stroke: #6e6250; }
+.hexCell[data-terrain="forest"] polygon { fill: #cfd6b4; stroke: #5c6b46; }
+.hexCell[data-terrain="hill"] polygon { fill: #ddc9a8; stroke: #77603c; }
+.hexCell[data-terrain="mountain"] polygon { fill: #b8b0a2; stroke: #57504a; }
+.hexCell[data-terrain="river"] polygon { fill: #b9cdc9; stroke: #315c67; }
+.hexCell[data-status="visited"] polygon, .hexCell[data-status="discovered"] polygon { stroke: #346454; stroke-width: 1.6; }
+.hexCell[data-dynamic="true"] polygon { stroke-dasharray: 4 2; }
+.hexCell[data-status="rumored"] polygon { fill: #ead9b4; stroke: #8b6930; stroke-dasharray: 3 2; }
+.hexCell[data-current="true"] polygon { fill: #3b3122; stroke: #b9924e; stroke-width: 2; }
+.hexCell[role="button"] { cursor: pointer; outline: none; }
+.hexCell[role="button"]:hover polygon { fill: #f1e5cd; }
+.hexCell[role="button"]:focus-visible polygon { stroke: #8b6930; stroke-width: 2.4; }
+.hexCell[data-current="true"]:hover polygon { fill: #493b28; }
+.currentRing { fill: none !important; stroke: #e8c87a !important; stroke-width: 1.6; stroke-dasharray: 3 2; }
+.hexCode { fill: #244f43; font: 700 9px var(--font-mono); letter-spacing: .04em; text-anchor: middle; pointer-events: none; }
+.hexName { fill: #3f554c; font: 700 8.5px var(--font-serif); text-anchor: middle; pointer-events: none; }
+.hexCell[data-current="true"] .hexCode, .hexCell[data-current="true"] .hexName { fill: #f1dfbd; }
+.hexRumor { fill: #765821; font: 700 13px var(--font-serif); text-anchor: middle; pointer-events: none; }
+.hexTerrain { fill: #6d614e99; font: 600 7.5px var(--font-sans); letter-spacing: .1em; text-anchor: middle; pointer-events: none; }
 .districtLabels span { position: absolute; z-index: 1; color: #67583e4a; font: 700 clamp(.65rem, 1.4vw, .9rem) var(--font-serif); letter-spacing: .22em; text-transform: uppercase; }
 .north { left: 43%; top: 4%; }.queen { left: 27%; top: 17%; }.hillston { left: 8%; top: 45%; }.east { right: 8%; top: 30%; }.bridge { left: 43%; bottom: 5%; }
 .node { position: absolute; z-index: 3; display: grid; grid-template-columns: 1.8rem max-content; align-items: center; gap: .32rem; max-width: 10rem; padding: .22rem .38rem .22rem .22rem; border: 1px dashed #766b58; background: #d7c9afde; color: #746a58; text-align: left; transform: translate(-50%, -50%); }

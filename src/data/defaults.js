@@ -2,9 +2,10 @@ import { makeId } from "../utils/id.js";
 import { withAdvancement } from "./character.js";
 import { MAX_STARTING_MONEY_PENCE, moneyFromPence } from "./money.js";
 import { initialDiscoveredLocations, normalizeLocationKnowledge } from "./map.js";
+import { buildWorld } from "./hexworld.js";
 import { ITEM_IMPORTANCE } from "./items.js";
 
-export const SAVE_VERSION = 10;
+export const SAVE_VERSION = 11;
 export const AI_SETTINGS_VERSION = "1.4";
 
 export const LOW_SEQUENCE_PATHWAYS = [
@@ -162,7 +163,7 @@ export function createInitialGame(character) {
   const normalizedCharacter = withAdvancement(character);
   const { startingMoneyPence = 240, ...characterProfile } = normalizedCharacter;
   const initialMoneyPence = Math.max(0, Math.min(MAX_STARTING_MONEY_PENCE, Number(startingMoneyPence) || 0));
-  return {
+  const game = {
     version: SAVE_VERSION,
     id: makeId("game"),
     title: `${character.name}的贝克兰德档案`,
@@ -224,4 +225,6 @@ export function createInitialGame(character) {
     lastTurnAudit: null,
     lastTurnMetrics: null,
   };
+  game.world = buildWorld(game);
+  return game;
 }
