@@ -20,6 +20,8 @@
 .avatarHint small { color: #6e6350; }
 .avatarRemove { position: absolute; top: .55rem; right: .55rem; z-index: 1; padding: .25rem .5rem; border: 1px solid #a98a5666; background: #0a0d0ecc; color: #c9b892; font: 700 .6rem var(--font-sans); letter-spacing: .1em; cursor: pointer; }
 .avatarRemove:hover { border-color: var(--danger); color: #e8b7ae; }
+.avatarNote { position: absolute; top: 100%; left: 0; width: 14rem; margin-top: .45rem; color: #6e6350; font: .58rem/1.5 var(--font-sans); letter-spacing: .06em; }
+.avatarNote a { color: var(--brass-light); }
 .form { align-self: start; padding: clamp(1.3rem, 3vw, 2.5rem); border-top: 3px solid var(--brass); background: var(--paper); color: var(--ink); box-shadow: 0 20px 60px #0005; }
 .formHeading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 1.4rem; padding-bottom: .8rem; border-bottom: 1px solid #8e7b594d; }
 .formHeading span { font: 500 1.5rem var(--font-serif); letter-spacing: .08em; }
