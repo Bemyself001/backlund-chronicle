@@ -8,12 +8,18 @@
 .kicker { margin: 0 0 .7rem; color: var(--brass-light); font: 700 .65rem var(--font-sans); letter-spacing: .3em; }
 .intro h1 { margin: 0; font: 400 clamp(2.8rem, 5vw, 5.2rem)/1.02 var(--font-serif); letter-spacing: .08em; }
 .intro > p:not(.kicker) { max-width: 24rem; margin: 1.5rem 0; color: #a9a08f; font: .95rem/1.8 var(--font-serif); }
-.portrait { position: relative; height: 15rem; margin-top: 2.2rem; overflow: hidden; border: 1px solid #a98a5642; background: radial-gradient(circle at 50% 30%, #55605a, #171d1c 55%, #0a0d0e); }
-.portrait::before, .portrait::after { content: ""; position: absolute; inset: .65rem; border: 1px solid #c19a5830; }
-.portrait::after { inset: 50% auto auto 0; width: 100%; height: 1px; }
-.head { position: absolute; top: 2.9rem; left: 50%; width: 4.7rem; height: 6rem; border-radius: 45% 45% 38% 38%; background: #080b0c; transform: translateX(-50%); box-shadow: 0 -1rem 0 -.3rem #080b0c; }
-.shoulders { position: absolute; bottom: -3rem; left: 50%; width: 14rem; height: 9rem; border-radius: 50% 50% 0 0; background: #080b0c; transform: translateX(-50%); }
-.portrait span { position: absolute; right: 1.2rem; bottom: 1rem; z-index: 1; color: #918269; font: .62rem var(--font-mono); letter-spacing: .14em; }
+.avatarFrame { position: relative; width: 11rem; height: 13rem; margin-bottom: 2rem; }
+.avatarPick { position: relative; display: grid; width: 100%; height: 100%; place-items: center; overflow: hidden; border: 1px dashed #a98a5680; background: radial-gradient(circle at 50% 32%, #2c3331, #12181a 60%, #0a0d0e); color: #918269; cursor: pointer; }
+.avatarPick::before, .avatarPick::after { content: ""; position: absolute; pointer-events: none; }
+.avatarPick::before { inset: .55rem; border: 1px solid #c19a5830; }
+.avatarPick::after { inset: 50% auto auto 0; width: 100%; height: 1px; background: #c19a5822; }
+.avatarPick:hover { border-color: var(--brass-light); border-style: solid; }
+.avatarPick img { width: 100%; height: 100%; object-fit: cover; }
+.avatarIcon { width: 3.2rem; height: 4.4rem; border-radius: 45% 45% 38% 38%; background: #080b0c; box-shadow: 0 -0.8rem 0 -0.25rem #080b0c, 0 3.4rem 0 1.4rem #080b0c; }
+.avatarHint { position: absolute; right: 0; bottom: .9rem; left: 0; font: .62rem/1.6 var(--font-mono); letter-spacing: .12em; text-align: center; }
+.avatarHint small { color: #6e6350; }
+.avatarRemove { position: absolute; top: .55rem; right: .55rem; z-index: 1; padding: .25rem .5rem; border: 1px solid #a98a5666; background: #0a0d0ecc; color: #c9b892; font: 700 .6rem var(--font-sans); letter-spacing: .1em; cursor: pointer; }
+.avatarRemove:hover { border-color: var(--danger); color: #e8b7ae; }
 .form { align-self: start; padding: clamp(1.3rem, 3vw, 2.5rem); border-top: 3px solid var(--brass); background: var(--paper); color: var(--ink); box-shadow: 0 20px 60px #0005; }
 .formHeading { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; margin-bottom: 1.4rem; padding-bottom: .8rem; border-bottom: 1px solid #8e7b594d; }
 .formHeading span { font: 500 1.5rem var(--font-serif); letter-spacing: .08em; }
@@ -37,5 +43,5 @@
 .error { padding: .65rem .8rem; border-left: 3px solid var(--danger); background: #812b2212; color: #6c211c; font: .8rem var(--font-sans); }
 .formFooter { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px solid #8e7b594d; }
 .formFooter p { max-width: 20rem; }
-@media (max-width: 850px) { .layout { grid-template-columns: 1fr; } .intro { position: static; display: grid; grid-template-columns: 1fr auto; align-items: end; } .intro > p, .portrait { display: none; } }
+@media (max-width: 850px) { .layout { grid-template-columns: 1fr; } .intro { position: static; } .intro > p { display: none; } .avatarFrame { width: 7.5rem; height: 9rem; margin-bottom: 1.2rem; } }
 @media (max-width: 600px) { .header { grid-template-columns: 1fr auto; } .header span { display: none; } .layout { width: 100%; padding: 1.8rem 0 0; gap: 1.5rem; } .intro { padding: 0 1rem; } .intro h1 { font-size: 2.7rem; } .form { padding: 1.2rem 1rem 2rem; } .grid, .identity { grid-template-columns: 1fr; } .spanTwo { grid-column: auto; } .formHeading p { display: none; } .formFooter { align-items: stretch; flex-direction: column; } }

@@ -21,6 +21,7 @@
 .avatar { position: relative; width: 3.5rem; height: 4.2rem; overflow: hidden; border: 1px solid #9f82504d; background: radial-gradient(circle at 50% 28%, #63706a, #202726 55%, #0a0d0e); }
 .avatar i { position: absolute; top: .7rem; left: 50%; width: 1.45rem; height: 1.85rem; border-radius: 45%; background: #0c1011; transform: translateX(-50%); }
 .avatar b { position: absolute; bottom: -.8rem; left: 50%; width: 3.4rem; height: 2.5rem; border-radius: 50% 50% 0 0; background: #0c1011; transform: translateX(-50%); }
+.avatar img { width: 100%; height: 100%; object-fit: cover; }
 .profile p { margin: 0 0 .15rem; color: var(--brass-light); font: 700 .56rem var(--font-sans); letter-spacing: .11em; text-transform: uppercase; }
 .profile p[data-extraordinary="true"] { display: inline-flex; padding: .18rem .32rem; border: 1px solid #9d7748; background: #b18e5018; color: #d5b878; }
 .profile h2 { margin: 0; font: 500 1.15rem var(--font-serif); letter-spacing: .06em; }

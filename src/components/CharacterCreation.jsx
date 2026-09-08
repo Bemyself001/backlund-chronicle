@@ -1,7 +1,33 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { EMPTY_CHARACTER, LOW_SEQUENCE_PATHWAYS, randomCharacter } from "../data/defaults.js";
 import { MAX_STARTING_MONEY_PENCE, moneyFromPence, formatMoney } from "../data/money.js";
 import styles from "./CharacterCreation.module.css";
+
+const AVATAR_SIZE = 192;
+
+function readAvatarFile(file) {
+  return new Promise((resolve, reject) => {
+    if (!file || !file.type.startsWith("image/")) { reject(new Error("请选择图片文件（PNG / JPG 等）。")); return; }
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error("图片读取失败，请换一张试试。"));
+    reader.onload = () => {
+      const image = new Image();
+      image.onerror = () => reject(new Error("图片解析失败，请换一张试试。"));
+      image.onload = () => {
+        const canvas = document.createElement("canvas");
+        canvas.width = AVATAR_SIZE;
+        canvas.height = AVATAR_SIZE;
+        const scale = Math.max(AVATAR_SIZE / image.width, AVATAR_SIZE / image.height);
+        const width = image.width * scale;
+        const height = image.height * scale;
+        canvas.getContext("2d").drawImage(image, (AVATAR_SIZE - width) / 2, (AVATAR_SIZE - height) / 2, width, height);
+        resolve(canvas.toDataURL("image/jpeg", 0.85));
+      };
+      image.src = reader.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
 
 const fields = [
   ["name", "姓名", "text"], ["gender", "性别", "select", ["女", "男", "非二元", "不公开"]], ["age", "年龄", "number"],
@@ -13,6 +39,18 @@ const fields = [
 export default function CharacterCreation({ onBack, onCreate }) {
   const [character, setCharacter] = useState({ ...EMPTY_CHARACTER });
   const [error, setError] = useState("");
+  const fileInputRef = useRef(null);
+  const pickAvatar = async (event) => {
+    const file = event.target.files?.[0];
+    event.target.value = "";
+    if (!file) return;
+    try {
+      update("avatar", await readAvatarFile(file));
+      setError("");
+    } catch (avatarError) {
+      setError(avatarError.message);
+    }
+  };
   const update = (key, value) => setCharacter((current) => ({ ...current, [key]: value }));
   const selectExtraordinary = (extraordinary) => setCharacter((current) => ({
     ...current,
@@ -32,10 +70,18 @@ export default function CharacterCreation({ onBack, onCreate }) {
       <header className={styles.header}><button type="button" onClick={onBack}>← 返回</button><span>贝克兰德临时居民登记处</span><small>FORM BK—04</small></header>
       <section className={styles.layout}>
           <aside className={styles.intro}>
+          <div className={styles.avatarFrame} data-filled={Boolean(character.avatar) || null}>
+            <button type="button" className={styles.avatarPick} onClick={() => fileInputRef.current?.click()} aria-label={character.avatar ? "更换头像" : "上传头像"}>
+              {character.avatar
+                ? <img src={character.avatar} alt="角色头像预览" />
+                : <><span className={styles.avatarIcon} aria-hidden="true" /><span className={styles.avatarHint}>点击录入肖像<br /><small>PNG / JPG，自动压缩</small></span></>}
+            </button>
+            {character.avatar && <button type="button" className={styles.avatarRemove} onClick={() => update("avatar", "")}>移除</button>}
+            <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={pickAvatar} />
+          </div>
           <p className={styles.kicker}>CHARACTER DOSSIER</p><h1>建立你的<br />私人档案</h1>
           <p>这不是英雄履历，而是一份会被世界记住的过去。欲望会指引你，恐惧与秘密也会留下代价。</p>
-          <button className="button button--secondary" type="button" onClick={() => { setCharacter({ ...EMPTY_CHARACTER, ...randomCharacter() }); setError(""); }}>随机生成角色</button>
-          <div className={styles.portrait} aria-label="风格化角色头像占位图"><div className={styles.head} /><div className={styles.shoulders} /><span>肖像待录入</span></div>
+          <button className="button button--secondary" type="button" onClick={() => { setCharacter({ ...EMPTY_CHARACTER, ...randomCharacter(), avatar: character.avatar }); setError(""); }}>随机生成角色</button>
         </aside>
         <form className={styles.form} onSubmit={submit}>
           <div className={styles.formHeading}><span>个人资料</span><p>带 * 的项目会影响开局叙事</p></div>

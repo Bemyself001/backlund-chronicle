@@ -86,6 +86,7 @@ export const EMPTY_CHARACTER = {
   name: "",
   gender: "女",
   age: 24,
+  avatar: "",
   appearance: "",
   origin: "贝克兰德桥区",
   occupation: "报社校对员",
