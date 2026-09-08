@@ -67,7 +67,8 @@
 .locationList span, .locationList small { display: block; }
 .locationList span { color: #aaa18f; font: .68rem var(--font-serif); }
 .locationList small { margin-top: .16rem; color: #666861; font: .57rem/1.4 var(--font-sans); }
-.story { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; min-width: 0; overflow: hidden; background-color: #e8dcc4; background-image: linear-gradient(#3d33290a 1px, transparent 1px), radial-gradient(circle at 30% 20%, #fff5, transparent 24%); background-size: 100% 31px, auto; color: var(--ink); }
+.story { display: grid; grid-template-rows: minmax(0, 1fr) auto; min-width: 0; overflow: hidden; background-color: #e8dcc4; background-image: linear-gradient(#3d33290a 1px, transparent 1px), radial-gradient(circle at 30% 20%, #fff5, transparent 24%); background-size: 100% 31px, auto; color: var(--ink); }
+.story.withTip { grid-template-rows: auto minmax(0, 1fr) auto; }
 .mockTip { display: grid; gap: .4rem; margin: 1rem clamp(1.3rem, 5vw, 5.5rem) 0; padding: .9rem 1.1rem; border: 1px solid #8b6930; border-left: 3px solid var(--brass); background: #ead9b4; color: #4d4028; font: .78rem/1.6 var(--font-sans); }
 .mockTip strong { color: #3a2f1c; font-size: .85rem; }
 .mockTip div { display: flex; gap: .6rem; margin-top: .3rem; }

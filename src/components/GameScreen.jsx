@@ -183,7 +183,7 @@ export default function GameScreen({ game, loading, turnPhase, streamText, error
     </header>
     <div className={styles.workspace}>
       <aside className={`${styles.left} ${mobilePanel === "character" ? styles.drawerOpen : ""}`} aria-label="角色状态"><div className={styles.drawerHeader}><span>角色状态</span><button type="button" onClick={() => setMobilePanel(null)}>关闭</button></div><CharacterPanel game={game} /></aside>
-      <section className={styles.story} aria-label="剧情与行动">
+      <section className={showMockTip ? `${styles.story} ${styles.withTip}` : styles.story} aria-label="剧情与行动">
         {showMockTip && <div className={styles.mockTip} role="note">
           <strong>当前为 Mock 演示模式</strong>
           <span>剧情由本地脚本生成，不消耗 API。配置自己的模型服务（OpenAI / DeepSeek / Gemini / Ollama 等）后关闭 Mock 模式，即可获得真正由 AI 驱动的沙盒体验。</span>
