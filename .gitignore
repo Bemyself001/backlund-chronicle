@@ -10,3 +10,4 @@ scripts/bench-settings.json
 *.apk
 *.apk.sha256
 .shots/
+webbridge-*.json
