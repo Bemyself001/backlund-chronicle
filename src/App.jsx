@@ -22,7 +22,7 @@ import { ensureMapMoveToolCall, ensureMockMapDiscoveryToolCall } from "./service
 import { hasUsableChoices, injectOccultEntryChoice } from "./services/choices.js";
 import { createTurnResolution } from "./services/turnResolution.js";
 import { makeId } from "./utils/id.js";
-import { checkForUpdate, isNativeAndroid } from "./services/updates.js";
+import { canHotUpdate, checkForUpdate, downloadAndApplyOta, isNativeAndroid } from "./services/updates.js";
 import { finishTurnMetrics, markTurnMetric, recordModelRequest, startTurnMetrics } from "./services/turnMetrics.js";
 import { isExplicitAdvancementIntent } from "./data/character.js";
 import { exploreHex } from "./data/hexworld.js";
@@ -70,8 +70,16 @@ export default function App() {
     if (!isNativeAndroid()) return undefined;
     let active = true;
     const timer = window.setTimeout(() => {
-      checkForUpdate().then((result) => {
-        if (active && result.hasUpdate) setModal("update-auto");
+      checkForUpdate().then(async (result) => {
+        if (!active || !result.hasUpdate) return;
+        if (canHotUpdate(result)) {
+          // 静默热更新：后台下载页面资源包，下次启动生效；失败则退回更新弹窗
+          try {
+            await downloadAndApplyOta(result, { reload: false });
+            return;
+          } catch { /* 退回完整安装包流程 */ }
+        }
+        setModal("update-auto");
       }).catch(() => {});
     }, 1800);
     return () => { active = false; window.clearTimeout(timer); };

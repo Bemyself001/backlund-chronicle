@@ -53,6 +53,8 @@ jobs:
           mkdir pages
           cp "dist/贝克兰德纪事-离线版.html" pages/index.html
           cp dist/privacy.html pages/privacy.html
+          cd dist/client && zip -qr ../../pages/web-bundle.zip . && cd ../..
+          sha256sum pages/web-bundle.zip | awk '{print $1}' > /tmp/web-bundle.sha256
 
       - name: Write update manifest (latest.json)
         continue-on-error: true
@@ -68,6 +70,8 @@ jobs:
             const manifest = {
               version: String(release.tag_name || "").replace(/^v/i, ""),
               apkUrl: apk ? apk.browser_download_url : null,
+              bundleUrl: "https://bemyself001.github.io/backlund-chronicle/web-bundle.zip",
+              bundleSha256: fs.readFileSync("/tmp/web-bundle.sha256", "utf8").trim(),
               releaseUrl: release.html_url,
               notes: release.body || "",
               publishedAt: new Date().toISOString(),

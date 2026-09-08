@@ -32,3 +32,22 @@ test("getDownloadOptions skips mirrors for non-GitHub urls", () => {
   assert.equal(options.length, 2);
   assert.equal(options[1].label, "打开发布页手动下载");
 });
+
+import { pickBundleAsset, canHotUpdate } from "../src/services/updates.js";
+
+test("pickBundleAsset finds the OTA web bundle among release assets", () => {
+  const assets = [
+    { name: "backlund-chronicle.apk" },
+    { name: "web-bundle.zip" },
+    { name: "web-bundle.zip.sha256" },
+  ];
+  assert.equal(pickBundleAsset(assets)?.name, "web-bundle.zip");
+  assert.equal(pickBundleAsset([{ name: "backlund-chronicle.apk" }]), null);
+  assert.equal(pickBundleAsset(undefined), null);
+});
+
+test("canHotUpdate requires native android, an update and a bundle url", () => {
+  // 测试环境是非原生（web），因此一律为 false
+  assert.equal(canHotUpdate({ hasUpdate: true, bundleUrl: "https://x/web-bundle.zip" }), false);
+  assert.equal(canHotUpdate(null), false);
+});

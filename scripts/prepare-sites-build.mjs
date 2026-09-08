@@ -43,5 +43,6 @@ await writeFile(standaloneTarget, standaloneEntry, "utf8");
 await mkdir(clientDirectory, { recursive: true });
 await rename(clientEntrySource, clientEntryTarget);
 await rename(clientAssetsSource, clientAssetsTarget);
+await copyFile(resolve(buildDirectory, "privacy.html"), resolve(clientDirectory, "privacy.html"));
 await mkdir(workerDirectory, { recursive: true });
 await copyFile(workerSource, workerTarget);

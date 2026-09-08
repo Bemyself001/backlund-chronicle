@@ -57,11 +57,18 @@ function pickApkAsset(assets) {
     || assets?.find((asset) => asset.name?.endsWith(".apk"));
 }
 
+export function pickBundleAsset(assets) {
+  return assets?.find((asset) => asset.name === "web-bundle.zip") || null;
+}
+
 function shapeGitHubRelease(release) {
   const apk = pickApkAsset(release.assets);
+  const bundle = pickBundleAsset(release.assets);
   return {
     latestVersion: String(release.tag_name || "").replace(/^v/i, ""),
     downloadUrl: apk?.browser_download_url || release.html_url,
+    bundleUrl: bundle?.browser_download_url || null,
+    bundleSha256: null, // Release 通道无法稳定获取校验文件，TLS 直连即可
     releaseUrl: release.html_url,
     notes: release.body || "本次发布未提供更新说明。",
   };
@@ -72,6 +79,8 @@ function shapePagesManifest(manifest) {
   return {
     latestVersion: String(manifest.version).replace(/^v/i, ""),
     downloadUrl: manifest.apkUrl || manifest.releaseUrl,
+    bundleUrl: manifest.bundleUrl || null,
+    bundleSha256: manifest.bundleSha256 || null,
     releaseUrl: manifest.releaseUrl,
     notes: manifest.notes || "本次发布未提供更新说明。",
   };
@@ -126,10 +135,39 @@ export async function checkForUpdate({ force = false } = {}) {
     latestVersion: release.latestVersion,
     hasUpdate: Boolean(release.downloadUrl) && compareVersions(release.latestVersion, APP_VERSION) > 0,
     downloadUrl: release.downloadUrl,
+    bundleUrl: release.bundleUrl,
+    bundleSha256: release.bundleSha256,
     releaseUrl: release.releaseUrl,
     notes: release.notes,
     source,
   };
+}
+
+export function canHotUpdate(result) {
+  return isNativeAndroid() && Boolean(result?.hasUpdate && result?.bundleUrl);
+}
+
+/** 下载并校验 Web 热更新包；reload=false 时下次启动生效，true 时立即重新载入。 */
+export async function downloadAndApplyOta(result, { reload = false } = {}) {
+  if (!canHotUpdate(result)) throw new Error("当前环境不支持热更新");
+  const bundle = await Updater.downloadBundle({
+    url: result.bundleUrl,
+    version: result.latestVersion,
+    sha256: result.bundleSha256 || "",
+  });
+  await Updater.applyBundle({ path: bundle.path, version: result.latestVersion, reload });
+  return bundle;
+}
+
+export async function resetOtaBundle({ reload = false } = {}) {
+  if (!isNativeAndroid()) return;
+  await Updater.resetBundle({ reload });
+}
+
+/** 已就绪的热更新立即生效（重新载入界面）。 */
+export async function activateOtaNow(bundle) {
+  if (!isNativeAndroid() || !bundle?.path) return;
+  await Updater.applyBundle({ path: bundle.path, version: bundle.version || "", reload: true });
 }
 
 export async function openUpdateDownload(url) {
