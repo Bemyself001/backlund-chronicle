@@ -28,6 +28,15 @@ public class UpdaterPlugin extends Plugin {
     private static final String KEY_PATH = "bundlePath";
     private static final String KEY_VERSION = "bundleVersion";
 
+    /** 插件 load() 在页面加载前执行：此时切换资源路径，无需 reload，避免本地服务器未就绪的竞态。 */
+    @Override
+    public void load() {
+        String path = activeBundlePath(getContext());
+        if (path != null) {
+            getBridge().setServerAssetPath(path);
+        }
+    }
+
     @PluginMethod
     public void openDownload(PluginCall call) {
         String url = call.getString("url");
