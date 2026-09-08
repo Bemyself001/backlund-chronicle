@@ -391,11 +391,11 @@ const TOOL_PARAMETER_SCHEMAS = {
       patch: {
         type: "object",
         additionalProperties: false,
-        description: "受限角色数值的目标值，只允许生命、理智、灵性",
+        description: "受限角色数值的增减量（正数恢复、负数扣减，引擎自动截断到 0 至上限），只允许生命、理智、灵性",
         properties: {
-          health: { type: "integer", minimum: 0 },
-          sanity: { type: "integer", minimum: 0 },
-          spirituality: { type: "integer", minimum: 0 },
+          health: { type: "integer" },
+          sanity: { type: "integer" },
+          spirituality: { type: "integer" },
         },
       },
       requiresOccult: { type: "boolean", description: "仅非凡相关变化为 true，需已接触非凡世界" },

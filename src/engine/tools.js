@@ -20,7 +20,7 @@ export const TOOL_SCHEMAS = {
   "occult.contact": { required: ["entryId"], description: "确认玩家主动接触当前非凡入口" },
   "occult.reveal": { required: ["topic", "evidence"], description: "在已有非凡接触后揭示有限神秘知识" },
   "advancement.promote": { required: ["pathwayId", "sequence", "potionInstanceId", "recipeClueId", "evidence"], description: "验证剧情接触、配方与魔药后完成晋升" },
-  "character.update": { required: ["patch"], description: "更新受限角色数值" },
+  "character.update": { required: ["patch"], description: "以增减量调整受限角色数值（可为负），由引擎截断到 0 至上限" },
   "status.add": { required: ["status"], description: "添加状态效果" },
   "status.remove": { required: ["statusId"], description: "移除状态效果" },
   "relationship.update": { required: ["npcId", "delta"], description: "更新已知 NPC 关系" },
@@ -530,12 +530,41 @@ function executeOne(game, call, options = {}) {
     case "character.update": {
       if (args.requiresOccult && Number(game.occult?.contact) !== 1) return fail(call.name, "尚未接触非凡世界，不能应用非凡相关角色变化");
       const allowed = ["health", "sanity", "spirituality"];
+      const statLabels = { health: "生命", sanity: "理智", spirituality: "灵性" };
+      // 归零联动状态：由引擎自动维护，AI 无需手动增删
+      const collapseStatuses = {
+        health: { id: "collapse-health", name: "濒危", kind: "danger", description: "伤势已超出身体负荷，需要立刻获得照料。" },
+        sanity: { id: "collapse-sanity", name: "精神恍惚", kind: "danger", description: "现实的轮廓开始晃动，任何刺激都可能留下裂痕。" },
+        spirituality: { id: "collapse-spirituality", name: "灵性枯竭", kind: "neutral", description: "灵性暂时见底，非凡能力难以成形。" },
+      };
+      const changes = [];
       Object.entries(args.patch || {}).forEach(([key, value]) => {
         if (!allowed.includes(key) || !Number.isFinite(Number(value))) return;
-        const max = game.character.stats[`max${key[0].toUpperCase()}${key.slice(1)}`];
-        game.character.stats[key] = Math.max(0, Math.min(max, Number(value)));
+        const delta = Math.trunc(Number(value));
+        if (delta === 0) return;
+        const max = Number(game.character.stats[`max${key[0].toUpperCase()}${key.slice(1)}`]);
+        const before = Number(game.character.stats[key]);
+        const after = Math.max(0, Math.min(max, before + delta));
+        if (after === before) return;
+        game.character.stats[key] = after;
+        changes.push({ stat: key, label: statLabels[key], before, after, delta: after - before, requested: delta });
       });
-      return succeed(call.name, `${turnLabel}：角色状态发生变化——${call.reason}。`);
+      if (!changes.length) return fail(call.name, "没有有效的数值变化；patch 只接受生命、理智、灵性的非零增减量");
+      const autoStatuses = [];
+      changes.forEach(({ stat, after }) => {
+        const collapse = collapseStatuses[stat];
+        const existing = game.statusEffects.find((entry) => entry.id === collapse.id);
+        if (after === 0 && !existing) {
+          game.statusEffects.push({ ...collapse });
+          autoStatuses.push(`自动附加状态「${collapse.name}」`);
+        } else if (after > 0 && existing) {
+          game.statusEffects = game.statusEffects.filter((entry) => entry.id !== collapse.id);
+          autoStatuses.push(`自动解除状态「${collapse.name}」`);
+        }
+      });
+      const changeText = changes.map(({ label, before, after, delta }) => `${label} ${before}→${after}（${delta > 0 ? "+" : ""}${delta}）`).join("，");
+      const suffix = autoStatuses.length ? `；${autoStatuses.join("，")}` : "";
+      return succeed(call.name, `${turnLabel}：角色状态变化——${changeText}（${call.reason}）${suffix}。`, { statChanges: changes, autoStatuses });
     }
     case "status.add": {
       if (!args.status?.id || !args.status?.name) return fail(call.name, "状态必须包含 id 与 name");

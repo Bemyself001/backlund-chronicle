@@ -151,3 +151,37 @@ test("money tools accept flat denomination args by folding them into amount", ()
   const nested = normalizeToolCall({ name: "money.remove", args: { amount: { pence: 6 }, reason: "购买黑啤酒" } }, game);
   assert.deepEqual(nested.args.amount, { pence: 6 });
 });
+
+test("character.update applies deltas, clamps to bounds and logs before/after", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "增减量测试员" });
+  game.character.stats.sanity = 9;
+  const hurt = executeToolCalls(game, [{ id: "hurt", name: "character.update", args: { patch: { sanity: -2, health: -99 } }, reason: "目睹异常景象" }]);
+  assert.equal(hurt.results[0].ok, true);
+  assert.equal(hurt.game.character.stats.sanity, 7);
+  assert.equal(hurt.game.character.stats.health, 0); // 截断到 0
+  assert.match(hurt.results[0].log, /理智 9→7（-2）/);
+  assert.match(hurt.results[0].log, /生命 10→0（-10）/);
+  const healed = executeToolCalls(hurt.game, [{ id: "heal", name: "character.update", args: { patch: { sanity: 50 } }, reason: "安稳睡了一觉" }]);
+  assert.equal(healed.game.character.stats.sanity, 10); // 截断到上限
+});
+
+test("character.update auto-manages collapse statuses when stats hit or leave zero", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "归零测试员" });
+  const drained = executeToolCalls(game, [{ id: "drain", name: "character.update", args: { patch: { spirituality: -9 } }, reason: "强行维持灵视" }]);
+  assert.equal(drained.game.character.stats.spirituality, 0);
+  assert.ok(drained.game.statusEffects.some((status) => status.id === "collapse-spirituality"));
+  assert.match(drained.results[0].log, /灵性枯竭/);
+  const recovered = executeToolCalls(drained.game, [{ id: "recover", name: "character.update", args: { patch: { spirituality: 2 } }, reason: "短暂冥想" }]);
+  assert.equal(recovered.game.character.stats.spirituality, 2);
+  assert.ok(!recovered.game.statusEffects.some((status) => status.id === "collapse-spirituality"));
+  assert.match(recovered.results[0].log, /自动解除状态「灵性枯竭」/);
+});
+
+test("character.update rejects zero or empty patches", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "空补丁测试员" });
+  const zero = executeToolCalls(game, [{ id: "zero", name: "character.update", args: { patch: { sanity: 0 } }, reason: "无变化" }]);
+  assert.equal(zero.results[0].ok, false);
+  const empty = executeToolCalls(game, [{ id: "empty", name: "character.update", args: { patch: {} }, reason: "无变化" }]);
+  assert.equal(empty.results[0].ok, false);
+  assert.equal(game.character.stats.sanity, 9);
+});
