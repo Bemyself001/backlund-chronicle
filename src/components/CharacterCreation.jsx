@@ -90,6 +90,7 @@ export default function CharacterCreation({ onBack, onCreate }) {
               {type === "select" ? <select value={character[key]} onChange={(e) => update(key, e.target.value)}>{options.map((option) => <option key={option}>{option}</option>)}</select>
                 : type === "textarea" ? <textarea rows={key === "background" ? 4 : 2} value={character[key]} onChange={(e) => update(key, e.target.value)} />
                   : <input type={type} min={type === "number" ? 16 : undefined} max={type === "number" ? 80 : undefined} value={character[key]} onChange={(e) => update(key, e.target.value)} />}
+              {key === "name" && <small className={styles.fieldHint}>可使用虚构昵称；仅用于角色扮演，详见<a href="/privacy.html" target="_blank" rel="noreferrer">隐私政策</a></small>}
             </label>)}
           </div>
           <fieldset className={styles.identity}><legend>非凡身份</legend>

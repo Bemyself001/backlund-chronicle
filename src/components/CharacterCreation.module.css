@@ -30,7 +30,8 @@
 .field input, .field select { min-height: 2.7rem; padding: .55rem .65rem; }
 .field textarea { padding: .7rem; resize: vertical; }
 .pathwayField { margin-top: .2rem; }
-.pathwayField small { color: #665e50; font: .72rem/1.5 var(--font-sans); letter-spacing: normal; text-transform: none; }
+.pathwayField small, .fieldHint { color: #665e50; font: .72rem/1.5 var(--font-sans); letter-spacing: normal; text-transform: none; }
+.fieldHint a { color: var(--verdigris); }
 .spanTwo { grid-column: 1 / -1; }
 .identity { display: grid; grid-template-columns: 1fr 1fr; gap: .7rem; margin: 1.2rem 0; padding: 1rem; border: 1px solid #8c79584f; }
 .identity legend { padding: 0 .4rem; color: var(--ink-soft); font: 700 .68rem var(--font-sans); letter-spacing: .1em; text-transform: uppercase; }
