@@ -470,7 +470,7 @@ export default function App() {
 
   return <>
     <a className="skip-link" href="#main">跳到主要内容</a>
-    {screen === "welcome" && <Welcome hasSave={saves.some((slot) => slot.slotId === "autosave")} apiSettings={settings} onNew={() => setScreen("create")} onContinue={handleContinue} onImport={handleImport} onApi={() => setModal("api")} onChangelog={() => setModal("changelog")} />}
+    {screen === "welcome" && <Welcome hasSave={saves.some((slot) => slot.slotId === "autosave")} saves={saves} apiSettings={settings} onNew={() => setScreen("create")} onContinue={handleContinue} onLoadSlot={loadSlot} onImport={handleImport} onApi={() => setModal("api")} onChangelog={() => setModal("changelog")} />}
     {screen === "create" && <CharacterCreation onBack={() => setScreen("welcome")} onCreate={handleCreate} />}
     {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} mockMode={Boolean(settings.mockMode)} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onRegenerateChoices={regenerateChoices} onLocalTool={runLocalTool} onOpenMap={() => setModal("map")} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => setScreen("welcome")} />}
     {itemConfirmation && <ImportantItemConfirmation changes={itemConfirmation.changes} onConfirm={(approvedKeys) => settleImportantItemConfirmation({ approvedKeys })} onCancel={() => settleImportantItemConfirmation({ cancelled: true })} />}
