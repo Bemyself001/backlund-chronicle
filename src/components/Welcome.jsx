@@ -25,7 +25,7 @@ export default function Welcome({ hasSave, apiSettings, onNew, onContinue, onImp
       <section className={styles.hero} aria-labelledby="welcome-title">
         <div className={styles.registry}><span>案卷编号</span><strong>BK—1107</strong></div>
         <p className={styles.kicker}>AI NARRATIVE SANDBOX</p>
-        <h1 id="welcome-title"><small className={styles.series}>诡秘之主</small><span>贝克兰德</span>纪事</h1>
+        <h1 id="welcome-title"><span>贝克兰德</span>纪事</h1>
         <p className={styles.subtitle}>在煤烟、钟声与隐秘仪式之间，<br />写下只属于你的非凡档案。</p>
         <div className={styles.rule} aria-hidden="true"><i /><span>◆</span><i /></div>
         <div className={styles.actions}>
