@@ -18,7 +18,7 @@
 /* 档案开箱：左侧卷宗标题，右侧档案柜 */
 .desk { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(20rem, .85fr); gap: clamp(2rem, 5vw, 5rem); width: min(92%, 76rem); margin: 0 auto; padding: clamp(2.5rem, 7vh, 5.5rem) 0 6rem; }
 .folio { margin: 0 0 1.1rem; color: #8d816b; font: 600 .6rem var(--font-mono); letter-spacing: .28em; text-transform: uppercase; }
-.hero h1 { margin: 0; font: 400 clamp(3.4rem, 7.5vw, 6.4rem)/.95 var(--font-display); letter-spacing: .07em; text-shadow: 0 8px 40px #000; white-space: nowrap; }
+.hero h1 { margin: 0; font-family: var(--font-display); font-size: 3.4rem; font-size: clamp(3.4rem, 7.5vw, 6.4rem); font-style: normal; font-weight: 400; line-height: .95; letter-spacing: .07em; text-shadow: 0 8px 40px #000; white-space: nowrap; }
 .hero h1 span { color: var(--brass-light); }
 .subtitle { margin: 1.8rem 0; color: #c4b9a2; font: 400 clamp(.95rem, 1.8vw, 1.15rem)/1.9 var(--font-serif); letter-spacing: .14em; }
 .rule { display: flex; align-items: center; gap: .8rem; width: min(22rem, 90%); margin: 1.8rem 0; color: var(--brass); font-size: .55rem; }
@@ -60,4 +60,4 @@
   .desk { grid-template-columns: 1fr; gap: 2.5rem; padding-bottom: 7rem; }
   .stamp { bottom: 3.4rem; }
 }
-@media (max-width: 700px) { .masthead { min-height: 4.6rem; padding: 0 1rem; } .masthead > p { display: none; } .mastheadActions { gap: .1rem; } .changelogLink, .apiStatus { padding-inline: .45rem; font-size: .7rem; } .hero h1 { white-space: normal; font-size: clamp(2.4rem, 11vw, 3.4rem); letter-spacing: .025em; } .actions { flex-direction: column; align-items: stretch; width: min(100%, 21rem); } .footer { justify-content: space-around; gap: .5rem; } .footer span:nth-child(2) { display: none; } }
+@media (max-width: 700px) { .masthead { min-height: 4.6rem; padding: 0 1rem; } .masthead > p { display: none; } .mastheadActions { gap: .1rem; } .changelogLink, .apiStatus { padding-inline: .45rem; font-size: .7rem; } .hero h1 { white-space: normal; font-size: 2.4rem; font-size: clamp(2.4rem, 11vw, 3.4rem); letter-spacing: .025em; } .actions { flex-direction: column; align-items: stretch; width: min(100%, 21rem); } .footer { justify-content: space-around; gap: .5rem; } .footer span:nth-child(2) { display: none; } }

@@ -1,6 +1,19 @@
 export const LATEST_UPDATE = {
   date: "2026-09-09",
   dateLabel: "2026.09.09",
+  title: "修复手机端标题字体",
+  summary: "修复部分手机内置浏览器因不支持 clamp() 字号简写而整条丢弃标题字体的问题，并主动刷新旧的字体失败缓存。",
+  changes: [
+    "标题的字体族、字号、字重与行高改为独立声明；旧版移动 WebView 即使不支持 clamp()，也仍会正确应用山海星夜哥特。",
+    "桌面与手机断点都增加固定字号兜底，现代浏览器继续使用响应式字号。",
+    "页面启动时预加载标题字体，并使用新资源版本标识绕过手机浏览器可能保留的旧 404 缓存。",
+  ],
+};
+
+export const PREVIOUS_UPDATES = [
+  {
+  date: "2026-09-09",
+  dateLabel: "2026.09.09",
   title: "修复 APK 更新与线上标题字体",
   summary: "修复 GitHub Pages、完整 APK 与热更新包之间的发布竞态，并把山海星夜哥特字体纳入线上网页和 Android 更新产物。",
   changes: [
@@ -9,9 +22,7 @@ export const LATEST_UPDATE = {
     "Pages 更新清单只引用已经完成的 APK Release；APK 构建成功后会自动再次发布网页，消除新版号误指向旧安装包的竞态。",
     "移除 Android 与现代浏览器不再需要的 TTF 下载兜底，避免把热更新包额外放大约 6 MB。",
   ],
-};
-
-export const PREVIOUS_UPDATES = [
+  },
   {
   date: "2026-09-09",
   dateLabel: "2026.09.09",

@@ -37,6 +37,7 @@ const [script, stylesheet] = await Promise.all([
 ]);
 const standaloneEntry = clientEntry
   .replace(scriptMatch[0], () => `<script type="module">${script.replace(/<\/script/gi, "<\\/script")}</script>`)
+  .replace(/href=(["'])\/fonts\//gi, "href=$1./fonts/")
   .replace(stylesheetMatch[0], () => `<style>${stylesheet
     .replace(/url\((["']?)\/fonts\//gi, "url($1./fonts/")
     .replace(/<\/style/gi, "<\\/style")}</style>`);
