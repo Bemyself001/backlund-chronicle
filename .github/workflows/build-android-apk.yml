@@ -96,5 +96,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "贝克兰德纪事 ${APP_VERSION_NAME}" \
-            --notes "正式签名的 Android 版本。已安装 1.1.66 及以上底座的设备将通过热更新获取后续版本（约 0.2 MB，免重装）；首次从旧版迁移请安装本 APK，安装前请导出存档并卸载旧版。" \
+            --notes "正式签名的 Android 版本。已安装 1.1.66 及以上底座的设备将通过热更新获取后续版本（包含页面资源与标题字体，约 3.3 MB，免重装）；首次从旧版迁移请安装本 APK，安装前请导出存档并卸载旧版。" \
             --latest

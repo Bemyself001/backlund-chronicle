@@ -12,7 +12,7 @@ export default function UpdateDialog({ onClose, automatic = false }) {
 
   const startHotUpdate = async () => {
     setOtaState("downloading");
-    setStatus("正在下载热更新包（仅页面资源，约 0.2 MB）…");
+    setStatus("正在下载热更新包（包含页面资源与标题字体，约 3.3 MB）…");
     try {
       const bundle = await downloadAndApplyOta(result, { reload: false });
       setOtaBundle(bundle);
@@ -53,7 +53,7 @@ export default function UpdateDialog({ onClose, automatic = false }) {
           <div className={styles.version}><span>最新版本</span><strong>{result.latestVersion}</strong></div>
           <div className={styles.notes}><strong>更新说明</strong><p>{result.notes}</p></div>
           {hotUpdate
-            ? <p className={styles.hint}>热更新只下载页面资源（约 0.2 MB），无需重新安装 APK，存档不受影响。</p>
+            ? <p className={styles.hint}>热更新会下载页面资源与标题字体（约 3.3 MB），无需重新安装 APK，存档不受影响。</p>
             : <p className={styles.hint}>下载完成后，Android 会要求你确认安装。首次从旧调试版迁移时，请先导出存档并卸载旧版。</p>}
         </>}
         <div className={styles.actions}>

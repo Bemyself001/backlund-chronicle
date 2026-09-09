@@ -1,6 +1,20 @@
 export const LATEST_UPDATE = {
   date: "2026-09-09",
   dateLabel: "2026.09.09",
+  title: "修复 APK 更新与线上标题字体",
+  summary: "修复 GitHub Pages、完整 APK 与热更新包之间的发布竞态，并把山海星夜哥特字体纳入线上网页和 Android 更新产物。",
+  changes: [
+    "Android 内置资源与 OTA 热更新包现在都会携带 WOFF2 标题字体，更新后不再回退到默认衬线字体。",
+    "GitHub Pages 会发布字体文件，并将单页版中的字体地址改为仓库子目录可用的相对路径。",
+    "Pages 更新清单只引用已经完成的 APK Release；APK 构建成功后会自动再次发布网页，消除新版号误指向旧安装包的竞态。",
+    "移除 Android 与现代浏览器不再需要的 TTF 下载兜底，避免把热更新包额外放大约 6 MB。",
+  ],
+};
+
+export const PREVIOUS_UPDATES = [
+  {
+  date: "2026-09-09",
+  dateLabel: "2026.09.09",
   title: "标题界面改为档案开箱",
   summary: "重构标题界面为「档案开箱」风格：左侧卷宗式主入口，右侧分类账式存档柜；标题字体接入山海星夜哥特，更贴合贝克兰德的纪事氛围。",
   changes: [
@@ -9,9 +23,7 @@ export const LATEST_UPDATE = {
     "保留顶部报头（更新日志、API 状态）与底部雾光氛围；右下角新增虚线版本戳，网页与 APK 分别显示构建号与版本号。",
     "标题字体接入本地「山海星夜哥特」字体（font-display: swap，衬线兜底），大标题与存档柜标题统一视觉。",
   ],
-};
-
-export const PREVIOUS_UPDATES = [
+  },
   {
   date: "2026-09-08",
   dateLabel: "2026.09.08",

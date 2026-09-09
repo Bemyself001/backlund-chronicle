@@ -71,7 +71,7 @@ API Key 输入框使用本地圆点遮罩而非系统密码字段，并请求浏
 
 正式构建依赖四个 GitHub Actions Secrets：`ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和 `ANDROID_KEY_PASSWORD`。签名文件及其本地恢复信息保存在被 Git 忽略的 `.signing/`；必须离线备份，丢失后将无法覆盖更新现有安装。
 
-构建完成后，可直接从仓库的 **Releases** 页面下载 `backlund-chronicle.apk`，无需登录且不会像 Actions Artifact 一样在 14 天后过期。APK 会在启动约两秒后每天至多自动检查一次最新版；也可在 **API 设置 → 检查应用更新** 手动检查。发现新版后会跳转浏览器下载，最终安装仍由 Android 系统要求用户确认。
+构建完成后，可直接从仓库的 **Releases** 页面下载 `backlund-chronicle.apk`，无需登录且不会像 Actions Artifact 一样在 14 天后过期。APK 会在启动约两秒后每天至多自动检查一次最新版；也可在 **API 设置 → 检查应用更新** 手动检查。支持热更新的正式版会下载包含页面资源与标题字体的更新包（约 3.3 MB）并在下次启动时生效；完整 APK 下载与安装仍由 Android 系统要求用户确认。
 
 旧的 `apk-8`、`apk-9` 等版本使用临时调试签名，无法直接覆盖升级为新的正式签名版。首次迁移前请先导出游戏存档，然后卸载旧版、安装新正式版并导入存档；API Key 不包含在存档中，需要重新填写。
 

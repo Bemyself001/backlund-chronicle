@@ -4,6 +4,9 @@ on:
   workflow_dispatch:
   push:
     branches: [main]
+  workflow_run:
+    workflows: [Build Android APK]
+    types: [completed]
 
 permissions:
   contents: read
@@ -16,6 +19,7 @@ concurrency:
 
 jobs:
   build:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
 
@@ -55,6 +59,8 @@ jobs:
           mkdir pages
           cp "dist/贝克兰德纪事-离线版.html" pages/index.html
           cp dist/privacy.html pages/privacy.html
+          mkdir -p pages/fonts
+          cp dist/fonts/ShanHaiXingYeGeTeW-2.woff2 pages/fonts/
           cd dist/client && zip -qr ../../pages/web-bundle.zip . && cd ../..
           sha256sum pages/web-bundle.zip | awk '{print $1}' > /tmp/web-bundle.sha256
 
@@ -69,14 +75,15 @@ jobs:
             const release = JSON.parse(fs.readFileSync("/tmp/release.json", "utf8"));
             const assets = release.assets || [];
             const apk = assets.find((a) => a.name === "backlund-chronicle.apk") || assets.find((a) => a.name && a.name.endsWith(".apk"));
-            // 版本号与 APK 工作流共用同一规则（提交计数），保证清单版本始终等于本次部署的内容版本
-            const commitCount = Number(require("child_process").execSync("git rev-list --count HEAD").toString().trim());
+            const releaseVersion = String(release.tag_name || "").replace(/^v/i, "");
+            const releaseMatchesBuild = release.target_commitish === process.env.GITHUB_SHA;
             const manifest = {
-              version: `1.2.${commitCount}`,
+              // Pages 可能先于 APK 构建完成；只发布已存在 Release 的版本，避免新版号指向旧安装包。
+              version: releaseVersion,
               apkUrl: apk ? apk.browser_download_url : null,
-              bundleUrl: "https://bemyself001.github.io/backlund-chronicle/web-bundle.zip",
-              bundleSha256: fs.readFileSync("/tmp/web-bundle.sha256", "utf8").trim(),
-              releaseUrl: release.html_url,
+              bundleUrl: releaseMatchesBuild ? "https://bemyself001.github.io/backlund-chronicle/web-bundle.zip" : null,
+              bundleSha256: releaseMatchesBuild ? fs.readFileSync("/tmp/web-bundle.sha256", "utf8").trim() : null,
+              releaseUrl: release.html_url || null,
               notes: release.body || "",
               publishedAt: new Date().toISOString(),
             };
