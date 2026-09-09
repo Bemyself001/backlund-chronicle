@@ -79,7 +79,7 @@ export default function CharacterCreation({ onBack, onCreate }) {
             </button>
             {character.avatar && <button type="button" className={styles.avatarRemove} onClick={() => update("avatar", "")}>移除</button>}
             <input ref={fileInputRef} type="file" accept="image/*" hidden onChange={pickAvatar} />
-            <small className={styles.avatarNote}>头像仅保存在本地存档，详见<a href="/privacy.html" target="_blank" rel="noreferrer">隐私政策</a></small>
+            <small className={styles.avatarNote}>不建议使用真实人像；仅在本地保存，可能用于 AI 对话。详见<a href="/privacy.html" target="_blank" rel="noreferrer">隐私政策</a></small>
           </div>
           <p className={styles.kicker}>CHARACTER DOSSIER</p><h1>建立你的<br />私人档案</h1>
           <p>这不是英雄履历，而是一份会被世界记住的过去。欲望会指引你，恐惧与秘密也会留下代价。</p>
