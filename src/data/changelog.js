@@ -1,6 +1,20 @@
 export const LATEST_UPDATE = {
   date: "2026-09-09",
   dateLabel: "2026.09.09",
+  title: "独立发布 APK 封装插件",
+  summary: "将《贝克兰德纪事》的 Capacitor + GitHub Actions APK 封装流程整理为可复用的 capacitor-apk-release 插件，已在本地安装并独立开源发布。",
+  changes: [
+    "插件覆盖前端构建、Capacitor 同步、正式签名、递增版本号、APK 与 SHA-256 校验文件、GitHub Release 发布等完整流程。",
+    "内置可适配 pnpm / npm 项目的 GitHub Actions 模板，并支持按需发布带校验值的 OTA 网页更新包。",
+    "新增静态检查脚本，可识别签名变量、版本配置、临时 Actions 产物与公开 Release 资源混淆、误提交密钥等常见问题。",
+    "capacitor-apk-release 0.1.0 已安装并启用；源码独立发布于 github.com/Bemyself001/capacitor-apk-release。",
+  ],
+};
+
+export const PREVIOUS_UPDATES = [
+  {
+  date: "2026-09-09",
+  dateLabel: "2026.09.09",
   title: "明确肖像图片隐私说明",
   summary: "隐私政策与角色创建页现已明确提示：不建议使用真实人像；肖像仅在本地保存，但可能用于用户自行配置的 AI 对话。",
   changes: [
@@ -9,9 +23,7 @@ export const LATEST_UPDATE = {
     "说明肖像数据可能随必要角色资料发送至用户自行配置的第三方 AI 服务，仅可能用于 AI 对话。",
     "补充导出存档可能包含肖像数据，以及用户可移除肖像、删除本地数据的控制方式。",
   ],
-};
-
-export const PREVIOUS_UPDATES = [
+  },
   {
   date: "2026-09-09",
   dateLabel: "2026.09.09",
