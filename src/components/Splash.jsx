@@ -1,4 +1,8 @@
-import background from "../../assets/promo-16x9.png";
+import desktopBackgroundJpg from "../../assets/promo-16x9-1600.jpg";
+import desktopBackgroundWebp from "../../assets/promo-16x9-1600.webp";
+import mobileBackgroundJpg from "../../assets/promo-9x16-720.jpg";
+import mobileBackgroundWebp from "../../assets/promo-9x16-720.webp";
+import backgroundPlaceholder from "../../assets/promo-placeholder.webp";
 import {
   OFFICIAL_QQ_GROUP_NUMBER,
   OFFICIAL_QQ_GROUP_URL,
@@ -9,7 +13,16 @@ import styles from "./Splash.module.css";
 export default function Splash({ onEnter }) {
   return (
     <main id="main" className={styles.page}>
-      <img className={styles.background} src={background} alt="" fetchPriority="high" />
+      <picture
+        className={styles.backgroundFrame}
+        style={{ backgroundImage: `url(${backgroundPlaceholder})` }}
+        aria-hidden="true"
+      >
+        <source media="(max-width: 600px)" srcSet={mobileBackgroundWebp} type="image/webp" />
+        <source media="(max-width: 600px)" srcSet={mobileBackgroundJpg} type="image/jpeg" />
+        <source srcSet={desktopBackgroundWebp} type="image/webp" />
+        <img className={styles.background} src={desktopBackgroundJpg} alt="" fetchPriority="high" />
+      </picture>
       <header className={styles.header}>
         <span>BACKLUND CHRONICLE</span>
         <span>私人调查档案 · 1349</span>

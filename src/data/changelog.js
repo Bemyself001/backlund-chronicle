@@ -1,6 +1,19 @@
 export const LATEST_UPDATE = {
   date: "2026-09-10",
   dateLabel: "2026.09.10",
+  title: "加速开屏背景加载",
+  summary: "开屏背景按设备加载轻量图片，并用模糊占位图消除首屏等待时的空白。",
+  changes: [
+    "桌面端改用 1600 × 900 横版 WebP，手机端改用 720 × 1280 竖版 WebP，不再让手机额外下载横向原图。",
+    "开屏图片由 3.16 MB PNG 降至约 122–134 KB WebP，保留 JPEG 作为旧浏览器兼容备用。",
+    "新增 204 字节的模糊占位背景，清晰图完成解码前即可呈现雾都画面的主体色彩。",
+    "页面按屏幕宽度预加载对应背景，并继续给予开屏图最高加载优先级。",
+  ],
+};
+
+const PROMOTIONAL_POSTERS_UPDATE = {
+  date: "2026-09-10",
+  dateLabel: "2026.09.10",
   title: "新增竖版宣传图组",
   summary: "根据真实手机游戏截图制作六张 1080 × 1920 竖版宣传图，统一去除系统通知栏和底部手势栏。",
   changes: [
@@ -62,6 +75,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  PROMOTIONAL_POSTERS_UPDATE,
   QQ_GROUP_UPDATE,
   MOBILE_SPLASH_UPDATE,
   SPLASH_UPDATE,

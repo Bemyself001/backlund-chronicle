@@ -1,5 +1,6 @@
 .page { position: relative; isolation: isolate; display: flex; flex-direction: column; min-height: 100vh; min-height: 100svh; background: #10100e; color: #f0e6d2; }
-.background { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 65% center; z-index: -3; }
+.backgroundFrame { position: absolute; inset: 0; z-index: -3; overflow: hidden; background-color: #10100e; background-position: 65% center; background-size: cover; }
+.background { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 65% center; }
 .page::before { content: ""; position: absolute; inset: 0; z-index: -2; background: linear-gradient(90deg, #080b0bea 0%, #080b0b88 42%, #080b0b0a 75%), linear-gradient(0deg, #080b0bd9, transparent 30%); }
 .header, .footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; padding: 2rem 5vw; color: #d0c2a6; font-size: .875rem; letter-spacing: .16em; }
 .header { border-bottom: 1px solid #dbb97928; }
@@ -28,7 +29,8 @@
 .tapButton:focus-visible, .qqButton:focus-visible, .enterButton:focus-visible { outline: 3px solid #fff2cd; outline-offset: 5px; }
 .footer { padding-top: 1rem; padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); color: #beb098; }
 @media (max-width: 600px) {
-  .background { object-position: 73% top; }
+  .backgroundFrame { background-position: center top; }
+  .background { object-position: center top; }
   .page::before { background: linear-gradient(0deg, #080b0bf5 0%, #080b0bd9 25%, #080b0b66 57%, #080b0b05 80%, #080b0b55 100%); }
   .header { padding: 1.2rem 6vw; font-size: .875rem; letter-spacing: .08em; }
   .header span:last-child { display: none; }
