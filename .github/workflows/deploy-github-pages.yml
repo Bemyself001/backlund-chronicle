@@ -59,6 +59,7 @@ jobs:
           mkdir pages
           cp "dist/贝克兰德纪事-离线版.html" pages/index.html
           cp dist/privacy.html pages/privacy.html
+          cp -R dist/client/assets pages/assets
           mkdir -p pages/fonts
           cp dist/fonts/ShanHaiXingYeGeTeW-2.woff2 pages/fonts/
           cd dist/client && zip -qr ../../pages/web-bundle.zip . && cd ../..

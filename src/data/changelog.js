@@ -1,6 +1,18 @@
 export const LATEST_UPDATE = {
   date: "2026-09-10",
   dateLabel: "2026.09.10",
+  title: "修复手机网页开屏背景",
+  summary: "补齐线上宣传图资源，修复开屏背景无法加载，并优化手机竖屏画面与按钮布局。",
+  changes: [
+    "GitHub Pages 同步发布构建资源目录，图片改用相对路径，兼容独立域名和仓库子路径。",
+    "手机背景重新裁切以突出人物与仪式圆环，调整遮罩透明度保留宣传图细节。",
+    "手机标题采用两行排版，压缩短屏留白，保持两个入口可读可操作。",
+  ],
+};
+
+const SPLASH_UPDATE = {
+  date: "2026-09-10",
+  dateLabel: "2026.09.10",
   title: "新增雾都宣传开屏",
   summary: "使用雾都宣传图新增前置开屏，提供 TapTap 广告合作入口与档案首页入口。",
   changes: [
@@ -24,6 +36,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  SPLASH_UPDATE,
   APK_PLUGIN_UPDATE,
   {
   date: "2026-09-09",

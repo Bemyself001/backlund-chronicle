@@ -35,8 +35,11 @@ const [script, stylesheet] = await Promise.all([
   readFile(scriptSource, "utf8"),
   readFile(stylesheetSource, "utf8"),
 ]);
+// 内联模块后 import.meta.url 指向 HTML，恢复原构建模块位置，避免图片路径丢失 assets/。
+const standaloneScript = script.replace(/\bimport\.meta\.url\b/g,
+  () => `new URL(${JSON.stringify(scriptMatch[1])}, document.baseURI).href`);
 const standaloneEntry = clientEntry
-  .replace(scriptMatch[0], () => `<script type="module">${script.replace(/<\/script/gi, "<\\/script")}</script>`)
+  .replace(scriptMatch[0], () => `<script type="module">${standaloneScript.replace(/<\/script/gi, "<\\/script")}</script>`)
   .replace(/href=(["'])\/fonts\//gi, "href=$1./fonts/")
   .replace(stylesheetMatch[0], () => `<style>${stylesheet
     .replace(/url\((["']?)\/fonts\//gi, "url($1./fonts/")
