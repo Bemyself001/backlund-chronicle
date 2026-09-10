@@ -1,4 +1,16 @@
 export const LATEST_UPDATE = {
+  date: "2026-09-10",
+  dateLabel: "2026.09.10",
+  title: "新增雾都宣传开屏",
+  summary: "使用雾都宣传图新增前置开屏，提供 TapTap 广告合作入口与档案首页入口。",
+  changes: [
+    "新增全屏宣传图背景，适配手机与桌面显示。",
+    "TapTap 下载按钮接入指定广告合作链接，点击后在外部页面打开。",
+    "点击「签署档案并进入贝克兰德」进入原有开屏；游戏内返回首页仍回到档案柜。",
+  ],
+};
+
+const APK_PLUGIN_UPDATE = {
   date: "2026-09-09",
   dateLabel: "2026.09.09",
   title: "独立发布 APK 封装插件",
@@ -12,6 +24,7 @@ export const LATEST_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  APK_PLUGIN_UPDATE,
   {
   date: "2026-09-09",
   dateLabel: "2026.09.09",
