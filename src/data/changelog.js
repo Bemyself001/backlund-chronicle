@@ -1,6 +1,19 @@
 export const LATEST_UPDATE = {
   date: "2026-09-10",
   dateLabel: "2026.09.10",
+  title: "新增竖版宣传图组",
+  summary: "根据真实手机游戏截图制作六张 1080 × 1920 竖版宣传图，统一去除系统通知栏和底部手势栏。",
+  changes: [
+    "新增开屏、角色创建、自由叙事、城区地图、调查档案与独立存档六个宣传主题。",
+    "真实界面截图保留原始文字与布局，仅裁去手机系统栏，并置入统一的黄铜档案画框。",
+    "使用无文字的雾都、乌鸦、调查员与仪式圆环背景统一视觉，避免生成模型改写游戏界面。",
+    "宣传标题使用山海星夜哥特字体后置排版，成品均为 1080 × 1920 PNG，符合竖图尺寸要求。",
+  ],
+};
+
+const QQ_GROUP_UPDATE = {
+  date: "2026-09-10",
+  dateLabel: "2026.09.10",
   title: "开屏新增官方玩家群入口",
   summary: "重构宣传开屏的操作顺序，新增官方 QQ 群一键加入入口，并明确区分外部推广与进入游戏操作。",
   changes: [
@@ -49,6 +62,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  QQ_GROUP_UPDATE,
   MOBILE_SPLASH_UPDATE,
   SPLASH_UPDATE,
   APK_PLUGIN_UPDATE,
