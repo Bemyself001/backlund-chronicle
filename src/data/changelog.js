@@ -1,6 +1,19 @@
 export const LATEST_UPDATE = {
   date: "2026-09-10",
   dateLabel: "2026.09.10",
+  title: "开屏新增官方玩家群入口",
+  summary: "重构宣传开屏的操作顺序，新增官方 QQ 群一键加入入口，并明确区分外部推广与进入游戏操作。",
+  changes: [
+    "宣传开屏新增「官方QQ群」按钮，接入一键加群链接，并显示群号 1124127684 作为备用信息。",
+    "TapTap 与 QQ 群作为外部入口，签署档案作为唯一主操作；外部页面在新窗口打开，不打断当前游戏页面。",
+    "手机端三个入口纵向排列，桌面端两个外部入口并排，短屏同步压缩间距与按钮高度。",
+    "每次重新打开、刷新网页版或冷启动 APK 时都会展示宣传开屏，同一次游戏过程中不重复出现。",
+  ],
+};
+
+const MOBILE_SPLASH_UPDATE = {
+  date: "2026-09-10",
+  dateLabel: "2026.09.10",
   title: "修复手机网页开屏背景",
   summary: "补齐线上宣传图资源，修复开屏背景无法加载，并优化手机竖屏画面与按钮布局。",
   changes: [
@@ -36,6 +49,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  MOBILE_SPLASH_UPDATE,
   SPLASH_UPDATE,
   APK_PLUGIN_UPDATE,
   {

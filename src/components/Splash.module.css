@@ -9,35 +9,47 @@
 .content h1 { margin: 0; font-family: var(--font-display); font-size: 4.5rem; font-size: clamp(3rem, 6.8vw, 6.4rem); font-weight: 400; line-height: 1.16; letter-spacing: .08em; text-shadow: 0 4px 32px #000; }
 .content h1 span { display: block; color: #d4b478; }
 .subtitle { margin: 1.8rem 0 2.8rem; font-family: var(--font-serif); font-size: 1rem; line-height: 1.9; letter-spacing: .13em; color: #d2c7b2; }
-.actions { display: grid; gap: 1.1rem; max-width: 24rem; }
-.tapButton, .enterButton { display: flex; align-items: center; justify-content: space-between; gap: 1rem; min-height: 3.8rem; width: 100%; padding: .9rem 1.3rem; text-decoration: none; font-size: 1rem; cursor: pointer; }
+.actions { display: grid; gap: .8rem; max-width: 30rem; }
+.externalActions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
+.tapButton, .qqButton, .enterButton { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 3.8rem; width: 100%; padding: .9rem 1.15rem; text-decoration: none; font-size: 1rem; cursor: pointer; }
 .tapButton { color: #052c29; border: 1px solid #22d6bb; border-radius: .75rem; background: #22d6bb; font-family: var(--font-sans); font-weight: 600; }
-.tapWordmark { font-family: Arial, sans-serif; font-size: 1.65rem; font-weight: 800; letter-spacing: -.07em; }
+.tapWordmark { font-family: Arial, sans-serif; font-size: 1.45rem; font-weight: 800; letter-spacing: -.07em; }
 .tapButton:hover { background: #65eed7; }
 .tapButton:disabled { cursor: not-allowed; opacity: .7; }
-.adNote { margin: .5rem 0 0; font-size: .875rem; color: #c5bcae; text-align: right; }
+.qqButton { border: 1px solid #7db4de; border-radius: .75rem; background: #14283bd9; color: #e5f4ff; font-family: var(--font-sans); }
+.qqButton:hover { border-color: #b8dcf7; background: #1d3b58eb; }
+.qqMark { display: grid; place-items: center; flex: 0 0 auto; width: 2.15rem; height: 2.15rem; border-radius: 50%; background: #e7f5ff; color: #173b5a; font-size: .72rem; font-weight: 800; }
+.qqLabel { display: grid; gap: .08rem; margin-right: auto; text-align: left; }
+.qqLabel strong { font-size: .95rem; }
+.qqLabel small { color: #abcce5; font-size: .68rem; letter-spacing: .06em; }
+.adNote { margin: -.2rem 0 0; font-size: .78rem; color: #c5bcae; text-align: right; }
 .enterButton { border: 1px solid #c5a773; border-radius: 2px; background: #121510b8; color: #edd7b0; font-family: var(--font-serif); }
 .enterButton:hover { background: #c5a77322; border-color: #ecd3a5; }
-.tapButton:focus-visible, .enterButton:focus-visible { outline: 3px solid #fff2cd; outline-offset: 5px; }
+.tapButton:focus-visible, .qqButton:focus-visible, .enterButton:focus-visible { outline: 3px solid #fff2cd; outline-offset: 5px; }
 .footer { padding-top: 1rem; padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); color: #beb098; }
 @media (max-width: 600px) {
   .background { object-position: 73% top; }
   .page::before { background: linear-gradient(0deg, #080b0bf5 0%, #080b0bd9 25%, #080b0b66 57%, #080b0b05 80%, #080b0b55 100%); }
   .header { padding: 1.2rem 6vw; font-size: .875rem; letter-spacing: .08em; }
   .header span:last-child { display: none; }
-  .content { margin-top: auto; margin-bottom: 0; padding: 9rem 6vw 1.5rem; padding-top: clamp(8rem, 24svh, 14rem); }
+  .content { margin-top: auto; margin-bottom: 0; padding: 9rem 6vw 1.25rem; padding-top: clamp(8rem, 24svh, 14rem); }
   .content h1 { font-size: 3.2rem; line-height: 1.1; }
   .content h1 span { display: block; font-size: 2.6rem; margin-top: .2rem; }
   .eyebrow { font-size: .875rem; letter-spacing: .12em; }
   .subtitle { margin: 1rem 0 1.5rem; letter-spacing: .04em; }
   .actions { max-width: none; }
+  .externalActions { grid-template-columns: 1fr; gap: .7rem; }
   .enterButton { font-size: .95rem; padding-inline: 1rem; }
-  .footer { padding-inline: 6vw; font-size: .875rem; letter-spacing: .03em; }
+  .adNote { text-align: left; line-height: 1.5; }
+  .footer { padding-inline: 6vw; padding-bottom: max(1rem, env(safe-area-inset-bottom)); font-size: .875rem; letter-spacing: .03em; }
 }
 @media (max-width: 600px) and (max-height: 720px) {
   .content { padding-top: 5rem; }
   .eyebrow { margin-bottom: 1rem; }
   .content h1 { font-size: 2.8rem; }
   .content h1 span { font-size: 2.2rem; }
+  .subtitle { margin-block: .75rem 1rem; }
+  .tapButton, .qqButton, .enterButton { min-height: 3.35rem; padding-block: .65rem; }
+  .actions, .externalActions { gap: .6rem; }
 }
 @media (max-width: 360px) { .content h1 { font-size: 2.8rem; } .content h1 span { font-size: 2rem; } }

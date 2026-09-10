@@ -1,5 +1,9 @@
 import background from "../../assets/promo-16x9.png";
-import { TAPTAP_DOWNLOAD_URL } from "../data/promotion.js";
+import {
+  OFFICIAL_QQ_GROUP_NUMBER,
+  OFFICIAL_QQ_GROUP_URL,
+  TAPTAP_DOWNLOAD_URL,
+} from "../data/promotion.js";
 import styles from "./Splash.module.css";
 
 export default function Splash({ onEnter }) {
@@ -15,7 +19,7 @@ export default function Splash({ onEnter }) {
         <h1 id="splash-title">贝克兰德<span>纪事</span></h1>
         <p className={styles.subtitle}>雾气之下，命运正等待你的署名。</p>
         <div className={styles.actions}>
-          <div className={styles.promotion}>
+          <div className={styles.externalActions}>
             {TAPTAP_DOWNLOAD_URL ? (
               <a className={styles.tapButton} href={TAPTAP_DOWNLOAD_URL} target="_blank" rel="noopener noreferrer sponsored">
                 <span className={styles.tapWordmark}>TapTap</span><span>官方下载 <span aria-hidden="true">↗</span></span>
@@ -25,8 +29,19 @@ export default function Splash({ onEnter }) {
                 <span className={styles.tapWordmark}>TapTap</span><span>官方下载 <span aria-hidden="true">↗</span></span>
               </button>
             )}
-            <p className={styles.adNote}>广告合作{!TAPTAP_DOWNLOAD_URL && <span id="promotion-pending"> · 下载链接待接入</span>}</p>
+            <a
+              className={styles.qqButton}
+              href={OFFICIAL_QQ_GROUP_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label={`加入官方QQ群 ${OFFICIAL_QQ_GROUP_NUMBER}（在新窗口打开）`}
+            >
+              <span className={styles.qqMark} aria-hidden="true">Q群</span>
+              <span className={styles.qqLabel}><strong>官方QQ群</strong><small>{OFFICIAL_QQ_GROUP_NUMBER}</small></span>
+              <span aria-hidden="true">↗</span>
+            </a>
           </div>
+          <p className={styles.adNote}>TapTap 为广告合作入口 · 外部页面将在新窗口打开{!TAPTAP_DOWNLOAD_URL && <span id="promotion-pending"> · 下载链接待接入</span>}</p>
           <button className={styles.enterButton} type="button" onClick={onEnter}>
             签署档案并进入贝克兰德 <span aria-hidden="true">→</span>
           </button>
