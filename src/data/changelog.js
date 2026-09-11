@@ -1,6 +1,20 @@
 export const LATEST_UPDATE = {
   date: "2026-09-11",
   dateLabel: "2026.09.11",
+  title: "调查员书房 · 标题页重构",
+  summary: "在雨夜书房中开启调查：全新横竖背景、私人卷宗菜单与完整档案柜。",
+  changes: [
+    "标题页换为雨夜钟楼、黄铜台灯与书桌卷宗场景，保留哥特标题；前置宣传页及 TapTap、QQ群入口保持不变。",
+    "有存档时优先显示「继续调查」，最近卷宗展示角色、地点、回合和归档时间；按钮读取对应存档，支持仅有手动存档的情况。",
+    "档案柜可展开查看所有在册存档，保留新建、导入、API 设置、更新日志与隐私政策入口。",
+    "手机加载独立竖版背景，桌面加载横版背景；采用轻量 WebP、JPEG 兼容图和模糊占位。",
+    "微弱灯光变化可切换静态场景，并遵循系统减少动态效果设置；适配手机、平板和键盘操作。",
+  ],
+};
+
+const CUSTOM_LOADOUT_UPDATE = {
+  date: "2026-09-11",
+  dateLabel: "2026.09.11",
   title: "自定义开局行装与衣着",
   summary: "玩家可以自选一件随身物品，并根据衣着描述整理开局衣物，确认清单后进入故事。",
   changes: [
@@ -115,6 +129,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  CUSTOM_LOADOUT_UPDATE,
   DISTRICT_OPENINGS_UPDATE,
   MAP_RETURN_UPDATE,
   SPLASH_PERFORMANCE_UPDATE,
