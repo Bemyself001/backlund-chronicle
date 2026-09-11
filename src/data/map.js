@@ -279,7 +279,12 @@ export function findTravelRoute(fromId, toId, allowedIds = getMapLocations().map
   if (fromId === toId) return { minutes: 0, grids: 0, path: [fromId], transports: [] };
   const allowed = new Set([...allowedIds, fromId]);
   if (!allowed.has(toId)) return null;
-  const fromLocation = getMapLocation(fromId, gameOrExtensions);
+  const currentPlayerHex = gameOrExtensions?.location?.id === fromId ? gameOrExtensions?.world?.player : null;
+  const fromLocation = getMapLocation(fromId, gameOrExtensions) || (
+    Number.isInteger(currentPlayerHex?.q) && Number.isInteger(currentPlayerHex?.r)
+      ? { ...gameOrExtensions.location, q: currentPlayerHex.q, r: currentPlayerHex.r }
+      : null
+  );
   const toLocation = getMapLocation(toId, gameOrExtensions);
   if (!fromLocation || !toLocation) return null;
   return estimateTravelByHex(fromLocation, toLocation);

@@ -31,17 +31,18 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
     return { size, points, minX, minY, width: Math.max(...xs) - minX + pad, height: Math.max(...ys) - minY + pad };
   }, [hexCells]);
   const currentRecord = getMapLocation(game.location.id, game);
-  const [selectedId, setSelectedId] = useState(currentRecord?.scope === "interior" ? currentRecord.parentId : game.location.id);
-  const [selectedHex, setSelectedHex] = useState(null);
   const playerHex = game.world?.player || null;
+  const [selectedId, setSelectedId] = useState(currentRecord?.scope === "interior" ? currentRecord.parentId : currentRecord?.id || null);
+  const [selectedHex, setSelectedHex] = useState(currentRecord || !playerHex ? null : { q: playerHex.q, r: playerHex.r });
   const exploreCell = selectedHex ? hexCells.find((cell) => cell.q === selectedHex.q && cell.r === selectedHex.r) : null;
+  const selectedHexIsCurrent = Boolean(selectedHex && playerHex && selectedHex.q === playerHex.q && selectedHex.r === playerHex.r);
   const selected = getMapLocation(selectedId, game);
   const selectedKnowledge = selected ? knowledgeById[selected.id] || { status: "unknown", note: "" } : { status: "unknown", note: "" };
   const discovered = selected && isDiscoveredLocationStatus(selectedKnowledge.status);
   const rumored = selected && selectedKnowledge.status === "rumored";
   const route = selected && discovered ? findTravelRoute(game.location.id, selected.id, discoveredIds, game) : null;
   const current = selected?.id === game.location.id;
-  const routeNames = route?.path.map((id) => getMapLocation(id, game)?.name || id).join(" → ");
+  const routeNames = route?.path.map((id) => id === game.location.id ? game.location.name : getMapLocation(id, game)?.name || id).join(" → ");
   const relations = discovered ? findLocationRelations(game, selected) : null;
   const hasRelations = relations && (relations.quests.length || relations.clues.length || relations.npcs.length);
   const children = selected ? getChildLocations(game, selected.id).filter((location) => knowledgeById[location.id]?.status !== "unknown") : [];
@@ -58,8 +59,8 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
               const known = cell.location && isDiscoveredLocationStatus(cell.status);
               const rumored = cell.location && cell.status === "rumored";
               const isCurrent = playerHex && cell.q === playerHex.q && cell.r === playerHex.r;
-              const interactive = Boolean(cell.location || cell.explorable);
-              const pick = () => { if (cell.location) { setSelectedHex(null); setSelectedId(cell.location.id); } else if (cell.explorable) { setSelectedId(null); setSelectedHex({ q: cell.q, r: cell.r }); } };
+              const interactive = Boolean(cell.location || cell.explorable || isCurrent);
+              const pick = () => { if (cell.location) { setSelectedHex(null); setSelectedId(cell.location.id); } else if (cell.explorable || isCurrent) { setSelectedId(null); setSelectedHex({ q: cell.q, r: cell.r }); } };
               return <g
                 key={`${cell.q},${cell.r}`}
                 className={styles.hexCell}
@@ -71,7 +72,7 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
                 data-dynamic={cell.location?.source === "dynamic" || null}
                 role={interactive ? "button" : undefined}
                 tabIndex={interactive ? 0 : undefined}
-                aria-label={cell.location ? (known ? `${cell.location.name}${isCurrent ? "，玩家当前位置" : ""}` : rumored ? `${cell.location.district}的地点传闻` : `${cell.location.district}的雾中区域`) : cell.explorable ? `可探索的${cityTerrainLabel(cell.tile.terrain)}` : (cell.discovered ? cityTerrainLabel(cell.tile.terrain) : "迷雾区域")}
+                aria-label={cell.location ? (known ? `${cell.location.name}${isCurrent ? "，玩家当前位置" : ""}` : rumored ? `${cell.location.district}的地点传闻` : `${cell.location.district}的雾中区域`) : isCurrent ? `${game.location.name}，玩家当前位置` : cell.explorable ? `可探索的${cityTerrainLabel(cell.tile.terrain)}` : (cell.discovered ? cityTerrainLabel(cell.tile.terrain) : "迷雾区域")}
                 onClick={interactive ? pick : undefined}
                 onKeyDown={interactive ? (event) => { if (event.key === "Enter" || event.key === " ") { event.preventDefault(); pick(); } } : undefined}
               >
@@ -88,7 +89,18 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
         </div>
       </section>
       <aside className={styles.detail} aria-live="polite">
-        {selectedHex && exploreCell ? <>
+        {selectedHex && exploreCell ? selectedHexIsCurrent ? <>
+          <p>当前位置 · 未归档区域</p>
+          <h3>{game.location.name}</h3>
+          <span>你正在一处普通街区。它不会占用重要地点档案；选择地图上任意已发现地点，即可从这里计算路线并动身返回。</span>
+          <dl>
+            <div><dt>地点类型</dt><dd>{cityTerrainLabel(exploreCell.tile.terrain)}</dd></div>
+            <div><dt>档案状态</dt><dd>普通探索区域</dd></div>
+            <div><dt>可用行动</dt><dd>继续探索或前往重要地点</dd></div>
+          </dl>
+          <button className="button button--primary" type="button" disabled>你正在这里</button>
+          <small>普通街区只保留探索与路线信息，不会出现在重要地点目录中。</small>
+        </> : <>
           <p>未归档区域</p>
           <h3>未登记的{cityTerrainLabel(exploreCell.tile.terrain)}</h3>
           <span>这片{cityTerrainLabel(exploreCell.tile.terrain)}尚无档案记录，离你的位置只有一街之隔。走上前去，看看雾后藏着什么。</span>

@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 
 import { createInitialGame, EMPTY_CHARACTER } from "../src/data/defaults.js";
-import { MAP_LOCATIONS, hexDistance, hexForLocation } from "../src/data/map.js";
+import { findTravelRoute, MAP_LOCATIONS, hexDistance, hexForLocation } from "../src/data/map.js";
 import { buildWorld, canExploreHex, ensureWorld, exploreHex, hexContext, travelToLocation, visibleHexes, worldSeedFor } from "../src/data/hexworld.js";
 import { migrateSave } from "../src/services/storage.js";
 
@@ -83,7 +83,30 @@ test("exploration moves the player to an adjacent empty hex, reveals fog and adv
   assert.equal(minutesAfter - minutesBefore, 13);
   assert.match(game.location.id, /^hex:/);
   assert.match(game.location.name, /^未登记的/);
+  assert.deepEqual({ q: game.location.q, r: game.location.r }, { q: target.q, r: target.r });
   void start;
+});
+
+test("exploration keeps every discovered landmark reachable from the current ordinary hex", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "返程测试员" });
+  ensureWorld(game);
+  const target = visibleHexes(game, 1).find((cell) => canExploreHex(game, cell.q, cell.r).ok);
+  assert.ok(target, "should find an explorable adjacent hex");
+  assert.equal(exploreHex(game, target.q, target.r).ok, true);
+  delete game.location.q;
+  delete game.location.r;
+
+  const discoveredIds = game.discoveredLocations.map((location) => location.id);
+  for (const destinationId of discoveredIds) {
+    const destination = MAP_LOCATIONS.find((location) => location.id === destinationId);
+    const route = findTravelRoute(game.location.id, destination.id, discoveredIds, game);
+    assert.ok(route, `${destination.name} should be reachable from an ordinary explored hex`);
+    assert.equal(route.grids, hexDistance(target, hexForLocation(destination)));
+    assert.deepEqual(route.path, [game.location.id, destination.id]);
+  }
+
+  const destination = MAP_LOCATIONS.find((location) => location.id === "queen-library");
+  assert.equal(travelToLocation(game, destination.id)?.grids, hexDistance(target, hexForLocation(destination)));
 });
 
 test("exploration rejects distant, occupied and impassable hexes", () => {

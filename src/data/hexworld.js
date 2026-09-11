@@ -71,7 +71,10 @@ export function reconcileWorld(world, game) {
       features: existing?.features || [],
     };
   }
-  const currentHex = game.location?.id ? hexForLocation(getMapLocations(game, { includeArchived: true }).find((entry) => entry.id === game.location.id) || {}) : null;
+  const registeredCurrentLocation = game.location?.id
+    ? getMapLocations(game, { includeArchived: true }).find((entry) => entry.id === game.location.id)
+    : null;
+  const currentHex = hexForLocation(registeredCurrentLocation || game.location);
   if (currentHex) {
     world.player = { q: currentHex.q, r: currentHex.r };
     const here = world.tiles[hexKey(currentHex.q, currentHex.r)];
@@ -196,7 +199,7 @@ export function exploreHex(game, q, r) {
   revealArea(world, q, r, 1);
   const variant = stableHash(world.seed, "scenery", q, r) % (SCENERY[tile.terrain]?.length || 1);
   const narrative = (SCENERY[tile.terrain] || SCENERY.plain)[variant];
-  game.location = { id: `hex:${q},${r}`, name: `未登记的${cityTerrainLabel(tile.terrain)}`, district: "贝克兰德城区" };
+  game.location = { id: `hex:${q},${r}`, name: `未登记的${cityTerrainLabel(tile.terrain)}`, district: "贝克兰德城区", q, r };
   game.worldTime = advanceWorldTime(game.worldTime, EXPLORE_MINUTES);
   return { ok: true, narrative, minutes: EXPLORE_MINUTES, tile: stored };
 }

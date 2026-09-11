@@ -1,4 +1,17 @@
 export const LATEST_UPDATE = {
+  date: "2026-09-11",
+  dateLabel: "2026.09.11",
+  title: "修复普通街区无法返回重要地点",
+  summary: "探索未登记街区后，现在可以从当前六边形坐标计算路线，并正常前往所有已发现的重要地点。",
+  changes: [
+    "普通街区成为有效的旅行起点，不再因为没有地点档案 ID 而让重要地点显示「暂无可用路线」。",
+    "从普通街区前往重要地点时按实际格数计算耗时和交通方式，路线名称不再显示内部坐标编号。",
+    "地图会明确标出当前普通街区，并提示玩家可以继续探索或选择已发现的重要地点返回。",
+    "普通街区仍不会登记为重要地点；新增回归测试覆盖探索后返程与旧存档坐标兼容逻辑。",
+  ],
+};
+
+const SPLASH_PERFORMANCE_UPDATE = {
   date: "2026-09-10",
   dateLabel: "2026.09.10",
   title: "加速开屏背景加载",
@@ -75,6 +88,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  SPLASH_PERFORMANCE_UPDATE,
   PROMOTIONAL_POSTERS_UPDATE,
   QQ_GROUP_UPDATE,
   MOBILE_SPLASH_UPDATE,
