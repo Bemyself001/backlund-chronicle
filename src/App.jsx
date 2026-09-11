@@ -109,7 +109,7 @@ export default function App() {
     setGame(saved);
     refreshSaves();
   };
-  const handleCreate = (character) => { const next = createInitialGame(character); commitGame(next); setScreen("game"); };
+  const handleCreate = (character, loadout) => { const next = createInitialGame(character, loadout); commitGame(next); setScreen("game"); };
   const handleContinue = () => { const loaded = loadGame(); if (loaded) { setGame(loaded); setScreen("game"); } };
   const handleImport = async (file) => { const imported = await importSave(file); setGame(imported); refreshSaves(); setScreen("game"); };
   const handleSettingsSave = (next) => { setSettings(saveApiSettings(next)); };
@@ -473,7 +473,7 @@ export default function App() {
     <a className="skip-link" href="#main">跳到主要内容</a>
     {screen === "splash" && <Splash onEnter={() => setScreen("welcome")} />}
     {screen === "welcome" && <Welcome hasSave={saves.some((slot) => slot.slotId === "autosave")} saves={saves} apiSettings={settings} onNew={() => setScreen("create")} onContinue={handleContinue} onLoadSlot={loadSlot} onImport={handleImport} onApi={() => setModal("api")} onChangelog={() => setModal("changelog")} />}
-    {screen === "create" && <CharacterCreation onBack={() => setScreen("welcome")} onCreate={handleCreate} />}
+    {screen === "create" && <CharacterCreation onBack={() => setScreen("welcome")} onCreate={handleCreate} settings={settings} onApi={() => setModal("api")} />}
     {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} mockMode={Boolean(settings.mockMode)} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onRegenerateChoices={regenerateChoices} onLocalTool={runLocalTool} onOpenMap={() => setModal("map")} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => setScreen("welcome")} />}
     {itemConfirmation && <ImportantItemConfirmation changes={itemConfirmation.changes} onConfirm={(approvedKeys) => settleImportantItemConfirmation({ approvedKeys })} onCancel={() => settleImportantItemConfirmation({ cancelled: true })} />}
     {modal === "map" && game && <WorldMap game={game} loading={loading} onClose={() => setModal(null)} onTravel={(location) => { setModal(null); return runTurn(`前往${location.name}`, { mapDestination: location }); }} onInvestigate={(location, knowledge) => { setModal(null); return runTurn(`根据地图上的传闻，调查${knowledge.note || location.district}。`, { mapInvestigation: { locationId: location.id, currentStatus: knowledge.status, rumor: knowledge.note || location.rumor } }); }} onExplore={handleExplore} />}

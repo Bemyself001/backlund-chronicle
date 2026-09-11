@@ -4,6 +4,7 @@ import { findLocationRelations, getMapLocation, getMapLocations, isDiscoveredLoc
 import { ensureWorld, travelToLocation } from "../data/hexworld.js";
 import { amountToPence, formatMoney, moneyFromPence, moneyToPence } from "../data/money.js";
 import { normalizeInventoryItem, normalizeItemImportance } from "../data/items.js";
+import { equipmentSlot } from "../data/loadout.js";
 import { applyAdvancement, getAdvancement, isExplicitAdvancementIntent } from "../data/character.js";
 import { getPathway } from "../data/pathways.js";
 
@@ -164,6 +165,7 @@ function repairToolArgs(name, rawArgs = {}, game = null) {
         name: args.name,
         description: args.description || args.detail,
         category: args.category,
+        slot: args.slot,
         quantity: args.quantity,
         weight: args.weight,
         rarity: args.rarity,
@@ -174,7 +176,7 @@ function repairToolArgs(name, rawArgs = {}, game = null) {
         potion: args.potion,
         source: args.source,
       };
-      ["itemId", "name", "description", "detail", "category", "quantity", "weight", "rarity", "condition", "importance", "tags", "properties", "potion", "source"].forEach((key) => delete args[key]);
+      ["itemId", "name", "description", "detail", "category", "slot", "quantity", "weight", "rarity", "condition", "importance", "tags", "properties", "potion", "source"].forEach((key) => delete args[key]);
       repairNote = appendRepairNote(repairNote, "已将物品字段整理到 item 对象");
     }
     if (typeof args.item === "string" && args.item.trim()) {
@@ -399,7 +401,10 @@ function executeOne(game, call, options = {}) {
       if (!Number.isInteger(quantity) || quantity < 1 || quantity > target.quantity) return fail(call.name, "移除数量无效或超过持有数量");
       const change = { ...target, delta: -quantity, reason: call.reason, importance: normalizeItemImportance(target) };
       target.quantity -= quantity;
-      if (target.quantity === 0) game.inventory = game.inventory.filter((item) => item.instanceId !== target.instanceId);
+      if (target.quantity === 0) {
+        game.inventory = game.inventory.filter((item) => item.instanceId !== target.instanceId);
+        Object.keys(game.equipment).forEach((slot) => { if (game.equipment[slot] === target.instanceId) delete game.equipment[slot]; });
+      }
       return succeed(call.name, `${turnLabel}：失去「${target.name}」×${quantity}——${call.reason}。`, { inventoryChange: change });
     }
     case "inventory.update": {
@@ -459,16 +464,20 @@ function executeOne(game, call, options = {}) {
       const target = findItem();
       if (!target) return fail(call.name, "找不到要装备的物品");
       if (!target.tags.includes("装备")) return fail(call.name, "该物品不允许装备");
-      Object.values(game.equipment).forEach((id) => { const old = game.inventory.find((item) => item.instanceId === id); if (old && old.category === target.category) old.equipped = false; });
+      const slot = equipmentSlot(target);
+      Object.entries(game.equipment).forEach(([key, id]) => {
+        const old = game.inventory.find((item) => item.instanceId === id);
+        if (old && equipmentSlot(old) === slot) { old.equipped = false; delete game.equipment[key]; }
+      });
       target.equipped = true;
-      game.equipment[target.category] = target.instanceId;
+      game.equipment[slot] = target.instanceId;
       return succeed(call.name, `${turnLabel}：装备「${target.name}」。`);
     }
     case "item.unequip": {
       const target = findItem();
       if (!target?.equipped) return fail(call.name, "该物品当前没有装备");
       target.equipped = false;
-      delete game.equipment[target.category];
+      Object.keys(game.equipment).forEach((slot) => { if (game.equipment[slot] === target.instanceId) delete game.equipment[slot]; });
       return succeed(call.name, `${turnLabel}：卸下「${target.name}」。`);
     }
     case "occult.contact": {

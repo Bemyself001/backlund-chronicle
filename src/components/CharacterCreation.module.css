@@ -23,6 +23,19 @@
 .avatarNote { position: absolute; top: 100%; left: 0; width: 14rem; margin-top: .45rem; color: #6e6350; font: .58rem/1.5 var(--font-sans); letter-spacing: .06em; }
 .avatarNote a { color: var(--brass-light); }
 .form { align-self: start; padding: clamp(1.3rem, 3vw, 2.5rem); border-top: 3px solid var(--brass); background: var(--paper); color: var(--ink); box-shadow: 0 20px 60px #0005; }
+.formFields { min-width: 0; margin: 0; padding: 0; border: 0; }
+.loadoutFields { min-width: 0; display: grid; gap: .8rem; margin: 1.6rem 0; padding: 1rem; border: 1px solid #8c795866; }
+.loadoutFields legend { font: 500 1.3rem var(--font-serif); padding: 0 .4rem; }
+.loadoutFields p, .loadoutPreview p { margin: 0; font: .8rem/1.75 var(--font-sans); overflow-wrap: anywhere; }
+.apiLink { min-height: 2.75rem; border: 0; background: transparent; color: var(--verdigris); text-decoration: underline; cursor: pointer; }
+.loadoutPreview { margin-top: 1.5rem; padding: 1rem; border-left: 3px solid var(--brass); background: #efe4ce; }
+.loadoutPreview h2 { font: 500 1.4rem var(--font-serif); }
+.loadoutPreview h3 { font: 600 .9rem var(--font-sans); margin: 1rem 0 .6rem; }
+.loadoutPreview ul { padding: 0; list-style: none; }
+.loadoutPreview li { display: grid; gap: .35rem; padding: .8rem 0; border-bottom: 1px solid #8c79584f; overflow-wrap: anywhere; }
+.loadoutPreview small { font: .75rem/1.5 var(--font-sans); color: var(--ink-soft); }
+.loadoutPreview > button { margin-top: 1rem; color: var(--ink); border-color: var(--verdigris); }
+.loadoutPreview > button:hover { background: #20534717; }
 .startingDistrict { min-width: 0; margin: 0 0 2rem; padding: 0 0 1.5rem; border: 0; border-bottom: 1px solid #8e7b594d; }
 .startingDistrict legend { padding: 0; font: 500 1.5rem var(--font-serif); letter-spacing: .05em; }
 .startingDistrict > p { color: var(--ink-soft); font: .8rem/1.7 var(--font-sans); }

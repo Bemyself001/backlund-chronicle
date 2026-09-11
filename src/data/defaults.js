@@ -6,6 +6,7 @@ import { getMapLocation } from "./map.js";
 import { getOpening, openingChoices, openingMapState } from "./openings.js";
 import { buildWorld } from "./hexworld.js";
 import { ITEM_IMPORTANCE } from "./items.js";
+import { DEFAULT_CLOTHING, equipmentSlot, loadoutInventory, localLoadout, validateLoadout } from "./loadout.js";
 
 export const SAVE_VERSION = 11;
 export const AI_SETTINGS_VERSION = "1.4";
@@ -94,6 +95,9 @@ export const EMPTY_CHARACTER = {
   appearance: "",
   origin: "贝克兰德桥区",
   startingDistrict: "东区",
+  clothingDescription: DEFAULT_CLOTHING,
+  carriedItemName: "",
+  carriedItemDescription: "",
   occupation: "报社校对员",
   personality: "谨慎、敏锐，对权威保留怀疑",
   desire: "找到足以改变自己命运的真相",
@@ -166,10 +170,12 @@ function item(itemId, name, category, description, quantity, weight, rarity, tag
   };
 }
 
-export function createInitialGame(character) {
+export function createInitialGame(character, confirmedLoadout) {
   const normalizedCharacter = withAdvancement(character);
   const opening = getOpening(character.startingDistrict);
   const startingLocation = getMapLocation(opening.locationId);
+  const loadout = confirmedLoadout ? validateLoadout(confirmedLoadout, character) : localLoadout(character);
+  const startingInventory = loadoutInventory(loadout);
   const { startingMoneyPence = 240, ...characterProfile } = normalizedCharacter;
   const initialMoneyPence = Math.max(0, Math.min(MAX_STARTING_MONEY_PENCE, Number(startingMoneyPence) || 0)) + talentMoneyBonus(normalizedCharacter.talent);
   const baseStats = { health: 10, maxHealth: 10, sanity: 9, maxSanity: 10, spirituality: normalizedCharacter.extraordinary === "low" ? 7 : 4, maxSpirituality: normalizedCharacter.extraordinary === "low" ? 8 : 5 };
@@ -201,15 +207,12 @@ export function createInitialGame(character) {
       entryHistory: [],
     },
     inventory: [
-      item("worn-coat", "旧呢外套", "服装", "内衬缝有两个不易察觉的暗袋。", 1, 1.8, "普通", ["装备"]),
-      item("brass-compass", "黄铜罗盘", "工具", "指针偶尔会避开正北方，原因未知。", 1, 0.3, "少见", ["可检查"]),
-      item("pocket-notebook", "袖珍笔记本", "文书", "夹着几张速记纸，尚有二十余页空白。", 1, 0.2, "普通", ["线索工具"]),
-      item("matchbox", "防潮火柴", "消耗品", "还剩十二根，硫磺气味明显。", 1, 0.1, "普通", ["消耗品"]),
+      ...startingInventory,
       ...(talentItem ? [talentItem] : []),
     ],
     money: moneyFromPence(initialMoneyPence),
     capacity: { maxWeight: 12 },
-    equipment: {},
+    equipment: Object.fromEntries(startingInventory.filter((entry) => entry.equipped).map((entry) => [equipmentSlot(entry), entry.instanceId])),
     statusEffects: [],
     quests: [],
     clues: [],

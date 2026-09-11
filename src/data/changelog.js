@@ -1,6 +1,20 @@
 export const LATEST_UPDATE = {
   date: "2026-09-11",
   dateLabel: "2026.09.11",
+  title: "自定义开局行装与衣着",
+  summary: "玩家可以自选一件随身物品，并根据衣着描述整理开局衣物，确认清单后进入故事。",
+  changes: [
+    "新增衣着描述、随身物品名称和描述；自选名额为一件，家传怀表由天赋额外发放。",
+    "使用玩家配置的 AI 生成衣物清单，离线演示支持常见衣物本地整理；显示衣物部位、描述和估算重量供确认。",
+    "生成支持取消、失败重试；修改角色资料后重新整理，确认前不创建存档。",
+    "移除固定赠送的罗盘、笔记本和火柴，衣物根据描述生成；不同穿戴部位可同时装备，物品移除会清理对应装备记录。",
+    "开局行装仅登记普通物品，数量、重量和穿戴部位由本地校验；已有存档的物品保持原样。",
+  ],
+};
+
+const DISTRICT_OPENINGS_UPDATE = {
+  date: "2026-09-11",
+  dateLabel: "2026.09.11",
   title: "五大城区独立开局",
   summary: "创建角色时可选择游戏开始的大区，五个城区分别提供独立开场与当地线索。",
   changes: [
@@ -101,6 +115,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  DISTRICT_OPENINGS_UPDATE,
   MAP_RETURN_UPDATE,
   SPLASH_PERFORMANCE_UPDATE,
   PROMOTIONAL_POSTERS_UPDATE,

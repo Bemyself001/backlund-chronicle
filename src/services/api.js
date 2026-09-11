@@ -3,6 +3,7 @@ import { PATHWAYS } from "../data/pathways.js";
 import { DYNAMIC_LOCATION_KINDS, DYNAMIC_LOCATION_SCOPES, MAP_DISTRICTS } from "../data/map.js";
 import { createProviderProfile, inferApiProvider } from "./apiProviders.js";
 import { normalizeAIResponse, textFromContent } from "./protocol.js";
+import { CLOTHING_SLOTS } from "../data/loadout.js";
 
 const SETTINGS_KEY = "mist-api-settings-v1";
 const LEGACY_SESSION_KEY = "mist-api-key";
@@ -130,6 +131,7 @@ const TOOL_PARAMETER_SCHEMAS = {
           name: { type: "string", description: "玩家可见的物品外观名称；未鉴定魔药不得在这里写真实途径或序列" },
           description: { type: "string", description: "玩家可见的外观描述；未鉴定魔药不得泄露真实身份" },
           category: { type: "string" },
+          slot: { type: "string", enum: CLOTHING_SLOTS, description: "服装穿戴部位；不同部位可同时穿戴" },
           quantity: { type: "integer", minimum: 1, maximum: 10 },
           weight: { type: "number", minimum: 0 },
           rarity: { type: "string" },
@@ -613,7 +615,7 @@ function emptyResponseError(finishReason, hasReasoning = false, metadata = {}) {
   return error;
 }
 
-function normalizeChatCompletion(data, requestMaxTokens = 0) {
+function normalizeChatCompletion(data, requestMaxTokens = 0, options = {}) {
   const choice = data?.choices?.[0] || {};
   const message = choice.message || {};
   const nativeCalls = nativeCallsFromMessage(message, { finishReason: choice.finish_reason, streamed: false });
@@ -621,6 +623,7 @@ function normalizeChatCompletion(data, requestMaxTokens = 0) {
   if (!textFromContent(payload).trim() && !(payload && typeof payload === "object" && !Array.isArray(payload)) && !nativeCalls.length) {
     throw emptyResponseError(choice.finish_reason, Boolean(reasoningFromMessage(message).trim()), { ...responseMetadata(data), requestMaxTokens });
   }
+  if (options.rawContent) return { content: typeof payload === "string" ? payload : JSON.stringify(payload) };
   return { ...normalizeAIResponse(payload, nativeCalls), reasoningContent: reasoningFromMessage(message), responseMetadata: { ...responseMetadata(data), requestMaxTokens } };
 }
 
@@ -852,10 +855,10 @@ export async function requestAI(settings, messages, signal, onChunk, options = {
     const raw = await response.text();
     let data;
     try { data = JSON.parse(raw); } catch {
-      if (raw.trim()) return { ...normalizeAIResponse(raw), responseMetadata: { contentType, rawLength: raw.length, requestMaxTokens: maxTokens } };
+      if (raw.trim()) return options.rawContent ? { content: raw } : { ...normalizeAIResponse(raw), responseMetadata: { contentType, rawLength: raw.length, requestMaxTokens: maxTokens } };
       throw emptyResponseError("", false, { contentType, rawLength: raw.length, requestMaxTokens: maxTokens });
     }
-    return normalizeChatCompletion(data, maxTokens);
+    return normalizeChatCompletion(data, maxTokens, options);
   }
   const streamed = await readStreamResponse(response, onChunk, options.onReasoningChunk);
   const nativeCalls = nativeCallsFromMessage({ tool_calls: Object.values(streamed.calls) }, { finishReason: streamed.finishReason, streamed: true });
