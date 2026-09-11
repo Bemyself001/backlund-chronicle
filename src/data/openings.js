@@ -1,0 +1,100 @@
+import { getMapLocation, MAP_LOCATIONS, normalizeLocationKnowledge } from "./map.js";
+
+// 开局地区与角色出身独立；这里的内容只在创建新档案时写入存档。
+export const OPENINGS = [
+  {
+    district: "东区", locationId: "east-station", title: "雾都来客", theme: "求生 · 劳工 · 城市入口",
+    preview: "雨雾中的火车站，招工与租房公告之间，一只无人认领的皮箱发出规律的轻响。",
+    time: "18:20", knownIds: ["east-station", "iron-gate", "soot-lamp", "queen-library"],
+    narrative: "列车在一阵尖锐的刹车声中驶入贝克兰德东区火车站。铸铁穹顶下，煤烟、湿羊毛和热蒸汽混成一层低垂的雾；搬运工推着行李车穿过人群，报童高声兜售晚报，远处的马车夫则为最后几位体面乘客争吵。\n\n你带着自己的行李踏上站台。售票厅外的城市地图标出通往桥区、皇后区与北区的线路；公告栏上同时贴着廉价房间、短工招聘、教会布告和几张边角卷起的失踪启事。若你愿意，今夜可以先找住处、谋一份工作、认识这座城市，或登上下一班车离开东区。\n\n封闭的第七码头旁停着一辆无人看管的行李车，最上方那只黑色皮箱正以稳定的七秒间隔，发出极轻的金属碰撞声。它没有拦住你的路。贝克兰德向四面八方展开，等待你自己决定第一步。",
+    summary: "故事从东区火车站开始。玩家乘列车抵达本站，尚未接受任何委托，可以自由探索城市；此事不代表玩家第一次来到贝克兰德。",
+    event: "贝克兰德连续第九日降雨；东区铁路因浓雾出现大面积晚点。",
+    clues: [
+      { id: "crossed-platform", title: "被划去的站台", detail: "旧时刻表上有一行被墨水反复涂抹，仍能辨出“十一点零七分”。" },
+      { id: "unclaimed-case", title: "无人认领的黑色皮箱", detail: "行李牌上的姓名与三日前报纸失踪启事中的文员相同。" },
+      { id: "duplicate-tag", title: "重复的行李牌", detail: "两件来自不同列车的行李使用了完全相同的黄铜编号牌。" },
+    ],
+    actions: ["查看城市地图、招工与租房公告", "向搬运工打听各区近况与落脚处", "跟随异常声响靠近封闭的第七码头"],
+    danger: { id: "hollow-chime", name: "空鸣者的回声" },
+  },
+  {
+    district: "北区", locationId: "north-flats", title: "灰墙之内", theme: "邻里 · 生计 · 秘密",
+    preview: "公寓门厅里，房东正在核对租客名册。一间空置已久的房间，却总有人按时缴纳租金。",
+    time: "18:20", knownIds: ["north-flats", "queen-library"],
+    narrative: "北区的雨顺着灰墙公寓的檐槽落下，门厅里晾着几件滴水的外套。你站在敞开的门边，看到房东将租客名册摊在煤油灯旁。墙上贴着空房价格、清扫楼梯的短工启事，还有一张通往公共图书馆的马车时刻表。\n\n一名提煤的住客停下来询问今晚是否仍供应热水；另一人正在抱怨面包涨价。你可以询问房价与工作，也可以去图书馆附近看看，或者离开这栋楼。没有人把你当作已经签约的租客。\n\n房东翻过一页时低声嘀咕：三楼那间空房，本月的租金又缴清了。收据仍是从门缝里递出来的，可钥匙始终挂在他腰间。楼梯上没有脚步声，名册上那一栏也没有姓名。这件事暂时只是一段被雨声盖住的闲话。",
+    summary: "故事从北区灰墙公寓门厅开始。玩家尚未租房或接受工作，听到空房仍有人缴租的疑问，可以调查，也可以离开。",
+    event: "北区部分公寓暂停夜间热水供应，住客开始合租煤炉。",
+    clues: [
+      { id: "north-paid-room", title: "空房租金", detail: "名册中一间空房按月结清租金，租客姓名一栏留白。" },
+      { id: "north-key", title: "未借出的钥匙", detail: "房东声称三楼空房的钥匙一直由自己保管。" },
+    ],
+    actions: ["查看空房价格与清扫短工启事", "向房东打听公寓住客与生活开销", "走上三楼，靠近那间仍在缴租的空房"],
+    danger: { id: "north-empty-room", name: "灰墙后的住客" },
+  },
+  {
+    district: "皇后区", locationId: "queen-library", title: "明日的更正", theme: "知识 · 档案 · 身份",
+    preview: "午后的阅览桌上，一则旧报更正启事写着明天的日期，事故地点却没有印全。",
+    time: "15:40", knownIds: ["queen-library", "queen-archive"],
+    narrative: "皇后区公共图书馆的高窗将午后雨光切成长条，阅览桌上能闻到纸张与浆糊的气味。你在公开报刊架旁停下，管理员正提醒访客：借阅证可以在前台询问，闭馆前请将合订本放回推车。\n\n入口布告栏列着抄录工作的报名办法和市政档案馆的开放时间。这里不要求你解释职业与来历，你可以先了解阅览规则、寻找公开资料，或到街边报摊看看。\n\n推车最上方的一册旧报摊在更正栏。一则短讯为某起事故中的错误伤亡数字致歉，末尾日期却印成了明天。事故地点的一半被装订线压住，纸张颜色又与周围略有不同。它可能只是误印或修补；是否值得追查，要由你自己判断。",
+    summary: "故事从皇后区公共图书馆的公开阅览区开始。玩家看到日期疑似印错的事故更正启事，尚未确认事故或异常真实发生，也未接受任务。",
+    event: "公共图书馆开始整理旧报合订本；市政档案馆公布了本周的阅档安排。",
+    clues: [
+      { id: "queen-future-correction", title: "明日的更正启事", detail: "旧报更正栏印着明天的日期，所述事故尚未核实。" },
+      { id: "queen-binding", title: "装订线下的地名", detail: "事故地名被装订线遮住半行，这页纸的颜色与相邻页略有差异。" },
+    ],
+    actions: ["查看借阅规则与抄录工作布告", "向管理员询问旧报来源和阅档安排", "尝试检查装订线下被遮住的事故地名"],
+    danger: { id: "queen-correction", name: "未刊出的事故" },
+  },
+  {
+    district: "希尔斯顿区", locationId: "hillston-market", title: "两份货单", theme: "金钱 · 阶层 · 交易",
+    preview: "商会街的橱窗贴出临时校对招募，两份相同编号的货单，却写着不同的收货人。",
+    time: "16:10", knownIds: ["hillston-market", "soot-lamp"],
+    narrative: "希尔斯顿区商会街上，马车停在擦亮的铜牌下，巡警沿橱窗缓慢走过。你面前的一家商行贴出了临时账目校对招募，报酬按页计算，报名者需要先完成一段试抄。对街的公共告示牌列着马车站点和桥区旅店的住宿广告。\n\n门内的书记员正在分拣送货文件，门外两名跑腿人争论着加急件的运费。你可以了解招募条件、询问行情，或沿商街继续走。这里没有人因为你的衣着便替你确定身份，也没有已经属于你的合同。\n\n一阵风吹落两张待归档的货单。它们的编号、货物和金额完全一致，收货人却不同，其中一张的签收日期还被刮改过。书记员将它们压在镇纸下，暂时没有作出解释。临近打烊，街上的脚步依然匆忙。",
+    summary: "故事从希尔斯顿区商会街开始。玩家看到商行临时校对招募与收货人不一致的货单，尚未受雇、签约或取得货单。",
+    event: "商会街数家商行提前结算运费，临时文书岗位增加。",
+    clues: [
+      { id: "hillston-two-consignees", title: "两个收货人", detail: "两份同编号货单的货物和金额一致，收货人却不同。" },
+      { id: "hillston-scraped-date", title: "刮改的签收日期", detail: "其中一张货单的签收日期有明显刮改痕迹。" },
+    ],
+    actions: ["查看校对招募条件与报酬说明", "向跑腿人打听商行信誉和运费行情", "靠近柜台，尝试核对两份货单的签收信息"],
+    danger: { id: "hillston-consignee", name: "第二位收货人" },
+  },
+  {
+    district: "桥区", locationId: "soot-lamp", title: "寄给昨日的信", theme: "人脉 · 传闻 · 河运",
+    preview: "旅店柜台贴着临时帮工招募。一封寄给前任住客的信，已经连续三晚被送回来。",
+    time: "18:20", knownIds: ["soot-lamp", "bridge-docks", "iron-gate"],
+    narrative: "桥区雾鸦旅店的门被河风推得轻响，厨房的热气从柜台后飘出来。你停在门内的小黑板前，上面写着房价、晚餐价格与临时帮工招募；旁边贴着南岸货栈的夜班时刻和铁门街的床位广告。\n\n几名船工围着一张桌子核算今晚的工钱，老板忙着找零钱。你可以询问住宿、打听河运工作，或者继续沿桥前往别处。眼下没有人为你订好房间，也没有非接不可的委托。\n\n送信人把一封信放上柜台，老板的手停了下来：“又是这一封？那位客人早就退房了。”信封一角的水渍与前两晚留下的记号重合，邮戳却换成了今天。信仍封着，老板也没有请任何人拆开。窗外一声汽笛响过，桌边的交谈很快恢复。",
+    summary: "故事从桥区雾鸦旅店开始。玩家尚未入住或受雇，听到一封寄给前任住客的信连续三晚被送回；可自由选择住宿、工作、旅行或调查。",
+    event: "河面浓雾使南岸货栈的夜班推迟，船工在桥区旅店等待消息。",
+    clues: [
+      { id: "bridge-returned-letter", title: "再次送回的信", detail: "寄给已退房住客的信连续三晚出现在旅店柜台，尚未拆封。" },
+      { id: "bridge-postmark", title: "变化的邮戳", detail: "老板记得信封上相同的水渍和记号，但邮戳日期变成了今天。" },
+    ],
+    actions: ["查看旅店房价与临时帮工招募", "向老板和船工打听住宿及河运消息", "征求查看信封的许可，核对邮戳与退房记录"],
+    danger: { id: "bridge-returned-mail", name: "昨日的收信人" },
+  },
+];
+
+export function getOpening(district) {
+  return OPENINGS.find((opening) => opening.district === district) || OPENINGS[0];
+}
+
+export function openingMapState(opening) {
+  const discoveredLocations = opening.knownIds.map((id) => {
+    const location = getMapLocation(id);
+    return { id, name: location.name, note: location.description };
+  });
+  const rumors = Object.fromEntries(MAP_LOCATIONS.map((location) => [location.id, {
+    status: "rumored", note: location.rumor,
+  }]));
+  return {
+    discoveredLocations,
+    locationKnowledge: normalizeLocationKnowledge(opening.district === "东区" ? {} : rumors, discoveredLocations, opening.locationId),
+  };
+}
+
+export function openingChoices(opening) {
+  return opening.actions.map((label, index) => ({ label,
+    intent: ["investigate", "social", "dangerous"][index], risk: ["low", "medium", "high"][index],
+  }));
+}

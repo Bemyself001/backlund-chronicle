@@ -1,4 +1,6 @@
 import { makeId } from "../utils/id.js";
+import { OPENINGS, openingChoices } from "../data/openings.js";
+import { getMapLocation } from "../data/map.js";
 
 function includesAny(text, words) { return words.some((word) => text.includes(word)); }
 
@@ -10,7 +12,23 @@ export async function mockResponse(game, action, signal, onChunk) {
   const lower = action.toLowerCase();
   let narrative;
   let toolCalls = [];
-  if (includesAny(lower, ["重要物品", "关键证据"])) {
+  const localOpening = OPENINGS.find((opening) => opening.locationId === game.location.id && opening.district !== "东区");
+  const openingAction = localOpening?.actions.indexOf(action) ?? -1;
+  const destination = action.startsWith("前往") ? game.discoveredLocations.find((place) => action === `前往${place.name}`) : null;
+  if (destination && destination.id !== game.location.id) {
+    narrative = `你从${game.location.name}动身，按已知路线前往${destination.name}。${getMapLocation(destination.id)?.description || "沿途街景在雨雾中逐渐变化。"}\n\n抵达后的行动由你决定：可以了解这里的生活与工作，也可以继续前往其他已知地点。`;
+    toolCalls = [{ id: makeId("mock"), name: "location.move", reason: "玩家明确选择前往已发现地点", args: { locationId: destination.id } }];
+  } else if (localOpening && openingAction >= 0) {
+    const scene = `${game.location.name}的日常仍在继续。`;
+    narrative = openingAction === 0
+      ? `你仔细核对眼前的公开说明，记下价格、时间与申请条件，暂时没有签约或付款。${scene}\n\n你可以按自己的职业与预算询问细节，也可以先到其他街区比较机会。眼前的疑点不会阻止你安排生活。`
+      : openingAction === 1
+        ? `你向现场的人说明想了解当地的生活与工作，对方先介绍公开的条件，没有替你承诺职位或住处。${scene}\n\n交谈间有人再次提起：${localOpening.clues[0].detail}这仍只是一条需要核实的消息；你可以继续追问，也可以把话题转回生计。`
+        : `你按自己的选择接近疑点，先核对能够观察或获准查看的记录。${localOpening.clues[0].detail}\n\n目前的证据还不足以证明某种非凡力量，也没有授权你拿走物品。你可以记录这个疑问、寻找另一位知情人，或结束调查。`;
+    if (openingAction === 2 && !game.clues.some((clue) => clue.id === localOpening.clues[0].id)) {
+      toolCalls = [{ id: makeId("mock"), name: "clue.add", reason: "玩家主动核对开场中可见的疑点", args: { clue: { ...localOpening.clues[0] } } }];
+    }
+  } else if (game.location.id === "east-station" && includesAny(lower, ["重要物品", "关键证据"])) {
     narrative = "你在站台长椅下发现一本带有铁路行会封蜡的薄账册。页码与失踪启事上的日期彼此对应，它可能成为案件的关键证据；在把它正式收入档案前，本地审计会要求你确认。";
     toolCalls = [{ id: makeId("mock"), name: "inventory.add", reason: "玩家主动检查现场并取得案件关键证据", args: { item: { itemId: "sealed-rail-ledger", name: "封蜡铁路账册", description: "记录着异常列车班次与数笔可疑支出。", category: "证据", quantity: 1, weight: 0.2, rarity: "少见", importance: "important", tags: ["关键证据"], source: "东区火车站长椅下" } } }];
   } else if (game.occult?.entryAvailable && game.occult.currentEntry && includesAny(lower, ["非凡入口", "异常暗号", "接触", "追查这条"])) {
@@ -41,32 +59,33 @@ export async function mockResponse(game, action, signal, onChunk) {
   } else if (includesAny(lower, ["新地点", "药材铺", "动态地图", "新的店铺"])) {
     narrative = "你从几名互不相识的跑腿人口中听到同一个说法：铁门街深处有一家只在傍晚开门的药材铺，门楣上总冒着淡红色烟气。没人能给出完整门牌，因此它现在只够成为一条地图传闻；本地地图会把它接在铁门街附近，等待你进一步调查。";
     toolCalls = [{ id: makeId("mock"), name: "location.grow", reason: "玩家从多个来源听到一处可长期复用的新店铺传闻", args: { location: { name: "红烟囱药材铺", district: "东区", kind: "shop", scope: "landmark", anchorId: "iron-gate", rumor: "铁门街深处据说有一家只在傍晚开门、门楣冒着红烟的药材铺。", description: "一间门面狭窄的药材铺，红铜烟管从二楼窗沿伸出，傍晚才会亮灯营业。", status: "rumored", temporary: false } } }];
-  } else if (includesAny(lower, ["地图", "公告", "招工", "租房", "观察", "查看车站"])) {
+  } else if (game.location.id === "east-station" && includesAny(lower, ["地图", "公告", "招工", "租房", "观察", "查看车站"])) {
     narrative = "你先把行李放在脚边，逐栏读完站内公告。城市地图把贝克兰德切成彼此相连又截然不同的区域：东区有最便宜的床位和最多的临时工作；桥区的旅店与小商行需要识字的帮工；皇后区的公共图书馆在白天允许访客查阅旧报。你可以先解决生计，也可以只选一条看顺眼的街道走下去。\n\n公告栏右下角压着几则互不相干的消息：钟表铺招聘学徒、教会施粥点征求登记员、货运公司寻找丢失账箱。最底下是一张三日前的失踪启事，照片中的夜班文员与第七码头黑色皮箱上的行李牌同姓。那也可能只是巧合。没有人注意你读到了这里，更没有人要求你负责。";
-  } else if (includesAny(lower, ["搬运工", "询问", "打听", "交涉", "住宿", "工作", "茶摊"])) {
+  } else if (game.location.id === "east-station" && includesAny(lower, ["搬运工", "询问", "打听", "交涉", "住宿", "工作", "茶摊"])) {
     narrative = "你拦住一位正靠着空行李车歇气的搬运工。他先打量你的鞋和箱子，确认你不像来查票的主管，才肯分享实用消息：铁门街的床位按周计价，桥区的店主更看重介绍信，若想找体面的文书工作，最好明早去皇后区的报馆街。\n\n他没有追问你的来历，只用下巴朝几个出口分别点了点。“想安稳，就在天黑前找房；想挣钱，东边仓库今晚还缺人；想听故事，去茶摊坐到末班车。”说完，他重新推起车，把选择完整地留给你。";
-  } else if (includesAny(lower, ["第七码头", "皮箱", "异常声", "封闭", "行李车"])) {
+  } else if (game.location.id === "east-station" && includesAny(lower, ["第七码头", "皮箱", "异常声", "封闭", "行李车"])) {
     narrative = "你主动绕过写着“暂停使用”的黄铜隔离牌，沿第七码头外缘接近那辆行李车。金属碰撞声并不来自皮箱内部，而来自箱底：一枚黄铜行李牌被细线系在车架上，每隔七秒便在蒸汽余震中敲击一次。\n\n牌面编号本应对应北上的早班列车，却又被刻上一行很新的小字——“11:07，旧钟街”。远处有巡站员提灯经过，但尚未看见你。你现在可以记下编号后离开、设法询问失物处，也可以冒险打开皮箱；这条线索不会妨碍你转身去做别的事。";
     toolCalls = [{ id: makeId("mock"), name: "clue.add", reason: "玩家主动检查第七码头的异常行李车", args: { clue: { id: "crossed-platform", title: "被划去的站台", detail: "行李车底的黄铜牌标着北上列车编号，背面新刻有“11:07，旧钟街”。" } } }];
-  } else if (includesAny(lower, ["铁门街", "找住处", "廉价旅店"])) {
+  } else if (game.location.id === "east-station" && includesAny(lower, ["铁门街", "找住处", "廉价旅店"])) {
     narrative = "你决定先把落脚处安顿下来。离开车站后，东区的雨变得更细，铁门街两侧依次亮起煤气灯。洗衣房的蒸汽越过低矮屋顶，廉价旅店的招牌在风里相互碰撞；你可以比较房价、去酒馆打听零工，或继续沿街探索。车站里的异响被留在身后，没有追上来。";
     toolCalls = [{ id: makeId("mock"), name: "location.move", reason: "玩家选择先在东区寻找落脚处", args: { locationId: "iron-gate", district: "贝克兰德东区" } }];
-  } else if (includesAny(lower, ["桥区", "雾鸦旅店"])) {
+  } else if (game.location.id === "east-station" && includesAny(lower, ["桥区", "雾鸦旅店"])) {
     narrative = "你搭上一辆驶往桥区的公共马车。车轮穿过积水，沿途的厂房逐渐被商铺、仓库与狭窄公寓取代。雾鸦旅店的黄铜招牌在雨里泛着暗光，门边的小黑板写着空房价格，也写着“代收信件、介绍短工”。你可以租房、用餐、结识老板，或只是把这里当作继续前往别处的中转站。";
     toolCalls = [{ id: makeId("mock"), name: "location.move", reason: "玩家自由选择前往桥区", args: { locationId: "soot-lamp", district: "贝克兰德桥区" } }];
-  } else if (includesAny(lower, ["皇后区", "图书馆", "查报纸"])) {
+  } else if (game.location.id === "east-station" && includesAny(lower, ["皇后区", "图书馆", "查报纸"])) {
     narrative = "你确认了前往皇后区的路线。此刻公共图书馆已经闭馆，但门廊下仍贴着开放时间与阅览规则，附近的报摊出售过去一周的晚报合订本。你可以先从报纸入手、在周边寻找住处，或等到明早再正式查阅档案。城市并不因你的到来停止运转，新的消息仍不断被印上纸面。";
     toolCalls = [{ id: makeId("mock"), name: "location.move", reason: "玩家自由选择前往皇后区查找公开资料", args: { locationId: "queen-library", district: "贝克兰德皇后区" } }];
   } else {
     narrative = `你选择了“${action}”。贝克兰德没有替你规定这个决定必须通向何处：眼前的人群、街道与公共交通都照常运转，你的行动只会引起与之相称的回应。\n\n在${game.location.name}，你仍能改变计划。可以先处理食宿与工作，也可以结识当地人、跨区旅行，或主动追查某个让你在意的异常。那些没有被选择的事件不会凭空消失，却也不会突然把你拖入一条既定路线。`;
   }
   onChunk?.(narrative);
+  const responseOpening = destination ? OPENINGS.find((opening) => opening.locationId === destination.id) : localOpening;
   return {
     narrative,
     toolCalls,
     memoryNotes: [`第${game.turn + 1}轮：玩家选择“${action.slice(0, 40)}”。`],
-    worldEvents: game.turn === 1 ? ["东区铁路公告称浓雾导致两班夜车取消，滞留旅客开始寻找临时住处。"] : [],
-    choices: [
+    worldEvents: game.turn === 1 ? [responseOpening?.event || "持续的雨雾让公共交通延误，各区居民开始调整出行安排。"] : [],
+    choices: responseOpening ? openingChoices(responseOpening) : [
       { label: "整理地图与公告，规划自己的下一站", intent: "investigate", risk: "low" },
       { label: "找当地人打听住处、工作和街区消息", intent: "social", risk: "medium" },
       { label: "主动接近一处尚未解释的异常", intent: "dangerous", risk: "high" },

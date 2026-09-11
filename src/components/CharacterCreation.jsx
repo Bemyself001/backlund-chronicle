@@ -3,6 +3,8 @@ import { EMPTY_CHARACTER, LOW_SEQUENCE_PATHWAYS, randomCharacter } from "../data
 import { TALENTS, getTalent } from "../data/talents.js";
 import { MAX_STARTING_MONEY_PENCE, moneyFromPence, formatMoney } from "../data/money.js";
 import styles from "./CharacterCreation.module.css";
+import { getOpening, OPENINGS } from "../data/openings.js";
+import { getMapLocation } from "../data/map.js";
 
 const AVATAR_SIZE = 192;
 
@@ -40,6 +42,7 @@ const fields = [
 export default function CharacterCreation({ onBack, onCreate }) {
   const [character, setCharacter] = useState({ ...EMPTY_CHARACTER });
   const [error, setError] = useState("");
+  const opening = getOpening(character.startingDistrict);
   const fileInputRef = useRef(null);
   const pickAvatar = async (event) => {
     const file = event.target.files?.[0];
@@ -83,9 +86,25 @@ export default function CharacterCreation({ onBack, onCreate }) {
           </div>
           <p className={styles.kicker}>CHARACTER DOSSIER</p><h1>建立你的<br />私人档案</h1>
           <p>这不是英雄履历，而是一份会被世界记住的过去。欲望会指引你，恐惧与秘密也会留下代价。</p>
-          <button className="button button--secondary" type="button" onClick={() => { setCharacter({ ...EMPTY_CHARACTER, ...randomCharacter(), avatar: character.avatar }); setError(""); }}>随机生成角色</button>
+          <button className="button button--secondary" type="button" onClick={() => { setCharacter({ ...EMPTY_CHARACTER, ...randomCharacter(), avatar: character.avatar, startingDistrict: character.startingDistrict }); setError(""); }}>随机生成角色</button>
         </aside>
         <form className={styles.form} onSubmit={submit}>
+          <fieldset className={styles.startingDistrict} aria-describedby="starting-district-help">
+            <legend>故事起点 · 开局大区</legend>
+            <p id="starting-district-help">选择故事开始时所在的大区。出身地区仍由个人资料决定，开局后可以自由前往其他城区。</p>
+            <div className={styles.districtOptions}>
+              {OPENINGS.map((entry) => <label key={entry.district} data-selected={opening.district === entry.district}>
+                <input type="radio" name="startingDistrict" value={entry.district} checked={opening.district === entry.district} onChange={() => update("startingDistrict", entry.district)} />
+                <span><strong>{entry.district}</strong><small>{entry.theme}</small></span>
+              </label>)}
+            </div>
+            <div className={styles.openingPreview} aria-live="polite" aria-atomic="true">
+              <small>开场预览 · {getMapLocation(opening.locationId).name}</small>
+              <h2>{opening.title}</h2>
+              <p>{opening.preview}</p>
+              <span>生活、交涉或调查，由你决定第一步。</span>
+            </div>
+          </fieldset>
           <div className={styles.formHeading}><span>个人资料</span><p>带 * 的项目会影响开局叙事</p></div>
           <div className={styles.grid}>
             {fields.map(([key, label, type, options]) => <label key={key} className={`${styles.field} ${type === "textarea" ? styles.spanTwo : ""}`}><span>{label}{["name", "background"].includes(key) && " *"}</span>

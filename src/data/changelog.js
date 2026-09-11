@@ -1,6 +1,19 @@
 export const LATEST_UPDATE = {
   date: "2026-09-11",
   dateLabel: "2026.09.11",
+  title: "五大城区独立开局",
+  summary: "创建角色时可选择游戏开始的大区，五个城区分别提供独立开场与当地线索。",
+  changes: [
+    "新增开局大区卡片与剧情预览：东区火车站、北区灰墙公寓、皇后区公共图书馆、希尔斯顿区商会街、桥区雾鸦旅店。",
+    "开局大区独立于角色出身；随机角色保留所选大区，旧存档继续原有故事。",
+    "各区同步设置当前位置、开局时间、章节、三个行动方向、初始线索、地图认知和剧情记忆。",
+    "AI 剧本说明与离线演示回复适配各区起点；玩家可自由选择生活、交涉、调查或跨区旅行。",
+  ],
+};
+
+const MAP_RETURN_UPDATE = {
+  date: "2026-09-11",
+  dateLabel: "2026.09.11",
   title: "修复普通街区无法返回重要地点",
   summary: "探索未登记街区后，现在可以从当前六边形坐标计算路线，并正常前往所有已发现的重要地点。",
   changes: [
@@ -88,6 +101,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  MAP_RETURN_UPDATE,
   SPLASH_PERFORMANCE_UPDATE,
   PROMOTIONAL_POSTERS_UPDATE,
   QQ_GROUP_UPDATE,

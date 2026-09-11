@@ -2,7 +2,8 @@ import { makeId } from "../utils/id.js";
 import { applyTalent, talentItemSpec, talentMoneyBonus } from "./talents.js";
 import { withAdvancement } from "./character.js";
 import { MAX_STARTING_MONEY_PENCE, moneyFromPence } from "./money.js";
-import { initialDiscoveredLocations, normalizeLocationKnowledge } from "./map.js";
+import { getMapLocation } from "./map.js";
+import { getOpening, openingChoices, openingMapState } from "./openings.js";
 import { buildWorld } from "./hexworld.js";
 import { ITEM_IMPORTANCE } from "./items.js";
 
@@ -92,6 +93,7 @@ export const EMPTY_CHARACTER = {
   avatar: "",
   appearance: "",
   origin: "贝克兰德桥区",
+  startingDistrict: "东区",
   occupation: "报社校对员",
   personality: "谨慎、敏锐，对权威保留怀疑",
   desire: "找到足以改变自己命运的真相",
@@ -166,6 +168,8 @@ function item(itemId, name, category, description, quantity, weight, rarity, tag
 
 export function createInitialGame(character) {
   const normalizedCharacter = withAdvancement(character);
+  const opening = getOpening(character.startingDistrict);
+  const startingLocation = getMapLocation(opening.locationId);
   const { startingMoneyPence = 240, ...characterProfile } = normalizedCharacter;
   const initialMoneyPence = Math.max(0, Math.min(MAX_STARTING_MONEY_PENCE, Number(startingMoneyPence) || 0)) + talentMoneyBonus(normalizedCharacter.talent);
   const baseStats = { health: 10, maxHealth: 10, sanity: 9, maxSanity: 10, spirituality: normalizedCharacter.extraordinary === "low" ? 7 : 4, maxSpirituality: normalizedCharacter.extraordinary === "low" ? 8 : 5 };
@@ -180,12 +184,14 @@ export function createInitialGame(character) {
     turn: 0,
     character: {
       ...characterProfile,
+      startingDistrict: opening.district,
       portraitSeed: Math.floor(Math.random() * 4),
       stats: applyTalent(baseStats, normalizedCharacter.talent),
     },
-    location: { id: "east-station", name: "东区·贝克兰德火车站", district: "贝克兰德东区" },
-    worldTime: "1349年 10月17日 · 周二 · 18:20",
-    chapter: { number: 1, title: "雾都来客" },
+    opening: { district: opening.district, locationId: opening.locationId, title: opening.title, summary: opening.summary },
+    location: { id: startingLocation.id, name: startingLocation.name, district: `贝克兰德${opening.district}` },
+    worldTime: `1349年 10月17日 · 周二 · ${opening.time}`,
+    chapter: { number: 1, title: opening.title },
     occult: {
       contact: normalizedCharacter.extraordinary === "low" ? 1 : 0,
       revealLevel: 0,
@@ -207,29 +213,20 @@ export function createInitialGame(character) {
     statusEffects: [],
     quests: [],
     clues: [],
-    availableClues: [
-      { id: "crossed-platform", title: "被划去的站台", detail: "旧时刻表上有一行被墨水反复涂抹，仍能辨出“十一点零七分”。" },
-      { id: "unclaimed-case", title: "无人认领的黑色皮箱", detail: "行李牌上的姓名与三日前报纸失踪启事中的文员相同。" },
-      { id: "duplicate-tag", title: "重复的行李牌", detail: "两件来自不同列车的行李使用了完全相同的黄铜编号牌。" },
-    ],
+    availableClues: structuredClone(opening.clues),
     relationships: [],
     mapExtensions: { locations: [], routes: [] },
-    discoveredLocations: initialDiscoveredLocations(),
-    locationKnowledge: normalizeLocationKnowledge({}, initialDiscoveredLocations(), "east-station"),
-    worldEvents: [{ id: makeId("event"), turn: 0, text: "贝克兰德连续第九日降雨；东区铁路因浓雾出现大面积晚点。" }],
-    recentDialogues: [{ id: makeId("msg"), role: "assistant", turn: 0, content: "列车在一阵尖锐的刹车声中驶入贝克兰德东区火车站。铸铁穹顶下，煤烟、湿羊毛和热蒸汽混成一层低垂的雾；搬运工推着行李车穿过人群，报童高声兜售晚报，远处的马车夫则为最后几位体面乘客争吵。\n\n你带着自己的行李踏上站台。没有人在这里等你，也没有一封命令替你安排未来。售票厅外的城市地图标出通往桥区、皇后区与北区的线路；公告栏上同时贴着廉价房间、短工招聘、教会布告和几张边角卷起的失踪启事。若你愿意，今夜可以先找住处、谋一份工作、认识这座城市，或登上下一班车离开东区。\n\n只有一件小事略显不协调：封闭的第七码头旁停着一辆无人看管的行李车，最上方那只黑色皮箱正以稳定的七秒间隔，发出极轻的金属碰撞声。它没有拦住你的路。贝克兰德向四面八方展开，等待你自己决定第一步。" }],
-    longTermSummary: "玩家刚刚抵达鲁恩王国首都贝克兰德，身处东区火车站，尚未接受任何委托或选定目标，可以自由探索城市。",
+    ...openingMapState(opening),
+    worldEvents: [{ id: makeId("event"), turn: 0, text: opening.event }],
+    recentDialogues: [{ id: makeId("msg"), role: "assistant", turn: 0, content: opening.narrative }],
+    longTermSummary: opening.summary,
     memoryNotes: [],
-    choices: [
-      { label: "查看城市地图、招工与租房公告", intent: "investigate", risk: "low" },
-      { label: "向搬运工打听各区近况与落脚处", intent: "social", risk: "medium" },
-      { label: "跟随异常声响靠近封闭的第七码头", intent: "dangerous", risk: "high" },
-    ],
+    choices: openingChoices(opening),
     choiceMeta: { source: "initial", fallback: false, reason: "opening" },
-    changeLog: [{ id: makeId("log"), turn: 0, text: "档案建立：你抵达贝克兰德东区火车站，尚未接受任何委托。", tone: "neutral" }],
+    changeLog: [{ id: makeId("log"), turn: 0, text: `档案建立：故事从${startingLocation.name}开始，尚未接受任何委托。`, tone: "neutral" }],
     processedToolCalls: [],
     aiSettingsVersion: AI_SETTINGS_VERSION,
-    hiddenDanger: { id: "hollow-chime", name: "空鸣者的回声", stage: 0, revealed: false },
+    hiddenDanger: { ...opening.danger, stage: 0, revealed: false },
     lastTurnBaseline: null,
     lastTurnAudit: null,
     lastTurnMetrics: null,
