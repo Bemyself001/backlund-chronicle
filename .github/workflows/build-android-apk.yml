@@ -47,9 +47,9 @@ jobs:
           test -n "$ANDROID_KEYSTORE_BASE64" || { echo "Missing ANDROID_KEYSTORE_BASE64 repository secret"; exit 1; }
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/backlund-release.jks"
           COMMIT_COUNT=$(git rev-list --count HEAD)
-          echo "APP_VERSION_NAME=1.2.${COMMIT_COUNT}" >> "$GITHUB_ENV"
-          echo "APP_VERSION_CODE=$((20000 + COMMIT_COUNT))" >> "$GITHUB_ENV"
-          echo "VITE_APP_VERSION=1.2.${COMMIT_COUNT}" >> "$GITHUB_ENV"
+          echo "APP_VERSION_NAME=1.3.${COMMIT_COUNT}" >> "$GITHUB_ENV"
+          echo "APP_VERSION_CODE=$((30000 + COMMIT_COUNT))" >> "$GITHUB_ENV"
+          echo "VITE_APP_VERSION=1.3.${COMMIT_COUNT}" >> "$GITHUB_ENV"
           echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/backlund-release.jks" >> "$GITHUB_ENV"
           echo "ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
           echo "ANDROID_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
@@ -99,5 +99,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "贝克兰德纪事 ${APP_VERSION_NAME}" \
-            --notes "修复热更新后 localhost 无法连接：正确初始化本地资源服务，新增启动确认与失败回退。1.2.99 及更早正式签名版请下载 backlund-chronicle.apk 直接覆盖安装，保留存档，不要先卸载。升级此 APK 后可接收经过 SHA-256 校验的新热更新包。" \
+            --notes "1.3 · 游戏界面重构：聚焦剧情阅读，重整角色、行囊与调查手记，新增夜读与字号设置，适配手机和平板。城区图新增圣赛缪尔、机械之心、圣风、永恒烈阳四座教会地标，初始为传闻状态。请下载 backlund-chronicle.apk 直接覆盖安装以保留存档，不要先卸载。" \
             --latest

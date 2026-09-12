@@ -104,7 +104,7 @@ export default function Welcome({ hasSave, saves = [], apiSettings, onNew, onCon
           <a href="https://bemyself001.github.io/backlund-chronicle/privacy.html" target="_blank" rel="noreferrer">隐私政策<span className="sr-only">（新窗口打开）</span></a>
           <button type="button" aria-pressed={stillScene} onClick={() => setStillScene((current) => !current)}>静态场景{stillScene ? " · 开" : " · 关"}</button>
         </div>
-        <span className={styles.version}>{isNativeAndroid() ? `VER ${APP_VERSION}` : `WEB ${WEB_BUILD}`}</span>
+        <span className={styles.version}>{`VER ${APP_VERSION}`}{!isNativeAndroid() && ` · WEB ${WEB_BUILD}`}</span>
         <input ref={inputRef} className="sr-only" tabIndex={-1} aria-label="选择存档文件" type="file" accept="application/json,.json" onChange={chooseFile} />
         {importError && <p className={styles.error} role="alert">{importError}</p>}
       </footer>

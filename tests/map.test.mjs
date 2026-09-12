@@ -55,7 +55,7 @@ test("confirmed location discovery unlocks the place and its route", () => {
 });
 
 test("map exposes connected routes without crossing undiscovered locations", () => {
-  assert.equal(MAP_LOCATIONS.length, 9);
+  assert.equal(MAP_LOCATIONS.length, 13);
   const direct = findTravelRoute("east-station", "soot-lamp", known);
   assert.equal(direct.minutes, 27);
   assert.equal(direct.grids, 3);

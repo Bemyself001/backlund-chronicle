@@ -9,6 +9,10 @@ export const MAP_LOCATIONS = [
   { id: "iron-gate", name: "东区·铁门街", district: "东区", x: 79, y: 79, q: 4, r: 4, code: "E3", rumor: "铁门街有不少廉价住处和临时工作。", description: "廉价旅店、工棚、诊所与小酒馆密集，适合寻找住处和零工。" },
   { id: "soot-lamp", name: "桥区·雾鸦旅店", district: "桥区", x: 55, y: 72, q: 1, r: 3, code: "B1", rumor: "桥区有家旅店愿意替客人打听消息。", description: "一间价格尚可的旅店，也接受替客人打听消息的委托。" },
   { id: "bridge-docks", name: "桥区·南岸货栈", district: "桥区", x: 54, y: 89, q: 1, r: 6, code: "B2", rumor: "夜班搬运工常提到桥区南岸的一片货栈。", description: "驳船、货栈和夜班搬运工构成了另一套城市时钟。" },
+  { id: "st-samuel", name: "北区·圣赛缪尔教堂", district: "北区", x: 62, y: 17, q: 2, r: -5, code: "N2", rumor: "北区的居民说，佩斯菲尔街那座纯黑教堂入夜后也不点灯。", description: "黑夜女神教会贝克兰德教区总部，坐落于佩斯菲尔街。纯黑色的对称教堂，两侧各有一座钟楼；祈祷厅顶部的孔洞将天光筛成星点。" },
+  { id: "machinery-heart", name: "东区·机械之心教堂", district: "东区", x: 88, y: 54, q: 5, r: 1, code: "E4", rumor: "工厂区的工人提到一座门楣上悬着三角圣徽的教堂。", description: "蒸汽与机械之神教会的东区教堂，三角圣徽里铸着齿轮、杠杆与蒸汽的符号。弥撒钟声常与锅炉房的汽笛同时响起。" },
+  { id: "saint-wind", name: "桥区·圣风大教堂", district: "桥区", x: 45, y: 68, q: -1, r: 3, code: "B3", rumor: "桥区的船工说，圣风大教堂穹顶上的风向仪从不停下。", description: "风暴之主教会贝克兰德教区主教座堂。青色穹顶上的风向仪终年急转，弥撒的管风琴声里总混着隐约的雷鸣。" },
+  { id: "blazing-sun", name: "希尔斯顿区·永恒烈阳教堂", district: "希尔斯顿区", x: 14, y: 62, q: -5, r: 2, code: "H2", rumor: "希尔斯顿的因蒂斯商人只在正午走进一座金色小教堂。", description: "因蒂斯国教在贝克兰德的小教堂，金色马赛克穹顶在雾都的灰调里格格不入。只在正午短暂开放，教众多为因蒂斯裔商人与外交官。" },
 ];
 
 export const MAP_ROUTES = [
@@ -26,10 +30,14 @@ export const MAP_ROUTES = [
   { from: "iron-gate", to: "soot-lamp", minutes: 22, transport: "步行" },
   { from: "iron-gate", to: "bridge-docks", minutes: 25, transport: "步行" },
   { from: "soot-lamp", to: "bridge-docks", minutes: 17, transport: "步行" },
+  { from: "north-flats", to: "st-samuel", minutes: 14, transport: "步行" },
+  { from: "east-industry", to: "machinery-heart", minutes: 12, transport: "步行" },
+  { from: "soot-lamp", to: "saint-wind", minutes: 13, transport: "步行" },
+  { from: "hillston-market", to: "blazing-sun", minutes: 11, transport: "步行" },
 ];
 
 export const INITIAL_DISCOVERED_LOCATION_IDS = ["east-station", "iron-gate", "soot-lamp", "queen-library"];
-export const INITIAL_RUMORED_LOCATION_IDS = ["queen-archive", "bridge-docks"];
+export const INITIAL_RUMORED_LOCATION_IDS = ["queen-archive", "bridge-docks", "st-samuel", "machinery-heart", "saint-wind", "blazing-sun"];
 export const LOCATION_KNOWLEDGE_STATUSES = ["unknown", "rumored", "discovered", "visited"];
 export const DYNAMIC_LOCATION_SCOPES = ["landmark", "interior"];
 export const DYNAMIC_LOCATION_KINDS = ["street", "residence", "shop", "tavern", "office", "church", "warehouse", "station", "institution", "hideout", "interior", "other"];

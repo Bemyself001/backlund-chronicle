@@ -1,6 +1,7 @@
 import { writeFileSync } from "node:fs";
+import { RELEASE_VERSION } from "../src/data/release.js";
 
-const version = process.env.VITE_APP_VERSION || "1.1.0";
+const version = process.env.VITE_APP_VERSION || RELEASE_VERSION;
 if (!/^\d+\.\d+\.\d+$/.test(version)) throw new Error("Invalid OTA version");
 writeFileSync("dist/client/bundle-manifest.json", JSON.stringify({
   version,

@@ -1,4 +1,5 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
+import { RELEASE_VERSION } from "../data/release.js";
 
 const REPOSITORY = "Bemyself001/backlund-chronicle";
 const RELEASE_API = `https://api.github.com/repos/${REPOSITORY}/releases/latest`;
@@ -13,7 +14,7 @@ const MIRROR_PREFIXES = [
   "https://gh-proxy.com/",
 ];
 
-export const APP_VERSION = import.meta.env?.VITE_APP_VERSION || "1.1.0";
+export const APP_VERSION = import.meta.env?.VITE_APP_VERSION || RELEASE_VERSION;
 export const WEB_BUILD = (import.meta.env?.VITE_APP_BUILD || "local").slice(0, 7);
 
 const Updater = registerPlugin("Updater");
