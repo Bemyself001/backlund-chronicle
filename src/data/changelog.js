@@ -1,6 +1,18 @@
 export const LATEST_UPDATE = {
   date: "2026-09-12",
   dateLabel: "2026.09.12",
+  title: "独立更新入口与产品名称修正",
+  summary: "标题页新增独立检查更新按钮，隐私政策统一使用《贝克兰德纪事》名称。",
+  changes: [
+    "检查更新从 API 设置中移出，改为标题页顶栏的独立按钮，无需进入模型设置即可查看版本和下载安装包。",
+    "更新入口与更新日志保持独立：前者负责检查和安装版本，后者继续展示历次改动记录。",
+    "隐私政策的页面标题、摘要与正文产品名称由《诡秘之主：贝克兰德纪事》修正为《贝克兰德纪事》，并更新政策修订日期。",
+  ],
+};
+
+const OTA_RECOVERY_UPDATE = {
+  date: "2026-09-12",
+  dateLabel: "2026.09.12",
   title: "修复热更新后 localhost 无法连接",
   summary: "修复 Android 热更新资源加载时机与路径，增加启动确认、失败回退和原安装覆盖恢复。",
   changes: [
@@ -157,6 +169,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  OTA_RECOVERY_UPDATE,
   CONTENT_SYSTEM_UPDATE,
   TITLE_SCREEN_UPDATE,
   CUSTOM_LOADOUT_UPDATE,

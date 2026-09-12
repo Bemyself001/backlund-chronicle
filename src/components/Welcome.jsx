@@ -15,7 +15,7 @@ function formatSavedAt(iso) {
   return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-export default function Welcome({ hasSave, saves = [], apiSettings, onNew, onContinue, onLoadSlot, onImport, onApi, onChangelog }) {
+export default function Welcome({ hasSave, saves = [], apiSettings, onNew, onContinue, onLoadSlot, onImport, onApi, onUpdate, onChangelog }) {
   const inputRef = useRef(null);
   const [importError, setImportError] = useState("");
   const [archiveOpen, setArchiveOpen] = useState(false);
@@ -47,10 +47,15 @@ export default function Welcome({ hasSave, saves = [], apiSettings, onNew, onCon
       <header className={styles.masthead}>
         <div className={styles.brandMark} aria-hidden="true"><span>BC</span></div>
         <div className={styles.brandText}><span>PRIVATE INVESTIGATION</span><p>贝克兰德私人调查档案</p></div>
-        <button className={styles.apiStatus} type="button" onClick={onApi} title={apiSettings.mockMode ? "离线演示，无需连接 AI" : apiSettings.model || "未配置模型"}>
-          <span className={apiSettings.mockMode ? styles.ready : styles.live} aria-hidden="true" />
-          {apiSettings.mockMode ? "离线演示" : "AI 对话设置"}<span aria-hidden="true">↗</span>
-        </button>
+        <div className={styles.headerActions}>
+          <button className={styles.updateStatus} type="button" onClick={onUpdate}>
+            <span aria-hidden="true">◆</span><span>检查更新</span><span aria-hidden="true">↗</span>
+          </button>
+          <button className={styles.apiStatus} type="button" onClick={onApi} title={apiSettings.mockMode ? "离线演示，无需连接 AI" : apiSettings.model || "未配置模型"}>
+            <span className={apiSettings.mockMode ? styles.ready : styles.live} aria-hidden="true" />
+            {apiSettings.mockMode ? "离线演示" : "AI 对话设置"}<span aria-hidden="true">↗</span>
+          </button>
+        </div>
       </header>
 
       <div className={styles.desk}>

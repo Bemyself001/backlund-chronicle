@@ -472,12 +472,12 @@ export default function App() {
   return <>
     <a className="skip-link" href="#main">跳到主要内容</a>
     {screen === "splash" && <Splash onEnter={() => setScreen("welcome")} />}
-    {screen === "welcome" && <Welcome hasSave={saves.some((slot) => slot.slotId === "autosave")} saves={saves} apiSettings={settings} onNew={() => setScreen("create")} onContinue={handleContinue} onLoadSlot={loadSlot} onImport={handleImport} onApi={() => setModal("api")} onChangelog={() => setModal("changelog")} />}
+    {screen === "welcome" && <Welcome hasSave={saves.some((slot) => slot.slotId === "autosave")} saves={saves} apiSettings={settings} onNew={() => setScreen("create")} onContinue={handleContinue} onLoadSlot={loadSlot} onImport={handleImport} onApi={() => setModal("api")} onUpdate={() => setModal("update")} onChangelog={() => setModal("changelog")} />}
     {screen === "create" && <CharacterCreation onBack={() => setScreen("welcome")} onCreate={handleCreate} settings={settings} onApi={() => setModal("api")} />}
     {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} mockMode={Boolean(settings.mockMode)} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onRegenerateChoices={regenerateChoices} onLocalTool={runLocalTool} onOpenMap={() => setModal("map")} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => setScreen("welcome")} />}
     {itemConfirmation && <ImportantItemConfirmation changes={itemConfirmation.changes} onConfirm={(approvedKeys) => settleImportantItemConfirmation({ approvedKeys })} onCancel={() => settleImportantItemConfirmation({ cancelled: true })} />}
     {modal === "map" && game && <WorldMap game={game} loading={loading} onClose={() => setModal(null)} onTravel={(location) => { setModal(null); return runTurn(`前往${location.name}`, { mapDestination: location }); }} onInvestigate={(location, knowledge) => { setModal(null); return runTurn(`根据地图上的传闻，调查${knowledge.note || location.district}。`, { mapInvestigation: { locationId: location.id, currentStatus: knowledge.status, rumor: knowledge.note || location.rumor } }); }} onExplore={handleExplore} />}
-    {modal === "api" && <ApiSettings settings={settings} onSave={handleSettingsSave} onCheckUpdate={() => setModal("update")} onClose={() => setModal(null)} />}
+    {modal === "api" && <ApiSettings settings={settings} onSave={handleSettingsSave} onClose={() => setModal(null)} />}
     {(modal === "update" || modal === "update-auto") && <UpdateDialog automatic={modal === "update-auto"} onClose={() => setModal(null)} />}
     {modal === "changelog" && <ChangelogDialog onClose={() => setModal(null)} />}
     {modal === "prompt" && <PromptEditor value={prompt} onSave={handlePromptSave} onClose={() => setModal(null)} />}

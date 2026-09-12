@@ -10,7 +10,10 @@
 .brandMark span { color: #d2b47c; font: 700 .65rem var(--font-serif); transform: rotate(-45deg); }
 .brandText span { color: #c5ab7a; font: .56rem var(--font-mono); letter-spacing: .24em; }
 .brandText p { margin: .25rem 0 0; font: .7rem var(--font-serif); letter-spacing: .16em; color: #c7bea9; }
-.apiStatus { display: flex; align-items: center; gap: .65rem; flex-shrink: 0; min-height: 2.75rem; margin-left: auto; padding: .5rem .75rem; border: 1px solid #c2a46d40; background: #080f10b3; color: #d3c8af; font: .7rem var(--font-sans); }
+.headerActions { display: flex; align-items: center; gap: .6rem; flex-shrink: 0; margin-left: auto; }
+.apiStatus, .updateStatus { display: flex; align-items: center; gap: .65rem; flex-shrink: 0; min-height: 2.75rem; padding: .5rem .75rem; border: 1px solid #c2a46d40; background: #080f10b3; color: #d3c8af; font: .7rem var(--font-sans); }
+.updateStatus { border-color: #c7a46288; color: #e1c78f; background: linear-gradient(115deg, #181b17d9, #101818d9); }
+.updateStatus > span:first-child { color: #c7a462; font-size: .45rem; }
 .ready, .live { width: .35rem; height: .35rem; border-radius: 50%; background: #d3ae68; box-shadow: 0 0 8px #d3ae6860; }
 .live { background: #82b7a6; }
 .desk { flex: 1; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(18rem, .8fr); align-items: center; gap: 4rem; width: min(88%, 79rem); margin: 0 auto; padding: clamp(2.8rem, 6vh, 5rem) 0 3.5rem; }
@@ -53,7 +56,7 @@
 .footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .4rem 2rem; padding: .65rem clamp(1.5rem, 5vw, 5rem) max(.65rem, env(safe-area-inset-bottom)); border-top: 1px solid #b99c6338; background: #080e10cc; }
 .minorActions { display: flex; flex-wrap: wrap; gap: .3rem 1.6rem; }
 .minorActions button, .minorActions a { display: inline-flex; align-items: center; min-height: 2.75rem; padding: 0; border: 0; background: transparent; color: #c6bda7; font: .68rem var(--font-sans); text-decoration: none; }
-.minorActions button:hover, .minorActions a:hover, .apiStatus:hover { color: #f3dfb2; }
+.minorActions button:hover, .minorActions a:hover, .apiStatus:hover, .updateStatus:hover { color: #f3dfb2; border-color: #d6b777; background-color: #1c2522; }
 .minorActions button[aria-pressed="true"] { color: #eed399; }
 .version { color: #a89d85; font: .55rem var(--font-mono); letter-spacing: .13em; }
 .error { width: 100%; margin: .25rem 0 .5rem; color: #ffd2c5; font: .78rem/1.6 var(--font-sans); }
@@ -87,7 +90,9 @@
   .brandMark { width: 1.8rem; }
   .brandText span { font-size: .42rem; letter-spacing: .13em; }
   .brandText p { font-size: .57rem; letter-spacing: .06em; }
-  .apiStatus { font-size: .61rem; gap: .4rem; padding: .4rem .5rem; }
+  .headerActions { gap: .35rem; }
+  .apiStatus, .updateStatus { font-size: .61rem; gap: .35rem; padding: .4rem .5rem; }
+  .updateStatus > span:first-child { display: none; }
   .scene { height: 100svh; min-height: 48rem; }
   .scene img { object-position: center top; }
   .page::before { background: linear-gradient(90deg, #050b0c60, transparent), linear-gradient(0deg, #090e0e 0%, #090e0eec 19%, #090e0e88 40%, #090e0e18 78%); }
