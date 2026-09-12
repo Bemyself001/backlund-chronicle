@@ -11,7 +11,7 @@
     "dev": "vite --configLoader runner",
     "build": "vite build --configLoader runner",
     "postbuild": "node scripts/prepare-sites-build.mjs",
-    "android:sync": "pnpm run build && cap sync android",
+    "android:sync": "pnpm run build && node scripts/prepare-ota-bundle.mjs && cap sync android",
     "android:open": "cap open android",
     "lint": "eslint .",
     "test": "node --test tests/*.test.mjs",

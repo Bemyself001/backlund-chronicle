@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { EMPTY_CHARACTER, LOW_SEQUENCE_PATHWAYS, randomCharacter } from "../data/defaults.js";
-import { TALENTS, getTalent, talentItemSpec } from "../data/talents.js";
+import { EMPTY_CHARACTER, LOW_SEQUENCE_PATHWAYS, randomCharacter } from "../system/game.js";
+import { OPENINGS, TALENTS, getOpening, getTalent } from "../content/index.js";
+import { talentItemSpec } from "../system/talents.js";
 import { generateLoadout } from "../services/loadout.js";
-import { loadoutInput } from "../data/loadout.js";
-import { MAX_STARTING_MONEY_PENCE, moneyFromPence, formatMoney } from "../data/money.js";
+import { loadoutInput } from "../system/loadout.js";
+import { MAX_STARTING_MONEY_PENCE, moneyFromPence, formatMoney } from "../system/money.js";
 import styles from "./CharacterCreation.module.css";
-import { getOpening, OPENINGS } from "../data/openings.js";
-import { getMapLocation } from "../data/map.js";
+import { getMapLocation } from "../system/map.js";
 
 const AVATAR_SIZE = 192;
 

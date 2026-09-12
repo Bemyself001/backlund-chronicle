@@ -62,34 +62,22 @@ jobs:
           cp -R dist/client/assets pages/assets
           mkdir -p pages/fonts
           cp dist/fonts/ShanHaiXingYeGeTeW-2.woff2 pages/fonts/
-          cd dist/client && zip -qr ../../pages/web-bundle.zip . && cd ../..
-          sha256sum pages/web-bundle.zip | awk '{print $1}' > /tmp/web-bundle.sha256
 
       - name: Write update manifest (latest.json)
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh api "repos/$GITHUB_REPOSITORY/releases/latest" > /tmp/release.json || echo '{}' > /tmp/release.json
-          node -e '
-            const fs = require("fs");
-            const release = JSON.parse(fs.readFileSync("/tmp/release.json", "utf8"));
-            const assets = release.assets || [];
-            const apk = assets.find((a) => a.name === "backlund-chronicle.apk") || assets.find((a) => a.name && a.name.endsWith(".apk"));
-            const releaseVersion = String(release.tag_name || "").replace(/^v/i, "");
-            const releaseMatchesBuild = release.target_commitish === process.env.GITHUB_SHA;
-            const manifest = {
-              // Pages 可能先于 APK 构建完成；只发布已存在 Release 的版本，避免新版号指向旧安装包。
-              version: releaseVersion,
-              apkUrl: apk ? apk.browser_download_url : null,
-              bundleUrl: releaseMatchesBuild ? "https://bemyself001.github.io/backlund-chronicle/web-bundle.zip" : null,
-              bundleSha256: releaseMatchesBuild ? fs.readFileSync("/tmp/web-bundle.sha256", "utf8").trim() : null,
-              releaseUrl: release.html_url || null,
-              notes: release.body || "",
-              publishedAt: new Date().toISOString(),
-            };
-            fs.writeFileSync("pages/latest.json", JSON.stringify(manifest, null, 2));
-          '
+          gh api "repos/$GITHUB_REPOSITORY/releases/latest" > /tmp/release.json
+          RELEASE_TAG=$(jq -r '.tag_name' /tmp/release.json)
+          RELEASE_VERSION="${RELEASE_TAG#v}"
+          [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          if jq -e '.assets[] | select(.name == "web-bundle-v2.zip")' /tmp/release.json > /dev/null; then
+            mkdir -p "pages/ota/$RELEASE_VERSION"
+            gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
+              --pattern 'web-bundle-v2.zip*' --dir "pages/ota/$RELEASE_VERSION"
+          fi
+          node scripts/write-update-manifests.mjs /tmp/release.json pages
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

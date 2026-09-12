@@ -1,9 +1,8 @@
-import { DEFAULT_API_SETTINGS } from "../data/defaults.js";
-import { PATHWAYS } from "../data/pathways.js";
-import { DYNAMIC_LOCATION_KINDS, DYNAMIC_LOCATION_SCOPES, MAP_DISTRICTS } from "../data/map.js";
+import { DEFAULT_API_SETTINGS } from "../system/game.js";
+import { PATHWAYS, DYNAMIC_LOCATION_KINDS, DYNAMIC_LOCATION_SCOPES, MAP_DISTRICTS } from "../content/index.js";
 import { createProviderProfile, inferApiProvider } from "./apiProviders.js";
 import { normalizeAIResponse, textFromContent } from "./protocol.js";
-import { CLOTHING_SLOTS } from "../data/loadout.js";
+import { CLOTHING_SLOTS } from "../system/loadout.js";
 
 const SETTINGS_KEY = "mist-api-settings-v1";
 const LEGACY_SESSION_KEY = "mist-api-key";

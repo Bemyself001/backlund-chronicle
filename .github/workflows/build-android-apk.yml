@@ -56,13 +56,15 @@ jobs:
           echo "ANDROID_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> "$GITHUB_ENV"
 
       - name: Build web app and sync Android
+        env:
+          VITE_APP_BUILD: ${{ github.sha }}
         run: pnpm run android:sync
 
       - name: Build signed release APK
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease
+          ./gradlew testDebugUnitTest assembleRelease
 
       - name: Prepare public APK
         run: |
@@ -72,8 +74,9 @@ jobs:
       - name: Prepare OTA web bundle
         run: |
           test -f dist/client/index.html
-          cd dist/client && zip -qr ../../web-bundle.zip . && cd ../..
-          sha256sum web-bundle.zip > web-bundle.zip.sha256
+          test -f dist/client/bundle-manifest.json
+          cd dist/client && zip -qr ../../web-bundle-v2.zip . && cd ../..
+          sha256sum web-bundle-v2.zip > web-bundle-v2.zip.sha256
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
@@ -91,10 +94,10 @@ jobs:
           gh release create "$RELEASE_TAG" \
             backlund-chronicle.apk \
             backlund-chronicle.apk.sha256 \
-            web-bundle.zip \
-            web-bundle.zip.sha256 \
+            web-bundle-v2.zip \
+            web-bundle-v2.zip.sha256 \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "贝克兰德纪事 ${APP_VERSION_NAME}" \
-            --notes "正式签名的 Android 版本。已安装 1.1.66 及以上底座的设备将通过热更新获取后续版本（包含页面资源与标题字体，约 3.3 MB，免重装）；首次从旧版迁移请安装本 APK，安装前请导出存档并卸载旧版。" \
+            --notes "修复热更新后 localhost 无法连接：正确初始化本地资源服务，新增启动确认与失败回退。1.2.99 及更早正式签名版请下载 backlund-chronicle.apk 直接覆盖安装，保留存档，不要先卸载。升级此 APK 后可接收经过 SHA-256 校验的新热更新包。" \
             --latest

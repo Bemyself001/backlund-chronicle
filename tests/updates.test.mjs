@@ -1,7 +1,10 @@
 import test from "node:test";
 import assert from "node:assert/strict";
+import { createHash } from "node:crypto";
+import { Capacitor } from "@capacitor/core";
+import { createUpdateManifest } from "../scripts/write-update-manifests.mjs";
 
-import { compareVersions, getDownloadOptions } from "../src/services/updates.js";
+import { compareVersions, getDownloadOptions, shapeGitHubRelease, shapePagesManifest } from "../src/services/updates.js";
 
 test("compareVersions orders semantic versions", () => {
   assert.equal(compareVersions("1.1.52", "1.1.51"), 1);
@@ -39,11 +42,51 @@ test("pickBundleAsset finds the OTA web bundle among release assets", () => {
   const assets = [
     { name: "backlund-chronicle.apk" },
     { name: "web-bundle.zip" },
-    { name: "web-bundle.zip.sha256" },
+    { name: "web-bundle-v2.zip" },
+    { name: "web-bundle-v2.zip.sha256" },
   ];
-  assert.equal(pickBundleAsset(assets)?.name, "web-bundle.zip");
+  assert.equal(pickBundleAsset(assets)?.name, "web-bundle-v2.zip");
+  assert.equal(pickBundleAsset([{ name: "web-bundle.zip" }]), null);
   assert.equal(pickBundleAsset([{ name: "backlund-chronicle.apk" }]), null);
   assert.equal(pickBundleAsset(undefined), null);
+});
+
+test("OTA requires a repaired native loader, checksum and a release that has not failed startup", (t) => {
+  const oldNative = Capacitor.isNativePlatform;
+  const oldPlatform = Capacitor.getPlatform;
+  Capacitor.isNativePlatform = () => true;
+  Capacitor.getPlatform = () => "android";
+  t.after(() => {
+    Capacitor.isNativePlatform = oldNative;
+    Capacitor.getPlatform = oldPlatform;
+  });
+  const release = {
+    hasUpdate: true, latestVersion: "1.2.101", bundleUrl: "https://example.com/bundle.zip",
+    bundleSha256: "a".repeat(64), minUpdaterProtocol: 2, updaterProtocol: 2,
+  };
+  assert.equal(canHotUpdate(release), true);
+  assert.equal(canHotUpdate({ ...release, updaterProtocol: 0 }), false);
+  assert.equal(canHotUpdate({ ...release, bundleSha256: null }), false);
+  assert.equal(canHotUpdate({ ...release, minUpdaterProtocol: 3 }), false);
+  assert.equal(canHotUpdate({ ...release, failedVersion: "1.2.101" }), false);
+});
+
+test("Release and Pages describe the same checked OTA bytes and version", () => {
+  const bytes = Buffer.from("exact bytes from the APK release build");
+  const hash = createHash("sha256").update(bytes).digest("hex");
+  const release = { tag_name: "v1.2.100", html_url: "https://example.com/release", assets: [
+    { name: "backlund-chronicle.apk", browser_download_url: "https://example.com/app.apk" },
+    { name: "web-bundle-v2.zip", browser_download_url: "https://example.com/bundle.zip", digest: `sha256:${hash}` },
+  ] };
+  const github = shapeGitHubRelease(release);
+  const manifest = createUpdateManifest(release, bytes, `${hash}  web-bundle-v2.zip\n`);
+  const pages = shapePagesManifest(manifest);
+  assert.equal(github.latestVersion, pages.latestVersion);
+  assert.equal(github.bundleSha256, pages.bundleSha256);
+  assert.equal(pages.minUpdaterProtocol, 2);
+  assert.ok(pages.bundleUrl.endsWith("/ota/1.2.100/web-bundle-v2.zip"));
+  assert.throws(() => createUpdateManifest(release, bytes, "0".repeat(64)), /checksum mismatch/);
+  assert.throws(() => createUpdateManifest({ ...release, assets: [] }), /APK is missing/);
 });
 
 test("canHotUpdate requires native android, an update and a bundle url", () => {

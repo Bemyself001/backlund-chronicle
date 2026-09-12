@@ -1,6 +1,6 @@
-import { getAdvancement } from "../data/character.js";
-import { formatMoney, moneyFromPence, moneyToPence } from "../data/money.js";
-import { isImportantNonMoneyItem, normalizeItemImportance } from "../data/items.js";
+import { getAdvancement } from "../system/character.js";
+import { formatMoney, moneyFromPence, moneyToPence } from "../system/money.js";
+import { isImportantNonMoneyItem, normalizeItemImportance } from "../system/items.js";
 
 const ITEM_FIELDS = ["name", "category", "description", "weight", "rarity", "condition", "equipped", "tags", "properties", "discoveredInfo", "potion"];
 

@@ -1,4 +1,32 @@
 export const LATEST_UPDATE = {
+  date: "2026-09-12",
+  dateLabel: "2026.09.12",
+  title: "修复热更新后 localhost 无法连接",
+  summary: "修复 Android 热更新资源加载时机与路径，增加启动确认、失败回退和原安装覆盖恢复。",
+  changes: [
+    "通过启动配置加载手机本地更新目录，在资源服务初始化后再打开页面，修复热更新后无法连接 localhost。",
+    "新资源先等待页面启动确认；失败或启动中断时恢复上一个可用版本，覆盖安装新版 APK 会停用旧热更新，保留玩家存档。",
+    "新热更新包强制校验 SHA-256、内容版本与更新协议，下载使用独立目录，避免覆盖正在运行的资源。",
+    "GitHub 与备用通道使用同一份 APK 构建资源；旧 APK 改为提示完整安装包，1.2.99 及更早正式版请直接覆盖安装，不要卸载。",
+    "页面版本与 APK 版本分别显示；复用已经下载的更新，修复下载失败后自动检查被长时间跳过的问题。",
+  ],
+};
+
+const CONTENT_SYSTEM_UPDATE = {
+  date: "2026-09-11",
+  dateLabel: "2026.09.11",
+  title: "系统与世界内容分层",
+  summary: "贝克兰德的固定内容、游戏规则与玩家存档建立清晰边界，后续扩展剧情无需改动底层规则。",
+  changes: [
+    "建立版本化的贝克兰德核心内容包，集中保存五区开局、固定地点、路线、天赋、途径与角色模板。",
+    "地图、六边形世界、角色、物品、行装、货币、天赋和建档流程迁入系统层；界面与 AI 服务改用统一内容查询入口。",
+    "内容包只允许不可变、可序列化数据，启动和测试时校验重复 ID、缺失地点引用、开局行动数量及可执行函数。",
+    "新档案分别记录系统版本、内容格式版本和内容版本；旧档案迁移为 legacy 内容来源，原有进度不被新版开局覆盖。",
+    "保留原 data 导入路径作为兼容层，现有存档、五区开局、地图、物品、晋升和 AI 协议行为保持不变。",
+  ],
+};
+
+const TITLE_SCREEN_UPDATE = {
   date: "2026-09-11",
   dateLabel: "2026.09.11",
   title: "调查员书房 · 标题页重构",
@@ -129,6 +157,8 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  CONTENT_SYSTEM_UPDATE,
+  TITLE_SCREEN_UPDATE,
   CUSTOM_LOADOUT_UPDATE,
   DISTRICT_OPENINGS_UPDATE,
   MAP_RETURN_UPDATE,

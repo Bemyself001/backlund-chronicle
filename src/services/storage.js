@@ -1,9 +1,10 @@
-import { SAVE_VERSION } from "../data/defaults.js";
-import { isMoneyItem, normalizeInventoryItem } from "../data/items.js";
-import { withAdvancement } from "../data/character.js";
-import { moneyFromPence } from "../data/money.js";
-import { getMapLocations, normalizeLocationKnowledge, normalizeMapExtensions } from "../data/map.js";
-import { buildWorld, reconcileWorld } from "../data/hexworld.js";
+import { ACTIVE_CONTENT, CONTENT_SCHEMA_VERSION } from "../content/index.js";
+import { GAME_SYSTEM_VERSION, SAVE_VERSION } from "../system/version.js";
+import { isMoneyItem, normalizeInventoryItem } from "../system/items.js";
+import { withAdvancement } from "../system/character.js";
+import { moneyFromPence } from "../system/money.js";
+import { getMapLocations, normalizeLocationKnowledge, normalizeMapExtensions } from "../system/map.js";
+import { buildWorld, reconcileWorld } from "../system/hexworld.js";
 
 const SAVES_KEY = "mist-chronicle-saves-v1";
 const AUTOSAVE_ID = "autosave";
@@ -76,6 +77,8 @@ export function migrateSave(raw) {
   const result = {
     ...migrated,
     version: SAVE_VERSION,
+    systemVersion: Number(migrated.systemVersion) || GAME_SYSTEM_VERSION,
+    content: migrated.content || { packId: ACTIVE_CONTENT.id, schemaVersion: CONTENT_SCHEMA_VERSION, contentVersion: "legacy" },
     character: { ...withAdvancement(migrated.character), advancement },
     inventory,
     money,

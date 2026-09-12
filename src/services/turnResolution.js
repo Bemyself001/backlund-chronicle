@@ -1,4 +1,4 @@
-import { playerVisibleItem } from "../data/items.js";
+import { playerVisibleItem } from "../system/items.js";
 
 function playerVisibleResultData(data = {}) {
   if (!data.inventoryChange) return data;

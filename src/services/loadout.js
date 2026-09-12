@@ -1,6 +1,6 @@
 import { requestAIWithReasoningFallback } from "./api.js";
 import { extractJson } from "./protocol.js";
-import { CLOTHING_SLOTS, loadoutInput, localLoadout, validateLoadout } from "../data/loadout.js";
+import { CLOTHING_SLOTS, loadoutInput, localLoadout, validateLoadout } from "../system/loadout.js";
 
 export async function generateLoadout(character, settings, signal) {
   const input = loadoutInput(character);

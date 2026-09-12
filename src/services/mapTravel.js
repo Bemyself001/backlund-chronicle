@@ -1,4 +1,4 @@
-import { getMapLocation } from "../data/map.js";
+import { getMapLocation } from "../system/map.js";
 
 export function ensureMapMoveToolCall(toolCalls = [], destination, turn) {
   if (!destination?.id) return Array.isArray(toolCalls) ? toolCalls : [];

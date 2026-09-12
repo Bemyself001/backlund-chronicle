@@ -13,6 +13,8 @@ test("version 1 saves migrate from Grayharbor to Backlund without losing progres
     recentDialogues: [{ role: "assistant", content: "灰檐港市档案馆已经关门。" }],
   });
   assert.equal(migrated.version, 11);
+  assert.equal(migrated.systemVersion, 1);
+  assert.deepEqual(migrated.content, { packId: "backlund-core", schemaVersion: 1, contentVersion: "legacy" });
   assert.equal(migrated.turn, 8);
   assert.equal(migrated.title, "艾琳的贝克兰德档案");
   assert.equal(migrated.location.district, "贝克兰德桥区·旧钟街");

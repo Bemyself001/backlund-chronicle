@@ -1,12 +1,12 @@
 import { makeId } from "../utils/id.js";
 import { applyStatDelta } from "./statChanges.js";
-import { findLocationRelations, getMapLocation, getMapLocations, isDiscoveredLocationStatus, normalizeLocationKnowledge, normalizeMapExtensions, planDynamicLocation } from "../data/map.js";
-import { ensureWorld, travelToLocation } from "../data/hexworld.js";
-import { amountToPence, formatMoney, moneyFromPence, moneyToPence } from "../data/money.js";
-import { normalizeInventoryItem, normalizeItemImportance } from "../data/items.js";
-import { equipmentSlot } from "../data/loadout.js";
-import { applyAdvancement, getAdvancement, isExplicitAdvancementIntent } from "../data/character.js";
-import { getPathway } from "../data/pathways.js";
+import { findLocationRelations, getMapLocation, getMapLocations, isDiscoveredLocationStatus, normalizeLocationKnowledge, normalizeMapExtensions, planDynamicLocation } from "../system/map.js";
+import { ensureWorld, travelToLocation } from "../system/hexworld.js";
+import { amountToPence, formatMoney, moneyFromPence, moneyToPence } from "../system/money.js";
+import { normalizeInventoryItem, normalizeItemImportance } from "../system/items.js";
+import { equipmentSlot } from "../system/loadout.js";
+import { applyAdvancement, getAdvancement, isExplicitAdvancementIntent } from "../system/character.js";
+import { getPathway } from "../content/index.js";
 
 export const TOOL_SCHEMAS = {
   "inventory.add": { required: ["item"], description: "新增或合并一个结构化物品实例" },

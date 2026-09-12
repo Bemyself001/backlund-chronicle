@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import Modal from "./Modal.jsx";
-import { findLocationRelations, findTravelRoute, getChildLocations, getMapLocation, getMapLocations, isDiscoveredLocationStatus, normalizeLocationKnowledge } from "../data/map.js";
-import { cityTerrainLabel, canExploreHex, hexPolygonPoints, hexToPixel, visibleHexes } from "../data/hexworld.js";
+import { findLocationRelations, findTravelRoute, getChildLocations, getMapLocation, getMapLocations, isDiscoveredLocationStatus, normalizeLocationKnowledge } from "../system/map.js";
+import { cityTerrainLabel, canExploreHex, hexPolygonPoints, hexToPixel, visibleHexes } from "../system/hexworld.js";
 import styles from "./WorldMap.module.css";
 
 const KIND_LABELS = {

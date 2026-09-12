@@ -1,9 +1,9 @@
 import { memo, useEffect, useRef, useState } from "react";
 import styles from "./GameScreen.module.css";
-import { getAdvancement } from "../data/character.js";
-import { getTalent } from "../data/talents.js";
+import { getAdvancement } from "../system/character.js";
+import { getTalent } from "../content/index.js";
 import { STAT_LABELS } from "../engine/statChanges.js";
-import { formatMoney } from "../data/money.js";
+import { formatMoney } from "../system/money.js";
 import { getPotionAdvancementEligibility } from "../services/advancement.js";
 
 const RISK_LABEL = { low: "谨慎", medium: "交涉", high: "高风险" };

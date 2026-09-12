@@ -1,6 +1,7 @@
 import { makeId } from "../utils/id.js";
-import { OPENINGS, openingChoices } from "../data/openings.js";
-import { getMapLocation } from "../data/map.js";
+import { OPENINGS } from "../content/index.js";
+import { openingChoices } from "../system/openings.js";
+import { getMapLocation } from "../system/map.js";
 
 function includesAny(text, words) { return words.some((word) => text.includes(word)); }
 

@@ -2,7 +2,7 @@ import { Capacitor, registerPlugin } from "@capacitor/core";
 
 const REPOSITORY = "Bemyself001/backlund-chronicle";
 const RELEASE_API = `https://api.github.com/repos/${REPOSITORY}/releases/latest`;
-const PAGES_MANIFEST = "https://bemyself001.github.io/backlund-chronicle/latest.json";
+const PAGES_MANIFEST = "https://bemyself001.github.io/backlund-chronicle/latest-v2.json";
 const CHECK_TIMEOUT = 8000;
 const CHECKED_AT_KEY = "backlund-update-checked-at";
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000;
@@ -58,29 +58,31 @@ function pickApkAsset(assets) {
 }
 
 export function pickBundleAsset(assets) {
-  return assets?.find((asset) => asset.name === "web-bundle.zip") || null;
+  return assets?.find((asset) => asset.name === "web-bundle-v2.zip") || null;
 }
 
-function shapeGitHubRelease(release) {
+export function shapeGitHubRelease(release) {
   const apk = pickApkAsset(release.assets);
   const bundle = pickBundleAsset(release.assets);
   return {
     latestVersion: String(release.tag_name || "").replace(/^v/i, ""),
     downloadUrl: apk?.browser_download_url || release.html_url,
     bundleUrl: bundle?.browser_download_url || null,
-    bundleSha256: null, // Release 通道无法稳定获取校验文件，TLS 直连即可
+    bundleSha256: /^sha256:[a-f0-9]{64}$/i.test(bundle?.digest || "") ? bundle.digest.slice(7) : null,
+    minUpdaterProtocol: 2,
     releaseUrl: release.html_url,
     notes: release.body || "本次发布未提供更新说明。",
   };
 }
 
-function shapePagesManifest(manifest) {
+export function shapePagesManifest(manifest) {
   if (!manifest?.version) throw new Error("备用清单缺少版本信息");
   return {
     latestVersion: String(manifest.version).replace(/^v/i, ""),
     downloadUrl: manifest.apkUrl || manifest.releaseUrl,
     bundleUrl: manifest.bundleUrl || null,
     bundleSha256: manifest.bundleSha256 || null,
+    minUpdaterProtocol: manifest.minUpdaterProtocol || 2,
     releaseUrl: manifest.releaseUrl,
     notes: manifest.notes || "本次发布未提供更新说明。",
   };
@@ -113,6 +115,7 @@ export async function checkForUpdate({ force = false } = {}) {
       autoUpdated: true,
     };
   }
+  const native = await Updater.getStatus().catch(() => ({ updaterProtocol: 0 }));
   const lastCheckedAt = Number(localStorage.getItem(CHECKED_AT_KEY) || 0);
   if (!force && Date.now() - lastCheckedAt < CHECK_INTERVAL) return { skipped: true, reason: "recent" };
 
@@ -129,14 +132,18 @@ export async function checkForUpdate({ force = false } = {}) {
       throw new Error(`检查更新失败：发布服务器与备用通道均无法连接（${primaryError.message || "网络错误"}）`);
     }
   }
-  localStorage.setItem(CHECKED_AT_KEY, String(Date.now()));
+  const currentVersion = native.currentVersion || APP_VERSION;
+  const hasUpdate = Boolean(release.downloadUrl) && compareVersions(release.latestVersion, currentVersion) > 0;
+  if (!hasUpdate) localStorage.setItem(CHECKED_AT_KEY, String(Date.now()));
   return {
-    currentVersion: APP_VERSION,
+    ...native,
+    currentVersion,
     latestVersion: release.latestVersion,
-    hasUpdate: Boolean(release.downloadUrl) && compareVersions(release.latestVersion, APP_VERSION) > 0,
+    hasUpdate,
     downloadUrl: release.downloadUrl,
     bundleUrl: release.bundleUrl,
     bundleSha256: release.bundleSha256,
+    minUpdaterProtocol: release.minUpdaterProtocol,
     releaseUrl: release.releaseUrl,
     notes: release.notes,
     source,
@@ -144,19 +151,41 @@ export async function checkForUpdate({ force = false } = {}) {
 }
 
 export function canHotUpdate(result) {
-  return isNativeAndroid() && Boolean(result?.hasUpdate && result?.bundleUrl);
+  return isNativeAndroid() && Boolean(result?.hasUpdate && result?.bundleUrl
+    && result.updaterProtocol >= result.minUpdaterProtocol
+    && /^[a-f0-9]{64}$/i.test(result.bundleSha256 || "")
+    && result.failedVersion !== result.latestVersion);
 }
+
+/** Called only after React has mounted the application's first screen. */
+export async function confirmAppReady() {
+  if (!isNativeAndroid()) return;
+  await Updater.notifyReady({ version: APP_VERSION });
+}
+
+let otaDownload;
 
 /** 下载并校验 Web 热更新包；reload=false 时下次启动生效，true 时立即重新载入。 */
 export async function downloadAndApplyOta(result, { reload = false } = {}) {
   if (!canHotUpdate(result)) throw new Error("当前环境不支持热更新");
-  const bundle = await Updater.downloadBundle({
-    url: result.bundleUrl,
-    version: result.latestVersion,
-    sha256: result.bundleSha256 || "",
-  });
-  await Updater.applyBundle({ path: bundle.path, version: result.latestVersion, reload });
-  return bundle;
+  if (otaDownload) return otaDownload;
+  otaDownload = (async () => {
+    const native = await Updater.getStatus();
+    const bundle = native.pendingVersion === result.latestVersion && native.pendingPath
+      ? { path: native.pendingPath, version: native.pendingVersion }
+      : await Updater.downloadBundle({
+        url: result.bundleUrl,
+        version: result.latestVersion,
+        sha256: result.bundleSha256,
+      });
+    await Updater.applyBundle({ path: bundle.path, version: result.latestVersion, reload });
+    return bundle;
+  })();
+  try {
+    return await otaDownload;
+  } finally {
+    otaDownload = null;
+  }
 }
 
 export async function resetOtaBundle({ reload = false } = {}) {

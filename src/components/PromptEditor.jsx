@@ -1,7 +1,7 @@
 import { useState } from "react";
 import Modal from "./Modal.jsx";
 import styles from "./Forms.module.css";
-import { DEFAULT_SYSTEM_PROMPT } from "../data/defaults.js";
+import { DEFAULT_SYSTEM_PROMPT } from "../system/game.js";
 
 export default function PromptEditor({ value, onSave, onClose }) {
   const [draft, setDraft] = useState(value);
@@ -13,4 +13,3 @@ export default function PromptEditor({ value, onSave, onClose }) {
     </div>
   </Modal>;
 }
-

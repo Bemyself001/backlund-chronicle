@@ -1,4 +1,4 @@
-import { getAdvancement } from "../data/character.js";
+import { getAdvancement } from "../system/character.js";
 
 export function getPotionAdvancementEligibility(game, potionInstanceId) {
   if (Number(game?.occult?.contact) !== 1) return null;

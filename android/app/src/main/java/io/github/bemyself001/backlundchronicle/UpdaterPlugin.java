@@ -1,8 +1,6 @@
 package io.github.bemyself001.backlundchronicle;
 
-import android.content.Context;
 import android.content.Intent;
-import android.content.SharedPreferences;
 import android.net.Uri;
 
 import com.getcapacitor.JSObject;
@@ -18,23 +16,38 @@ import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.security.MessageDigest;
+import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipInputStream;
 
 @CapacitorPlugin(name = "Updater")
 public class UpdaterPlugin extends Plugin {
-    private static final String PREFS = "backlund-ota";
-    private static final String KEY_PATH = "bundlePath";
-    private static final String KEY_VERSION = "bundleVersion";
+    private static final AtomicBoolean downloading = new AtomicBoolean(false);
 
-    /** 插件 load() 在页面加载前执行：此时切换资源路径，无需 reload，避免本地服务器未就绪的竞态。 */
-    @Override
-    public void load() {
-        String path = activeBundlePath(getContext());
-        if (path != null) {
-            getBridge().setServerAssetPath(path);
-        }
+    @PluginMethod
+    public void getStatus(PluginCall call) {
+        BundleState state = BundleStore.read(getContext());
+        JSObject result = new JSObject();
+        result.put("updaterProtocol", BundleStore.PROTOCOL);
+        result.put("nativeVersion", BundleStore.nativeVersion(getContext()));
+        result.put("currentVersion", ((MainActivity) getActivity()).runningVersion());
+        result.put("pendingVersion", state.pendingVersion);
+        result.put("pendingPath", state.pendingPath);
+        result.put("failedVersion", state.failedVersion);
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void notifyReady(PluginCall call) {
+        getActivity().runOnUiThread(() -> {
+            if (((MainActivity) getActivity()).confirmReady(call.getString("version", ""))) {
+                call.resolve(new JSObject());
+            } else {
+                call.reject("页面版本与待确认的热更新版本不匹配");
+            }
+        });
     }
 
     @PluginMethod
@@ -50,46 +63,36 @@ public class UpdaterPlugin extends Plugin {
         call.resolve(new JSObject());
     }
 
-    /** 启动时读取已就绪的 OTA 资源目录；目录损坏时回退到内置资源。 */
-    public static String activeBundlePath(Context context) {
-        SharedPreferences prefs = context.getSharedPreferences(PREFS, Context.MODE_PRIVATE);
-        String path = prefs.getString(KEY_PATH, null);
-        if (path == null) return null;
-        File dir = new File(path);
-        File entry = new File(dir, "index.html");
-        if (dir.isDirectory() && entry.isFile()) return path;
-        prefs.edit().remove(KEY_PATH).remove(KEY_VERSION).apply();
-        return null;
-    }
-
-    public static String activeBundleVersion(Context context) {
-        return context.getSharedPreferences(PREFS, Context.MODE_PRIVATE).getString(KEY_VERSION, null);
-    }
-
     @PluginMethod
     public void downloadBundle(PluginCall call) {
         String url = call.getString("url");
         String version = call.getString("version", "");
         String sha256 = call.getString("sha256", "");
-        if (url == null || !url.startsWith("https://")) {
-            call.reject("无效的热更新地址");
+        if (url == null || !url.startsWith("https://") || !version.matches("[0-9]+\\.[0-9]+\\.[0-9]+")
+            || sha256 == null || !sha256.matches("(?i)[a-f0-9]{64}")) {
+            call.reject("热更新地址、版本或校验信息无效");
             return;
         }
-        final String targetVersion = version.isEmpty() ? String.valueOf(System.currentTimeMillis()) : version;
-        final String expectedHash = sha256 == null ? "" : sha256.trim().toLowerCase();
+        if (!downloading.compareAndSet(false, true)) {
+            call.reject("已有热更新正在下载，请稍后重试");
+            return;
+        }
+        final String targetVersion = version;
+        final String expectedHash = sha256.toLowerCase(java.util.Locale.ROOT);
         new Thread(() -> {
             File bundlesRoot = new File(getContext().getFilesDir(), "bundles");
-            File zipFile = new File(bundlesRoot, targetVersion + ".zip");
-            File targetDir = new File(bundlesRoot, targetVersion);
+            // Every attempt owns a fresh directory; never overwrite the bundle currently in use.
+            String downloadId = targetVersion + "-" + UUID.randomUUID();
+            File zipFile = new File(bundlesRoot, downloadId + ".zip");
+            File targetDir = new File(bundlesRoot, downloadId);
             try {
                 bundlesRoot.mkdirs();
-                download(url, zipFile);
-                if (!expectedHash.isEmpty() && !expectedHash.equals(sha256Of(zipFile))) {
+                download(url, zipFile, 0);
+                if (!expectedHash.equals(sha256Of(zipFile))) {
                     throw new Exception("热更新包校验失败");
                 }
-                deleteRecursively(targetDir);
                 unzip(zipFile, targetDir);
-                if (!new File(targetDir, "index.html").isFile()) throw new Exception("热更新包缺少入口文件");
+                BundleStore.validate(getContext(), targetDir.getAbsolutePath(), targetVersion);
                 zipFile.delete();
                 JSObject result = new JSObject();
                 result.put("path", targetDir.getAbsolutePath());
@@ -99,6 +102,8 @@ public class UpdaterPlugin extends Plugin {
                 zipFile.delete();
                 deleteRecursively(targetDir);
                 call.reject("热更新下载失败：" + error.getMessage());
+            } finally {
+                downloading.set(false);
             }
         }).start();
     }
@@ -107,42 +112,39 @@ public class UpdaterPlugin extends Plugin {
     public void applyBundle(PluginCall call) {
         String path = call.getString("path");
         String version = call.getString("version", "");
-        if (path == null || !new File(path, "index.html").isFile()) {
-            call.reject("热更新资源不存在");
+        try {
+            BundleStore.stage(getContext(), path, version);
+        } catch (Exception error) {
+            call.reject(error.getMessage());
             return;
         }
-        getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().putString(KEY_PATH, path).putString(KEY_VERSION, version).apply();
         boolean reload = Boolean.TRUE.equals(call.getBoolean("reload", false));
-        if (reload) {
-            getActivity().runOnUiThread(() -> {
-                getBridge().setServerAssetPath(path);
-                getBridge().reload();
-            });
-        }
         call.resolve(new JSObject());
+        if (reload) {
+            getActivity().runOnUiThread(() -> getActivity().recreate());
+        }
     }
 
     @PluginMethod
     public void resetBundle(PluginCall call) {
-        getContext().getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-            .edit().remove(KEY_PATH).remove(KEY_VERSION).apply();
+        BundleStore.reset(getContext());
         boolean reload = Boolean.TRUE.equals(call.getBoolean("reload", false));
-        if (reload) getActivity().runOnUiThread(() -> getBridge().reload());
         call.resolve(new JSObject());
+        if (reload) getActivity().runOnUiThread(() -> getActivity().recreate());
     }
 
-    private static void download(String url, File target) throws Exception {
+    private static void download(String url, File target, int redirects) throws Exception {
+        if (!url.startsWith("https://") || redirects > 5) throw new Exception("热更新下载重定向无效");
         HttpURLConnection connection = (HttpURLConnection) new URL(url).openConnection();
         connection.setConnectTimeout(15000);
         connection.setReadTimeout(60000);
-        connection.setInstanceFollowRedirects(true);
+        connection.setInstanceFollowRedirects(false);
         int status = connection.getResponseCode();
         if (status >= 300 && status < 400) {
             String location = connection.getHeaderField("Location");
             connection.disconnect();
             if (location == null) throw new Exception("HTTP " + status);
-            download(location, target);
+            download(new URL(new URL(url), location).toString(), target, redirects + 1);
             return;
         }
         if (status != 200) {
@@ -152,7 +154,12 @@ public class UpdaterPlugin extends Plugin {
         try (InputStream in = connection.getInputStream(); FileOutputStream out = new FileOutputStream(target)) {
             byte[] buffer = new byte[8192];
             int read;
-            while ((read = in.read(buffer)) != -1) out.write(buffer, 0, read);
+            long size = 0;
+            while ((read = in.read(buffer)) != -1) {
+                size += read;
+                if (size > 32L * 1024 * 1024) throw new Exception("热更新下载包过大");
+                out.write(buffer, 0, read);
+            }
         } finally {
             connection.disconnect();
         }
@@ -176,7 +183,10 @@ public class UpdaterPlugin extends Plugin {
         try (ZipInputStream zip = new ZipInputStream(new FileInputStream(zipFile))) {
             ZipEntry entry;
             byte[] buffer = new byte[8192];
+            long size = 0;
+            int entries = 0;
             while ((entry = zip.getNextEntry()) != null) {
+                if (++entries > 4096) throw new Exception("热更新文件数量过多");
                 File outFile = new File(targetDir, entry.getName());
                 if (!outFile.getCanonicalPath().startsWith(canonicalTarget)) throw new Exception("热更新包含非法路径");
                 if (entry.isDirectory()) {
@@ -186,7 +196,11 @@ public class UpdaterPlugin extends Plugin {
                 outFile.getParentFile().mkdirs();
                 try (FileOutputStream out = new FileOutputStream(outFile)) {
                     int read;
-                    while ((read = zip.read(buffer)) != -1) out.write(buffer, 0, read);
+                    while ((read = zip.read(buffer)) != -1) {
+                        size += read;
+                        if (size > 128L * 1024 * 1024) throw new Exception("热更新解压包过大");
+                        out.write(buffer, 0, read);
+                    }
                 }
                 zip.closeEntry();
             }
