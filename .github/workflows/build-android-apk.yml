@@ -26,10 +26,12 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          EXISTING=$(gh api "repos/$GITHUB_REPOSITORY/git/refs/tags/v$PRODUCT_VERSION" --jq '.object.sha' 2>/dev/null || true)
-          if [ -n "$EXISTING" ] && [ "$EXISTING" != "$GITHUB_SHA" ]; then
-            echo "::error::版本 v$PRODUCT_VERSION 已发布（指向 $EXISTING），请先递增 PRODUCT_VERSION（.github/workflows/build-android-apk.yml 与 src/data/release.js）再推送。"
-            exit 1
+          # 只有 tag 确实存在（API 成功）才比较；404 表示未发布，直接放行
+          if EXISTING=$(gh api "repos/$GITHUB_REPOSITORY/git/refs/tags/v$PRODUCT_VERSION" --jq '.object.sha' 2>/dev/null); then
+            if [ "$EXISTING" != "$GITHUB_SHA" ]; then
+              echo "::error::版本 v$PRODUCT_VERSION 已发布（指向 $EXISTING），请先递增 PRODUCT_VERSION（.github/workflows/build-android-apk.yml 与 src/data/release.js）再推送。"
+              exit 1
+            fi
           fi
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
