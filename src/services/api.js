@@ -842,6 +842,9 @@ export async function requestAI(settings, messages, signal, onChunk, options = {
   if (settings.nativeTools && !options.disableTools) {
     const definitions = toolDefinitions(options.toolSet || "state", options.allowedToolNames);
     if (definitions.length) body.tools = definitions;
+    if (options.requireChoiceTool && options.toolSet === "choices" && definitions.length) {
+      body.tool_choice = { type: "function", function: { name: "ui__present_choices" } };
+    }
   }
   const response = await fetch(endpoint(settings.baseUrl, "/chat/completions"), {
     method: "POST", signal,

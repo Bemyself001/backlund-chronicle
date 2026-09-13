@@ -1,8 +1,4 @@
-export const FALLBACK_CHOICES = [
-  { label: "观察眼前变化，确认可用信息", intent: "observe", risk: "low" },
-  { label: "与在场人物谈谈当前打算", intent: "interact", risk: "low" },
-  { label: "离开当前焦点，继续自己的计划", intent: "redirect", risk: "medium" },
-];
+import { choiceResult, normalizeChoices } from "./choices.js";
 
 function firstBalancedObject(text) {
   for (let start = text.indexOf("{"); start >= 0; start = text.indexOf("{", start + 1)) {
@@ -68,16 +64,6 @@ function responseObject(raw) {
   }
 }
 
-function normalizeChoice(choice, index) {
-  const fallback = FALLBACK_CHOICES[index];
-  const label = typeof choice === "string" ? choice : choice?.label ?? choice?.text ?? choice?.title ?? choice?.action;
-  return {
-    label: String(label || fallback.label),
-    intent: String(choice?.intent || "").trim().slice(0, 32) || fallback.intent,
-    risk: ["low", "medium", "high"].includes(choice?.risk) ? choice.risk : fallback.risk,
-  };
-}
-
 function hasToolName(call) {
   const name = call?.name || call?.tool || call?.function?.name;
   return typeof name === "string" && name.trim().length > 0;
@@ -90,25 +76,21 @@ export function normalizeAIResponse(raw, nativeToolCalls = []) {
   const hasNarrative = Boolean(narrativeText.trim());
   const narrative = narrativeText.trim()
     || (nativeToolCalls.length ? "命运的齿轮轻轻转动。本轮状态提议正由本地规则校验。" : "雾中的细节暂时无法拼成完整叙述。你可以重试，或换一种行动方式。");
-  const choiceToolCall = nativeToolCalls.find((call) => call.name === "ui.present_choices");
+  const choiceToolCalls = nativeToolCalls.filter((call) => call.name === "ui.present_choices");
   const nativeStateCalls = nativeToolCalls.filter((call) => call.name !== "ui.present_choices");
-  const sourceChoices = parsed.choices ?? parsed.actions ?? parsed.options ?? parsed.nextActions ?? parsed.next_actions ?? parsed.suggestions ?? choiceToolCall?.args?.choices;
-  const rawChoices = Array.isArray(sourceChoices) ? sourceChoices : [];
-  const choices = rawChoices.slice(0, 3).map(normalizeChoice);
-  const labels = rawChoices.slice(0, 3).map((choice) => String(typeof choice === "string" ? choice : choice?.label ?? choice?.text ?? choice?.title ?? choice?.action ?? "").trim()).filter(Boolean);
-  const hasThreeDistinctLabels = rawChoices.length === 3 && labels.length === 3 && new Set(labels).size === 3;
-  const choiceMeta = !Array.isArray(sourceChoices)
-    ? { source: "fallback", fallback: true, reason: "missing_choices" }
-    : hasThreeDistinctLabels
-      ? { source: "model", fallback: false, reason: "" }
-      : { source: "recovered", fallback: false, reason: rawChoices.length === 3 ? "invalid_or_duplicate_labels" : "choice_count" };
-  while (choices.length < 3) choices.push({ ...FALLBACK_CHOICES[choices.length] });
+  const candidates = [...choiceToolCalls.map((call) => call.args?.choices), parsed.choices, parsed.actions, parsed.options, parsed.nextActions, parsed.next_actions, parsed.suggestions].filter(Array.isArray);
+  const rawChoices = candidates.flat();
+  const choices = normalizeChoices(rawChoices);
+  const invalidCall = choiceToolCalls.find((call) => call.argsInvalid);
+  const reason = invalidCall ? (invalidCall.argsInvalidCause === "length" ? "tool_arguments_truncated" : "invalid_tool_arguments")
+    : !rawChoices.length ? "missing_choices" : choices.length < Math.min(3, rawChoices.length) ? "invalid_or_duplicate_labels" : "choice_count";
+  const { choiceMeta } = choiceResult(choices, reason);
   const rawProtocolToolCalls = parsed.toolCalls ?? parsed.tool_calls;
   const protocolToolCalls = Array.isArray(rawProtocolToolCalls) ? rawProtocolToolCalls.filter(hasToolName) : [];
   const ignoredToolCalls = Array.isArray(rawProtocolToolCalls) ? rawProtocolToolCalls.length - protocolToolCalls.length : 0;
   const memoryNotes = parsed.memoryNotes ?? parsed.memory_notes;
   const worldEvents = parsed.worldEvents ?? parsed.world_events;
-  const baseProtocolWarning = parsed.protocolWarning || (choiceMeta.source === "fallback" ? "模型没有返回 choices，已生成临时行动建议。" : choiceMeta.source === "recovered" ? "choices 字段不完整，已生成临时行动建议。" : "");
+  const baseProtocolWarning = parsed.protocolWarning || (choices.length < 3 ? "行动建议未完整返回，已保留收到的有效选项。" : "");
   const protocolWarning = [baseProtocolWarning, ignoredToolCalls ? `模型返回了 ${ignoredToolCalls} 条不完整工具调用，已忽略。` : ""].filter(Boolean).join(" ");
   return {
     narrative,

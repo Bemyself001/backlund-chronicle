@@ -2,7 +2,19 @@ import { STAT_LABELS } from "../engine/statChanges.js";
 import { formatSignedMoney } from "../system/money.js";
 
 export const READING_KEY = "mist-reading-preferences";
-export const RISK_LABELS = { low: "低风险", medium: "中风险", high: "高风险" };
+export const RISK_LABELS = { low: "低风险", medium: "中风险", high: "高风险", unknown: "风险未标注" };
+
+export function choiceStatusMessage(meta) {
+  const reason = {
+    timeout: "行动建议补全超时",
+    cancelled: "行动建议补全已中止",
+    request_failed: "行动建议请求失败",
+    response_truncated: "行动建议响应被截断",
+    tool_arguments_truncated: "行动建议响应被截断",
+    invalid_tool_arguments: "行动建议格式未能解析",
+  }[meta?.reason] || "行动建议未完整返回";
+  return `本轮剧情已保存。${reason}，你可以使用已有建议、重新补全或自由输入行动。`;
+}
 
 export function normalizeReadingPreferences(value) {
   return {

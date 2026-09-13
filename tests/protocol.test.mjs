@@ -7,12 +7,12 @@ test("extractJson reads fenced and embedded balanced objects", () => {
   assert.equal(extractJson('说明文字 {"narrative":"雾起"} 后续文字').narrative, "雾起");
 });
 
-test("plain text API responses continue as narrative with fallback choices", () => {
+test("plain text API responses preserve narrative without fabricating choices", () => {
   const result = normalizeAIResponse("煤气灯忽然熄灭，楼梯上传来第三个人的脚步声。");
   assert.match(result.narrative, /煤气灯/);
-  assert.equal(result.choices.length, 3);
+  assert.equal(result.choices.length, 0);
   assert.match(result.protocolWarning, /普通文本/);
-  assert.equal(result.choiceMeta.source, "fallback");
+  assert.equal(result.choiceMeta.source, "unavailable");
 });
 
 test("content-part arrays and alternate action fields are normalized", () => {
@@ -21,7 +21,9 @@ test("content-part arrays and alternate action fields are normalized", () => {
   const result = normalizeAIResponse({ content: [{ text: "回声" }], actions: ["检查窗台"] });
   assert.equal(result.narrative, "回声");
   assert.equal(result.choices[0].label, "检查窗台");
-  assert.equal(result.choices.length, 3);
+  assert.equal(result.choices.length, 1);
+  assert.equal(result.choiceMeta.source, "partial");
+  assert.equal(result.choices[0].risk, "unknown");
 });
 
 test("native tool calls remain usable when the assistant content is empty", () => {
@@ -90,4 +92,26 @@ test("choice parser accepts alternate action fields and text labels", () => {
   ] });
   assert.equal(result.choiceMeta.source, "model");
   assert.deepEqual(result.choices.map((choice) => choice.label), ["检查街角的脚印", "询问巡夜人", "跟上黑伞客"]);
+});
+
+test("empty content choices cannot mask native choices across multiple calls", () => {
+  const result = normalizeAIResponse({ narrative: "你站在门口。", choices: [] }, [
+    { name: "ui.present_choices", args: { choices: ["等待", "敲门"] } },
+    { name: "ui.present_choices", args: { choices: ["等待", "离开", "观望"] } },
+  ]);
+  assert.deepEqual(result.choices.map(choice => choice.label), ["等待", "敲门", "离开"]);
+  assert.equal(result.choiceMeta.source, "model");
+  assert.deepEqual(result.toolCalls, []);
+});
+
+test("malformed and truncated native choice arguments keep diagnostics without filler", () => {
+  for (const [cause, reason] of [["length", "tool_arguments_truncated"], ["json", "invalid_tool_arguments"]]) {
+    const result = normalizeAIResponse("门没有打开。", [
+      { name: "ui.present_choices", args: {}, argsInvalid: true, argsInvalidCause: cause },
+    ]);
+    assert.equal(result.choiceMeta.reason, reason);
+    assert.equal(result.choices.length, 0);
+    assert.equal(result.hasNarrative, true);
+    assert.deepEqual(result.toolCalls, []);
+  }
 });

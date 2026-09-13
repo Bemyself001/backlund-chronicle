@@ -1,7 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CharacterPanel, InventoryPanel, JournalPanel, MenuPanel } from "./GamePanels.jsx";
 import GameIcon from "./GameIcon.jsx";
-import { getAuditRows, normalizeReadingPreferences, READING_KEY, RISK_LABELS, shouldSubmitAction } from "./gameUi.js";
+import { choiceStatusMessage, getAuditRows, normalizeReadingPreferences, READING_KEY, RISK_LABELS, shouldSubmitAction } from "./gameUi.js";
 import { formatMoney, normalizeMoney } from "../system/money.js";
 import { APP_VERSION } from "../services/updates.js";
 import { RELEASE_NAME } from "../data/release.js";
@@ -51,7 +51,7 @@ function TurnProgress({ phase }) {
   }, []);
   return <div className={styles.turnStatus}>
     <p role="status"><span className={styles.activityDot} aria-hidden="true" />{PHASE_MESSAGES[phase] || PHASE_MESSAGES.generating}</p>
-    <small>{elapsed > 4 ? `已等待 ${elapsed} 秒 · ` : ""}本轮尚未保存</small>
+    <small>{elapsed > 4 ? `已等待 ${elapsed} 秒 · ` : ""}{phase === "choiceRetry" ? "本轮剧情已保存，中止只停止补全建议" : "本轮尚未保存"}</small>
   </div>;
 }
 
@@ -223,8 +223,11 @@ function GameSession({ game, loading, turnPhase, streamText, error, mockMode, on
               {error && <div className={styles.error} role="alert"><strong>本轮未能完成</strong><p>{error}</p><button type="button" disabled={loading} onClick={retry}>重试本轮</button></div>}
               {!loading && game.lastTurnAudit && <button className={styles.turnResult} type="button" onClick={event => { setJournalRequest(value => value + 1); changePanel("journal", event, true); }}><span><small>{game.lastTurnAudit.importantItemConfirmation?.status === "player-action" ? "最近物品操作" : `第 ${game.lastTurnAudit.turn} 轮 · 已确认`}</small>{auditRows.length ? auditRows.slice(0, 2).map(row => row.text).join("；") : "物品、资金与属性没有变化"}{auditRows.length > 2 ? `，另有 ${auditRows.length - 2} 项` : ""}</span><span aria-hidden="true">↗</span></button>}
               {!loading && <section className={styles.interaction} aria-label="下一步行动"><div className={styles.choiceHeading}><h2>接下来，你打算……</h2><button type="button" aria-expanded={!choicesFolded} aria-controls="action-choices" onClick={() => setChoicesFolded(value => !value)}>{choicesFolded ? "展开建议" : "收起建议"}</button></div>
-                {game.choiceMeta?.source === "unavailable" && <p className={styles.choiceNote}>建议暂不可用，你仍可以自由输入行动。</p>}
-                <div id="action-choices" className={styles.choices} hidden={choicesFolded}>{game.choices?.length ? game.choices.map((choice, i) => <button type="button" key={`${choice.intent}-${i}`} disabled={loading} onClick={() => performAction(choice.label)}><span>{String(i + 1).padStart(2, "0")}</span><strong>{choice.label}</strong><small data-risk={choice.risk}>{RISK_LABELS[choice.risk] || "行动"}</small></button>) : <button type="button" onClick={onRegenerateChoices} disabled={loading || mockMode}><span>↻</span><strong>{mockMode ? "请在下方自由输入行动" : "重新生成行动建议"}</strong></button>}</div>
+                {(game.choices?.length || 0) < 3 && <p className={styles.choiceNote} role="status">{choiceStatusMessage(game.choiceMeta)}</p>}
+                <div id="action-choices" className={styles.choices} hidden={choicesFolded}>
+                  {game.choices?.map((choice, i) => <button type="button" key={`${choice.intent}-${i}`} disabled={loading} onClick={() => performAction(choice.label)}><span>{String(i + 1).padStart(2, "0")}</span><strong>{choice.label}</strong><small data-risk={choice.risk}>{RISK_LABELS[choice.risk] || "风险未标注"}</small></button>)}
+                  {(game.choices?.length || 0) < 3 && <button type="button" onClick={onRegenerateChoices} disabled={loading || mockMode}><span>↻</span><strong>{mockMode ? "请在下方自由输入行动" : game.choices?.length ? "补全行动建议" : "重新生成行动建议"}</strong></button>}
+                </div>
               </section>}
             </div>
           </div>
@@ -232,7 +235,7 @@ function GameSession({ game, loading, turnPhase, streamText, error, mockMode, on
         </div>
         <form className={styles.composer} onSubmit={event => { event.preventDefault(); submit(); }}>
           <div className={styles.composerInner}><label className={styles.inputLabel}><span>自由行动</span><textarea aria-label="自由行动" ref={inputRef} rows="1" value={input} onChange={event => setInput(event.target.value)} onFocus={() => setEditing(true)} onBlur={() => setEditing(false)} onKeyDown={event => { if (shouldSubmitAction(event) && !window.matchMedia("(pointer: coarse)").matches) { event.preventDefault(); submit(); } }} placeholder="描述你的行动、问题或对话…" disabled={loading} /></label>{loading ? <button type="button" className={styles.abort} onClick={onAbort}>中止生成</button> : <button type="submit" className={styles.submit} disabled={!input.trim()}>提交行动 <span aria-hidden="true">↗</span></button>}</div>
-          <div className={styles.composerMeta}><span>Enter 发送 · Shift + Enter 换行</span><span>{loading ? "本轮尚未保存" : "进度自动保存"}</span></div>
+          <div className={styles.composerMeta}><span>Enter 发送 · Shift + Enter 换行</span><span>{turnPhase === "choiceRetry" ? "剧情已保存 · 正在补全建议" : loading ? "本轮尚未保存" : "进度自动保存"}</span></div>
         </form>
       </section>
       {panelOpen && <><button className={styles.panelScrim} type="button" onClick={closePanel} aria-label="关闭资料面板" tabIndex={-1} /><aside id="game-dossier" className={styles.dossier} aria-label={PANEL_NAMES[panel]}><div className={styles.dossierHeading}><div><small>PRIVATE DOSSIER</small><h2>{PANEL_NAMES[panel]}</h2></div><button ref={closeRef} type="button" onClick={closePanel} aria-label="关闭资料，返回剧情">返回剧情 <span aria-hidden="true">×</span></button></div><div className={styles.dossierScroll} ref={paneRef}>

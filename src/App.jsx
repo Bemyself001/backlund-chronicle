@@ -15,12 +15,13 @@ import { buildRejectedToolNarrative, dedupeToolCalls, executeToolCalls, normaliz
 import { auditTurnChanges, collectImportantItemConfirmations, createAuditBaseline } from "./engine/audit.js";
 import { resolveTurnProgress } from "./engine/turn.js";
 import { loadApiSettings, requestAIWithReasoningFallback, saveApiSettings } from "./services/api.js";
-import { buildChoiceRegenerationContext, buildFastNarrativeContinuationContext, buildFastPresentationContext, buildPlanningContext, buildRenderingContext, buildSummaryContext, buildToolRepairContext, computeMemoryUpdate, composeSummary, parseSectionedSummary } from "./services/memory.js";
+import { buildFastNarrativeContinuationContext, buildFastPresentationContext, buildPlanningContext, buildRenderingContext, buildSummaryContext, buildToolRepairContext, computeMemoryUpdate, composeSummary, parseSectionedSummary } from "./services/memory.js";
 import { mockResponse } from "./services/mock.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
 import { extractNarrativePreview } from "./services/streamPreview.js";
 import { ensureMapMoveToolCall, ensureMockMapDiscoveryToolCall } from "./services/mapTravel.js";
-import { hasUsableChoices, injectOccultEntryChoice } from "./services/choices.js";
+import { choiceResult, choiceValidationError, hasValidModelChoices, modelChoices, injectOccultEntryChoice } from "./services/choices.js";
+import { applyChoiceRecovery, recoverChoices } from "./services/choiceRecovery.js";
 import { createTurnResolution } from "./services/turnResolution.js";
 import { makeId } from "./utils/id.js";
 import { canHotUpdate, checkForUpdate, downloadAndApplyOta, isNativeAndroid } from "./services/updates.js";
@@ -30,16 +31,6 @@ import { exploreHex } from "./system/hexworld.js";
 import { ensureRequestedAdvancementToolCall } from "./services/advancement.js";
 import { launchFastModeTasks, throwIfFastTaskAborted } from "./services/fastMode.js";
 import { repairToolCallsConcurrently } from "./services/toolRepair.js";
-
-function hasValidModelChoices(response) {
-  return response?.choiceMeta?.source === "model"
-    && hasUsableChoices(response.choices)
-    && new Set(response.choices.map((choice) => choice.risk)).size === 3;
-}
-
-function choiceValidationError(response) {
-  return response?.choiceMeta?.reason || "模型没有返回三个符合当前情境且互不重复的行动选项";
-}
 
 export default function App() {
   const [screen, setScreen] = useState("splash");
@@ -130,14 +121,16 @@ export default function App() {
 
   const settleImportantItemConfirmation = (decision) => itemConfirmationResolverRef.current?.(decision);
 
-  const requestChoicesFromAI = (targetGame, action, narrative, validationError, signal, options = {}) => {
-    const messages = buildChoiceRegenerationContext(targetGame, action, narrative, validationError, prompt, { nativeTools: settings.nativeTools, ...options });
-    return requestAIWithReasoningFallback(settings, messages, signal, undefined, {
-      toolSet: "choices",
-      disableJsonMode: Boolean(settings.nativeTools),
-      forceDisableReasoning: true,
-      maxTokensModeOverride: "manual",
-      maxTokensOverride: 1200,
+  const requestChoicesFromAI = (targetGame, action, narrative, initialResponse, signal, onResponse) => recoverChoices({
+    game: targetGame, action, narrative, initialResponse, signal, prompt, settings, onResponse,
+  });
+
+  const saveRecoveredChoices = (target, response, metrics) => {
+    const entry = target.occult?.contact === 0 ? target.occult.currentEntry : null;
+    const choices = injectOccultEntryChoice(response.choices, entry);
+    setGame(current => {
+      const next = applyChoiceRecovery(current, target, { ...response, choices });
+      return next === current ? current : saveGame(metrics ? { ...next, lastTurnMetrics: finishTurnMetrics(metrics) } : next);
     });
   };
 
@@ -326,29 +319,17 @@ export default function App() {
             buildFastNarrativeContinuationContext(game, resolvedGame, action, fastPresentationResponse.narrative, prompt, resolution),
             { disableTools: true, disableJsonMode: true, forceDisableReasoning: true, maxTokensModeOverride: "manual", maxTokensOverride: 1400 },
           ),
-          choices: async () => {
-            const choiceResponse = await requestChoicesFromAI(
-              resolvedGame,
-              action,
-              fastPresentationResponse.narrative,
-              "根据本地权威结算生成后续行动",
-              controller.signal,
-              { narrativeStatus: "draft", turnResolution: resolution },
-            );
-            recordModelRequest(metrics, choiceResponse);
-            return choiceResponse;
-          },
         });
-        const [continuationOutcome, choicesOutcome] = await Promise.all([finalTasks.continuation, finalTasks.choices]);
-        throwIfFastTaskAborted(continuationOutcome, choicesOutcome);
+        const continuationOutcome = await finalTasks.continuation;
+        throwIfFastTaskAborted(continuationOutcome);
 
         if (continuationOutcome.value?.hasNarrative) {
           response = {
             ...fastPresentationResponse,
             narrative: `${fastPresentationResponse.narrative.trim()}\n\n${continuationOutcome.value.narrative.trim()}`,
             hasNarrative: true,
-            choices: hasValidModelChoices(choicesOutcome.value) ? choicesOutcome.value.choices : [],
-            choiceMeta: hasValidModelChoices(choicesOutcome.value) ? choicesOutcome.value.choiceMeta : { source: "unavailable", fallback: false, reason: choicesOutcome.error?.message || choiceValidationError(choicesOutcome.value) },
+            // Draft choices predate settlement; regenerate against the completed scene after saving.
+            ...choiceResult([], "scene_changed"),
           };
         } else {
           needsFullRendering = true;
@@ -376,29 +357,14 @@ export default function App() {
         if (confirmedAdvancement) response = { ...response, narrative: `${response.narrative}\n\n你作出最终确认后服下魔药。本地档案同步记录了灵性的变化：你已经不再是普通人，而是${confirmedAdvancement.pathwayName}途径的${confirmedAdvancement.sequenceLabel}非凡者。`, hasNarrative: true };
       }
 
-      let choices = hasValidModelChoices(response) ? response.choices : [];
-      let choiceMeta = hasValidModelChoices(response) ? response.choiceMeta : { source: "unavailable", fallback: false, reason: choiceValidationError(response) };
-      if (!settings.mockMode && !choices.length) {
-        setTurnPhase("choiceRetry");
-        try {
-          const choiceResponse = await requestChoicesFromAI(resolvedGame, action, response.narrative, choiceMeta.reason, controller.signal);
-          recordModelRequest(metrics, choiceResponse);
-          if (hasValidModelChoices(choiceResponse)) {
-            choices = choiceResponse.choices;
-            choiceMeta = { ...choiceResponse.choiceMeta, source: "regenerated" };
-          }
-        } catch (choiceError) {
-          if (choiceError.name === "AbortError") throw choiceError;
-          choiceMeta = { source: "unavailable", fallback: false, reason: choiceError.message || choiceMeta.reason };
-        }
-      }
+      const { choices, choiceMeta } = choiceResult(modelChoices(response), choiceValidationError(response));
 
       const occultNarrative = progress.occultEntry && !response.narrative.includes(progress.occultEntry.title)
         ? `${response.narrative}\n\n【${progress.occultEntry.title}】${progress.occultEntry.text}`
         : response.narrative;
       const nextChoices = choices.length === 3
         ? injectOccultEntryChoice(choices, progress.occult.contact === 0 ? (progress.occultEntry || progress.occult.currentEntry) : null)
-        : [];
+        : choices;
       const memoryPlan = computeMemoryUpdate(execution.game, action, occultNarrative, resolution);
       const auditBaseline = createAuditBaseline(game, game.turn + 1);
       const automaticAudit = { ...auditTurnChanges(auditBaseline, resolvedGame), importantItemConfirmation: confirmationStatus };
@@ -411,6 +377,18 @@ export default function App() {
         lastTurnMetrics: finishTurnMetrics(metrics),
       };
       resetStreamPreview(); commitGame(next);
+      // Narrative and settlement are durable before any optional suggestion request.
+      clearTimeout(watchdogTimer);
+      if (!settings.mockMode && !hasValidModelChoices(next)) {
+        setTurnPhase("choiceRetry");
+        try {
+          const recovered = await requestChoicesFromAI(next, action, occultNarrative, next, controller.signal,
+            choiceResponse => recordModelRequest(metrics, choiceResponse));
+          saveRecoveredChoices(next, recovered, metrics);
+        } catch {
+          saveRecoveredChoices(next, choiceResult(next.choices, "request_failed"));
+        }
+      }
       scheduleSummaryRewrite(memoryPlan, next.id, next.turn);
       return true;
     } catch (err) {
@@ -425,16 +403,15 @@ export default function App() {
     if (!game || busyRef.current || settings.mockMode) return false;
     const narrative = [...game.recentDialogues].reverse().find((message) => message.role === "assistant")?.content || "";
     const action = [...game.recentDialogues].reverse().find((message) => message.role === "user")?.content || "继续当前场景";
-    if (!narrative) { setError("当前没有可用于生成选项的剧情正文。"); return false; }
+    if (!narrative) return false;
     busyRef.current = true; setLoading(true); setTurnPhase("choiceRetry"); setError("");
     const controller = new AbortController(); controllerRef.current = controller;
     try {
-      const response = await requestChoicesFromAI(game, action, narrative, game.choiceMeta?.reason || "手动重新生成", controller.signal);
-      if (!hasValidModelChoices(response)) throw new Error("AI 仍未返回三个有效选项，请稍后再试或直接自由输入行动。");
-      commitGame({ ...game, choices: response.choices, choiceMeta: { ...response.choiceMeta, source: "regenerated" } });
-      return true;
-    } catch (choiceError) {
-      setError(choiceError.name === "AbortError" ? "选项生成已中止。" : choiceError.message || "选项生成失败。");
+      const response = await requestChoicesFromAI(game, action, narrative, game, controller.signal);
+      saveRecoveredChoices(game, response);
+      return hasValidModelChoices(response);
+    } catch {
+      saveRecoveredChoices(game, choiceResult(modelChoices(game), "request_failed"));
       return false;
     } finally {
       setTurnPhase("idle"); setLoading(false); busyRef.current = false; controllerRef.current = null;

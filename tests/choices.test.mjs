@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { hasUsableChoices, injectOccultEntryChoice } from "../src/services/choices.js";
+import { choiceResult, hasUsableChoices, hasValidModelChoices, injectOccultEntryChoice, modelChoices, normalizeChoices } from "../src/services/choices.js";
 
 const choices = [
   { label: "检查窗边残留的泥水", intent: "investigate", risk: "low" },
@@ -35,4 +35,23 @@ test("a locally authorized occult entry replaces one valid high-risk option", ()
 test("occult injection does not manufacture choices when AI choices are unavailable", () => {
   const entry = { choice: { label: "追查这条非凡入口（可选）", intent: "occult", risk: "medium" } };
   assert.deepEqual(injectOccultEntryChoice([], entry), []);
+});
+
+test("shared model validation accepts short labels and all-low risks", () => {
+  const result = choiceResult(["等待", "敲门", "离开"].map(label => ({ label, risk: "low" })));
+  assert.equal(hasValidModelChoices(result), true);
+  assert.deepEqual(result.choices.map(choice => choice.risk), ["low", "low", "low"]);
+});
+
+test("normalization retains partial actions, deduplicates and limits without inventing risk", () => {
+  const partial = choiceResult([null, { label: " " }, " 等待 ", "等待", { text: "敲门", risk: "extreme" }]);
+  assert.equal(partial.choiceMeta.source, "partial");
+  assert.deepEqual(partial.choices.map(choice => choice.label), ["等待", "敲门"]);
+  assert.deepEqual(partial.choices.map(choice => choice.risk), ["unknown", "unknown"]);
+  assert.equal(hasValidModelChoices(partial), false);
+  assert.equal(normalizeChoices(["甲", "乙", "丙", "丁"]).length, 3);
+});
+
+test("legacy fabricated fallback choices are never reused for recovery", () => {
+  assert.deepEqual(modelChoices({ choices, choiceMeta: { source: "fallback" } }), []);
 });

@@ -26,7 +26,7 @@ test("Enter submits while Chinese IME confirmation and Shift+Enter do not", () =
 });
 
 test("risk labels describe risk, not an invented action type", () => {
-  assert.deepEqual(RISK_LABELS, { low: "低风险", medium: "中风险", high: "高风险" });
+  assert.deepEqual(RISK_LABELS, { low: "低风险", medium: "中风险", high: "高风险", unknown: "风险未标注" });
 });
 
 test("UI summaries use actual confirmed audit deltas and ignore narrative claims", () => {

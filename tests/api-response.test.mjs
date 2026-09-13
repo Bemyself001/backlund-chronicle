@@ -24,7 +24,7 @@ test("requestAI accepts a non-stream plain-text compatible response", async (con
   }), { status: 200, headers: { "Content-Type": "application/json" } });
   const result = await requestAI(settings, [{ role: "user", content: "观察街道" }]);
   assert.match(result.narrative, /铜制招牌/);
-  assert.equal(result.choices.length, 3);
+  assert.equal(result.choices.length, 0);
 });
 
 test("auto Max Tokens fits the prompt inside the configured context", async (context) => {
@@ -369,6 +369,7 @@ test("choice-only requests expose only the ui choice tool", async (context) => {
 
   const result = await requestAI({ ...settings, nativeTools: true }, [{ role: "user", content: "继续" }], undefined, undefined, { toolSet: "choices", disableJsonMode: true });
   assert.deepEqual(requestBody.tools.map((tool) => tool.function.name), ["ui__present_choices"]);
+  assert.equal(requestBody.tool_choice, undefined, "mixed narrative rendering must not force tool-only output");
   assert.equal(requestBody.response_format, undefined);
   assert.equal(result.choices.length, 3);
   assert.deepEqual(result.toolCalls, []);
