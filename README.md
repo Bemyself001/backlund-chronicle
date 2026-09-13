@@ -67,7 +67,7 @@ API Key 输入框使用本地圆点遮罩而非系统密码字段，并请求浏
 
 ## GitHub 云端构建 APK
 
-项目包含 Capacitor Android 工程与 `.github/workflows/build-android-apk.yml`。代码推送到 GitHub 的 `main` 分支后会自动构建正式签名 APK，也可以在仓库的 **Actions → Build Android APK → Run workflow** 手动运行。流水线以 `1.1.<Actions 运行编号>` 生成显示版本，以 `10000 + 运行编号` 生成始终递增的 Android `versionCode`。
+项目包含 Capacitor Android 工程与 `.github/workflows/build-android-apk.yml`。代码推送到 GitHub 的 `main` 分支后会自动构建正式签名 APK，也可以在仓库的 **Actions → Build Android APK → Run workflow** 手动运行。产品版本由 `src/data/release.js` 维护；为兼容已经发布的 `v1.3.102` 等安装包，流水线继续以 `1.3.<完整提交数>` 生成 Android 与 OTA 兼容构建号，并以 `30000 + 完整提交数` 生成始终递增的 `versionCode`。例如产品版本 1.3.5 可对应兼容构建 `v1.3.105`。
 
 正式构建依赖四个 GitHub Actions Secrets：`ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和 `ANDROID_KEY_PASSWORD`。签名文件及其本地恢复信息保存在被 Git 忽略的 `.signing/`；必须离线备份，丢失后将无法覆盖更新现有安装。
 

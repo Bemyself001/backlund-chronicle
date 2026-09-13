@@ -14,7 +14,7 @@ test("system prompt map rules migrate idempotently", () => {
   assert.equal((migrated.match(/location\.grow/g) || []).length, 1);
 });
 
-test("default prose and choice rules migrate to the 1.3 writing scheme", () => {
+test("default prose and choice rules migrate to the 1.3.5 writing scheme", () => {
   const previousChoiceRule = "9. 每轮给出三个真正不同的行动选项：谨慎调查、社交交涉、高风险行动，同时允许自由输入；选项应包含当前场景的多种可能，而非三个措辞不同的同一目标。";
   const previousNarrativeRule = "12. narrative 使用克制、可读的中文，每轮约 250—600 字，不复述原著段落，不让原作角色抢占玩家中心位置。";
   const previousPrompt = DEFAULT_SYSTEM_PROMPT
@@ -22,8 +22,12 @@ test("default prose and choice rules migrate to the 1.3 writing scheme", () => {
     .replace(/^12\..+$/m, previousNarrativeRule);
   const migrated = migrateSystemPrompt(previousPrompt);
 
-  assert.match(DEFAULT_SYSTEM_PROMPT, /白金级商业小说的完成度/);
+  assert.match(DEFAULT_SYSTEM_PROMPT, /【叙事目标】/);
+  assert.match(DEFAULT_SYSTEM_PROMPT, /白金级商业小说作家的完成度/);
   assert.match(DEFAULT_SYSTEM_PROMPT, /120—250 字/);
+  assert.match(DEFAULT_SYSTEM_PROMPT, /雨水、煤气灯/);
+  assert.match(DEFAULT_SYSTEM_PROMPT, /隐瞒、误解、拒绝、试探、讨价还价或改变主意/);
+  assert.match(DEFAULT_SYSTEM_PROMPT, /【行动选项】/);
   assert.match(DEFAULT_SYSTEM_PROMPT, /不得固定套用调查、交涉、冒险三种模板/);
   assert.doesNotMatch(DEFAULT_SYSTEM_PROMPT, /克制、可读|250—600 字/);
   assert.equal(migrated, DEFAULT_SYSTEM_PROMPT);
