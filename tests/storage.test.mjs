@@ -13,7 +13,7 @@ test("version 1 saves migrate from Grayharbor to Backlund without losing progres
     recentDialogues: [{ role: "assistant", content: "灰檐港市档案馆已经关门。" }],
     longTermSummary: "已经听说灰檐港市档案馆的传闻。",
   });
-  assert.equal(migrated.version, 11);
+  assert.equal(migrated.version, 12);
   assert.equal(migrated.systemVersion, 1);
   assert.deepEqual(migrated.content, { packId: "backlund-core", schemaVersion: 1, contentVersion: "legacy" });
   assert.equal(migrated.turn, 8);
@@ -49,7 +49,7 @@ test("dynamic map nodes survive save migration with routes and knowledge intact"
       routes: [{ from: "iron-gate", to: "dyn-shop", minutes: 11, transport: "步行", source: "dynamic" }],
     },
   });
-  assert.equal(migrated.version, 11);
+  assert.equal(migrated.version, 12);
   assert.equal(migrated.mapExtensions.locations[0].id, "dyn-shop");
   assert.equal(migrated.mapExtensions.routes[0].to, "dyn-shop");
   assert.equal(migrated.locationKnowledge["dyn-shop"].status, "discovered");
@@ -67,7 +67,7 @@ test("structured advancement repairs contradictory legacy ordinary fields", () =
     },
     inventory: [],
   });
-  assert.equal(migrated.version, 11);
+  assert.equal(migrated.version, 12);
   assert.equal(migrated.character.extraordinary, "low");
   assert.equal(migrated.character.pathway, "占卜家（序列9）");
   assert.equal(migrated.character.advancement.unlockedAbilities.length, 3);
@@ -81,4 +81,25 @@ test("legacy copper coin items migrate into the separate money wallet", () => {
   });
   assert.deepEqual(migrated.money, { pounds: 0, solers: 1, pence: 6 });
   assert.equal(migrated.inventory.length, 0);
+});
+
+test("legacy occult entries migrate into trigger state with a fresh ten-turn grace period", () => {
+  const migrated = migrateSave({
+    version: 11,
+    id: "legacy-entry-save",
+    turn: 27,
+    character: { name: "旧入口迁移员", extraordinary: "ordinary", pathway: "无" },
+    inventory: [],
+    occult: {
+      contact: 0,
+      entryAvailable: true,
+      currentEntry: { id: "occult-entry-25", turn: 25, title: "旧非凡入口", text: "旧线索", choice: { label: "追查旧线索", intent: "occult", risk: "medium" } },
+      entryHistory: [{ id: "occult-entry-20", turn: 20, title: "更早的入口" }],
+    },
+  });
+  const active = migrated.triggerState.active.find((entry) => entry.instanceId === "occult-entry-25");
+  assert.equal(active.status, "available");
+  assert.equal(active.expiresTurn, 37);
+  assert.equal(migrated.triggerState.history.find((entry) => entry.instanceId === "occult-entry-20")?.status, "expired");
+  assert.equal(migrated.occult.currentEntry.id, "occult-entry-25");
 });

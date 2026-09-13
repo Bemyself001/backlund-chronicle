@@ -14,6 +14,7 @@ import { createInitialGame, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from ".
 import { buildRejectedToolNarrative, dedupeToolCalls, executeToolCalls, normalizeToolCalls } from "./engine/tools.js";
 import { auditTurnChanges, collectImportantItemConfirmations, createAuditBaseline } from "./engine/audit.js";
 import { resolveTurnProgress } from "./engine/turn.js";
+import { processTriggers } from "./engine/triggerEngine.js";
 import { loadApiSettings, requestAIWithReasoningFallback, saveApiSettings } from "./services/api.js";
 import { buildFastNarrativeContinuationContext, buildFastPresentationContext, buildPlanningContext, buildRenderingContext, buildSummaryContext, buildToolRepairContext, computeMemoryUpdate } from "./services/memory.js";
 import { applyMemorySummary, createMemorySummaryJob, parseMemoryDigestPayload } from "./services/memoryState.js";
@@ -128,7 +129,8 @@ export default function App() {
   });
 
   const saveRecoveredChoices = (target, response, metrics) => {
-    const entry = target.occult?.contact === 0 ? target.occult.currentEntry : null;
+    const entry = target.triggerState?.active?.filter((item) => item.status === "available").sort((left, right) => right.createdTurn - left.createdTurn)[0]?.presentation
+      || (target.occult?.entryAvailable ? target.occult.currentEntry : null);
     const choices = injectOccultEntryChoice(response.choices, entry);
     setGame(current => {
       const next = applyChoiceRecovery(current, target, { ...response, choices });
@@ -265,6 +267,7 @@ export default function App() {
         turn: game.turn + 1,
         worldTime: progress.worldTime,
         occult: progress.occult,
+        triggerState: progress.triggerState,
         hiddenDanger: progress.hiddenDanger,
       };
       const importantChanges = collectImportantItemConfirmations(proposedToolCalls, execution.results);
@@ -300,6 +303,7 @@ export default function App() {
             turn: game.turn + 1,
             worldTime: progress.worldTime,
             occult: progress.occult,
+            triggerState: progress.triggerState,
             hiddenDanger: progress.hiddenDanger,
           };
         }
@@ -368,18 +372,22 @@ export default function App() {
 
       const { choices, choiceMeta } = choiceResult(modelChoices(response), choiceValidationError(response));
 
-      const occultNarrative = progress.occultEntry && !response.narrative.includes(progress.occultEntry.title)
-        ? `${response.narrative}\n\n【${progress.occultEntry.title}】${progress.occultEntry.text}`
+      const appearedTrigger = progress.newTrigger ? { id: progress.newTrigger.instanceId, ...progress.newTrigger.presentation } : null;
+      const occultNarrative = appearedTrigger && !response.narrative.includes(appearedTrigger.title)
+        ? `${response.narrative}\n\n【${appearedTrigger.title}】${appearedTrigger.text}`
         : response.narrative;
+      const availableTrigger = progress.newTrigger?.presentation
+        || progress.triggerState?.active?.filter((item) => item.status === "available").sort((left, right) => right.createdTurn - left.createdTurn)[0]?.presentation
+        || (progress.occult?.entryAvailable ? progress.occult.currentEntry : null);
       const nextChoices = choices.length === 3
-        ? injectOccultEntryChoice(choices, progress.occult.contact === 0 ? (progress.occultEntry || progress.occult.currentEntry) : null)
+        ? injectOccultEntryChoice(choices, availableTrigger)
         : choices;
       const memoryPlan = computeMemoryUpdate(execution.game, action, occultNarrative, resolution, { settledGame: resolvedGame });
       const auditBaseline = createAuditBaseline(game, game.turn + 1);
       const automaticAudit = { ...auditTurnChanges(auditBaseline, resolvedGame), importantItemConfirmation: confirmationStatus };
       const next = {
         ...resolvedGame, ...memoryPlan.updates, choices: nextChoices, choiceMeta,
-        worldEvents: [...game.worldEvents, ...(progress.occultEntry ? [{ id: makeId("event"), turn: game.turn + 1, text: `非凡入口出现：${progress.occultEntry.title}` }] : [])].slice(-40),
+        worldEvents: [...game.worldEvents, ...(appearedTrigger ? [{ id: makeId("event"), turn: game.turn + 1, text: `特殊事件出现：${appearedTrigger.title}` }] : [])].slice(-40),
         changeLog: [...game.changeLog, ...execution.logs, ...(progress.statusTickLogs || [])].slice(-100),
         lastTurnBaseline: auditBaseline,
         lastTurnAudit: automaticAudit,
@@ -435,8 +443,11 @@ export default function App() {
   const runLocalTool = (name, args, reason) => {
     if (!game || loading) return;
     const auditBaseline = createAuditBaseline(game, game.turn);
-    const execution = executeToolCalls({ ...game, turn: game.turn - 1 }, [{ id: makeId("local"), name, args, reason }]);
-    const next = { ...execution.game, turn: game.turn, changeLog: [...game.changeLog, ...execution.logs].slice(-100) };
+    const call = { id: makeId("local"), name, args, reason };
+    const execution = executeToolCalls({ ...game, turn: game.turn - 1 }, [call]);
+    const triggerProgress = processTriggers(execution.game, { action: reason, toolCalls: [call], toolResults: execution.results, turn: game.turn });
+    const triggerLogs = triggerProgress.events.available.map((entry) => ({ id: makeId("log"), turn: game.turn, text: `发现可选事件「${entry.presentation?.title || "特殊事件"}」。`, tone: "neutral" }));
+    const next = { ...execution.game, turn: game.turn, triggerState: triggerProgress.state, occult: execution.game.occult, changeLog: [...game.changeLog, ...execution.logs, ...triggerLogs].slice(-100) };
     commitGame({ ...next, lastTurnBaseline: auditBaseline, lastTurnAudit: { ...auditTurnChanges(auditBaseline, next), importantItemConfirmation: { required: false, status: "player-action", confirmed: 0, rejected: 0 } } });
   };
   const handleExplore = (cell) => {

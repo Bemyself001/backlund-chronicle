@@ -186,7 +186,6 @@ const TOOL_PARAMETER_SCHEMAS = {
       instanceId: { type: "string", description: "必须复制当前背包中的 instanceId" },
       itemId: { type: "string" },
       name: { type: "string" },
-      reveal: { type: "boolean" },
       reason: { type: "string" },
     },
   },
@@ -230,6 +229,24 @@ const TOOL_PARAMETER_SCHEMAS = {
     properties: {
       entryId: { type: "string", description: "当前场景中明确出现的非凡入口 ID" },
       reason: { type: "string", description: "玩家主动接触入口的理由" },
+    },
+  },
+  "trigger.engage": {
+    type: "object",
+    additionalProperties: false,
+    required: ["instanceId", "reason"],
+    properties: {
+      instanceId: { type: "string", description: "玩家可见的特殊事件实例 ID" },
+      reason: { type: "string", description: "玩家本轮明确追查该事件的行动" },
+    },
+  },
+  "trigger.abandon": {
+    type: "object",
+    additionalProperties: false,
+    required: ["instanceId", "reason"],
+    properties: {
+      instanceId: { type: "string", description: "玩家要明确放弃的特殊事件实例 ID" },
+      reason: { type: "string", description: "玩家明确拒绝或放弃的表达" },
     },
   },
   "occult.reveal": {
@@ -489,7 +506,7 @@ const TOOL_PARAMETER_SCHEMAS = {
   },
 };
 
-const STATE_TOOL_NAMES = ["inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.grow", "location.discover", "location.move", "location.archive", "clue.add", "quest.add", "quest.update", "dice.check"];
+const STATE_TOOL_NAMES = ["inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "trigger.engage", "trigger.abandon", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.grow", "location.discover", "location.move", "location.archive", "clue.add", "quest.add", "quest.update", "dice.check"];
 
 const CHOICE_TOOL_SCHEMA = {
   type: "object",

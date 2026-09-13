@@ -6,6 +6,7 @@ import { moneyFromPence } from "../system/money.js";
 import { getMapLocations, normalizeLocationKnowledge, normalizeMapExtensions } from "../system/map.js";
 import { buildWorld, reconcileWorld } from "../system/hexworld.js";
 import { normalizeMemoryState } from "./memoryState.js";
+import { normalizeTriggerState, syncLegacyOccult } from "../engine/triggerState.js";
 
 const SAVES_KEY = "mist-chronicle-saves-v1";
 const AUTOSAVE_ID = "autosave";
@@ -93,6 +94,8 @@ export function migrateSave(raw) {
     lastTurnBaseline: migrated.lastTurnBaseline ? { ...migrated.lastTurnBaseline, inventory: (migrated.lastTurnBaseline.inventory || []).filter((item) => !isMoneyItem(item)).map(normalizeInventoryItem) } : null,
     lastTurnAudit: migrated.lastTurnAudit || null,
   };
+  result.triggerState = normalizeTriggerState(result);
+  syncLegacyOccult(result, result.triggerState);
   result.memoryState = normalizeMemoryState(result);
   // 六边形世界：旧存档保留已有迷雾进度，再以注册表对齐；无 world 字段时现场重建
   if (result.world && typeof result.world.seed === "number" && result.world.tiles) {

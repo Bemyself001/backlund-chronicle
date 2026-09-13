@@ -47,7 +47,7 @@ export const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, 
     <div className={styles.capacity}><span>负重</span><strong>{weight.toFixed(1)} / {game.capacity.maxWeight} kg</strong><progress max={game.capacity.maxWeight} value={weight} aria-label="随身负重" /></div>
     {selected ? <section className={styles.itemDetail}>
       <button ref={backRef} type="button" className={styles.back} onClick={returnToList}>← 返回物品列表</button>
-      <p className={styles.muted}>{selected.rarity} · {selected.category}</p><h3>{selected.name}</h3><p>{selected.description}</p>
+      <p className={styles.muted}>{selected.rarity} · {selected.category}</p><h3>{selected.name}</h3><p>{selected.discoveredInfo || selected.description}</p>
       {selected.potion && <div className={styles.record}><h4>{selected.potion.identified ? `${selected.potion.pathwayName}途径 · 序列${selected.potion.sequence}魔药` : "性质未明的魔药"}</h4><p>{selected.potion.identified ? eligible ? "配方与当前序列匹配，可以申请晋升。" : "服用前仍需匹配配方、途径与目标序列。" : "需要对应配方或同途径经验才能鉴定；不能直接服用。"}</p></div>}
       <dl className={styles.dataList}><div><dt>重量</dt><dd>{selected.weight} kg</dd></div><div><dt>状态</dt><dd>{selected.condition}</dd></div><div><dt>数量</dt><dd>{selected.quantity}</dd></div><div><dt>来源</dt><dd>{selected.source}</dd></div></dl>
       <div className={styles.itemActions}>
@@ -82,10 +82,11 @@ export function AuditPanel({ game }) {
 
 export const JournalPanel = memo(function JournalPanel({ game }) {
   const [tab, setTab] = useState("changes");
+  const specialEvents = (game.triggerState?.active || []).filter((event) => ["available", "engaged"].includes(event.status));
   return <div className={styles.content}>
     <nav className={styles.filtersNav} aria-label="手记类别">{[["changes", "记录"], ["quests", "任务"], ["clues", "线索"], ["people", "人物"]].map(([id, label]) => <button type="button" key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>{label}</button>)}</nav>
     {tab === "changes" && <><AuditPanel game={game} /><details><summary>近期变更记录</summary><ol className={styles.logs}>{game.changeLog.slice().reverse().map((entry, i) => <li key={entry.id || `entry-${i}`} data-tone={entry.tone}><small>{typeof entry === "string" ? "探索" : `第 ${entry.turn} 轮`}</small><p>{typeof entry === "string" ? entry : entry.text}</p></li>)}</ol></details><p className={styles.muted}>此处展示近期记录；完整历史正文尚未归档。</p></>}
-    {tab === "quests" && <section><h3>案件任务 <small>{game.quests.length}</small></h3>{game.quests.length ? game.quests.map(quest => <article className={styles.record} key={quest.id}><small>{quest.status}</small><h4>{quest.title}</h4><p>{quest.summary}</p></article>) : <p className={styles.empty}>尚未接受委托。你可以按自己的意愿探索。</p>}</section>}
+    {tab === "quests" && <section><h3>案件任务 <small>{game.quests.length + specialEvents.length}</small></h3>{specialEvents.map(event => <article className={styles.record} key={event.instanceId}><small>{event.status === "available" ? "可选线索 · 尚未追查" : `正在追查 · ${event.stage}`}</small><h4>{event.presentation?.title || "特殊事件"}</h4><p>{event.status === "available" ? event.presentation?.text : "该事件由本地阶段规则推进，普通任务工具不会跳过其目标。"}</p></article>)}{game.quests.map(quest => <article className={styles.record} key={quest.id}><small>{quest.status}</small><h4>{quest.title}</h4><p>{quest.summary}</p></article>)}{!game.quests.length && !specialEvents.length && <p className={styles.empty}>尚未接受委托。你可以按自己的意愿探索。</p>}</section>}
     {tab === "clues" && <section><h3>已确认线索 <small>{game.clues.length}</small></h3>{game.clues.length ? game.clues.map(clue => <article className={styles.record} key={clue.id}><h4>{clue.title}</h4><p>{clue.detail}</p><small>{clue.discoveredAt}</small></article>) : <p className={styles.empty}>尚未确认任何线索。</p>}</section>}
     {tab === "people" && <section><h3>人物关系 <small>{game.relationships.length}</small></h3>{game.relationships.length ? game.relationships.map(npc => <article className={styles.record} key={npc.id}><h4>{npc.name}<span>{npc.value >= 0 ? "+" : ""}{npc.value}</span></h4><small>{npc.role}</small><p>{npc.note}</p></article>) : <p className={styles.empty}>尚未建立人物关系。</p>}</section>}
   </div>;

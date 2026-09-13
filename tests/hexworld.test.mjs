@@ -59,7 +59,7 @@ test("legacy saves without a world rebuild one during migration", () => {
   delete legacy.world;
   legacy.version = 10;
   const migrated = migrateSave(legacy);
-  assert.equal(migrated.version, 11);
+  assert.equal(migrated.version, 12);
   assert.ok(migrated.world?.tiles);
   const station = hexForLocation(MAP_LOCATIONS.find((location) => location.id === "east-station"));
   assert.equal(migrated.world.tiles[`${station.q},${station.r}`].discovered, true);

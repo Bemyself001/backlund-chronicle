@@ -44,14 +44,12 @@ test("turn progress applies elapsed time and actual danger only", () => {
   assert.equal(progress.hiddenDanger.stage, 0);
 });
 
-test("ordinary characters receive optional occult entry windows every five turns", () => {
-  const game = { turn: 4, worldTime: "1349年 10月17日 · 周二 · 18:20", character: { extraordinary: "ordinary" }, occult: { contact: 0, entryAvailable: false } };
-  assert.equal(occultEntryForTurn(game, 5)?.id, "occult-entry-5");
-  assert.equal(occultEntryForTurn(game, 6), null);
-  const next = resolveTurnProgress(game, "观察车站", "low");
+test("ordinary characters receive an optional occult entry from active exploration", () => {
+  const game = { id: "turn-flow", turn: 4, worldTime: "1349年 10月17日 · 周二 · 18:20", location: { id: "station", name: "车站" }, character: { extraordinary: "ordinary" }, occult: { contact: 0, entryAvailable: false } };
+  assert.match(occultEntryForTurn(game, 5)?.id, /^trigger-/);
+  const next = resolveTurnProgress(game, "调查车站公告", "low");
   assert.equal(next.occult.contact, 0);
   assert.equal(next.occult.entryAvailable, true);
   assert.equal(next.occultEntry.turn, 5);
-  assert.equal(occultEntryForTurn({ ...game, turn: 9 }, 10)?.id, "occult-entry-10");
-  assert.equal(occultEntryForTurn({ ...game, occult: { contact: 1 } }, 5), null);
+  assert.equal(next.triggerState.active.filter((entry) => entry.category === "occult-entry" && entry.status === "available").length, 1);
 });

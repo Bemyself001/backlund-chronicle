@@ -1,4 +1,5 @@
 import { applyStatDelta } from "./statChanges.js";
+import { processTriggers } from "./triggerEngine.js";
 
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 
@@ -61,20 +62,10 @@ export function advanceWorldTime(value, minutes) {
 }
 
 export function occultEntryForTurn(game, nextTurn) {
-  const occult = game.occult || {};
-  if (Number(occult.contact) === 1 || nextTurn < 5 || (nextTurn - 5) % 5 !== 0) return null;
-  const variants = [
-    "一名戴灰手套的陌生人把写有陌生符号的收据压在车站公告栏下方。他没有拦你，也没有解释符号的含义；你可以记下位置、询问知情人，或把它留在原处。",
-    "一则不起眼的夜间招工启事使用了不合常规的暗语，落款只写着一个不存在的商号。它看起来像普通骗局，也可能通往某个不愿公开露面的圈子。",
-    "你在公共档案的借阅登记中发现一串重复出现的缩写，旁边留有一个只在午夜后开放的地址。没有人要求你前往，选择权仍在你手里。",
-  ];
-  return {
-    id: `occult-entry-${nextTurn}`,
-    turn: nextTurn,
-    title: "非凡入口",
-    text: variants[Math.floor((nextTurn - 5) / 5) % variants.length],
-    choice: { label: "追查这条非凡入口（可选）", intent: "occult", risk: "medium" },
-  };
+  const clone = structuredClone(game);
+  const result = processTriggers(clone, { action: "调查异常线索", turn: nextTurn });
+  const entry = result.occultEntry;
+  return entry ? { id: entry.instanceId, turn: entry.createdTurn, ...entry.presentation } : null;
 }
 
 export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], toolResults = []) {
@@ -83,28 +74,21 @@ export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], 
   const statusTicks = settleStatusTicks(game);
   const statusTickLogs = statusTicks.map((tick) => `状态「${tick.status}」结算：${tick.label} ${tick.before}→${tick.after}（${tick.delta > 0 ? "+" : ""}${tick.delta}）${tick.autoStatus ? `；${tick.autoStatus}` : ""}`);
   const nextTurn = Number(game.turn || 0) + 1;
-  const occultEntry = occultEntryForTurn(game, nextTurn);
-  const occult = {
-    contact: Number(game.occult?.contact) === 1 || game.character?.extraordinary === "low" ? 1 : 0,
-    revealLevel: Math.max(0, Number(game.occult?.revealLevel || 0)),
-    entryAvailable: Boolean(game.occult?.entryAvailable),
-    currentEntry: game.occult?.currentEntry || null,
-    lastEntryTurn: game.occult?.lastEntryTurn ?? null,
-    entryHistory: Array.isArray(game.occult?.entryHistory) ? game.occult.entryHistory : [],
-  };
-  if (occultEntry) {
-    occult.entryAvailable = true;
-    occult.currentEntry = occultEntry;
-    occult.lastEntryTurn = nextTurn;
-    occult.entryHistory = [...occult.entryHistory, occultEntry].slice(-8);
-  }
+  const worldTime = advanceWorldTime(game.worldTime, elapsedMinutes);
+  game.worldTime = worldTime;
+  const triggerProgress = processTriggers(game, { action, toolCalls, toolResults, turn: nextTurn });
+  const occultEntry = triggerProgress.occultEntry ? { id: triggerProgress.occultEntry.instanceId, turn: triggerProgress.occultEntry.createdTurn, ...triggerProgress.occultEntry.presentation } : null;
   return {
     elapsedMinutes,
     dangerDelta,
     statusTicks,
     statusTickLogs,
-    worldTime: advanceWorldTime(game.worldTime, elapsedMinutes),
-    occult,
+    worldTime,
+    occult: game.occult,
+    triggerState: game.triggerState,
+    triggerEvents: triggerProgress.events,
+    triggerSignals: triggerProgress.signals,
+    newTrigger: triggerProgress.newTrigger,
     occultEntry,
     hiddenDanger: {
       ...game.hiddenDanger,

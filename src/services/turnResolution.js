@@ -25,6 +25,7 @@ export function createTurnResolution(toolCalls = [], results = [], progress = {}
       worldTime: progress.worldTime || "",
       dangerDelta: progress.dangerDelta || 0,
       occultEntry: progress.occultEntry || null,
+      triggerEvents: progress.triggerEvents || { available: [], engaged: [], advanced: [], completed: [], failed: [], expired: [], abandoned: [] },
     },
   };
 }

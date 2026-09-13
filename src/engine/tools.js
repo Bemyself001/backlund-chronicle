@@ -7,6 +7,9 @@ import { normalizeInventoryItem, normalizeItemImportance } from "../system/items
 import { equipmentSlot } from "../system/loadout.js";
 import { applyAdvancement, getAdvancement, isExplicitAdvancementIntent } from "../system/character.js";
 import { getPathway } from "../content/index.js";
+import { abandonTrigger, engageTrigger } from "./triggerEngine.js";
+import { inspectHeirloomWatch } from "./watchTriggers.js";
+import { normalizeTriggerState } from "./triggerState.js";
 
 export const TOOL_SCHEMAS = {
   "inventory.add": { required: ["item"], description: "新增或合并一个结构化物品实例" },
@@ -20,6 +23,8 @@ export const TOOL_SCHEMAS = {
   "item.equip": { required: ["instanceId"], description: "装备可装备物品" },
   "item.unequip": { required: ["instanceId"], description: "卸下已装备物品" },
   "occult.contact": { required: ["entryId"], description: "确认玩家主动接触当前非凡入口" },
+  "trigger.engage": { required: ["instanceId"], description: "确认玩家主动追查一个已经出现的特殊事件" },
+  "trigger.abandon": { required: ["instanceId"], description: "确认玩家明确放弃一个已出现或正在追查的特殊事件" },
   "occult.reveal": { required: ["topic", "evidence"], description: "在已有非凡接触后揭示有限神秘知识" },
   "advancement.promote": { required: ["pathwayId", "sequence", "potionInstanceId", "recipeClueId", "evidence"], description: "验证剧情接触、配方与魔药后完成晋升" },
   "character.update": { required: ["patch"], description: "以增减量调整受限角色数值（可为负），由引擎截断到 0 至上限" },
@@ -229,6 +234,13 @@ function repairToolArgs(name, rawArgs = {}, game = null) {
   if (name === "occult.contact" && game?.occult?.entryAvailable && !args.entryId && game.occult.currentEntry?.id) {
     args.entryId = game.occult.currentEntry.id;
     repairNote = appendRepairNote(repairNote, "已匹配当前非凡入口");
+  }
+  if (["trigger.engage", "trigger.abandon"].includes(name) && !args.instanceId && game) {
+    const available = normalizeTriggerState(game).active.filter((entry) => name === "trigger.engage" ? entry.status === "available" : ["available", "engaged"].includes(entry.status));
+    if (available.length === 1) {
+      args.instanceId = available[0].instanceId;
+      repairNote = appendRepairNote(repairNote, "已匹配当前特殊事件");
+    }
   }
   if (name === "relationship.update") {
     const nestedRelationship = args.relationship && typeof args.relationship === "object" ? args.relationship : null;
@@ -445,7 +457,10 @@ function executeOne(game, call, options = {}) {
         target.potion = { ...target.potion, identified: true };
         return succeed(call.name, `${turnLabel}：依据${recipe ? `配方「${recipe.title}」` : "同途径经验"}，确认「${target.name}」是${target.potion.pathwayName}途径序列${target.potion.sequence}魔药。`, { identifiedPotion: { ...target.potion, instanceId: target.instanceId } });
       }
-      if (target.hiddenInfo && args.reveal) target.discoveredInfo = `${target.discoveredInfo} ${target.hiddenInfo}`.trim();
+      if (target.itemId === "heirloom-watch") {
+        const inspection = inspectHeirloomWatch(game, target, game.turn + 1);
+        return succeed(call.name, `${turnLabel}：检查「${target.name}」——${inspection.text}`, inspection.data);
+      }
       return succeed(call.name, `${turnLabel}：检查「${target.name}」——${target.discoveredInfo || target.description}`);
     }
     case "item.use": {
@@ -481,12 +496,22 @@ function executeOne(game, call, options = {}) {
       return succeed(call.name, `${turnLabel}：卸下「${target.name}」。`);
     }
     case "occult.contact": {
-      const occult = game.occult || { contact: 0, revealLevel: 0, entryAvailable: false, entryHistory: [] };
-      if (Number(occult.contact) === 1) return fail(call.name, "玩家已经接触过非凡世界，本轮不重复记录");
-      if (!occult.entryAvailable || !occult.currentEntry) return fail(call.name, "当前没有可验证的非凡入口");
-      if (args.entryId !== occult.currentEntry.id) return fail(call.name, "入口 ID 与当前可见入口不匹配");
-      game.occult = { ...occult, contact: 1, entryAvailable: false, contactedAt: turnLabel, contactedEntryId: args.entryId };
-      return succeed(call.name, `${turnLabel}：你确认接触了非凡世界的入口「${occult.currentEntry.title}」——${call.reason}。`, { contact: 1, entryId: args.entryId });
+      if (options.playerAction !== undefined && !/(追查|深入|接触|前往|查证|回应|接受)/.test(String(options.playerAction))) return fail(call.name, "玩家本轮没有明确选择追查这条非凡入口");
+      const result = engageTrigger(game, args.entryId, game.turn + 1, call.reason);
+      if (!result.ok || result.instance.category !== "occult-entry") return fail(call.name, result.reason || "入口 ID 与当前可见入口不匹配");
+      return succeed(call.name, `${turnLabel}：你开始追查「${result.instance.presentation?.title || "非凡入口"}」——${call.reason}。`, { contact: 1, entryId: args.entryId, triggerTransition: { instanceId: args.entryId, status: "engaged" } });
+    }
+    case "trigger.engage": {
+      if (options.playerAction !== undefined && !/(追查|继续|深入|验证|调查|接受|着手|查明|拆查|检查)/.test(String(options.playerAction))) return fail(call.name, "玩家本轮没有明确表示追查该事件");
+      const result = engageTrigger(game, args.instanceId, game.turn + 1, call.reason);
+      if (!result.ok) return fail(call.name, result.reason);
+      return succeed(call.name, `${turnLabel}：开始追查「${result.instance.presentation?.title || "特殊事件"}」——${call.reason}。`, { triggerTransition: { instanceId: args.instanceId, status: "engaged", stage: result.instance.stage } });
+    }
+    case "trigger.abandon": {
+      if (options.playerAction !== undefined && !/(放弃|拒绝|不再|停止追查|离开这件事)/.test(String(options.playerAction))) return fail(call.name, "玩家本轮没有明确表示放弃该事件");
+      const result = abandonTrigger(game, args.instanceId, game.turn + 1);
+      if (!result.ok) return fail(call.name, result.reason);
+      return succeed(call.name, `${turnLabel}：你明确放弃了「${result.instance.presentation?.title || "特殊事件"}」。`, { triggerTransition: { instanceId: args.instanceId, status: "abandoned" } });
     }
     case "occult.reveal": {
       const occult = game.occult || { contact: 0, revealLevel: 0 };
