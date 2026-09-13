@@ -37,6 +37,18 @@ const RELEASE_135_UPDATE = {
 export const LATEST_UPDATE = {
   date: "2026-09-13",
   dateLabel: "2026.09.13",
+  title: "1.4.0 · 版本号修正与更新链修复",
+  summary: "原 1.3.6 在数值上低于旧构建 1.3.104+，导致旧版本误判自己为最新、收不到更新提示；产品版本统一调整为 1.4.0，内容与 1.3.6 相同。",
+  changes: [
+    "版本号改为 1.4.0：逐段数值比较下高于所有 1.3.x 历史构建，旧版本（含 1.3.104 及以后）重新能够检测到更新。",
+    "产品、页面与 Android 版本号统一为 1.4.0；Android 内部版本号继续递增，覆盖安装与存档保留不受影响。",
+    "内容与 1.3.6 一致：叙事提示词升级、行动建议独立补全修复、状态栏配色修复，以及四座教会地标。",
+  ],
+};
+
+const RELEASE_136_UPDATE = {
+  date: "2026-09-13",
+  dateLabel: "2026.09.13",
   title: "1.3.6 · 版本号统一",
   summary: "产品、页面与 Android 版本号统一为 1.3.6（对应原递增兼容构建 1.3.106），并修复行动建议补全时误重放已完成回合的问题。",
   changes: [
@@ -230,6 +242,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_136_UPDATE,
   RELEASE_135_UPDATE,
   RELEASE_13_UPDATE,
   CHURCH_MAP_UPDATE,

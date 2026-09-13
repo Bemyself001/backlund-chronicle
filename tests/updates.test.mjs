@@ -5,12 +5,19 @@ import { Capacitor } from "@capacitor/core";
 import { createUpdateManifest } from "../scripts/write-update-manifests.mjs";
 
 import { compareVersions, getDownloadOptions, shapeGitHubRelease, shapePagesManifest } from "../src/services/updates.js";
+import { RELEASE_VERSION } from "../src/data/release.js";
 
 test("compareVersions orders semantic versions", () => {
   assert.equal(compareVersions("1.1.52", "1.1.51"), 1);
   assert.equal(compareVersions("v1.2.0", "1.10.0"), -1);
   assert.equal(compareVersions("1.1.0", "1.1.0"), 0);
   assert.equal(compareVersions("garbage", "1.1.0"), 0);
+});
+
+test("a short marketing version must outrank every incremental compatibility build", () => {
+  // 回归：1.3.6 曾被 1.3.104+ 的旧版本误判为旧版，导致更新链断裂
+  assert.equal(compareVersions(RELEASE_VERSION, "1.3.106"), 1);
+  assert.equal(compareVersions(RELEASE_VERSION, "1.3.104"), 1);
 });
 
 test("getDownloadOptions lists direct, mirrors, and release page", () => {
