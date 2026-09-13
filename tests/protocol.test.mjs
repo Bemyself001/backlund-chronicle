@@ -56,6 +56,21 @@ test("ui choice tools populate choices without entering the state tool channel",
   assert.equal(result.requiresToolFollowUp, false);
 });
 
+test("scene-specific choice intents and repeated risk levels survive normalization", () => {
+  const result = normalizeAIResponse({
+    narrative: "店员把账本推到你面前，等你决定从哪一笔查起。",
+    choices: [
+      { label: "核对昨日下午的三笔赊账", intent: "audit_accounts", risk: "low" },
+      { label: "请店员回忆送货人的口音", intent: "prompt_memory", risk: "low" },
+      { label: "暂时收起账本，去后巷找车辙", intent: "follow_tracks", risk: "medium" },
+    ],
+  });
+
+  assert.equal(result.choiceMeta.source, "model");
+  assert.deepEqual(result.choices.map((choice) => choice.intent), ["audit_accounts", "prompt_memory", "follow_tracks"]);
+  assert.deepEqual(result.choices.map((choice) => choice.risk), ["low", "low", "medium"]);
+});
+
 test("incomplete JSON tool calls are ignored with an actionable warning", () => {
   const result = normalizeAIResponse({
     narrative: "雨声压过了远处的钟响。",

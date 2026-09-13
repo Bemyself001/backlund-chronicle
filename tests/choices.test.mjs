@@ -14,6 +14,16 @@ test("choice validation requires exactly three distinct concrete labels", () => 
   assert.equal(hasUsableChoices([choices[0], choices[0], choices[2]]), false);
 });
 
+test("choice validation allows repeated risks but rejects unknown risk values", () => {
+  const situationalChoices = [
+    { label: "留在柜台前核对这张收据", intent: "verify", risk: "low" },
+    { label: "去后门等那名迟到的送货员", intent: "wait", risk: "low" },
+    { label: "先回住处整理今天得到的线索", intent: "leave", risk: "medium" },
+  ];
+  assert.equal(hasUsableChoices(situationalChoices), true);
+  assert.equal(hasUsableChoices(situationalChoices.map((choice, index) => index === 2 ? { ...choice, risk: "extreme" } : choice)), false);
+});
+
 test("a locally authorized occult entry replaces one valid high-risk option", () => {
   const entry = { choice: { label: "追查这条非凡入口（可选）", intent: "occult", risk: "medium" } };
   const injected = injectOccultEntryChoice(choices, entry);

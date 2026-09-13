@@ -1,7 +1,8 @@
 export function hasUsableChoices(choices = []) {
   if (!Array.isArray(choices) || choices.length !== 3) return false;
   const labels = choices.map((choice) => String(choice?.label || "").trim());
-  return labels.every((label) => label.length >= 4) && new Set(labels).size === 3;
+  return labels.every((label) => label.length >= 4) && new Set(labels).size === 3
+    && choices.every((choice) => ["low", "medium", "high"].includes(choice?.risk));
 }
 
 export function injectOccultEntryChoice(choices = [], entry = null) {

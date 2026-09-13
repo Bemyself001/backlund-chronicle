@@ -506,7 +506,7 @@ const CHOICE_TOOL_SCHEMA = {
         required: ["label", "intent", "risk"],
         properties: {
           label: { type: "string", description: "与当前场景紧密相关的具体行动" },
-          intent: { type: "string", enum: ["investigate", "social", "dangerous"] },
+          intent: { type: "string", description: "简短的行动目的标识，例如 observe、negotiate、travel、investigate、withdraw" },
           risk: { type: "string", enum: ["low", "medium", "high"] },
         },
       },
@@ -516,7 +516,7 @@ const CHOICE_TOOL_SCHEMA = {
 
 function toolDefinitions(toolSet = "state", allowedToolNames = null) {
   if (toolSet === "choices") {
-    return [{ type: "function", function: { name: "ui__present_choices", description: "提交本轮三个真正不同的玩家行动选项。", parameters: CHOICE_TOOL_SCHEMA } }];
+    return [{ type: "function", function: { name: "ui__present_choices", description: "提交本轮三个目的不同、符合当前情境的玩家行动选项；风险等级可以重复。", parameters: CHOICE_TOOL_SCHEMA } }];
   }
   if (toolSet === "unified") {
     const stateDefs = toolDefinitions("state", allowedToolNames);

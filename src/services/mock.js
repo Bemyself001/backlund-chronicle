@@ -87,9 +87,9 @@ export async function mockResponse(game, action, signal, onChunk) {
     memoryNotes: [`第${game.turn + 1}轮：玩家选择“${action.slice(0, 40)}”。`],
     worldEvents: game.turn === 1 ? [responseOpening?.event || "持续的雨雾让公共交通延误，各区居民开始调整出行安排。"] : [],
     choices: responseOpening ? openingChoices(responseOpening) : [
-      { label: "整理地图与公告，规划自己的下一站", intent: "investigate", risk: "low" },
-      { label: "找当地人打听住处、工作和街区消息", intent: "social", risk: "medium" },
-      { label: "主动接近一处尚未解释的异常", intent: "dangerous", risk: "high" },
+      { label: "观察周围正在发生的变化", intent: "observe", risk: "low" },
+      { label: "和附近的人谈谈当前打算", intent: "interact", risk: "low" },
+      { label: "离开当前焦点，继续自己的计划", intent: "redirect", risk: "medium" },
     ],
     choiceMeta: { source: "model", fallback: false, reason: "mock" },
   };

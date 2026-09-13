@@ -1,7 +1,7 @@
 export const FALLBACK_CHOICES = [
-  { label: "留在原地继续观察", intent: "investigate", risk: "low" },
-  { label: "向在场的人谨慎打听", intent: "social", risk: "medium" },
-  { label: "冒险追查最异常的迹象", intent: "dangerous", risk: "high" },
+  { label: "观察眼前变化，确认可用信息", intent: "observe", risk: "low" },
+  { label: "与在场人物谈谈当前打算", intent: "interact", risk: "low" },
+  { label: "离开当前焦点，继续自己的计划", intent: "redirect", risk: "medium" },
 ];
 
 function firstBalancedObject(text) {
@@ -73,7 +73,7 @@ function normalizeChoice(choice, index) {
   const label = typeof choice === "string" ? choice : choice?.label ?? choice?.text ?? choice?.title ?? choice?.action;
   return {
     label: String(label || fallback.label),
-    intent: ["investigate", "social", "dangerous"].includes(choice?.intent) ? choice.intent : fallback.intent,
+    intent: String(choice?.intent || "").trim().slice(0, 32) || fallback.intent,
     risk: ["low", "medium", "high"].includes(choice?.risk) ? choice.risk : fallback.risk,
   };
 }

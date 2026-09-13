@@ -14,6 +14,22 @@ test("system prompt map rules migrate idempotently", () => {
   assert.equal((migrated.match(/location\.grow/g) || []).length, 1);
 });
 
+test("default prose and choice rules migrate to the 1.3 writing scheme", () => {
+  const previousChoiceRule = "9. 每轮给出三个真正不同的行动选项：谨慎调查、社交交涉、高风险行动，同时允许自由输入；选项应包含当前场景的多种可能，而非三个措辞不同的同一目标。";
+  const previousNarrativeRule = "12. narrative 使用克制、可读的中文，每轮约 250—600 字，不复述原著段落，不让原作角色抢占玩家中心位置。";
+  const previousPrompt = DEFAULT_SYSTEM_PROMPT
+    .replace(/^9\..+$/m, previousChoiceRule)
+    .replace(/^12\..+$/m, previousNarrativeRule);
+  const migrated = migrateSystemPrompt(previousPrompt);
+
+  assert.match(DEFAULT_SYSTEM_PROMPT, /白金级商业小说的完成度/);
+  assert.match(DEFAULT_SYSTEM_PROMPT, /120—250 字/);
+  assert.match(DEFAULT_SYSTEM_PROMPT, /不得固定套用调查、交涉、冒险三种模板/);
+  assert.doesNotMatch(DEFAULT_SYSTEM_PROMPT, /克制、可读|250—600 字/);
+  assert.equal(migrated, DEFAULT_SYSTEM_PROMPT);
+  assert.equal(migrateSystemPrompt(migrated), migrated);
+});
+
 test("planning context injects private simulation data only as untrusted turn data", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "上下文测试员" });
   const messages = buildPlanningContext(game, "观察站台", DEFAULT_SYSTEM_PROMPT, { nativeTools: true });
@@ -73,6 +89,8 @@ test("rendering context contains the authoritative resolution but excludes priva
   assert.match(serialized, /阶段 B：最终叙事/);
   assert.match(serialized, /turnResolution/);
   assert.match(serialized, /assistant\.content 只放纯文本剧情/);
+  assert.match(serialized, /120—250 字/);
+  assert.match(serialized, /risk 允许重复/);
   assert.doesNotMatch(messages.at(-1).content, /hiddenDanger/);
 });
 
@@ -84,6 +102,8 @@ test("fast presentation can stream in parallel without receiving private or auth
 
   assert.match(protocol.content, /narrative 必须是第一个字段/);
   assert.match(protocol.content, /不得宣称物品、金钱、属性、关系、任务、地点发现、检定或晋升已经改变/);
+  assert.match(protocol.content, /内容完整后立即结束/);
+  assert.match(protocol.content, /risk 允许重复/);
   assert.doesNotMatch(data, /privateSimulationState|hiddenDanger|mapDiscoveryCandidates/);
   assert.match(data, /playerVisibleState/);
 });
@@ -107,6 +127,8 @@ test("choice regeneration receives final narrative and cannot change state", () 
   const messages = buildChoiceRegenerationContext(game, "检查门锁", "门锁没有被打开。", "选项重复", DEFAULT_SYSTEM_PROMPT, { nativeTools: true });
   assert.match(messages[1].content, /ui\.present_choices/);
   assert.match(messages[1].content, /不得改变游戏状态/);
+  assert.match(messages[1].content, /不得固定套用调查、交涉、冒险三类/);
+  assert.match(messages[1].content, /risk 允许重复/);
   assert.match(messages.at(-1).content, /门锁没有被打开/);
 });
 

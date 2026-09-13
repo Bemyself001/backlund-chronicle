@@ -38,7 +38,7 @@ function hasValidModelChoices(response) {
 }
 
 function choiceValidationError(response) {
-  return response?.choiceMeta?.reason || "模型没有返回三个互不重复且风险不同的行动选项";
+  return response?.choiceMeta?.reason || "模型没有返回三个符合当前情境且互不重复的行动选项";
 }
 
 export default function App() {
