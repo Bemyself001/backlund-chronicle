@@ -56,4 +56,6 @@ test("release 1.3.6 updates product metadata without migrating the save format",
   assert.ok(LATEST_UPDATE.title.startsWith("1.3.6"));
   assert.ok(PREVIOUS_UPDATES.some(update => update.title.startsWith("1.3.5 ·")));
   assert.ok(PREVIOUS_UPDATES.some(update => update.title === "四座教堂列入城区图"));
+  const workflow = readFileSync(new URL("../.github/workflows/build-android-apk.yml", import.meta.url), "utf8");
+  assert.ok(workflow.includes(`PRODUCT_VERSION: "${RELEASE_VERSION}"`), "workflow PRODUCT_VERSION 必须与 release.js 的 RELEASE_VERSION 一致");
 });
