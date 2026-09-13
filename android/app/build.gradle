@@ -1,7 +1,7 @@
 apply plugin: 'com.android.application'
 
-def appVersionCode = (project.findProperty("APP_VERSION_CODE") ?: System.getenv("APP_VERSION_CODE") ?: "30105").toInteger()
-def appVersionName = project.findProperty("APP_VERSION_NAME") ?: System.getenv("APP_VERSION_NAME") ?: "1.3.5"
+def appVersionCode = (project.findProperty("APP_VERSION_CODE") ?: System.getenv("APP_VERSION_CODE") ?: "30106").toInteger()
+def appVersionName = project.findProperty("APP_VERSION_NAME") ?: System.getenv("APP_VERSION_NAME") ?: "1.3.6"
 def releaseStoreFile = System.getenv("ANDROID_KEYSTORE_PATH")
 def hasReleaseSigning = releaseStoreFile && System.getenv("ANDROID_KEYSTORE_PASSWORD") && System.getenv("ANDROID_KEY_ALIAS") && System.getenv("ANDROID_KEY_PASSWORD")
 

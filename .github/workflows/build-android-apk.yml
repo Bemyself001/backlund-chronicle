@@ -47,10 +47,10 @@ jobs:
           test -n "$ANDROID_KEYSTORE_BASE64" || { echo "Missing ANDROID_KEYSTORE_BASE64 repository secret"; exit 1; }
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/backlund-release.jks"
           COMMIT_COUNT=$(git rev-list --count HEAD)
-          echo "PRODUCT_VERSION=1.3.5" >> "$GITHUB_ENV"
-          echo "APP_VERSION_NAME=1.3.${COMMIT_COUNT}" >> "$GITHUB_ENV"
+          echo "PRODUCT_VERSION=1.3.6" >> "$GITHUB_ENV"
+          echo "APP_VERSION_NAME=1.3.6" >> "$GITHUB_ENV"
           echo "APP_VERSION_CODE=$((30000 + COMMIT_COUNT))" >> "$GITHUB_ENV"
-          echo "VITE_APP_VERSION=1.3.${COMMIT_COUNT}" >> "$GITHUB_ENV"
+          echo "VITE_APP_VERSION=1.3.6" >> "$GITHUB_ENV"
           echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/backlund-release.jks" >> "$GITHUB_ENV"
           echo "ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
           echo "ANDROID_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
@@ -99,6 +99,6 @@ jobs:
             web-bundle-v2.zip.sha256 \
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
-            --title "贝克兰德纪事 ${PRODUCT_VERSION} · 兼容构建 ${APP_VERSION_NAME}" \
-            --notes "1.3.5 · 叙事提示词升级：采用白金级商业小说写作标准，强化行动反馈、人物动机、动态篇幅与场景化选项，并减少重复环境描写和强行高风险事件；同时修复手机状态栏文字竖排，为生命、理智、灵性加入红、蓝、金配色。Android 使用递增兼容构建号 ${APP_VERSION_NAME}，请下载 backlund-chronicle.apk 直接覆盖安装以保留存档，不要先卸载。" \
+            --title "贝克兰德纪事 ${PRODUCT_VERSION}" \
+            --notes "1.3.6 · 叙事提示词升级：采用白金级商业小说写作标准，强化行动反馈、人物动机、动态篇幅与场景化选项，并减少重复环境描写和强行高风险事件；修复行动建议缺失时的独立补全，不再重放已完成回合；同时修复手机状态栏文字竖排，为生命、理智、灵性加入红、蓝、金配色。城区图新增圣赛缪尔、机械之心、圣风、永恒烈阳四座教会地标。请下载 backlund-chronicle.apk 直接覆盖安装以保留存档，不要先卸载。" \
             --latest

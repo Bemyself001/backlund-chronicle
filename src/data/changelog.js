@@ -15,7 +15,7 @@ const RELEASE_13_UPDATE = {
   ],
 };
 
-export const LATEST_UPDATE = {
+const RELEASE_135_UPDATE = {
   date: "2026-09-13",
   dateLabel: "2026.09.13",
   title: "1.3.5 · 叙事提示词与行动建议修复",
@@ -31,6 +31,18 @@ export const LATEST_UPDATE = {
     "旧版默认提示词会自动迁移到 1.3.5 新规范；用户自行编写的自定义提示词保持不变。",
     "修复手机状态栏文字竖排问题，并为生命、理智、灵性分别使用红色、蓝色与金色。",
     "产品版本更新为 1.3.5；Android 继续使用递增兼容构建号，保持原包名、正式签名与覆盖升级能力。",
+  ],
+};
+
+export const LATEST_UPDATE = {
+  date: "2026-09-13",
+  dateLabel: "2026.09.13",
+  title: "1.3.6 · 版本号统一",
+  summary: "产品、页面与 Android 版本号统一为 1.3.6（对应原递增兼容构建 1.3.106），并修复行动建议补全时误重放已完成回合的问题。",
+  changes: [
+    "产品版本、网页版本与 Android 版本统一显示为 1.3.6；Android 内部版本号继续递增，覆盖升级与签名配置不变。",
+    "行动建议补全只针对缺失选项，不再重新执行已经完成的回合，避免重复结算。",
+    "城区图包含圣赛缪尔、机械之心、圣风、永恒烈阳四座教会地标，初始为传闻状态，调查后正式入档。",
   ],
 };
 
@@ -218,6 +230,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_135_UPDATE,
   RELEASE_13_UPDATE,
   CHURCH_MAP_UPDATE,
   STANDALONE_UPDATER_UPDATE,
