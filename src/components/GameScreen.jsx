@@ -204,7 +204,7 @@ function GameSession({ game, loading, turnPhase, streamText, error, mockMode, on
         {[["health", "生命"], ["sanity", "理智"], ["spirituality", "灵性"]].map(([key, label]) => {
           const max = game.character.stats[`max${key[0].toUpperCase()}${key.slice(1)}`];
           const value = game.character.stats[key];
-          return <button type="button" key={key} className={styles.vital} data-low={value <= max * .25 || undefined} onClick={event => changePanel("character", event)} aria-label={`${label} ${value}/${max}，查看角色`}><span>{label}<strong>{value}<small>/{max}</small></strong></span><i aria-hidden="true"><b style={{ width: `${max > 0 ? Math.max(0, Math.min(100, value / max * 100)) : 0}%` }} /></i></button>;
+          return <button type="button" key={key} className={styles.vital} data-stat={key} data-low={value <= max * .25 || undefined} onClick={event => changePanel("character", event)} aria-label={`${label} ${value}/${max}${value <= max * .25 ? "，偏低" : ""}，查看角色`}><span><span className={styles.vitalLabel}>{label}</span><strong>{value}<small>/{max}</small></strong></span><i aria-hidden="true"><b style={{ width: `${max > 0 ? Math.max(0, Math.min(100, value / max * 100)) : 0}%` }} /></i></button>;
         })}
         <button type="button" className={styles.money} onClick={event => changePanel("inventory", event)} aria-label={`资金 ${formatMoney(money)}，查看行囊`}><span>资金</span><strong>£{money.pounds}<small> · {money.solers}苏 · {money.pence}便</small></strong></button>
       </div>

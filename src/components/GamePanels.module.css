@@ -28,6 +28,10 @@
 .dataList > div { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: .6rem 0; border-bottom: 1px solid #53614980; font-size: .85rem; }
 .dataList dt { color: #bfc2ab; flex-shrink: 0; }
 .dataList dd { margin: 0; color: #e3dbc5; text-align: right; }
+.dataList [data-stat="health"] { --stat-color: var(--stat-health); }
+.dataList [data-stat="sanity"] { --stat-color: var(--stat-sanity); }
+.dataList [data-stat="spirituality"] { --stat-color: var(--stat-spirituality); }
+.dataList [data-stat] dt, .dataList [data-stat] dd { color: var(--stat-color); white-space: nowrap; }
 .record { padding: .8rem; margin: .6rem 0; border-left: 2px solid #8f9e70; background: #253429; }
 .record h4 { display: flex; align-items: baseline; justify-content: space-between; gap: .7rem; }
 .record h4 span { font: .8rem var(--font-mono); color: #b8d4ac; }
