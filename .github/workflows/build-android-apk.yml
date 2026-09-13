@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  PRODUCT_VERSION: "1.4.0"
+  PRODUCT_VERSION: "1.4.1"
 
 jobs:
   build-release-apk:
