@@ -17,6 +17,9 @@ test("new characters begin freely at the East Borough railway station", () => {
   assert.deepEqual(game.quests, []);
   assert.match(game.recentDialogues[0].content, /可以先找住处/);
   assert.match(game.recentDialogues[0].content, /贝克兰德向四面八方展开/);
+  assert.deepEqual(game.storyHistory, game.recentDialogues);
+  assert.equal(game.memoryState.version, 2);
+  assert.equal(game.memoryState.digest.events[0].certainty, "confirmed");
   assert.match(game.longTermSummary, /尚未接受任何委托/);
   assert.equal(game.choices.length, 3);
   assert.equal(game.systemVersion, 1);
@@ -44,6 +47,7 @@ test("every district initializes a coherent, independent opening and survives sa
     assert.deepEqual(loaded.world.player, game.world.player);
     assert.deepEqual(loaded.choices, game.choices);
     assert.equal(loaded.longTermSummary, game.longTermSummary);
+    assert.deepEqual(loaded.memoryState, game.memoryState);
     const context = buildContext(game, "了解这里", DEFAULT_SYSTEM_PROMPT);
     assert.ok(context.some((message) => message.content.includes(game.opening.summary)));
     assert.ok(context.every((message) => !message.content.includes("这是从贝克兰德东区火车站开始的")));

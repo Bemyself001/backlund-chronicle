@@ -11,6 +11,7 @@ test("version 1 saves migrate from Grayharbor to Backlund without losing progres
     location: { name: "煤灯街·雾鸦旅店", district: "灰檐港旧钟区" },
     inventory: [{ instanceId: "item-1", name: "旧呢外套", tags: ["任务物品"] }],
     recentDialogues: [{ role: "assistant", content: "灰檐港市档案馆已经关门。" }],
+    longTermSummary: "已经听说灰檐港市档案馆的传闻。",
   });
   assert.equal(migrated.version, 11);
   assert.equal(migrated.systemVersion, 1);
@@ -19,6 +20,12 @@ test("version 1 saves migrate from Grayharbor to Backlund without losing progres
   assert.equal(migrated.title, "艾琳的贝克兰德档案");
   assert.equal(migrated.location.district, "贝克兰德桥区·旧钟街");
   assert.match(migrated.recentDialogues[0].content, /贝克兰德市政档案分馆/);
+  assert.deepEqual(migrated.storyHistory, migrated.recentDialogues);
+  assert.equal(migrated.memoryState.version, 2);
+  assert.equal(migrated.memoryState.throughTurn, 8);
+  assert.equal(migrated.memoryState.pending.length, 0);
+  assert.equal(migrated.memoryState.digest.events[0].certainty, "reported");
+  assert.match(migrated.memoryState.digest.events[0].summary, /贝克兰德市政档案分馆/);
   assert.equal(migrated.inventory[0].name, "旧呢外套");
   assert.equal(migrated.inventory[0].importance, "important");
   assert.equal(migrated.character.advancement.sequenceLabel, "普通人");

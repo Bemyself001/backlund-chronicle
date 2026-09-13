@@ -15,7 +15,8 @@ import { buildRejectedToolNarrative, dedupeToolCalls, executeToolCalls, normaliz
 import { auditTurnChanges, collectImportantItemConfirmations, createAuditBaseline } from "./engine/audit.js";
 import { resolveTurnProgress } from "./engine/turn.js";
 import { loadApiSettings, requestAIWithReasoningFallback, saveApiSettings } from "./services/api.js";
-import { buildFastNarrativeContinuationContext, buildFastPresentationContext, buildPlanningContext, buildRenderingContext, buildSummaryContext, buildToolRepairContext, computeMemoryUpdate, composeSummary, parseSectionedSummary } from "./services/memory.js";
+import { buildFastNarrativeContinuationContext, buildFastPresentationContext, buildPlanningContext, buildRenderingContext, buildSummaryContext, buildToolRepairContext, computeMemoryUpdate } from "./services/memory.js";
+import { applyMemorySummary, createMemorySummaryJob, parseMemoryDigestPayload } from "./services/memoryState.js";
 import { mockResponse } from "./services/mock.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
 import { extractNarrativePreview } from "./services/streamPreview.js";
@@ -56,6 +57,7 @@ export default function App() {
   const lastActionRef = useRef("");
   const streamTimerRef = useRef(null);
   const pendingStreamRef = useRef("");
+  const summaryJobRef = useRef(null);
   const refreshSaves = () => setSaves(listSaves());
 
   useEffect(() => {
@@ -134,31 +136,38 @@ export default function App() {
     });
   };
 
-  // 回合提交后异步让模型重写长期摘要；失败或玩家已开始新回合则保留截断版
-  const scheduleSummaryRewrite = (memoryPlan, gameId, turn) => {
-    if (settings.mockMode || !memoryPlan.archived.length) return;
+  // 每满十个未总结回合，后台整理一批；失败时原摘要和待总结事件保持不变。
+  useEffect(() => {
+    if (!game || settings.mockMode || summaryJobRef.current) return undefined;
+    const job = createMemorySummaryJob(game);
+    if (!job) return undefined;
+    const jobKey = `${job.gameId}:${job.baseRevision}:${job.throughTurn}`;
+    summaryJobRef.current = jobKey;
     const summaryController = new AbortController();
     (async () => {
       try {
-        const response = await requestAIWithReasoningFallback(settings, buildSummaryContext(memoryPlan.previousSummary, memoryPlan.archived, prompt), summaryController.signal, undefined, {
+        const response = await requestAIWithReasoningFallback(settings, buildSummaryContext(job), summaryController.signal, undefined, {
           disableTools: true,
-          disableJsonMode: true,
           forceDisableReasoning: true,
           skipReasoningRetry: true,
+          streamOverride: false,
           maxTokensModeOverride: "manual",
-          maxTokensOverride: 1200,
+          maxTokensOverride: 1600,
         });
-        const summary = String(response.narrative || "").trim().slice(-1800);
-        if (!summary) return;
-        const sections = parseSectionedSummary(summary);
+        const digest = parseMemoryDigestPayload(response.protocolPayload, job);
+        if (!digest) return;
         setGame((current) => {
-          if (!current || current.id !== gameId || current.turn !== turn) return current;
-          if (!sections) return saveGame({ ...current, longTermSummary: summary.replace(/\s+/g, " ") });
-          return saveGame({ ...current, memorySections: sections, longTermSummary: composeSummary(sections) });
+          const next = applyMemorySummary(current, job, digest);
+          if (next === current) return current;
+          return saveGame(next);
         });
-      } catch { /* 截断版摘要已随回合写入，静默降级 */ }
+      } catch { /* 保留现有摘要与事件，等下次载入或回合完成后重试 */ }
+      finally {
+        if (summaryJobRef.current === jobKey) summaryJobRef.current = null;
+      }
     })();
-  };
+    return undefined;
+  }, [game, settings]);
 
   const runTurn = async (action, options = {}) => {
     if (!game || busyRef.current || !action.trim()) return false;
@@ -365,7 +374,7 @@ export default function App() {
       const nextChoices = choices.length === 3
         ? injectOccultEntryChoice(choices, progress.occult.contact === 0 ? (progress.occultEntry || progress.occult.currentEntry) : null)
         : choices;
-      const memoryPlan = computeMemoryUpdate(execution.game, action, occultNarrative, resolution);
+      const memoryPlan = computeMemoryUpdate(execution.game, action, occultNarrative, resolution, { settledGame: resolvedGame });
       const auditBaseline = createAuditBaseline(game, game.turn + 1);
       const automaticAudit = { ...auditTurnChanges(auditBaseline, resolvedGame), importantItemConfirmation: confirmationStatus };
       const next = {
@@ -389,7 +398,6 @@ export default function App() {
           saveRecoveredChoices(next, choiceResult(next.choices, "request_failed"));
         }
       }
-      scheduleSummaryRewrite(memoryPlan, next.id, next.turn);
       return true;
     } catch (err) {
       setError(err.name === "AbortError"

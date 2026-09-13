@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createInitialGame, DEFAULT_SYSTEM_PROMPT, EMPTY_CHARACTER, migrateSystemPrompt } from "../src/data/defaults.js";
 import { executeToolCalls } from "../src/engine/tools.js";
-import { buildChoiceRegenerationContext, buildFastNarrativeContinuationContext, buildFastPresentationContext, buildPlanningContext, buildRenderingContext, composeSummary, parseSectionedSummary, updateMemory, visibleGameState } from "../src/services/memory.js";
+import { buildChoiceRegenerationContext, buildFastNarrativeContinuationContext, buildFastPresentationContext, buildPlanningContext, buildRenderingContext, buildSummaryContext, updateMemory, visibleGameState } from "../src/services/memory.js";
 import { createTurnResolution } from "../src/services/turnResolution.js";
 
 test("system prompt map rules migrate idempotently", () => {
@@ -167,18 +167,17 @@ test("turn resolution and memory are derived from local execution results", () =
   assert.match(memory.memoryNotes.at(-1), /拒绝 money\.add/);
 });
 
-test("sectioned summary parses markers, drops empty sections and round-trips", () => {
-  const text = "【案件与调查】黑函的笔迹指向市政档案馆。\n【人物与关系】售票员答应留意灰呢帽男人。\n【承诺与伏笔】无\n【居住与日常】租下灰墙公寓单间。";
-  const sections = parseSectionedSummary(text);
-  assert.deepEqual(sections, {
-    cases: "黑函的笔迹指向市政档案馆。",
-    people: "售票员答应留意灰呢帽男人。",
-    hooks: "",
-    daily: "租下灰墙公寓单间。",
+test("summary context requests concise sourced people and events as strict JSON", () => {
+  const messages = buildSummaryContext({
+    previousDigest: { people: [], events: [], openThreads: [] },
+    episodes: [{ id: "memory-game-1", turn: 1, action: "询问售票员", narrative: "售票员说他见过灰呢帽男人。" }],
   });
-  const composed = composeSummary(sections);
-  assert.match(composed, /【案件与调查】黑函/);
-  assert.match(composed, /【居住与日常】租下/);
-  assert.doesNotMatch(composed, /【承诺与伏笔】/);
-  assert.equal(parseSectionedSummary("没有分区标记的普通摘要"), null);
+  const serialized = messages.map((message) => message.content).join("\n");
+  assert.match(serialized, /600—900/);
+  assert.match(serialized, /people/);
+  assert.match(serialized, /events/);
+  assert.match(serialized, /openThreads/);
+  assert.match(serialized, /sourceTurns/);
+  assert.match(serialized, /confirmed、reported 或 intended/);
+  assert.doesNotMatch(serialized, /案件与调查|居住与日常/);
 });

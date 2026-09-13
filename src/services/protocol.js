@@ -93,6 +93,7 @@ export function normalizeAIResponse(raw, nativeToolCalls = []) {
   const baseProtocolWarning = parsed.protocolWarning || (choices.length < 3 ? "行动建议未完整返回，已保留收到的有效选项。" : "");
   const protocolWarning = [baseProtocolWarning, ignoredToolCalls ? `模型返回了 ${ignoredToolCalls} 条不完整工具调用，已忽略。` : ""].filter(Boolean).join(" ");
   return {
+    protocolPayload: parsed,
     narrative,
     choices,
     toolCalls: [...(Array.isArray(protocolToolCalls) ? protocolToolCalls : []), ...nativeStateCalls],

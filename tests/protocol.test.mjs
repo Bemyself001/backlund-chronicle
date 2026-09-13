@@ -15,6 +15,12 @@ test("plain text API responses preserve narrative without fabricating choices", 
   assert.equal(result.choiceMeta.source, "unavailable");
 });
 
+test("normalized responses retain the parsed protocol payload for background jobs", () => {
+  const payload = { memory: { people: [], events: [{ summary: "已发生", certainty: "confirmed", sourceTurns: [1] }], openThreads: [] } };
+  const result = normalizeAIResponse(payload);
+  assert.equal(result.protocolPayload, payload);
+});
+
 test("content-part arrays and alternate action fields are normalized", () => {
   assert.equal(textFromContent([{ type: "text", text: "第一段" }, { text: { value: "第二段" } }]), "第一段\n第二段");
   assert.equal(textFromContent({ type: "text", text: "单段正文" }), "单段正文");

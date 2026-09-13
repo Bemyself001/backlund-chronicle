@@ -114,6 +114,7 @@ export function createInitialGame(character, confirmedLoadout) {
   const baseStats = { health: 10, maxHealth: 10, sanity: 9, maxSanity: 10, spirituality: normalizedCharacter.extraordinary === "low" ? 7 : 4, maxSpirituality: normalizedCharacter.extraordinary === "low" ? 8 : 5 };
   const talentSpec = talentItemSpec(normalizedCharacter.talent);
   const talentItem = talentSpec ? { ...item(talentSpec.itemId, talentSpec.name, talentSpec.category, talentSpec.description, 1, talentSpec.weight, talentSpec.rarity, talentSpec.tags), hiddenInfo: talentSpec.hiddenInfo || "" } : null;
+  const openingMessage = { id: makeId("msg"), role: "assistant", turn: 0, content: opening.narrative };
   const game = {
     version: SAVE_VERSION,
     systemVersion: GAME_SYSTEM_VERSION,
@@ -156,8 +157,20 @@ export function createInitialGame(character, confirmedLoadout) {
     mapExtensions: { locations: [], routes: [] },
     ...openingMapState(opening),
     worldEvents: [{ id: makeId("event"), turn: 0, text: opening.event }],
-    recentDialogues: [{ id: makeId("msg"), role: "assistant", turn: 0, content: opening.narrative }],
+    recentDialogues: [openingMessage],
+    storyHistory: [openingMessage],
     longTermSummary: opening.summary,
+    memoryState: {
+      version: 2,
+      revision: 0,
+      throughTurn: 0,
+      digest: {
+        people: [],
+        events: [{ summary: opening.summary, certainty: "confirmed", sourceTurns: [0] }],
+        openThreads: [],
+      },
+      pending: [],
+    },
     memoryNotes: [],
     choices: openingChoices(opening),
     choiceMeta: { source: "initial", fallback: false, reason: "opening" },
