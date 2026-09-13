@@ -99,12 +99,14 @@ test("Mock follows all non-East opening actions and permits travel to known plac
   }));
 });
 
-test("character creation exposes twelve distinct sequence 9 pathways", () => {
-  assert.equal(LOW_SEQUENCE_PATHWAYS.length, 12);
-  assert.equal(new Set(LOW_SEQUENCE_PATHWAYS).size, 12);
+test("character creation exposes all 22 distinct sequence 9 pathways", () => {
+  assert.equal(LOW_SEQUENCE_PATHWAYS.length, 22);
+  assert.equal(new Set(LOW_SEQUENCE_PATHWAYS).size, 22);
   LOW_SEQUENCE_PATHWAYS.forEach((pathway) => assert.match(pathway, /（序列9）$/));
   assert.ok(LOW_SEQUENCE_PATHWAYS.includes("窥秘人（序列9）"));
   assert.ok(LOW_SEQUENCE_PATHWAYS.includes("猎人（序列9）"));
+  assert.ok(LOW_SEQUENCE_PATHWAYS.includes("偷盗者（序列9）"));
+  assert.ok(LOW_SEQUENCE_PATHWAYS.includes("秘祈人（序列9）"));
 });
 
 test("low sequence characters keep a structured pathway and sequence record", () => {
