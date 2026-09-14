@@ -1,7 +1,7 @@
 import { normalizeInventoryItem } from "../system/items.js";
 import { getAdvancement } from "../system/character.js";
 import { allConditionsMatch, hasActionTerms } from "./triggerConditions.js";
-import { TRIGGER_DEFINITIONS, getTriggerDefinition } from "./triggerDefinitions.js";
+import { TRIGGER_DEFINITIONS, getInstanceTriggerDefinition } from "./triggerDefinitions.js";
 import { canReceiveNewOccultEntry } from "./occultTriggers.js";
 import {
   availableOccultEntry,
@@ -20,9 +20,9 @@ function definitionEligible(definition, context) {
   return true;
 }
 
-function canRegisterEligibility(state, definition, turn) {
-  if (state.active.some((entry) => entry.definitionId === definition.id)) return false;
-  const history = state.history.filter((entry) => entry.definitionId === definition.id);
+function canRegisterEligibility(definition, turn, activeDefinitionIds, historyByDefinition) {
+  if (activeDefinitionIds.has(definition.id)) return false;
+  const history = historyByDefinition.get(definition.id) || [];
   if (definition.oncePerSave && history.length) return false;
   if (definition.cooldown != null && history.length) {
     const lastTurn = Math.max(...history.map((entry) => Number(entry.completedTurn ?? entry.createdTurn ?? 0)));
@@ -35,11 +35,18 @@ function refreshEligibility(game, state, signals, action, turn) {
   const context = { game, state, signals, action, turn };
   state.active = state.active.filter((instance) => {
     if (instance.status !== "eligible") return true;
-    const definition = getTriggerDefinition(instance.definitionId);
+    const definition = getInstanceTriggerDefinition(instance);
     return definition && definitionEligible(definition, context);
   });
+  const activeDefinitionIds = new Set(state.active.map((entry) => entry.definitionId));
+  const historyByDefinition = new Map();
+  for (const entry of state.history) {
+    const history = historyByDefinition.get(entry.definitionId) || [];
+    history.push(entry);
+    historyByDefinition.set(entry.definitionId, history);
+  }
   for (const definition of TRIGGER_DEFINITIONS) {
-    if (!canRegisterEligibility(state, definition, turn) || !definitionEligible(definition, context)) continue;
+    if (!canRegisterEligibility(definition, turn, activeDefinitionIds, historyByDefinition) || !definitionEligible(definition, context)) continue;
     state.active.push({
       instanceId: makeTriggerInstanceId(game.id || "game", definition.id, turn),
       definitionId: definition.id,
@@ -53,7 +60,9 @@ function refreshEligibility(game, state, signals, action, turn) {
       completedTurn: null,
       source: { action: "", evidenceIds: [] },
       stageHistory: [],
+      definitionVersion: Number(definition.version || 1),
     });
+    activeDefinitionIds.add(definition.id);
   }
 }
 
@@ -98,7 +107,7 @@ function candidateScore(definition, context) {
 function makeAvailableInstance(game, state, definition, turn, action, signals) {
   const evidenceIds = signals.map((signal) => signal.id).filter(Boolean);
   const instance = state.active.find((entry) => entry.definitionId === definition.id && entry.status === "eligible") || {
-    instanceId: makeTriggerInstanceId(game.id || "game", definition.id, turn), definitionId: definition.id, category: definition.category, stageHistory: [],
+    instanceId: makeTriggerInstanceId(game.id || "game", definition.id, turn), definitionId: definition.id, category: definition.category, stageHistory: [], definitionVersion: Number(definition.version || 1), definitionSnapshot: structuredClone(definition),
   };
   instance.status = "available";
   instance.stage = definition.initialStage || "discovered";
@@ -108,6 +117,8 @@ function makeAvailableInstance(game, state, definition, turn, action, signals) {
   instance.completedTurn = null;
   instance.source = { action: String(action || ""), evidenceIds };
   instance.presentation = structuredClone(definition.presentation || {});
+  instance.definitionVersion = Number(definition.version || 1);
+  instance.definitionSnapshot = structuredClone(definition);
   instance.stageHistory.push({ id: `${instance.instanceId}:eligible:available`, from: "eligible", to: "available", turn, evidenceIds });
   return instance;
 }
@@ -160,7 +171,7 @@ function completeInstance(game, state, instance, definition, turn, events, trans
 function advanceExisting(game, state, signals, action, turn, events) {
   const context = { game, state, signals, action, turn };
   for (const instance of [...state.active]) {
-    const definition = getTriggerDefinition(instance.definitionId);
+    const definition = getInstanceTriggerDefinition(instance);
     if (!definition) continue;
     if (instance.status === "available" && definition.autoEngageWhen?.length && allConditionsMatch(definition.autoEngageWhen, context)) {
       instance.status = "engaged";
@@ -240,7 +251,7 @@ export function engageTrigger(game, instanceId, turn, action = "") {
   game.triggerState = state;
   const instance = state.active.find((entry) => entry.instanceId === instanceId);
   if (!instance || instance.status !== "available") return { ok: false, reason: "当前没有匹配的可追查事件" };
-  const definition = getTriggerDefinition(instance.definitionId);
+  const definition = getInstanceTriggerDefinition(instance);
   const previousStage = instance.stage;
   instance.status = "engaged";
   instance.engagedTurn = turn;
@@ -269,7 +280,7 @@ export function progressTrigger(game, instanceId, objectiveId, turn, action = ""
   game.triggerState = state;
   const instance = state.active.find((entry) => entry.instanceId === instanceId && entry.status === "engaged");
   if (!instance) return { ok: false, reason: "当前没有匹配的进行中特殊任务" };
-  const definition = getTriggerDefinition(instance.definitionId);
+  const definition = getInstanceTriggerDefinition(instance);
   const stage = (definition?.stages || []).find((entry) => entry.id === instance.stage);
   const transition = (stage?.transitions || []).find((entry) => entry.objectiveId === objectiveId);
   if (!transition) return { ok: false, reason: "该目标不属于任务当前阶段，不能跳过或倒退" };

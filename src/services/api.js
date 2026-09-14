@@ -116,6 +116,17 @@ export async function testApiConnection(settings, signal) {
 }
 
 const TOOL_PARAMETER_SCHEMAS = {
+  "context.lookup": {
+    type: "object",
+    additionalProperties: false,
+    required: ["query", "reason"],
+    properties: {
+      query: { type: "string", description: "需要补充的设定主题；只会返回当前披露条件允许的本地资料" },
+      ids: { type: "array", maxItems: 8, items: { type: "string" }, description: "可选的精确设定条目 ID" },
+      limit: { type: "integer", minimum: 1, maximum: 8 },
+      reason: { type: "string", description: "为何本轮叙事需要补充该资料" },
+    },
+  },
   "inventory.add": {
     type: "object",
     additionalProperties: false,
@@ -529,7 +540,7 @@ const TOOL_PARAMETER_SCHEMAS = {
   },
 };
 
-const STATE_TOOL_NAMES = ["inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "trigger.engage", "trigger.progress", "trigger.abandon", "organization.join", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.grow", "location.discover", "location.move", "location.archive", "clue.add", "quest.add", "quest.update", "dice.check"];
+const STATE_TOOL_NAMES = ["context.lookup", "inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "trigger.engage", "trigger.progress", "trigger.abandon", "organization.join", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.grow", "location.discover", "location.move", "location.archive", "clue.add", "quest.add", "quest.update", "dice.check"];
 
 const CHOICE_TOOL_SCHEMA = {
   type: "object",

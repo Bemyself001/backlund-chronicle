@@ -24,6 +24,17 @@ export const INITIAL_RUMORED_LOCATION_IDS = ACTIVE_CONTENT.map.initialRumoredLoc
 export const LOCATION_KNOWLEDGE_STATUSES = ACTIVE_CONTENT.map.locationKnowledgeStatuses;
 export const DYNAMIC_LOCATION_SCOPES = ACTIVE_CONTENT.map.dynamicLocationScopes;
 export const DYNAMIC_LOCATION_KINDS = ACTIVE_CONTENT.map.dynamicLocationKinds;
+export const ORGANIZATIONS = ACTIVE_CONTENT.organizations;
+export const ITEM_BEHAVIORS = ACTIVE_CONTENT.itemBehaviors;
+export const TRIGGER_DEFINITIONS = ACTIVE_CONTENT.triggers;
+export const LORE_ENTRIES = ACTIVE_CONTENT.lore;
+export const CONTENT_MIGRATIONS = ACTIVE_CONTENT.migrations;
+export const SCENARIO_RULES = ACTIVE_CONTENT.narrative.scenarioRules;
+
+const ORGANIZATIONS_BY_ID = new Map(ORGANIZATIONS.map((entry) => [entry.id, entry]));
+const ITEM_BEHAVIORS_BY_ID = new Map(ITEM_BEHAVIORS.map((entry) => [entry.itemId, entry]));
+const TRIGGERS_BY_ID = new Map(TRIGGER_DEFINITIONS.map((entry) => [entry.id, entry]));
+const LORE_BY_ID = new Map(LORE_ENTRIES.map((entry) => [entry.id, entry]));
 
 export function getOpening(district) {
   return OPENINGS.find((opening) => opening.district === district) || OPENINGS[0];
@@ -35,6 +46,22 @@ export function getTalent(id) {
 
 export function getPathway(pathwayId) {
   return PATHWAYS.find((pathway) => pathway.id === pathwayId) || null;
+}
+
+export function getOrganization(organizationId) {
+  return ORGANIZATIONS_BY_ID.get(String(organizationId || "").trim()) || null;
+}
+
+export function getItemBehavior(itemId) {
+  return ITEM_BEHAVIORS_BY_ID.get(String(itemId || "").trim()) || null;
+}
+
+export function getContentTrigger(definitionId) {
+  return TRIGGERS_BY_ID.get(String(definitionId || "").trim()) || null;
+}
+
+export function getLoreEntry(loreId) {
+  return LORE_BY_ID.get(String(loreId || "").trim()) || null;
 }
 
 export function pathwayIdForName(pathwayName) {
@@ -70,11 +97,85 @@ function containsRuntimeValue(value, ancestors = new Set()) {
 }
 
 const asArray = (value) => Array.isArray(value) ? value : [];
+const CONDITION_TYPES = new Set(["always", "all", "any", "character", "item", "fact", "action", "signal", "location", "time", "weather", "relationship", "organization", "clue", "trigger", "turn", "available-slot"]);
+const REWARD_TYPES = new Set(["fact", "clue", "item", "item-remove", "item-update", "money", "relationship"]);
+const ITEM_EFFECT_TYPES = new Set(["discover-fact", "signal"]);
+
+function validateConditions(conditions, label, errors) {
+  for (const condition of asArray(conditions)) {
+    if (!condition || !CONDITION_TYPES.has(condition.type)) errors.push(`${label} 使用了未知条件类型：${condition?.type || "未填写"}`);
+    if (["all", "any"].includes(condition?.type)) validateConditions(condition.conditions, label, errors);
+  }
+}
+
+function definitionRewards(definition) {
+  return [
+    ...asArray(definition.rewards),
+    ...asArray(definition.stages).flatMap((stage) => [
+      ...asArray(stage.rewards),
+      ...asArray(stage.transitions).flatMap((transition) => asArray(transition.rewards)),
+    ]),
+  ];
+}
+
+function validateTriggerContent(triggers, errors) {
+  const ids = new Set();
+  const rewardOwners = new Map();
+  for (const definition of asArray(triggers)) {
+    if (!definition?.id || !definition?.category) errors.push("触发定义缺少 id 或 category");
+    if (ids.has(definition?.id)) errors.push(`触发定义 ID 重复：${definition.id}`);
+    ids.add(definition?.id);
+    validateConditions(definition?.eligibility, `触发 ${definition?.id}`, errors);
+    validateConditions(definition?.appearWhen, `触发 ${definition?.id}`, errors);
+    validateConditions(definition?.autoEngageWhen, `触发 ${definition?.id}`, errors);
+    validateConditions(definition?.failWhen, `触发 ${definition?.id}`, errors);
+    const stages = asArray(definition?.stages);
+    const stageIds = new Set(stages.map((stage) => stage?.id));
+    if (definition?.engagedStage && !stageIds.has(definition.engagedStage)) errors.push(`${definition.id} 的 engagedStage 不存在：${definition.engagedStage}`);
+    for (const stage of stages) {
+      if (!stage?.id) errors.push(`${definition.id} 存在缺少 ID 的阶段`);
+      validateConditions(stage?.advanceWhen, `阶段 ${definition.id}/${stage?.id}`, errors);
+      validateConditions(stage?.failWhen, `阶段 ${definition.id}/${stage?.id}`, errors);
+      if (stage?.nextStage && !stage.complete && !stageIds.has(stage.nextStage)) errors.push(`${definition.id} 引用了不存在的阶段：${stage.nextStage}`);
+      for (const transition of asArray(stage?.transitions)) {
+        if (!transition?.objectiveId) errors.push(`${definition.id}/${stage?.id} 存在缺少 objectiveId 的分支`);
+        validateConditions(transition?.when, `分支 ${definition.id}/${transition?.objectiveId}`, errors);
+        validateConditions(transition?.requirements, `分支 ${definition.id}/${transition?.objectiveId}`, errors);
+        if (transition?.nextStage && !transition.complete && !transition.fail && !stageIds.has(transition.nextStage)) errors.push(`${definition.id} 引用了不存在的阶段：${transition.nextStage}`);
+      }
+    }
+    for (const reward of definitionRewards(definition)) {
+      if (!reward?.id || !REWARD_TYPES.has(reward?.type)) errors.push(`${definition.id} 使用了无效奖励：${reward?.id || "未填写"}`);
+      const previous = rewardOwners.get(reward?.id);
+      if (previous) errors.push(`奖励 ID 重复：${reward.id}（${previous}、${definition.id}）`);
+      else if (reward?.id) rewardOwners.set(reward.id, definition.id);
+    }
+  }
+}
+
+function validateItemBehaviors(behaviors, errors) {
+  const ids = new Set();
+  for (const behavior of asArray(behaviors)) {
+    if (!behavior?.itemId || ids.has(behavior.itemId)) errors.push(`特殊物品存在空或重复 ID：${behavior?.itemId || "未填写"}`);
+    ids.add(behavior?.itemId);
+    for (const [actionName, actions] of Object.entries(behavior?.actions || {})) {
+      if (!["inspect", "use"].includes(actionName) || !Array.isArray(actions) || !actions.length) errors.push(`特殊物品 ${behavior.itemId} 的动作 ${actionName} 无效`);
+      const actionIds = new Set();
+      for (const action of asArray(actions)) {
+        if (!action?.id || actionIds.has(action.id)) errors.push(`特殊物品 ${behavior.itemId} 存在空或重复动作 ID：${action?.id || "未填写"}`);
+        actionIds.add(action?.id);
+        validateConditions(action?.when, `物品动作 ${action?.id}`, errors);
+        validateConditions(action?.denyWhen, `物品动作 ${action?.id}`, errors);
+        for (const effect of asArray(action?.result?.effects)) if (!ITEM_EFFECT_TYPES.has(effect?.type)) errors.push(`物品动作 ${action?.id} 使用了未知效果：${effect?.type || "未填写"}`);
+      }
+    }
+  }
+}
 
 export function validateContentPack(pack = ACTIVE_CONTENT) {
   const errors = [];
   if (!pack?.id || !pack?.name) errors.push("内容包缺少 id 或 name");
-  if (pack?.schemaVersion !== 1) errors.push(`不支持的内容格式版本：${pack?.schemaVersion ?? "未填写"}`);
+  if (pack?.schemaVersion !== 2) errors.push(`不支持的内容格式版本：${pack?.schemaVersion ?? "未填写"}`);
   if (containsRuntimeValue(pack)) errors.push("内容包只能包含可序列化数据，不能包含函数、类实例或循环引用");
   for (const [label, entries, key] of [["开局", pack?.openings, "district"], ["天赋", pack?.talents, "id"], ["途径", pack?.pathways, "id"], ["地点", pack?.map?.locations, "id"]]) {
     if (!Array.isArray(entries) || !entries.length) errors.push(`${label}数据为空`);
@@ -82,6 +183,18 @@ export function validateContentPack(pack = ACTIVE_CONTENT) {
     if (duplicates.length) errors.push(`${label}存在空或重复 ID：${duplicates.join("、")}`);
   }
   if (!pack?.characters?.default || !Array.isArray(pack?.characters?.random) || !pack.characters.random.length) errors.push("角色模板数据为空");
+  for (const [label, entries, key] of [["组织", pack?.organizations, "id"], ["特殊物品", pack?.itemBehaviors, "itemId"], ["触发定义", pack?.triggers, "id"], ["设定条目", pack?.lore, "id"], ["内容迁移", pack?.migrations, "id"]]) {
+    if (!Array.isArray(entries)) errors.push(`${label}数据不是数组`);
+    const duplicates = duplicateIds(entries, key);
+    if (duplicates.length) errors.push(`${label}存在空或重复 ID：${duplicates.join("、")}`);
+  }
+  validateTriggerContent(pack?.triggers, errors);
+  validateItemBehaviors(pack?.itemBehaviors, errors);
+  for (const lore of asArray(pack?.lore)) {
+    if (lore?.type !== "loreFact" || !String(lore?.text || "").trim()) errors.push(`设定条目 ${lore?.id || "未填写"} 缺少 loreFact 文本`);
+    validateConditions(lore?.revealWhen, `设定条目 ${lore?.id}`, errors);
+  }
+  if (!String(pack?.narrative?.scenarioRules || "").trim()) errors.push("内容包缺少场景规则");
   const locations = new Set(asArray(pack?.map?.locations).map((entry) => entry?.id));
   for (const route of asArray(pack?.map?.routes)) {
     if (!locations.has(route?.from) || !locations.has(route?.to)) errors.push(`路线引用不存在的地点：${route?.from} → ${route?.to}`);

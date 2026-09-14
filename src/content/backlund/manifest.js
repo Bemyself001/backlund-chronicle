@@ -7,16 +7,34 @@ import {
   INITIAL_DISCOVERED_LOCATION_IDS, INITIAL_RUMORED_LOCATION_IDS,
   LOCATION_KNOWLEDGE_STATUSES, DYNAMIC_LOCATION_SCOPES, DYNAMIC_LOCATION_KINDS,
 } from "./map.js";
+import { ITEM_BEHAVIORS } from "./itemBehaviors.js";
+import { ORGANIZATIONS } from "./organizations.js";
+import { OCCULT_ENTRY_DEFINITIONS } from "./occultEntries.js";
+import { LORE_ENTRIES } from "./lore.js";
+import { CONTENT_MIGRATIONS } from "./migrations.js";
+import { BACKLUND_SCENARIO_RULES } from "./narrative.js";
+import { SPECIAL_QUEST_DEFINITIONS } from "./specialQuests/index.js";
+import { PATHWAY_QUEST_DEFINITIONS } from "./pathwayQuests/index.js";
 
 export const BACKLUND_CONTENT = {
   id: "backlund-core",
   name: "贝克兰德核心内容",
-  schemaVersion: 1,
-  contentVersion: "2026.09.11",
+  schemaVersion: 2,
+  contentVersion: "2026.09.14",
   openings: OPENINGS,
   talents: TALENTS,
   pathways: PATHWAYS,
   characters: { default: DEFAULT_CHARACTER, random: RANDOM_CHARACTERS },
+  organizations: ORGANIZATIONS,
+  itemBehaviors: ITEM_BEHAVIORS,
+  triggers: [
+    ...OCCULT_ENTRY_DEFINITIONS,
+    ...SPECIAL_QUEST_DEFINITIONS,
+    ...PATHWAY_QUEST_DEFINITIONS,
+  ],
+  lore: LORE_ENTRIES,
+  migrations: CONTENT_MIGRATIONS,
+  narrative: { scenarioRules: BACKLUND_SCENARIO_RULES },
   map: {
     locations: MAP_LOCATIONS,
     routes: MAP_ROUTES,

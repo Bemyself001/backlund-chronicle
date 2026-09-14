@@ -1,19 +1,29 @@
-import { PATHWAY_QUEST_DEFINITIONS } from "../content/backlund/pathwayQuests/index.js";
-import { OCCULT_TRIGGER_DEFINITIONS } from "./occultTriggers.js";
-import { WATCH_TRIGGER_DEFINITIONS } from "./watchTriggers.js";
-import { SPECIAL_QUEST_DEFINITIONS } from "../content/backlund/specialQuests/index.js";
+import { TRIGGER_DEFINITIONS as CONTENT_TRIGGER_DEFINITIONS } from "../content/index.js";
 
-export const TRIGGER_DEFINITIONS = [
-  ...OCCULT_TRIGGER_DEFINITIONS,
-  ...WATCH_TRIGGER_DEFINITIONS,
-  ...SPECIAL_QUEST_DEFINITIONS,
-  ...PATHWAY_QUEST_DEFINITIONS,
-];
+export const TRIGGER_DEFINITIONS = CONTENT_TRIGGER_DEFINITIONS;
 
 const DEFINITIONS_BY_ID = new Map(TRIGGER_DEFINITIONS.map((definition) => [definition.id, definition]));
 
 export function getTriggerDefinition(definitionId) {
   return DEFINITIONS_BY_ID.get(definitionId) || null;
+}
+
+export function getInstanceTriggerDefinition(instance) {
+  if (!instance) return null;
+  const current = getTriggerDefinition(instance.definitionId);
+  const currentVersion = Number(current?.version || 1);
+  if (!instance.definitionSnapshot && current && instance.status !== "eligible") {
+    instance.definitionVersion = currentVersion;
+    instance.definitionSnapshot = structuredClone(current);
+  }
+  if (!current) return instance.definitionSnapshot || null;
+  if (instance.definitionVersion != null && Number(instance.definitionVersion) !== currentVersion) return instance.definitionSnapshot || current;
+  return current;
+}
+
+export function hydrateActiveTriggerDefinitions(state) {
+  for (const instance of state?.active || []) if (instance.status !== "eligible") getInstanceTriggerDefinition(instance);
+  return state;
 }
 
 export function validateTriggerDefinitions(definitions = TRIGGER_DEFINITIONS) {

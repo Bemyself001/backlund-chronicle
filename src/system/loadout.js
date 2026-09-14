@@ -1,4 +1,5 @@
 import { makeId } from "../utils/id.js";
+import { getTalent } from "../content/index.js";
 
 export const DEFAULT_CLOTHING = "旧呢外套、白衬衫、黑长裤、磨损的皮靴";
 export const CLOTHING_SLOTS = ["外套", "上装", "下装", "鞋履", "头饰", "手套", "围饰"];
@@ -55,7 +56,8 @@ export function validateLoadout(raw, character) {
   });
   if (raw.carriedItem?.accepted === false && input.name) throw new Error("随身物品需为一件普通物品，请调整描述；特殊能力和额外物资不能在开局直接获得。");
   const carriedItem = input.name ? { name: input.name, description: input.description || "一件随身携带的个人物品。", weight: validWeight(raw.carriedItem?.weight, 5) } : null;
-  const weight = clothes.reduce((sum, item) => sum + item.weight, 0) + (carriedItem?.weight || 0) + (character.talent === "heirloom-watch" ? 0.1 : 0);
+  const talentItemWeight = Number(getTalent(character.talent)?.effects?.item?.weight || 0);
+  const weight = clothes.reduce((sum, item) => sum + item.weight, 0) + (carriedItem?.weight || 0) + talentItemWeight;
   if (weight > 12) throw new Error("开局行装超过 12 kg，请精简衣着或随身物品。");
   return { clothes, carriedItem };
 }

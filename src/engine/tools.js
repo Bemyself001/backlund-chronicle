@@ -6,17 +6,11 @@ import { amountToPence, formatMoney, moneyFromPence, moneyToPence } from "../sys
 import { normalizeInventoryItem, normalizeItemImportance } from "../system/items.js";
 import { equipmentSlot } from "../system/loadout.js";
 import { applyAdvancement, getAdvancement, isExplicitAdvancementIntent } from "../system/character.js";
-import { getPathway } from "../content/index.js";
+import { getOrganization, getPathway } from "../content/index.js";
 import { abandonTrigger, engageTrigger, progressTrigger } from "./triggerEngine.js";
-import { inspectHeirloomWatch } from "./watchTriggers.js";
 import { normalizeTriggerState } from "./triggerState.js";
-
-const OFFICIAL_ORGANIZATIONS = {
-  nighthawks: "值夜者",
-  "machinery-hivemind": "机械之心",
-  "mandated-punishers": "代罚者",
-  mi9: "军情九处",
-};
+import { executeItemContentAction } from "./itemActions.js";
+import { lookupContext } from "./contextLookup.js";
 
 export const TOOL_SCHEMAS = {
   "inventory.add": { required: ["item"], description: "新增或合并一个结构化物品实例" },
@@ -25,6 +19,7 @@ export const TOOL_SCHEMAS = {
   "money.add": { required: ["amount"], description: "增加角色持有的镑、苏勒或便士" },
   "money.remove": { required: ["amount"], description: "扣除角色持有的镑、苏勒或便士" },
   "money.inspect": { required: [], description: "核对当前资金余额，不修改状态" },
+  "context.lookup": { required: ["query"], description: "按当前披露权限查询本地设定资料，不修改状态" },
   "item.inspect": { required: ["instanceId"], description: "检查物品并揭示已发现信息" },
   "item.use": { required: ["instanceId"], description: "使用消耗品或工具" },
   "item.equip": { required: ["instanceId"], description: "装备可装备物品" },
@@ -454,6 +449,10 @@ function executeOne(game, call, options = {}) {
       game.money = moneyFromPence(moneyToPence(game.money || {}));
       return succeed(call.name, `${turnLabel}：资金核对——当前余额 ${formatMoney(game.money)}。`, { balance: game.money });
     }
+    case "context.lookup": {
+      const lookup = lookupContext(game, { query: args.query, ids: args.ids, limit: args.limit });
+      return succeed(call.name, `${turnLabel}：只读资料查询完成，共返回 ${lookup.entries.length} 条当前可披露资料。`, { contextLookup: lookup });
+    }
     case "item.inspect": {
       const target = findItem();
       if (!target) return fail(call.name, "找不到要检查的物品");
@@ -466,9 +465,10 @@ function executeOne(game, call, options = {}) {
         target.potion = { ...target.potion, identified: true };
         return succeed(call.name, `${turnLabel}：依据${recipe ? `配方「${recipe.title}」` : "同途径经验"}，确认「${target.name}」是${target.potion.pathwayName}途径序列${target.potion.sequence}魔药。`, { identifiedPotion: { ...target.potion, instanceId: target.instanceId } });
       }
-      if (target.itemId === "heirloom-watch") {
-        const inspection = inspectHeirloomWatch(game, target, game.turn + 1);
-        return succeed(call.name, `${turnLabel}：检查「${target.name}」——${inspection.text}`, inspection.data);
+      const contentAction = executeItemContentAction(game, target, "inspect", { turn: game.turn + 1, playerAction: options.playerAction ?? call.reason });
+      if (contentAction?.handled) {
+        if (!contentAction.ok) return fail(call.name, contentAction.reason);
+        return succeed(call.name, `${turnLabel}：检查「${target.name}」——${contentAction.text}`, contentAction.data);
       }
       return succeed(call.name, `${turnLabel}：检查「${target.name}」——${target.discoveredInfo || target.description}`);
     }
@@ -476,12 +476,10 @@ function executeOne(game, call, options = {}) {
       const target = findItem();
       if (!target) return fail(call.name, "找不到要使用的物品");
       if (target.potion) return fail(call.name, target.potion.identified ? "魔药不能作为普通消耗品使用；必须通过晋升验证" : "未知魔药尚未鉴定，不能直接服用");
-      if (target.itemId === "azik-copper-whistle") {
-        if (/(攻击|杀死|消灭|作战|战斗召唤|命令.*战斗)/.test(String(options.playerAction || call.reason))) return fail(call.name, "阿兹克铜哨的骸骨信使只负责送信，不能被当作战斗召唤物");
-        return succeed(call.name, `${turnLabel}：吹响「${target.name}」后，巨大的白骨信使无声出现，等待接收写给阿兹克的信件；铜哨散发的死亡气息也可能吸引亡灵、令附近尸体出现异动。`, {
-          triggerSignals: [{ kind: "azik.whistle-blown", itemId: target.itemId, instanceId: target.instanceId, text: "阿兹克的骸骨信使回应了铜哨，但不会参与战斗。" }],
-          messenger: { recipient: "阿兹克·艾格斯", combatCapable: false, attractsUndead: true },
-        });
+      const contentAction = executeItemContentAction(game, target, "use", { turn: game.turn + 1, playerAction: options.playerAction ?? call.reason });
+      if (contentAction?.handled) {
+        if (!contentAction.ok) return fail(call.name, contentAction.reason);
+        return succeed(call.name, `${turnLabel}：${contentAction.text}`, contentAction.data);
       }
       if (target.tags.includes("消耗品")) {
         const change = { ...target, delta: -1, reason: call.reason, importance: normalizeItemImportance(target) };
@@ -541,11 +539,13 @@ function executeOne(game, call, options = {}) {
       if (options.playerAction !== undefined && !/(加入|宣誓|登记为|成为.*成员|接受招募)/.test(String(options.playerAction))) return fail(call.name, "玩家本轮没有明确同意加入该组织");
       if (!String(args.organizationId || "").trim() || !String(args.name || "").trim()) return fail(call.name, "组织必须具有稳定 ID 与名称");
       if (!["official", "unofficial"].includes(args.kind)) return fail(call.name, "组织性质只能是 official 或 unofficial");
-      if (args.kind === "official" && !OFFICIAL_ORGANIZATIONS[args.organizationId]) return fail(call.name, "该官方组织不在本地登记名录中");
+      const organization = getOrganization(args.organizationId);
+      if (args.kind === "official" && !organization?.tags?.includes("official")) return fail(call.name, "该官方组织不在当前内容包的登记名录中");
+      if (organization && !organization.tags.includes(args.kind)) return fail(call.name, "组织性质与当前内容包登记不一致");
       if (String(args.evidence || "").trim().length < 4) return fail(call.name, "必须记录宣誓、登记或正式接纳的剧情证据");
       if (game.organizationState?.membership?.status === "active") return fail(call.name, "角色已经拥有一个有效组织成员身份");
-      const organizationName = args.kind === "official" ? OFFICIAL_ORGANIZATIONS[args.organizationId] : String(args.name);
-      game.organizationState = { membership: { organizationId: String(args.organizationId), name: organizationName, kind: args.kind, status: "active", joinedTurn: game.turn + 1, evidence: String(args.evidence) } };
+      const organizationName = organization?.name || String(args.name);
+      game.organizationState = { membership: { organizationId: String(args.organizationId), name: organizationName, kind: args.kind, tags: organization?.tags ? [...organization.tags] : [args.kind], status: "active", joinedTurn: game.turn + 1, evidence: String(args.evidence) } };
       return succeed(call.name, `${turnLabel}：正式加入「${organizationName}」——${args.evidence}。`, { membership: structuredClone(game.organizationState.membership) });
     }
     case "occult.reveal": {

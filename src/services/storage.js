@@ -1,4 +1,4 @@
-import { ACTIVE_CONTENT, CONTENT_SCHEMA_VERSION } from "../content/index.js";
+import { ACTIVE_CONTENT, CONTENT_SCHEMA_VERSION, getOrganization } from "../content/index.js";
 import { GAME_SYSTEM_VERSION, SAVE_VERSION } from "../system/version.js";
 import { isMoneyItem, normalizeInventoryItem } from "../system/items.js";
 import { withAdvancement } from "../system/character.js";
@@ -7,6 +7,7 @@ import { getMapLocations, normalizeLocationKnowledge, normalizeMapExtensions } f
 import { buildWorld, reconcileWorld } from "../system/hexworld.js";
 import { normalizeMemoryState } from "./memoryState.js";
 import { normalizeTriggerState, syncLegacyOccult } from "../engine/triggerState.js";
+import { migrateContentState } from "../engine/contentMigrations.js";
 
 const SAVES_KEY = "mist-chronicle-saves-v1";
 const AUTOSAVE_ID = "autosave";
@@ -76,6 +77,14 @@ export function migrateSave(raw) {
     lastEntryTurn: migrated.occult?.lastEntryTurn ?? null,
     entryHistory: Array.isArray(migrated.occult?.entryHistory) ? migrated.occult.entryHistory : [],
   };
+  const previousMembership = migrated.organizationState?.membership;
+  const registeredOrganization = getOrganization(previousMembership?.organizationId);
+  const organizationState = previousMembership ? { membership: {
+    status: "active",
+    ...previousMembership,
+    name: registeredOrganization?.name || previousMembership.name,
+    tags: registeredOrganization?.tags ? [...registeredOrganization.tags] : (previousMembership.tags || [previousMembership.kind].filter(Boolean)),
+  } } : { membership: null };
   const result = {
     ...migrated,
     version: SAVE_VERSION,
@@ -88,7 +97,7 @@ export function migrateSave(raw) {
     discoveredLocations,
     locationKnowledge,
     occult,
-    organizationState: migrated.organizationState?.membership ? { membership: { status: "active", ...migrated.organizationState.membership } } : { membership: null },
+    organizationState,
     processedToolCalls: migrated.processedToolCalls || [],
     memoryNotes: migrated.memoryNotes || [],
     storyHistory: Array.isArray(migrated.storyHistory) ? migrated.storyHistory : (migrated.recentDialogues || []),
@@ -96,6 +105,7 @@ export function migrateSave(raw) {
     lastTurnAudit: migrated.lastTurnAudit || null,
   };
   result.triggerState = normalizeTriggerState(result);
+  migrateContentState(result);
   syncLegacyOccult(result, result.triggerState);
   result.memoryState = normalizeMemoryState(result);
   // 六边形世界：旧存档保留已有迷雾进度，再以注册表对齐；无 world 字段时现场重建

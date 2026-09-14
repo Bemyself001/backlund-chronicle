@@ -30,12 +30,45 @@ const AZIK_WHISTLE_REWARD = { id: "watch.late-hour.azik-whistle", type: "item", 
     source: "魔女会南岸货栈藏品",
   } };
 
+export const WATCH_DISCOVERY_QUESTS = [{
+  id: "watch.heirloom.hidden-note",
+  version: 1,
+  category: "personal-story",
+  priority: 80,
+  oncePerSave: true,
+  eligibility: [{ type: "item", itemId: "heirloom-watch" }],
+  appearWhen: [{ type: "signal", kind: "fact.discovered", factId: "watch.exterior-inspected" }],
+  initialStage: "exterior-inspected",
+  expiresAfterTurns: null,
+  presentation: {
+    title: "家传怀表：磨浅的刻痕",
+    text: "怀表外壳上的浅刻痕显然不是普通划痕。你已经看见这条线索，但只有继续拆查，才会正式进入这段家族旧事。",
+    choice: { label: "继续检查家传怀表的刻痕（可选）", intent: "trigger", risk: "low" },
+  },
+  engagedStage: "inscription-found",
+  stages: [
+    { id: "inscription-found", advanceWhen: [{ type: "fact", key: "watch.mechanism-opened", value: true }], nextStage: "mechanism-opened" },
+    { id: "mechanism-opened", advanceWhen: [{ type: "fact", key: "watch.note-recovered", value: true }], nextStage: "note-recovered" },
+    {
+      id: "note-recovered",
+      transitions: [{
+        objectiveId: "decode-watch-note",
+        description: "寻找可靠的人或资料，译出夹层纸条",
+        actionTerms: ["译", "辨认", "解读", "速记", "请教", "查阅"],
+        nextStage: "decoded",
+        complete: true,
+      }],
+    },
+  ],
+  rewards: [
+    { id: "watch.hidden-note.formal-quest", type: "fact", key: "watch.formal-quest-unlocked", value: true },
+    { id: "watch.hidden-note.decoded-clue", type: "clue", clue: { id: "clue-watch-note-decoded", title: "怀表夹层纸条的译文", detail: "纸条由雷金纳德·阿博特（R.A.）留下，记录了南岸货栈、被替换的整点交接暗号，以及一句仓促写下的警告：不要相信白鸢尾。", kind: "personal_story", locationId: "bridge-docks" } },
+  ],
+}];
+
 const MAIN_REWARDS = [
   { id: "watch.late-hour.fact-completed", type: "fact", key: "watch.late-hour.completed", value: true },
-  { id: "watch.late-hour.ra-released", type: "fact", key: "watch.ra-released", value: true },
   { id: "watch.late-hour.white-iris-identity", type: "fact", key: "demoness.white-iris.true-name", value: "塞西莉亚·沃恩" },
-  CHARACTERISTIC_REWARD,
-  AZIK_WHISTLE_REWARD,
   { id: "watch.late-hour.ledger", type: "clue", clue: {
     id: "clue-demoness-south-bank-ledger",
     title: "魔女会南岸账册",
@@ -52,6 +85,7 @@ const MAIN_REWARDS = [
 
 export const WATCH_MAIN_QUESTS = [{
   id: "watch.heirloom.late-hour",
+  version: 1,
   category: "personal-story",
   priority: 120,
   oncePerSave: true,
@@ -113,7 +147,7 @@ export const WATCH_MAIN_QUESTS = [{
         description: "以雷纳德子爵的人情加速所属官方组织的支援；仍须先在白鸢尾手下坚持",
         actionTerms: ["雷纳德", "人情", "支援", "坚持", "求援"],
         requirements: [
-          { type: "organization", kind: "official", status: "active" },
+          { type: "organization", tag: "official", status: "active" },
           { type: "fact", key: "noble.renard-favor", value: true },
         ],
         requirementMessage: "需要同时是官方组织成员并拥有雷纳德子爵的人情",
@@ -128,7 +162,7 @@ export const WATCH_MAIN_QUESTS = [{
         objectiveId: "survive-until-official-support",
         description: "官方成员坚持到所属组织支援赶到，迫使白鸢尾撤退",
         actionTerms: ["支援", "坚持", "拖延", "求援", "信号"],
-        requirements: [{ type: "organization", kind: "official", status: "active" }],
+        requirements: [{ type: "organization", tag: "official", status: "active" }],
         requirementMessage: "只有已登记的官方组织成员能走支援分支；支援来自所属组织而非铜哨",
         nextStage: "completed-official",
         complete: true,
@@ -142,7 +176,7 @@ export const WATCH_MAIN_QUESTS = [{
         description: "利用预先查明的南岸排水道安全撤离；白鸢尾仍然存活",
         actionTerms: ["排水道", "铁门", "逃", "撤离", "退潮"],
         requirements: [
-          { type: "organization", kind: "official", status: "active", not: true },
+          { type: "organization", tag: "official", status: "active", not: true },
           { type: "fact", key: "route.south-warehouse-drain", value: true },
         ],
         requirementMessage: "需要事先查明南岸货栈排水道路线，且当前没有官方组织支援",
@@ -157,7 +191,7 @@ export const WATCH_MAIN_QUESTS = [{
         objectiveId: "escape-white-iris",
         description: "没有官方支援时从白鸢尾手中逃生；不能击败她，铜哨信使也不会战斗",
         actionTerms: ["逃", "撤退", "脱身", "排水道", "制造混乱"],
-        requirements: [{ type: "organization", kind: "official", status: "active", not: true }],
+        requirements: [{ type: "organization", tag: "official", status: "active", not: true }],
         nextStage: "completed-escape",
         complete: true,
         rewards: [

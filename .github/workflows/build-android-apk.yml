@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  PRODUCT_VERSION: "1.4.3"
+  PRODUCT_VERSION: "1.4.4"
 
 jobs:
   build-release-apk:
@@ -113,5 +113,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "贝克兰德纪事 ${PRODUCT_VERSION}" \
-            --notes "1.4.3 · 家传怀表任务线：加入「迟到的整点」完整主线与三条独立支线，实装雷金纳德的傀儡真相、白鸢尾交锋、官方支援/无支援逃亡分支，以及考古学家非凡特性、魔女会账册和阿兹克铜哨奖励。特殊任务阶段、组织身份与奖励全部由本地状态验证并可靠去重；六边形地图保持不变。请下载 backlund-chronicle.apk 直接覆盖安装以保留存档，不要先卸载。" \
+            --notes "1.4.4 · 系统与内容彻底分层：特殊物品、组织、非凡入口与特殊任务改由可校验内容包统一驱动，新增渐进式资料披露、只读 context.lookup、固定叙事契约、内容迁移与进行中任务快照。旧存档自动升级，六边形地图保持不变。请下载 backlund-chronicle.apk 直接覆盖安装以保留存档，不要先卸载。" \
             --latest

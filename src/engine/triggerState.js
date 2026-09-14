@@ -16,7 +16,7 @@ export function initialOccultWindow(gameId = "") {
 
 export function createTriggerState(game = {}) {
   return {
-    version: 1,
+    version: 2,
     active: [],
     history: [],
     facts: {},
@@ -55,6 +55,8 @@ function normalizeInstance(instance = {}, fallbackStatus = "available") {
     },
     presentation: instance.presentation && typeof instance.presentation === "object" ? { ...instance.presentation } : undefined,
     stageHistory: Array.isArray(instance.stageHistory) ? instance.stageHistory.map((entry) => ({ ...entry })) : [],
+    definitionVersion: instance.definitionVersion == null ? null : Math.max(1, Number(instance.definitionVersion) || 1),
+    definitionSnapshot: instance.definitionSnapshot && typeof instance.definitionSnapshot === "object" ? structuredClone(instance.definitionSnapshot) : undefined,
   };
 }
 
@@ -69,7 +71,7 @@ function legacyPresentation(entry = {}) {
 export function normalizeTriggerState(game = {}) {
   const supplied = game.triggerState && typeof game.triggerState === "object" ? game.triggerState : null;
   const state = supplied ? {
-    version: 1,
+    version: 2,
     active: Array.isArray(supplied.active) ? supplied.active.map((entry) => normalizeInstance(entry, "available")) : [],
     history: Array.isArray(supplied.history) ? supplied.history.map((entry) => normalizeInstance(entry, "completed")) : [],
     facts: Object.fromEntries(Object.entries(supplied.facts || {}).map(([key, value]) => [key, normalizeFact(value)])),
@@ -131,7 +133,9 @@ export function setTriggerFact(state, key, turn, evidenceIds = [], value = true)
 
 export function terminalTrigger(state, instance, status, turn) {
   if (!TERMINAL_STATUSES.has(status)) return null;
-  const terminal = { ...instance, status, completedTurn: turn, expiresTurn: instance.expiresTurn ?? null };
+  const persistentHistory = { ...instance };
+  delete persistentHistory.definitionSnapshot;
+  const terminal = { ...persistentHistory, status, completedTurn: turn, expiresTurn: instance.expiresTurn ?? null };
   state.active = state.active.filter((entry) => entry.instanceId !== instance.instanceId);
   if (!state.history.some((entry) => entry.instanceId === instance.instanceId)) state.history.push(terminal);
   return terminal;

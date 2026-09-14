@@ -22,8 +22,8 @@ test("new characters begin freely at the East Borough railway station", () => {
   assert.equal(game.memoryState.digest.events[0].certainty, "confirmed");
   assert.match(game.longTermSummary, /尚未接受任何委托/);
   assert.equal(game.choices.length, 3);
-  assert.equal(game.systemVersion, 1);
-  assert.deepEqual(game.content, { packId: "backlund-core", schemaVersion: 1, contentVersion: "2026.09.11" });
+  assert.equal(game.systemVersion, 2);
+  assert.deepEqual(game.content, { packId: "backlund-core", schemaVersion: 2, contentVersion: "2026.09.14" });
 });
 
 test("every district initializes a coherent, independent opening and survives save reload", () => {

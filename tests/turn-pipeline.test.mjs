@@ -129,10 +129,11 @@ test("fast continuation receives only the draft and authoritative local resoluti
 test("choice regeneration receives final narrative and cannot change state", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "选项重试员" });
   const messages = buildChoiceRegenerationContext(game, "检查门锁", "门锁没有被打开。", "选项重复", DEFAULT_SYSTEM_PROMPT, { nativeTools: true });
-  assert.match(messages[1].content, /ui\.present_choices/);
-  assert.match(messages[1].content, /不得改变游戏状态/);
-  assert.match(messages[1].content, /不得固定套用调查、交涉、冒险三类/);
-  assert.match(messages[1].content, /risk 允许重复/);
+  const protocol = messages.find((message) => message.content.includes("行动选项重新生成"));
+  assert.match(protocol.content, /ui\.present_choices/);
+  assert.match(protocol.content, /不得改变游戏状态/);
+  assert.match(protocol.content, /不得固定套用调查、交涉、冒险三类/);
+  assert.match(protocol.content, /risk 允许重复/);
   assert.match(messages.at(-1).content, /门锁没有被打开/);
 });
 
@@ -145,7 +146,7 @@ test("fast choices use the shared draft and authoritative resolution", () => {
     turnResolution: resolution,
   });
 
-  assert.match(messages[1].content, /快速模式：并发行动选项/);
+  assert.ok(messages.some((message) => /快速模式：并发行动选项/.test(message.content)));
   assert.match(messages.at(-1).content, /narrativeDraft/);
   assert.match(messages.at(-1).content, /turnResolution/);
   assert.match(messages.at(-1).content, /inventory\.add/);

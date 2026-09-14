@@ -9,7 +9,7 @@ import { fileURLToPath } from "node:url";
 
 test("Backlund content pack is serializable, versioned, and internally valid", () => {
   assert.equal(ACTIVE_CONTENT.id, "backlund-core");
-  assert.equal(CONTENT_SCHEMA_VERSION, 1);
+  assert.equal(CONTENT_SCHEMA_VERSION, 2);
   assert.match(CONTENT_VERSION, /^\d{4}\.\d{2}\.\d{2}$/);
   assert.deepEqual(validateContentPack(), []);
   assert.doesNotThrow(() => JSON.stringify(ACTIVE_CONTENT));
@@ -32,6 +32,14 @@ test("content validation catches cross-reference and executable-data errors", ()
 
   const executable = { ...ACTIVE_CONTENT, unsafe: () => true };
   assert(validateContentPack(executable).some((error) => error.includes("不能包含函数")));
+
+  const brokenStage = structuredClone(ACTIVE_CONTENT);
+  brokenStage.triggers.find((entry) => entry.id === "watch.heirloom.late-hour").engagedStage = "missing-stage";
+  assert(validateContentPack(brokenStage).some((error) => error.includes("engagedStage 不存在")));
+
+  const invalidEffect = structuredClone(ACTIVE_CONTENT);
+  invalidEffect.itemBehaviors[0].actions.inspect[0].result.effects[0].type = "run-script";
+  assert(validateContentPack(invalidEffect).some((error) => error.includes("未知效果")));
 });
 
 test("core content files do not depend on runtime layers", () => {

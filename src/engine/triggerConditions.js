@@ -95,6 +95,7 @@ export function conditionMatches(condition = {}, context = {}) {
       matched = Boolean(membership)
         && (!condition.organizationId || membership.organizationId === condition.organizationId)
         && (!condition.kind || membership.kind === condition.kind)
+        && (!condition.tag || (membership.tags || [membership.kind]).includes(condition.tag))
         && (!condition.status || membership.status === condition.status);
       break;
     }
