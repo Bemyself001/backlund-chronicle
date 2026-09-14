@@ -52,9 +52,9 @@ const RELEASE_141_UPDATE = {
 };
 
 export const LATEST_UPDATE = {
-  date: "2026-09-13",
-  dateLabel: "2026.09.13",
-  title: "1.4.1 · 统一触发系统",
+  date: "2026-09-14",
+  dateLabel: "2026.09.14",
+  title: "1.4.2 · 统一触发系统",
   summary: "非凡入口、家传怀表与途径特殊任务改由本地统一触发引擎管理，出现、追查、阶段、过期与奖励均可独立存档并可靠去重。",
   changes: [
     "新增 triggerState 独立存档，统一保存资格、可选、追查中、完成、失败、放弃与过期状态，以及稳定事件 ID、阶段证据和奖励领取记录。",
@@ -65,6 +65,7 @@ export const LATEST_UPDATE = {
     "新增 trigger.engage 与 trigger.abandon 状态工具；特殊事件会显示在调查手记中，普通 quest.add / quest.update 不能越过其阶段。",
     "旧 currentEntry 与 entryHistory 自动迁移；旧可用入口从读档轮次起获得十轮宽限，原有物品、任务、线索、非凡接触与六边形地图状态保持不变。",
     "新增触发窗口、入口上限与过期、序列边界、怀表阶段、示例途径任务、奖励去重和旧存档迁移回归测试。",
+    "产品版本更新为 1.4.2；Android 内部版本号继续递增，保持原包名、正式签名与覆盖安装兼容性。",
   ],
 };
 

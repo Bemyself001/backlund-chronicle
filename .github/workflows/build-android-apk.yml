@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  PRODUCT_VERSION: "1.4.1"
+  PRODUCT_VERSION: "1.4.2"
 
 jobs:
   build-release-apk:
@@ -113,5 +113,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "贝克兰德纪事 ${PRODUCT_VERSION}" \
-            --notes "1.4.1 · 22条神之途径完整名录：内容包补全全部22条神之途径，每条登记序列9至序列0的完整称号阶梯（称号依据原著设定核对）；开局创建的序列9途径选项由12条扩展为全部22条，新增偷盗者、刺客、仲裁人、律师、囚犯、罪犯、耕种者、药师、怪物、秘祈人10条途径，各配序列9初始能力；原有存档与晋升数据不受影响。请下载 backlund-chronicle.apk 直接覆盖安装以保留存档，不要先卸载。" \
+            --notes "1.4.2 · 统一触发系统：非凡入口、家传怀表与途径特殊任务改由本地统一触发引擎管理；加入8至12轮首次保底、十轮有效期、单入口限制、分阶段怀表线、占卜家序列9示例任务，以及旧存档迁移和奖励去重。原有任务、物品、线索、非凡接触与六边形地图状态保持不变。请下载 backlund-chronicle.apk 直接覆盖安装以保留存档，不要先卸载。" \
             --latest

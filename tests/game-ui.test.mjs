@@ -46,14 +46,14 @@ test("UI summaries use actual confirmed audit deltas and ignore narrative claims
   assert.equal(rows.length, 3);
 });
 
-test("release 1.4.1 keeps product metadata while trigger state advances the save format", () => {
+test("release 1.4.2 keeps product metadata while trigger state advances the save format", () => {
   const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
-  assert.equal(RELEASE_NAME, "1.4.1");
-  assert.equal(RELEASE_VERSION, "1.4.1");
+  assert.equal(RELEASE_NAME, "1.4.2");
+  assert.equal(RELEASE_VERSION, "1.4.2");
   assert.equal(pkg.version, RELEASE_VERSION);
   assert.equal(GAME_SYSTEM_VERSION, 1);
   assert.equal(SAVE_VERSION, 12);
-  assert.ok(LATEST_UPDATE.title.startsWith("1.4.1"));
+  assert.ok(LATEST_UPDATE.title.startsWith("1.4.2"));
   assert.ok(PREVIOUS_UPDATES.some(update => update.title.startsWith("1.4.0 ·")));
   assert.ok(PREVIOUS_UPDATES.some(update => update.title.startsWith("1.3.6 ·")));
   assert.ok(PREVIOUS_UPDATES.some(update => update.title === "四座教堂列入城区图"));
