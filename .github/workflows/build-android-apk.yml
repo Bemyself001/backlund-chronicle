@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  PRODUCT_VERSION: "1.4.4"
+  PRODUCT_VERSION: "1.4.5"
 
 jobs:
   build-release-apk:
@@ -113,5 +113,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "贝克兰德纪事 ${PRODUCT_VERSION}" \
-            --notes "1.4.4 · 系统与内容彻底分层：特殊物品、组织、非凡入口与特殊任务改由可校验内容包统一驱动，新增渐进式资料披露、只读 context.lookup、固定叙事契约、内容迁移与进行中任务快照。旧存档自动升级，六边形地图保持不变。请下载 backlund-chronicle.apk 直接覆盖安装以保留存档，不要先卸载。" \
+            --notes "1.4.5 · 家传怀表姓名修复：完成全部怀表检查后才出现舅舅失踪的回忆；雷金纳德使用玩家姓名中可明确识别的姓氏，没有姓氏时只使用名字。任务卡、线索、奖励与旧存档同步迁移，六边形地图保持不变。请下载 backlund-chronicle.apk 直接覆盖安装以保留存档，不要先卸载。" \
             --latest
