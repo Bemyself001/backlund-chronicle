@@ -13,4 +13,51 @@ export const CONTENT_MIGRATIONS = [
     triggerStages: [],
     factRenames: [],
   },
+  {
+    id: "backlund.2026.09.14-to-2026.09.14.1",
+    fromVersion: "2026.09.14",
+    toVersion: "2026.09.14.1",
+    factRenames: [
+      { from: "watch.ra-found-alive", to: "watch.uncle-found-alive" },
+      { from: "watch.ra-sequence-confirmed", to: "watch.uncle-sequence-confirmed" },
+      { from: "watch.ra-release-chosen", to: "watch.uncle-release-chosen" },
+      { from: "watch.ra-released", to: "watch.uncle-released" },
+    ],
+    textReplacementFields: ["recentDialogues", "storyHistory", "longTermSummary", "memoryState", "memoryNotes", "lastTurnAudit", "triggerState", "clues", "inventory"],
+    textReplacements: [
+      { from: "雷金纳德·阿博特", to: "雷金纳德{characterSurnameSuffix}" },
+      { from: "R.A.", to: "雷金纳德{characterSurnameSuffix}" },
+    ],
+    definitionRefreshes: [
+      {
+        definitionId: "watch.heirloom.hidden-note",
+        toDefinitionVersion: 2,
+        refreshPresentation: true,
+        deferAvailableUntil: [{ type: "fact", key: "watch.note-recovered", value: true }],
+        stageMap: {
+          "exterior-inspected": "note-recovered",
+          "inscription-found": "note-recovered",
+          "mechanism-opened": "note-recovered",
+        },
+      },
+      {
+        definitionId: "watch.heirloom.late-hour",
+        toDefinitionVersion: 2,
+        refreshPresentation: true,
+        stageMap: {
+          "trace-reginald": "trace-uncle",
+          "find-reginald": "find-uncle",
+        },
+      },
+    ],
+    cluePatches: [
+      { id: "clue-watch-note-decoded", patch: { title: "雷金纳德{characterSurnameSuffix}留下的怀表纸条", detail: "纸条由主角失踪的舅舅雷金纳德{characterSurnameSuffix}留下，记录了南岸货栈、被替换的整点交接暗号，以及一句仓促写下的警告：不要相信白鸢尾。" } },
+      { id: "clue-reginald-abbott-history", patch: { id: "clue-missing-uncle-history", title: "雷金纳德{characterSurnameSuffix}失踪前的旧档", detail: "主角的舅舅雷金纳德{characterSurnameSuffix}曾是通识者途径序列9，失踪前在南岸货栈追查魔女会的军火与文物交接。" } },
+      { id: "clue-reginald-forced-advancement", patch: { id: "clue-uncle-forced-advancement", detail: "雷金纳德{characterSurnameSuffix}已被魔女会强行从序列9通识者晋升为序列8考古学家；他仍会使用机械、枪械与炸药，却已失去自主行动能力。" } },
+    ],
+    itemPatches: [
+      { itemId: "archaeologist-characteristic", patch: { description: "舅舅雷金纳德{characterSurnameSuffix}死后析出的序列8“考古学家”非凡特性。它不是可直接服用的魔药；通识者仍需配方、消化与调制，其他途径贸然使用极其危险。", source: "雷金纳德{characterSurnameSuffix}的遗留" } },
+      { itemId: "heirloom-watch", requiredTags: ["已查明"], patch: { description: "舅舅雷金纳德{characterSurnameSuffix}留下的家传怀表。它已经停止走动，成为一件被查明来历的纪念物。" } },
+    ],
+  },
 ];

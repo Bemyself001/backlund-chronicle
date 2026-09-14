@@ -20,7 +20,7 @@ export const BACKLUND_CONTENT = {
   id: "backlund-core",
   name: "贝克兰德核心内容",
   schemaVersion: 2,
-  contentVersion: "2026.09.14",
+  contentVersion: "2026.09.14.1",
   openings: OPENINGS,
   talents: TALENTS,
   pathways: PATHWAYS,

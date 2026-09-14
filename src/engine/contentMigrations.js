@@ -1,5 +1,67 @@
 import { ACTIVE_CONTENT, CONTENT_SCHEMA_VERSION, CONTENT_VERSION } from "../content/index.js";
-import { hydrateActiveTriggerDefinitions } from "./triggerDefinitions.js";
+import { getTriggerDefinition, hydrateActiveTriggerDefinitions } from "./triggerDefinitions.js";
+import { allConditionsMatch } from "./triggerConditions.js";
+import { renderContentData } from "./contentTemplates.js";
+
+function refreshDefinitions(game, step) {
+  const state = game.triggerState;
+  for (const refresh of step.definitionRefreshes || []) {
+    const definition = getTriggerDefinition(refresh.definitionId);
+    if (!definition) continue;
+    for (const instance of [...(state.active || []), ...(state.history || [])]) {
+      if (instance.definitionId !== refresh.definitionId) continue;
+      const shouldDefer = instance.status === "available" && refresh.deferAvailableUntil?.length
+        && !allConditionsMatch(refresh.deferAvailableUntil, { game, state, signals: [], action: "", turn: Number(game.turn || 0), instance });
+      if (shouldDefer) {
+        instance.status = "eligible";
+        instance.stage = definition.eligibleStage || "eligible";
+        instance.expiresTurn = null;
+        instance.presentation = undefined;
+      } else {
+        instance.stage = refresh.stageMap?.[instance.stage] || instance.stage;
+        const validStages = new Set((definition.stages || []).map((stage) => stage.id));
+        if (["available", "engaged"].includes(instance.status) && !validStages.has(instance.stage)) {
+          instance.stage = instance.status === "engaged"
+            ? definition.engagedStage || definition.initialStage
+            : definition.initialStage;
+        }
+        if (refresh.refreshPresentation && instance.status !== "eligible") {
+          instance.presentation = renderContentData(definition.presentation || {}, { game });
+        }
+      }
+      instance.definitionVersion = Number(refresh.toDefinitionVersion || definition.version || 1);
+      delete instance.definitionSnapshot;
+    }
+  }
+}
+
+function replaceStoryText(value, replacements, context) {
+  if (typeof value === "string") {
+    return replacements.reduce((text, replacement) => (
+      text.replaceAll(replacement.from, renderContentData(replacement.to, context))
+    ), value);
+  }
+  if (Array.isArray(value)) return value.map((entry) => replaceStoryText(entry, replacements, context));
+  if (value && typeof value === "object") {
+    return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, replaceStoryText(entry, replacements, context)]));
+  }
+  return value;
+}
+
+function patchStoryRecords(game, step) {
+  for (const field of step.textReplacementFields || []) {
+    if (game[field] != null) game[field] = replaceStoryText(game[field], step.textReplacements || [], { game });
+  }
+  for (const update of step.cluePatches || []) {
+    const clue = (game.clues || []).find((entry) => entry.id === update.id);
+    if (clue) Object.assign(clue, renderContentData(update.patch || {}, { game }));
+  }
+  for (const update of step.itemPatches || []) {
+    const item = (game.inventory || []).find((entry) => entry.itemId === update.itemId);
+    if (!item || (update.requiredTags || []).some((tag) => !(item.tags || []).includes(tag))) continue;
+    Object.assign(item, renderContentData(update.patch || {}, { game, item }));
+  }
+}
 
 function applyMigrationStep(game, step) {
   const state = game.triggerState;
@@ -17,6 +79,8 @@ function applyMigrationStep(game, step) {
       if (instance.status === "eligible" || instance.status === "available" || instance.status === "engaged") delete instance.definitionSnapshot;
     }
   }
+  refreshDefinitions(game, step);
+  patchStoryRecords(game, step);
 }
 
 function migrationPath(fromVersion) {

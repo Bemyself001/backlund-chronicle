@@ -16,7 +16,7 @@ export const ITEM_BEHAVIORS = [
           id: "watch.find-inscription",
           when: [{ type: "fact", key: "watch.inscription-found", not: true }],
           result: {
-            text: "顺着浅刻痕逐字辨认，你认出缩写“R.A.”与年份“1332”；上紧发条后，秒针每逢整点都会无故迟滞半拍。",
+            text: "顺着浅刻痕逐字辨认，你认出一枚被反复描深的羽毛笔形记号与年份“1332”；上紧发条后，秒针每逢整点都会无故迟滞半拍。",
             appendDiscovery: true,
             effects: [{ type: "discover-fact", factId: "watch.inscription-found" }],
           },
@@ -34,16 +34,20 @@ export const ITEM_BEHAVIORS = [
           id: "watch.recover-note",
           when: [{ type: "fact", key: "watch.note-recovered", not: true }],
           result: {
-            text: "移开隔板后，一卷极薄的纸条从机芯夹层里松脱出来；纸上是陌生速记符号，末尾重复着与内盖相同的“R.A.”。",
+            text: "移开隔板后，一卷极薄的纸条从机芯夹层里松脱出来；纸上是陌生的速记符号，末尾重复着内盖上的羽毛笔记号。指腹碰到那个记号时，一段尘封的记忆忽然清晰：这枚怀表最后属于你的舅舅雷金纳德{characterSurnameSuffix}。他在数年前毫无征兆地失踪，此后再没有回家；怀表却在不久后被人无声送回，家里始终没人知道送表的人是谁。",
             appendDiscovery: true,
-            effects: [{ type: "discover-fact", factId: "watch.note-recovered" }],
+            effects: [
+              { type: "discover-fact", factId: "watch.note-recovered" },
+              { type: "discover-fact", factId: "watch.owner-is-maternal-uncle" },
+              { type: "discover-fact", factId: "watch.uncle-missing-remembered" },
+            ],
           },
         },
         {
           id: "watch.inspect-complete",
           fallback: true,
           result: {
-            text: "怀表的刻字、整点迟滞与机芯夹层都已经检查过；那卷速记纸条仍需要可靠的人或资料来辨认。",
+            text: "怀表的刻字、整点迟滞与机芯夹层都已经检查过。你已经想起它最后属于失踪的舅舅雷金纳德{characterSurnameSuffix}；那卷速记纸条仍需要可靠的人或资料来辨认。",
           },
         },
       ],

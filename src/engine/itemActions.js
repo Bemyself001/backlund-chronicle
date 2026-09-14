@@ -1,14 +1,11 @@
 import { getItemBehavior } from "../content/index.js";
 import { allConditionsMatch, anyConditionMatches } from "./triggerConditions.js";
 import { normalizeTriggerState } from "./triggerState.js";
+import { renderContentText } from "./contentTemplates.js";
 
 function appendDiscovery(item, text) {
   const current = String(item.discoveredInfo || item.description || "").trim();
   if (!current.includes(text)) item.discoveredInfo = `${current} ${text}`.trim();
-}
-
-function renderTemplate(value, item) {
-  return String(value || "").replaceAll("{itemName}", String(item.name || item.itemId || "物品"));
 }
 
 function actionContext(game, item, turn, playerAction) {
@@ -39,7 +36,7 @@ export function executeItemContentAction(game, item, actionName, { turn, playerA
     return { handled: true, ok: false, reason: action.denyMessage || "本地内容规则不允许这样使用该物品" };
   }
   const result = action.result || {};
-  const text = renderTemplate(result.text || result.logTemplate, item);
+  const text = renderContentText(result.text || result.logTemplate, { game, item });
   if (result.appendDiscovery && text) appendDiscovery(item, text);
   const triggerSignals = [];
   for (const [index, effect] of (result.effects || []).entries()) {
@@ -50,7 +47,7 @@ export function executeItemContentAction(game, item, actionName, { turn, playerA
       evidenceIds: [`item-action:${action.id}:${turn}`],
     };
     if (effect.type === "discover-fact") triggerSignals.push({ ...base, kind: "fact.discovered", factId: effect.factId, text });
-    if (effect.type === "signal") triggerSignals.push({ ...base, kind: effect.kind, text: renderTemplate(effect.text, item) });
+    if (effect.type === "signal") triggerSignals.push({ ...base, kind: effect.kind, text: renderContentText(effect.text, { game, item }) });
   }
   const data = structuredClone(result.data || {});
   if (triggerSignals.length) data.triggerSignals = triggerSignals;

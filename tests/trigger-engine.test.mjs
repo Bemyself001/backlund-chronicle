@@ -100,46 +100,48 @@ test("sequence 8 creates no new entry but can continue an entry that appeared at
 });
 
 test("heirloom watch inspection advances one local fact at a time and rewards only once", () => {
-  let game = createInitialGame({ ...EMPTY_CHARACTER, name: "怀表阶段测试员", talent: "heirloom-watch" });
+  let game = createInitialGame({ ...EMPTY_CHARACTER, name: "克莱恩·莫雷蒂", talent: "heirloom-watch" });
   const watch = game.inventory.find((item) => item.itemId === "heirloom-watch");
   for (const [index, fact] of ["watch.exterior-inspected", "watch.inscription-found", "watch.mechanism-opened", "watch.note-recovered"].entries()) {
-    const calls = [];
-    if (index === 1) {
-      const available = game.triggerState.active.find((item) => item.definitionId === "watch.heirloom.hidden-note");
-      calls.push({ id: "engage-watch", name: "trigger.engage", args: { instanceId: available.instanceId }, reason: "明确继续拆查怀表" });
-    }
     const call = { id: `watch-inspect-${index}`, name: "item.inspect", args: { instanceId: watch.instanceId, reveal: true }, reason: "继续检查家传怀表" };
-    calls.push(call);
-    const settled = processTurn(game, index + 1, "继续检查家传怀表并追查刻痕", calls);
+    const settled = processTurn(game, index + 1, "继续检查家传怀表并追查刻痕", [call]);
     game = settled.game;
-    assert.equal(settled.results.at(-1).ok, true);
+    assert.equal(settled.results[0].ok, true);
     assert.ok(game.triggerState.facts[fact]);
-    if (index === 0) assert.equal(game.triggerState.active.find((item) => item.definitionId === "watch.heirloom.hidden-note")?.status, "available");
+    if (index < 3) assert.equal(game.triggerState.active.find((item) => item.definitionId === "watch.heirloom.hidden-note")?.status, "eligible");
+    else assert.match(settled.results[0].log, /舅舅雷金纳德·莫雷蒂/);
   }
-  const watchEvent = game.triggerState.active.find((item) => item.definitionId === "watch.heirloom.hidden-note");
-  assert.equal(watchEvent.status, "engaged");
+  let watchEvent = game.triggerState.active.find((item) => item.definitionId === "watch.heirloom.hidden-note");
+  assert.equal(watchEvent.status, "available");
   assert.equal(watchEvent.stage, "note-recovered");
+  assert.match(watchEvent.presentation.text, /舅舅雷金纳德·莫雷蒂/);
+  assert.ok(game.triggerState.facts["watch.owner-is-maternal-uncle"]);
+  assert.ok(game.triggerState.facts["watch.uncle-missing-remembered"]);
   assert.match(game.inventory.find((item) => item.instanceId === watch.instanceId).discoveredInfo, /速记符号/);
 
+  ({ game } = processTurn(game, 5, "主动追查舅舅留下的纸条", [{ id: "engage-watch", name: "trigger.engage", args: { instanceId: watchEvent.instanceId }, reason: "明确追查舅舅失踪的线索" }]));
+  watchEvent = game.triggerState.active.find((item) => item.definitionId === "watch.heirloom.hidden-note");
+  assert.equal(watchEvent.status, "engaged");
   const decodeCall = { id: "decode-watch", name: "trigger.progress", args: { instanceId: watchEvent.instanceId, objectiveId: "decode-watch-note", evidence: "用市政档案馆的旧速记表逐句核对出完整译文" }, reason: "找到可靠资料并完成辨认" };
-  ({ game } = processTurn(game, 5, "查阅旧速记表并译出怀表纸条", [decodeCall]));
+  ({ game } = processTurn(game, 6, "查阅旧速记表并译出怀表纸条", [decodeCall]));
   assert.equal(game.triggerState.history.find((item) => item.instanceId === watchEvent.instanceId)?.status, "completed");
   assert.ok(game.triggerState.facts["watch.formal-quest-unlocked"]);
-  assert.ok(game.clues.some((clue) => clue.id === "clue-watch-note-decoded"));
+  assert.match(game.clues.find((clue) => clue.id === "clue-watch-note-decoded")?.detail || "", /雷金纳德·莫雷蒂/);
   assert.equal(game.triggerState.rewardsClaimed.filter((id) => id.startsWith("watch.hidden-note")).length, 2);
 
-  processTriggers(game, { action: "重复提交", turn: 5 });
+  processTriggers(game, { action: "重复提交", turn: 6 });
   assert.equal(game.clues.filter((clue) => clue.id === "clue-watch-note-decoded").length, 1);
   assert.equal(game.triggerState.rewardsClaimed.filter((id) => id.startsWith("watch.hidden-note")).length, 2);
 });
 
 test("special task progress is stage-bound and the watch main quest resolves through the non-official escape", () => {
-  let game = createInitialGame({ ...EMPTY_CHARACTER, name: "迟到整点测试员", talent: "heirloom-watch", extraordinary: "low", pathway: "占卜家（序列9）" });
+  let game = createInitialGame({ ...EMPTY_CHARACTER, name: "格尔曼·斯帕罗", talent: "heirloom-watch", extraordinary: "low", pathway: "占卜家（序列9）" });
   game.triggerState.facts["watch.formal-quest-unlocked"] = { value: true, firstTurn: 0, evidenceIds: ["test"] };
   ({ game } = processTurn(game, 1, "查看怀表纸条译文"));
   const quest = game.triggerState.active.find((item) => item.definitionId === "watch.heirloom.late-hour");
   assert.equal(quest.status, "available");
-  ({ game } = processTurn(game, 2, "开始追查雷金纳德与南岸货栈", [{ id: "main-engage", name: "trigger.engage", args: { instanceId: quest.instanceId }, reason: "主动调查家族旧事" }]));
+  assert.match(quest.presentation.text, /雷金纳德·斯帕罗/);
+  ({ game } = processTurn(game, 2, "开始追查雷金纳德·斯帕罗与南岸货栈", [{ id: "main-engage", name: "trigger.engage", args: { instanceId: quest.instanceId }, reason: "主动调查家族旧事" }]));
 
   const progress = (turn, objectiveId, action, evidence = "本轮行动取得了足以确认阶段目标的可靠结果") => {
     const call = { id: `main-${objectiveId}`, name: "trigger.progress", args: { instanceId: quest.instanceId, objectiveId, evidence }, reason: evidence };
@@ -148,20 +150,20 @@ test("special task progress is stage-bound and the watch main quest resolves thr
     assert.equal(settled.results[0].ok, true, settled.results[0].reason);
   };
 
-  progress(3, "trace-reginald", "追查雷金纳德的档案记录");
+  progress(3, "trace-uncle", "追查舅舅雷金纳德·斯帕罗的档案记录");
   game.location = { id: "bridge-docks", name: "桥区·南岸货栈", district: "贝克兰德桥区" };
   progress(4, "enter-south-warehouse", "进入南岸货栈仓库");
   progress(5, "survive-warehouse-bomb", "辨认引线后绕开仓库炸弹");
-  progress(6, "find-reginald-alive", "搜查仓库并找到雷金纳德");
-  progress(7, "identify-reginald-sequence", "检查痕迹确认雷金纳德是序列8考古学家");
-  progress(8, "confirm-reginald-control", "试探并查明雷金纳德已成为受控傀儡");
+  progress(6, "find-uncle-alive", "搜查仓库并找到舅舅雷金纳德·斯帕罗");
+  progress(7, "identify-uncle-sequence", "检查痕迹确认雷金纳德·斯帕罗是序列8考古学家");
+  progress(8, "confirm-uncle-control", "试探并查明舅舅已经成为受控傀儡");
 
-  const invalid = processTurn(game, 9, "试图直接逃走", [{ id: "skip-mercy", name: "trigger.progress", args: { instanceId: quest.instanceId, objectiveId: "escape-white-iris", evidence: "试图跳过雷金纳德的生死决定" }, reason: "跳过当前阶段" }]);
+  const invalid = processTurn(game, 9, "试图直接逃走", [{ id: "skip-mercy", name: "trigger.progress", args: { instanceId: quest.instanceId, objectiveId: "escape-white-iris", evidence: "试图跳过舅舅的生死决定" }, reason: "跳过当前阶段" }]);
   assert.equal(invalid.results[0].ok, false);
   assert.match(invalid.results[0].reason, /当前阶段/);
 
-  progress(9, "release-reginald", "我明确开枪结束他的生命，让雷金纳德解脱", "玩家明确作出不可逆的解脱决定并亲手执行");
-  assert.equal(game.triggerState.facts["watch.ra-released"].value, true);
+  progress(9, "release-uncle", "我明确开枪结束他的生命，让舅舅雷金纳德·斯帕罗解脱", "玩家明确作出不可逆的解脱决定并亲手执行");
+  assert.equal(game.triggerState.facts["watch.uncle-released"].value, true);
   assert.ok(game.inventory.some((item) => item.itemId === "archaeologist-characteristic"));
   assert.ok(game.inventory.some((item) => item.itemId === "azik-copper-whistle"));
   progress(10, "escape-white-iris", "无法战胜白鸢尾，立刻撤退逃生", "没有官方支援，主角从短暂交手中脱身，白鸢尾仍然存活");

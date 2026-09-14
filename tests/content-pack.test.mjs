@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 test("Backlund content pack is serializable, versioned, and internally valid", () => {
   assert.equal(ACTIVE_CONTENT.id, "backlund-core");
   assert.equal(CONTENT_SCHEMA_VERSION, 2);
-  assert.match(CONTENT_VERSION, /^\d{4}\.\d{2}\.\d{2}$/);
+  assert.match(CONTENT_VERSION, /^\d{4}\.\d{2}\.\d{2}(?:\.\d+)?$/);
   assert.deepEqual(validateContentPack(), []);
   assert.doesNotThrow(() => JSON.stringify(ACTIVE_CONTENT));
   assert(Object.isFrozen(ACTIVE_CONTENT));

@@ -15,6 +15,7 @@ import { executeToolCalls } from "../src/engine/tools.js";
 import { processTriggers } from "../src/engine/triggerEngine.js";
 import { getInstanceTriggerDefinition } from "../src/engine/triggerDefinitions.js";
 import { terminalTrigger } from "../src/engine/triggerState.js";
+import { characterSurname, renderContentText } from "../src/engine/contentTemplates.js";
 import { buildPlanningContext } from "../src/services/memory.js";
 
 test("story-specific items, organizations, and triggers resolve through the content registry", () => {
@@ -22,6 +23,14 @@ test("story-specific items, organizations, and triggers resolve through the cont
   assert.equal(getOrganization("nighthawks").name, "值夜者");
   assert.ok(getOrganization("nighthawks").tags.includes("official"));
   assert.equal(getContentTrigger("watch.heirloom.late-hour").category, "personal-story");
+});
+
+test("content templates inherit an explicit player surname and omit it when unavailable", () => {
+  assert.equal(characterSurname({ name: "克莱恩·莫雷蒂" }), "莫雷蒂");
+  assert.equal(characterSurname({ name: "Klein Moretti" }), "Moretti");
+  assert.equal(characterSurname({ name: "克莱恩" }), "");
+  assert.equal(renderContentText("雷金纳德{characterSurnameSuffix}", { game: { character: { name: "克莱恩·莫雷蒂" } } }), "雷金纳德·莫雷蒂");
+  assert.equal(renderContentText("雷金纳德{characterSurnameSuffix}", { game: { character: { name: "克莱恩" } } }), "雷金纳德");
 });
 
 test("core runtime contains no concrete watch, whistle, or official organization IDs", () => {

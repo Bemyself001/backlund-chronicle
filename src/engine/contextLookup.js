@@ -1,6 +1,7 @@
 import { LORE_ENTRIES, getLoreEntry } from "../content/index.js";
 import { allConditionsMatch } from "./triggerConditions.js";
 import { normalizeTriggerState } from "./triggerState.js";
+import { renderContentText } from "./contentTemplates.js";
 
 const normalizeText = (value) => String(value || "").toLowerCase().replace(/\s+/g, "");
 
@@ -24,8 +25,8 @@ function relevanceScore(game, entry, query) {
   return score;
 }
 
-function playerSafeLore(entry) {
-  return { id: entry.id, type: "loreFact", text: entry.text };
+function playerSafeLore(game, entry) {
+  return { id: entry.id, type: "loreFact", text: renderContentText(entry.text, { game }) };
 }
 
 export function lookupContext(game, { query = "", ids = [], limit = 6 } = {}) {
@@ -39,7 +40,7 @@ export function lookupContext(game, { query = "", ids = [], limit = 6 } = {}) {
     .filter(({ score }) => score > 0)
     .sort((left, right) => right.score - left.score || left.entry.id.localeCompare(right.entry.id))
     .slice(0, Math.max(1, Math.min(8, Number(limit) || 6)))
-    .map(({ entry }) => playerSafeLore(entry));
+    .map(({ entry }) => playerSafeLore(game, entry));
   return { query: String(query || ""), entries: available, missing: requested.filter((id) => !available.some((entry) => entry.id === id)) };
 }
 

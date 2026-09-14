@@ -93,7 +93,7 @@ function mapGrowthAnchors(game) {
 
 function privatePlanningState(game, options = {}) {
   const triggerObjectives = (game.triggerState?.active || []).filter((entry) => entry.status === "engaged").map((entry) => {
-    const definition = getInstanceTriggerDefinition(entry);
+    const definition = getInstanceTriggerDefinition(entry, game);
     const stage = (definition?.stages || []).find((candidate) => candidate.id === entry.stage);
     return {
       instanceId: entry.instanceId,

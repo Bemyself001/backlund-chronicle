@@ -13,6 +13,7 @@ import {
 } from "./triggerState.js";
 import { buildTriggerSignals } from "./triggerSignals.js";
 import { moneyFromPence, moneyToPence } from "../system/money.js";
+import { renderContentData } from "./contentTemplates.js";
 
 function definitionEligible(definition, context) {
   if (!allConditionsMatch(definition.eligibility || [], context)) return false;
@@ -35,7 +36,7 @@ function refreshEligibility(game, state, signals, action, turn) {
   const context = { game, state, signals, action, turn };
   state.active = state.active.filter((instance) => {
     if (instance.status !== "eligible") return true;
-    const definition = getInstanceTriggerDefinition(instance);
+    const definition = getInstanceTriggerDefinition(instance, game);
     return definition && definitionEligible(definition, context);
   });
   const activeDefinitionIds = new Set(state.active.map((entry) => entry.definitionId));
@@ -116,7 +117,7 @@ function makeAvailableInstance(game, state, definition, turn, action, signals) {
   instance.engagedTurn = null;
   instance.completedTurn = null;
   instance.source = { action: String(action || ""), evidenceIds };
-  instance.presentation = structuredClone(definition.presentation || {});
+  instance.presentation = renderContentData(definition.presentation || {}, { game });
   instance.definitionVersion = Number(definition.version || 1);
   instance.definitionSnapshot = structuredClone(definition);
   instance.stageHistory.push({ id: `${instance.instanceId}:eligible:available`, from: "eligible", to: "available", turn, evidenceIds });
@@ -171,7 +172,7 @@ function completeInstance(game, state, instance, definition, turn, events, trans
 function advanceExisting(game, state, signals, action, turn, events) {
   const context = { game, state, signals, action, turn };
   for (const instance of [...state.active]) {
-    const definition = getInstanceTriggerDefinition(instance);
+    const definition = getInstanceTriggerDefinition(instance, game);
     if (!definition) continue;
     if (instance.status === "available" && definition.autoEngageWhen?.length && allConditionsMatch(definition.autoEngageWhen, context)) {
       instance.status = "engaged";
@@ -251,7 +252,7 @@ export function engageTrigger(game, instanceId, turn, action = "") {
   game.triggerState = state;
   const instance = state.active.find((entry) => entry.instanceId === instanceId);
   if (!instance || instance.status !== "available") return { ok: false, reason: "当前没有匹配的可追查事件" };
-  const definition = getInstanceTriggerDefinition(instance);
+  const definition = getInstanceTriggerDefinition(instance, game);
   const previousStage = instance.stage;
   instance.status = "engaged";
   instance.engagedTurn = turn;
@@ -280,7 +281,7 @@ export function progressTrigger(game, instanceId, objectiveId, turn, action = ""
   game.triggerState = state;
   const instance = state.active.find((entry) => entry.instanceId === instanceId && entry.status === "engaged");
   if (!instance) return { ok: false, reason: "当前没有匹配的进行中特殊任务" };
-  const definition = getInstanceTriggerDefinition(instance);
+  const definition = getInstanceTriggerDefinition(instance, game);
   const stage = (definition?.stages || []).find((entry) => entry.id === instance.stage);
   const transition = (stage?.transitions || []).find((entry) => entry.objectiveId === objectiveId);
   if (!transition) return { ok: false, reason: "该目标不属于任务当前阶段，不能跳过或倒退" };

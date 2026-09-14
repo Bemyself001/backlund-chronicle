@@ -10,8 +10,15 @@ export const LORE_ENTRIES = [
     id: "lore.watch.recovered-note",
     type: "loreFact",
     revealWhen: [{ type: "fact", key: "watch.note-recovered", value: true }],
-    relevance: { terms: ["怀表", "纸条", "速记", "R.A."], itemIds: ["heirloom-watch"] },
-    text: "怀表夹层纸条已经被取出，但在译出之前只能确认其使用陌生速记符号，并带有缩写 R.A.；不得提前透露译文。",
+    relevance: { terms: ["怀表", "纸条", "速记", "羽毛笔记号"], itemIds: ["heirloom-watch"] },
+    text: "怀表夹层纸条已经被取出，但在译出之前只能确认其使用陌生速记符号，并带有羽毛笔形记号；不得提前透露译文。",
+  },
+  {
+    id: "lore.watch.missing-uncle-memory",
+    type: "loreFact",
+    revealWhen: [{ type: "fact", key: "watch.uncle-missing-remembered", value: true }],
+    relevance: { terms: ["怀表", "舅舅", "失踪", "家人", "回忆"], itemIds: ["heirloom-watch"], definitionIds: ["watch.heirloom.hidden-note", "watch.heirloom.late-hour"] },
+    text: "主角已经回忆起：怀表最后属于舅舅雷金纳德{characterSurnameSuffix}。他数年前失踪，怀表随后被身份不明的人送回。雷金纳德的姓氏必须与主角姓名中可明确解析出的姓氏相同；无法解析时只称“雷金纳德”，不得另造姓氏。",
   },
   {
     id: "lore.watch.white-iris-confrontation",

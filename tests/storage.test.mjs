@@ -15,7 +15,7 @@ test("version 1 saves migrate from Grayharbor to Backlund without losing progres
   });
   assert.equal(migrated.version, 13);
   assert.equal(migrated.systemVersion, 2);
-  assert.deepEqual(migrated.content, { packId: "backlund-core", schemaVersion: 2, contentVersion: "2026.09.14" });
+  assert.deepEqual(migrated.content, { packId: "backlund-core", schemaVersion: 2, contentVersion: "2026.09.14.1" });
   assert.equal(migrated.turn, 8);
   assert.equal(migrated.title, "艾琳的贝克兰德档案");
   assert.equal(migrated.location.district, "贝克兰德桥区·旧钟街");
@@ -102,4 +102,66 @@ test("legacy occult entries migrate into trigger state with a fresh ten-turn gra
   assert.equal(active.expiresTurn, 37);
   assert.equal(migrated.triggerState.history.find((entry) => entry.instanceId === "occult-entry-20")?.status, "expired");
   assert.equal(migrated.occult.currentEntry.id, "occult-entry-25");
+});
+
+test("watch story content migration inherits the player surname and defers premature memories", () => {
+  const migrated = migrateSave({
+    version: 13,
+    systemVersion: 2,
+    id: "watch-content-migration",
+    turn: 6,
+    content: { packId: "backlund-core", schemaVersion: 2, contentVersion: "2026.09.14" },
+    character: { name: "克莱恩·莫雷蒂", extraordinary: "ordinary", pathway: "无" },
+    inventory: [{ instanceId: "watch-1", itemId: "heirloom-watch", name: "家传怀表", description: "雷金纳德·阿博特留下的怀表。", tags: ["重要物品", "已查明"] }],
+    clues: [{ id: "clue-reginald-abbott-history", title: "雷金纳德·阿博特的旧档", detail: "R.A.曾在南岸活动。" }],
+    storyHistory: [{ role: "assistant", content: "雷金纳德·阿博特已经失踪。" }],
+    longTermSummary: "R.A.是主角失踪的舅舅。",
+    triggerState: {
+      version: 2,
+      active: [
+        {
+          instanceId: "watch-discovery-old",
+          definitionId: "watch.heirloom.hidden-note",
+          definitionVersion: 1,
+          category: "personal-story",
+          status: "available",
+          stage: "exterior-inspected",
+          createdTurn: 1,
+          presentation: { title: "家传怀表", text: "雷金纳德·阿博特留下了一道刻痕。" },
+        },
+        {
+          instanceId: "watch-main-old",
+          definitionId: "watch.heirloom.late-hour",
+          definitionVersion: 1,
+          category: "personal-story",
+          status: "engaged",
+          stage: "trace-reginald",
+          createdTurn: 3,
+          engagedTurn: 4,
+          presentation: { title: "迟到的整点", text: "追查雷金纳德·阿博特。" },
+        },
+      ],
+      history: [],
+      facts: { "watch.ra-released": { value: true, firstTurn: 5, evidenceIds: ["old-release"] } },
+      rewardsClaimed: [],
+      nextInitialOccultWindow: 10,
+    },
+  });
+
+  assert.equal(migrated.content.contentVersion, "2026.09.14.1");
+  const discovery = migrated.triggerState.active.find((entry) => entry.instanceId === "watch-discovery-old");
+  assert.equal(discovery.status, "eligible");
+  assert.equal(discovery.stage, "eligible");
+  assert.equal(discovery.presentation, undefined);
+  const main = migrated.triggerState.active.find((entry) => entry.instanceId === "watch-main-old");
+  assert.equal(main.stage, "trace-uncle");
+  assert.match(main.presentation.text, /雷金纳德·莫雷蒂/);
+  assert.equal(migrated.triggerState.facts["watch.ra-released"], undefined);
+  assert.equal(migrated.triggerState.facts["watch.uncle-released"].value, true);
+  assert.match(migrated.storyHistory[0].content, /雷金纳德·莫雷蒂/);
+  assert.match(migrated.longTermSummary, /雷金纳德·莫雷蒂/);
+  assert.equal(migrated.clues[0].id, "clue-missing-uncle-history");
+  assert.match(migrated.clues[0].detail, /雷金纳德·莫雷蒂/);
+  assert.match(migrated.inventory[0].description, /雷金纳德·莫雷蒂/);
+  assert.doesNotMatch(JSON.stringify(migrated), /雷金纳德·阿博特|R\.A\./);
 });

@@ -1,4 +1,5 @@
 import { TRIGGER_DEFINITIONS as CONTENT_TRIGGER_DEFINITIONS } from "../content/index.js";
+import { renderContentData } from "./contentTemplates.js";
 
 export const TRIGGER_DEFINITIONS = CONTENT_TRIGGER_DEFINITIONS;
 
@@ -8,7 +9,7 @@ export function getTriggerDefinition(definitionId) {
   return DEFINITIONS_BY_ID.get(definitionId) || null;
 }
 
-export function getInstanceTriggerDefinition(instance) {
+export function getInstanceTriggerDefinition(instance, game = null) {
   if (!instance) return null;
   const current = getTriggerDefinition(instance.definitionId);
   const currentVersion = Number(current?.version || 1);
@@ -16,9 +17,11 @@ export function getInstanceTriggerDefinition(instance) {
     instance.definitionVersion = currentVersion;
     instance.definitionSnapshot = structuredClone(current);
   }
-  if (!current) return instance.definitionSnapshot || null;
-  if (instance.definitionVersion != null && Number(instance.definitionVersion) !== currentVersion) return instance.definitionSnapshot || current;
-  return current;
+  let definition;
+  if (!current) definition = instance.definitionSnapshot || null;
+  else if (instance.definitionVersion != null && Number(instance.definitionVersion) !== currentVersion) definition = instance.definitionSnapshot || current;
+  else definition = current;
+  return game && definition ? renderContentData(definition, { game }) : definition;
 }
 
 export function hydrateActiveTriggerDefinitions(state) {
