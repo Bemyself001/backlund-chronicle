@@ -11,7 +11,7 @@ const CHECK_INTERVAL = 24 * 60 * 60 * 1000;
 // 公共加速镜像随时可能失效，仅作为直连失败后的备选；顺序即优先级。
 const MIRROR_PREFIXES = [
   "https://ghproxy.net/",
-  "https://gh-proxy.com/",
+  "https://ghfast.top/",
 ];
 
 export const APP_VERSION = import.meta.env?.VITE_APP_VERSION || RELEASE_VERSION;

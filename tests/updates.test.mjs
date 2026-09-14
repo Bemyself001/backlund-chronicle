@@ -30,7 +30,10 @@ test("getDownloadOptions lists direct, mirrors, and release page", () => {
   assert.equal(options[0].url, direct);
   const mirrors = options.filter((option) => option.label.startsWith("镜像加速下载"));
   assert.equal(mirrors.length, 2);
-  assert.ok(mirrors.every((option) => option.url.endsWith(direct)));
+  assert.deepEqual(mirrors.map(({ label, url }) => ({ label, url })), [
+    { label: "镜像加速下载 1", url: `https://ghproxy.net/${direct}` },
+    { label: "镜像加速下载 2", url: `https://ghfast.top/${direct}` },
+  ]);
   assert.equal(options.at(-1).label, "打开发布页手动下载");
 });
 

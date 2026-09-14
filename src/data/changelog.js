@@ -100,7 +100,7 @@ const RELEASE_144_UPDATE = {
   ],
 };
 
-export const LATEST_UPDATE = {
+const RELEASE_145_UPDATE = {
   date: "2026-09-14",
   dateLabel: "2026.09.14",
   title: "1.4.5 · 家传怀表姓名修复",
@@ -112,6 +112,18 @@ export const LATEST_UPDATE = {
     "旧存档会更新进行中的怀表任务、既有线索、物品说明、剧情记录和长期摘要；过早出现的怀表回忆会退回等待完整检查。",
     "内容版本升级至 2026.09.14.1，并加入动态姓名、触发时机和旧档迁移测试；六边形地图保持不变。",
     "产品版本更新为 1.4.5；Android 内部版本号继续递增，保持原包名、正式签名与覆盖安装兼容性。",
+  ],
+};
+
+export const LATEST_UPDATE = {
+  date: "2026-09-14",
+  dateLabel: "2026.09.14",
+  title: "1.4.6 · 镜像下载2修复",
+  summary: "替换已经失效的第二个 APK 下载镜像，恢复备用安装包下载通道。",
+  changes: [
+    "镜像加速下载2由已返回 403 的 gh-proxy.com 切换为可正常返回最新版 APK 的 ghfast.top。",
+    "直接下载、镜像加速下载1、GitHub 发布页和热更新通道保持不变；新增精确地址回归测试，防止镜像配置误改。",
+    "产品版本更新为 1.4.6；Android 内部版本号递增至 30122，保持原包名、正式签名与覆盖安装兼容性。",
   ],
 };
 
@@ -323,6 +335,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_145_UPDATE,
   RELEASE_144_UPDATE,
   RELEASE_143_UPDATE,
   RELEASE_142_UPDATE,
