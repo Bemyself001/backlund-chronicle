@@ -63,21 +63,33 @@ jobs:
           mkdir -p pages/fonts
           cp dist/fonts/ShanHaiXingYeGeTeW-2.woff2 pages/fonts/
 
-      - name: Write update manifest (latest.json)
+      - name: Resolve latest release through accelerator
+        id: latest-release
         continue-on-error: true
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          gh api "repos/$GITHUB_REPOSITORY/releases/latest" > /tmp/release.json
-          RELEASE_TAG=$(jq -r '.tag_name' /tmp/release.json)
-          RELEASE_VERSION="${RELEASE_TAG#v}"
-          [[ "$RELEASE_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          if jq -e '.assets[] | select(.name == "web-bundle-v2.zip")' /tmp/release.json > /dev/null; then
-            mkdir -p "pages/ota/$RELEASE_VERSION"
-            gh release download "$RELEASE_TAG" --repo "$GITHUB_REPOSITORY" \
-              --pattern 'web-bundle-v2.zip*' --dir "pages/ota/$RELEASE_VERSION"
-          fi
-          node scripts/write-update-manifests.mjs /tmp/release.json pages
+        uses: ./.github/actions/github-cn-accelerator
+        with:
+          operation: latest-release
+          repository: ${{ github.repository }}
+          release-json: /tmp/release.json
+          github-token: ${{ github.token }}
+
+      - name: Download OTA assets through accelerator
+        id: ota-assets
+        if: steps.latest-release.outcome == 'success'
+        continue-on-error: true
+        uses: ./.github/actions/github-cn-accelerator
+        with:
+          operation: download-assets
+          repository: ${{ github.repository }}
+          release-json: /tmp/release.json
+          asset-pattern: web-bundle-v2.zip*
+          output-directory: pages/ota/${{ steps.latest-release.outputs.version }}
+          github-token: ${{ github.token }}
+
+      - name: Write update manifest (latest.json)
+        if: steps.latest-release.outcome == 'success' && steps.ota-assets.outcome == 'success'
+        continue-on-error: true
+        run: node scripts/write-update-manifests.mjs /tmp/release.json pages
 
       - name: Configure GitHub Pages
         uses: actions/configure-pages@v5

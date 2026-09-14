@@ -1,0 +1,79 @@
+name: GitHub CN Accelerator
+description: Race GitHub download routes, resume transfers, and verify official SHA-256 digests.
+
+inputs:
+  operation:
+    description: check-tag, latest-release, or download-assets
+    required: true
+  repository:
+    description: Repository in OWNER/REPO form
+    required: true
+  tag:
+    description: Tag used by check-tag
+    required: false
+  expected-sha:
+    description: Expected tag target; check-tag fails when an existing tag points elsewhere
+    required: false
+  release-json:
+    description: Path written by latest-release and read by download-assets
+    required: false
+    default: /tmp/github-release.json
+  asset-pattern:
+    description: Glob matched by download-assets
+    required: false
+    default: "*"
+  output-directory:
+    description: Destination directory for download-assets
+    required: false
+    default: .
+  timeout:
+    description: Per-route timeout in seconds
+    required: false
+    default: "15"
+  mirrors:
+    description: Newline-separated HTTPS mirror prefixes
+    required: false
+    default: |-
+      https://github.xxlab.tech/
+      https://ghfast.top/
+  github-token:
+    description: Token used only with the official api.github.com route
+    required: false
+
+outputs:
+  exists:
+    description: Whether check-tag found the tag
+    value: ${{ steps.accelerator.outputs.exists }}
+  tag:
+    description: Resolved release tag
+    value: ${{ steps.accelerator.outputs.tag }}
+  version:
+    description: Resolved release version without a leading v
+    value: ${{ steps.accelerator.outputs.version }}
+  target:
+    description: Existing tag target SHA
+    value: ${{ steps.accelerator.outputs.target }}
+  source:
+    description: Route that completed the metadata check
+    value: ${{ steps.accelerator.outputs.source }}
+  downloaded-files:
+    description: JSON array of downloaded asset paths
+    value: ${{ steps.accelerator.outputs.downloaded-files }}
+
+runs:
+  using: composite
+  steps:
+    - id: accelerator
+      shell: bash
+      env:
+        ACCELERATOR_OPERATION: ${{ inputs.operation }}
+        ACCELERATOR_REPOSITORY: ${{ inputs.repository }}
+        ACCELERATOR_TAG: ${{ inputs.tag }}
+        ACCELERATOR_EXPECTED_SHA: ${{ inputs.expected-sha }}
+        ACCELERATOR_RELEASE_JSON: ${{ inputs.release-json }}
+        ACCELERATOR_ASSET_PATTERN: ${{ inputs.asset-pattern }}
+        ACCELERATOR_OUTPUT_DIRECTORY: ${{ inputs.output-directory }}
+        ACCELERATOR_TIMEOUT: ${{ inputs.timeout }}
+        ACCELERATOR_MIRRORS: ${{ inputs.mirrors }}
+        GH_TOKEN: ${{ inputs.github-token }}
+      run: python3 "$GITHUB_ACTION_PATH/workflow_action.py"
