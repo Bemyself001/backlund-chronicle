@@ -1,6 +1,6 @@
 import { normalizeInventoryItem } from "../system/items.js";
 import { getAdvancement } from "../system/character.js";
-import { allConditionsMatch } from "./triggerConditions.js";
+import { allConditionsMatch, hasActionTerms } from "./triggerConditions.js";
 import { TRIGGER_DEFINITIONS, getTriggerDefinition } from "./triggerDefinitions.js";
 import { canReceiveNewOccultEntry } from "./occultTriggers.js";
 import {
@@ -12,6 +12,7 @@ import {
   terminalTrigger,
 } from "./triggerState.js";
 import { buildTriggerSignals } from "./triggerSignals.js";
+import { moneyFromPence, moneyToPence } from "../system/money.js";
 
 function definitionEligible(definition, context) {
   if (!allConditionsMatch(definition.eligibility || [], context)) return false;
@@ -125,13 +126,33 @@ function applyReward(game, state, reward, turn) {
     if (!game.clues.some((clue) => clue.id === reward.clue?.id)) game.clues.push({ detail: "", ...structuredClone(reward.clue), discoveredAt: `第 ${turn} 轮`, isNew: true });
   } else if (reward.type === "item") {
     if (!game.inventory.some((item) => item.instanceId === reward.item?.instanceId || item.itemId === reward.item?.itemId)) game.inventory.push(normalizeInventoryItem({ quantity: 1, ...structuredClone(reward.item), acquiredAt: `第 ${turn} 轮` }));
+  } else if (reward.type === "item-remove") {
+    const item = game.inventory.find((entry) => entry.itemId === reward.itemId);
+    if (item) {
+      item.quantity = Math.max(0, Number(item.quantity || 0) - Math.max(1, Number(reward.quantity || 1)));
+      if (item.quantity === 0) game.inventory = game.inventory.filter((entry) => entry.instanceId !== item.instanceId);
+    }
+  } else if (reward.type === "item-update") {
+    const item = game.inventory.find((entry) => entry.itemId === reward.itemId);
+    if (item) Object.assign(item, structuredClone(reward.patch || {}));
+  } else if (reward.type === "money") {
+    game.money = moneyFromPence(Math.max(0, moneyToPence(game.money || {}) + Number(reward.amountPence || 0)));
+  } else if (reward.type === "relationship") {
+    game.relationships = Array.isArray(game.relationships) ? game.relationships : [];
+    const relation = game.relationships.find((entry) => entry.id === reward.relationship?.id);
+    if (relation) {
+      relation.value = Math.max(-100, Math.min(100, Number(relation.value || 0) + Number(reward.delta || 0)));
+      if (reward.relationship?.note) relation.note = reward.relationship.note;
+    } else if (reward.relationship?.id && reward.relationship?.name) {
+      game.relationships.push({ value: Math.max(-100, Math.min(100, Number(reward.delta || 0))), ...structuredClone(reward.relationship) });
+    }
   }
   state.rewardsClaimed.push(rewardId);
   return rewardId;
 }
 
-function completeInstance(game, state, instance, definition, turn, events) {
-  const rewards = (definition.rewards || []).map((reward) => applyReward(game, state, reward, turn)).filter(Boolean);
+function completeInstance(game, state, instance, definition, turn, events, transitionRewards = []) {
+  const rewards = [...transitionRewards, ...(definition.rewards || [])].map((reward) => applyReward(game, state, reward, turn)).filter(Boolean);
   const completed = terminalTrigger(state, instance, "completed", turn);
   if (completed) events.completed.push({ ...completed, rewards });
 }
@@ -157,12 +178,22 @@ function advanceExisting(game, state, signals, action, turn, events) {
       if (failed) events.failed.push(failed);
       continue;
     }
-    if (!stage?.advanceWhen?.length || !allConditionsMatch(stage.advanceWhen, context)) continue;
+    const transition = (stage?.transitions || []).find((entry) => signals.some((signal) => (
+      signal.kind === "trigger.progress"
+      && signal.instanceId === instance.instanceId
+      && signal.objectiveId === entry.objectiveId
+    )) && allConditionsMatch(entry.when || [], { ...context, instance }));
+    const advanceWhen = stage?.advanceWhen || [];
+    if (!transition && (!advanceWhen.length || !allConditionsMatch(advanceWhen, { ...context, instance }))) continue;
     const previousStage = instance.stage;
-    instance.stage = stage.nextStage || instance.stage;
+    instance.stage = transition?.nextStage || stage.nextStage || instance.stage;
     instance.stageHistory.push({ id: `${instance.instanceId}:${previousStage}:${instance.stage}`, from: previousStage, to: instance.stage, turn, evidenceIds: signals.map((signal) => signal.id) });
     events.advanced.push({ instanceId: instance.instanceId, definitionId: instance.definitionId, from: previousStage, to: instance.stage, turn });
-    if (stage.complete) completeInstance(game, state, instance, definition, turn, events);
+    if (transition?.fail) {
+      const failed = terminalTrigger(state, instance, "failed", turn);
+      if (failed) events.failed.push(failed);
+    } else if (transition?.complete || stage.complete) completeInstance(game, state, instance, definition, turn, events, transition?.rewards || []);
+    else for (const reward of transition?.rewards || []) applyReward(game, state, reward, turn);
   }
 }
 
@@ -231,4 +262,32 @@ export function abandonTrigger(game, instanceId, turn) {
   const abandoned = terminalTrigger(state, instance, "abandoned", turn);
   syncLegacyOccult(game, state);
   return { ok: true, instance: abandoned };
+}
+
+export function progressTrigger(game, instanceId, objectiveId, turn, action = "", evidence = "") {
+  const state = normalizeTriggerState(game);
+  game.triggerState = state;
+  const instance = state.active.find((entry) => entry.instanceId === instanceId && entry.status === "engaged");
+  if (!instance) return { ok: false, reason: "当前没有匹配的进行中特殊任务" };
+  const definition = getTriggerDefinition(instance.definitionId);
+  const stage = (definition?.stages || []).find((entry) => entry.id === instance.stage);
+  const transition = (stage?.transitions || []).find((entry) => entry.objectiveId === objectiveId);
+  if (!transition) return { ok: false, reason: "该目标不属于任务当前阶段，不能跳过或倒退" };
+  if (transition.actionTerms?.length && !hasActionTerms(action, transition.actionTerms)) return { ok: false, reason: "玩家本轮行动没有明确完成当前目标" };
+  if (String(evidence || "").trim().length < 4) return { ok: false, reason: "任务推进必须说明本轮已经确认的证据或结果" };
+  const context = { game, state, signals: [], action, turn, instance };
+  if (!allConditionsMatch(transition.requirements || [], context)) return { ok: false, reason: transition.requirementMessage || "本地状态尚不满足这条任务分支" };
+  return {
+    ok: true,
+    instance,
+    transition,
+    signal: {
+      id: `signal:${turn}:trigger-progress:${instanceId}:${objectiveId}`,
+      kind: "trigger.progress",
+      instanceId,
+      objectiveId,
+      evidenceIds: [String(evidence).trim()],
+      text: `${action} ${evidence}`.trim(),
+    },
+  };
 }

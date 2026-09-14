@@ -3,6 +3,7 @@ import { hexContext } from "../system/hexworld.js";
 import { playerVisibleItem } from "../system/items.js";
 import { appendMemoryEpisode, createMemoryEpisode, memoryPromptState } from "./memoryState.js";
 import { playerVisibleTriggers } from "../engine/triggerState.js";
+import { getTriggerDefinition } from "../engine/triggerDefinitions.js";
 
 const SCENARIO_RULES = "【当前剧本】这是贝克兰德开放世界沙盒。开局大区是故事起点，与角色出身地区无关；根据存档中的 opening、剧情记忆及当前位置延续故事，不得擅自重置为东区车站开场。没有 opening 的旧档案以已有剧情记录为准。玩家可自由选择居所、职业、人脉、旅行方向与调查目标；各区开场中的疑点只是可选世界线，不是必须完成的主线。玩家未明确接受前，不得自动添加任务、安排 NPC 催促或用突发事件强迫回轨。特殊事件是否出现、追查、推进、过期和结算完全服从本地 triggerState 与回合确认结果；看见线索不等于接受任务。原作主线仅为遥远背景；隐藏危险不得无铺垫直接揭露。";
 
@@ -55,6 +56,7 @@ export function visibleGameState(game) {
     money: game.money,
     statusEffects: game.statusEffects,
     relationships: game.relationships,
+    organization: game.organizationState?.membership || null,
     occult: game.occult,
     inventory: visibleInventory(game),
     knownClues: game.clues,
@@ -89,11 +91,29 @@ function mapGrowthAnchors(game) {
 }
 
 function privatePlanningState(game, options = {}) {
+  const triggerObjectives = (game.triggerState?.active || []).filter((entry) => entry.status === "engaged").map((entry) => {
+    const definition = getTriggerDefinition(entry.definitionId);
+    const stage = (definition?.stages || []).find((candidate) => candidate.id === entry.stage);
+    return {
+      instanceId: entry.instanceId,
+      definitionId: entry.definitionId,
+      title: entry.presentation?.title || "特殊任务",
+      stage: entry.stage,
+      objectives: (stage?.transitions || []).map(({ objectiveId, description, requirements, requirementMessage }) => ({
+        objectiveId,
+        description,
+        requirements: requirements || [],
+        requirementMessage: requirementMessage || undefined,
+      })),
+    };
+  });
   return {
     hiddenDanger: game.hiddenDanger,
     occultEntryAvailable: Boolean(game.occult?.entryAvailable),
     currentOccultEntry: game.occult?.currentEntry || null,
     triggerState: game.triggerState || null,
+    organizationState: game.organizationState || { membership: null },
+    triggerObjectives,
     mapDiscoveryCandidates: shouldExposeMapCandidates(game, options) ? privateMapCandidates(game) : undefined,
     requestedMapInvestigation: options.mapInvestigation || null,
     mapGrowthAnchors: shouldExposeMapCandidates(game, options) ? mapGrowthAnchors(game) : undefined,

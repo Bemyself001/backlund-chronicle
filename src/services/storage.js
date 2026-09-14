@@ -88,6 +88,7 @@ export function migrateSave(raw) {
     discoveredLocations,
     locationKnowledge,
     occult,
+    organizationState: migrated.organizationState?.membership ? { membership: { status: "active", ...migrated.organizationState.membership } } : { membership: null },
     processedToolCalls: migrated.processedToolCalls || [],
     memoryNotes: migrated.memoryNotes || [],
     storyHistory: Array.isArray(migrated.storyHistory) ? migrated.storyHistory : (migrated.recentDialogues || []),

@@ -1,0 +1,127 @@
+const RENARD_COMMON_REWARDS = [
+  { id: "side.renard.completed", type: "fact", key: "side.renard.completed", value: true },
+  { id: "side.renard.favor", type: "fact", key: "noble.renard-favor", value: true },
+  { id: "side.renard.relationship", type: "relationship", relationship: { id: "viscount-renard", name: "雷纳德子爵", note: "女儿获救后欠下的人情；作为仲裁人，他愿意在合适时提供消息或正式协助。" }, delta: 20 },
+];
+
+export const SIDE_QUEST_DEFINITIONS = [
+  {
+    id: "side.queens.renard-fall",
+    category: "side-quest",
+    priority: 65,
+    oncePerSave: true,
+    eligibility: [{ type: "fact", key: "occult.contact", value: true }],
+    appearWhen: [{ type: "action", terms: ["隐秘组织", "隐秘圈子", "委托消息", "药师", "雷纳德"] }],
+    initialStage: "message-seen",
+    expiresAfterTurns: 10,
+    presentation: {
+      title: "高窗之下",
+      text: "皇后区雷纳德子爵在隐秘圈子发出急讯：他的女儿从高处坠落，普通医生只能暂时维持伤势，他愿以二十镑寻找一名药师。消息可以忽略，只有回应后才算接受。",
+      choice: { label: "回应雷纳德子爵的求医消息（可选）", intent: "trigger", risk: "medium" },
+    },
+    engagedStage: "assess-injury",
+    stages: [
+      { id: "assess-injury", transitions: [{ objectiveId: "assess-renard-injury", description: "抵达宅邸并确认伤势与治疗窗口", actionTerms: ["伤势", "检查", "诊断", "宅邸", "雷纳德"], nextStage: "secure-treatment" }] },
+      { id: "secure-treatment", transitions: [
+        {
+          objectiveId: "treat-as-apothecary",
+          description: "药师途径角色亲自治疗，领取全部二十镑",
+          actionTerms: ["治疗", "药师", "用药", "救治"],
+          requirements: [{ type: "character", kind: "extraordinary", pathwayId: "apothecary" }],
+          requirementMessage: "只有药师途径角色可以亲自完成这一分支",
+          nextStage: "completed-apothecary",
+          complete: true,
+          rewards: [{ id: "side.renard.pay-apothecary", type: "money", amountPence: 4800 }],
+        },
+        {
+          objectiveId: "recruit-apothecary",
+          description: "找到并说服一名药师合作",
+          actionTerms: ["寻找", "结识", "说服", "药师", "合作"],
+          nextStage: "shared-treatment",
+          rewards: [{ id: "side.renard.apothecary-met", type: "fact", key: "side.renard.apothecary-met", value: true }],
+        },
+        {
+          objectiveId: "use-healing-medicine",
+          description: "取得并使用适合重伤的治疗药剂，领取全部二十镑",
+          actionTerms: ["治疗药剂", "药剂", "用药", "服下", "救治"],
+          requirements: [{ type: "item", itemId: "renard-healing-draught" }],
+          requirementMessage: "背包中必须有已取得的重伤治疗药剂；这不是非凡者晋升用的魔药",
+          nextStage: "completed-medicine",
+          complete: true,
+          rewards: [
+            { id: "side.renard.consume-medicine", type: "item-remove", itemId: "renard-healing-draught", quantity: 1 },
+            { id: "side.renard.pay-medicine", type: "money", amountPence: 4800 },
+          ],
+        },
+      ] },
+      { id: "shared-treatment", transitions: [{
+        objectiveId: "complete-shared-treatment",
+        description: "与结识的药师完成治疗并平分酬金",
+        actionTerms: ["共同", "合作", "治疗", "平分", "药师"],
+        nextStage: "completed-shared",
+        complete: true,
+        rewards: [{ id: "side.renard.pay-shared", type: "money", amountPence: 2400 }],
+      }] },
+    ],
+    rewards: RENARD_COMMON_REWARDS,
+  },
+  {
+    id: "side.bridge.silent-detonator",
+    category: "side-quest",
+    priority: 55,
+    oncePerSave: true,
+    eligibility: [],
+    appearWhen: [
+      { type: "location", districts: ["桥区", "东区"] },
+      { type: "action", terms: ["雷管", "爆破", "炸药", "拆除工", "未响"] },
+    ],
+    initialStage: "dud-reported",
+    expiresAfterTurns: 10,
+    presentation: {
+      title: "没有响的雷管",
+      text: "一名桥梁拆除承包商发现整箱雷管被人调换，其中一枚哑火品仍留在工地。他只肯把调查交给愿意亲自查验的人。",
+      choice: { label: "检查哑火雷管并追查调包者（可选）", intent: "trigger", risk: "high" },
+    },
+    engagedStage: "inspect-dud",
+    stages: [
+      { id: "inspect-dud", transitions: [{ objectiveId: "inspect-dud", description: "检查哑火雷管，辨认调换痕迹", actionTerms: ["检查", "雷管", "哑火", "拆解"], nextStage: "trace-theft" }] },
+      { id: "trace-theft", transitions: [{ objectiveId: "trace-stolen-detonators", description: "追查被盗雷管的去向", actionTerms: ["追查", "雷管", "盗", "仓库", "买家"], nextStage: "disarm-live-detonator" }] },
+      { id: "disarm-live-detonator", transitions: [{ objectiveId: "disarm-live-detonator", description: "安全拆除已经启用的双保险雷管", actionTerms: ["拆除", "解除", "雷管", "保险", "安全"], nextStage: "completed", complete: true }] },
+    ],
+    rewards: [
+      { id: "side.detonator.completed", type: "fact", key: "side.silent-detonator.completed", value: true },
+      { id: "side.detonator.knowledge", type: "fact", key: "knowledge.dual-safety-detonator", value: true },
+      { id: "side.detonator.money", type: "money", amountPence: 480 },
+      { id: "side.detonator.kit", type: "item", item: { instanceId: "reward-detonator-toolkit", itemId: "blasting-tool-kit", name: "爆破工具包", category: "工具", description: "包含绝缘钳、探针、细扳手和固定夹，可用于安全处理常见雷管与引线。", quantity: 1, weight: 1.2, rarity: "少见", condition: "良好", tags: ["重要物品", "工具", "爆破"], importance: "important", source: "拆除承包商的酬谢" } },
+    ],
+  },
+  {
+    id: "side.bridge.ebb-iron-door",
+    category: "side-quest",
+    priority: 55,
+    oncePerSave: true,
+    eligibility: [],
+    appearWhen: [
+      { type: "location", locationId: "bridge-docks" },
+      { type: "action", terms: ["退潮", "铁门", "排水道", "码头男孩", "失踪"] },
+    ],
+    initialStage: "boy-missing",
+    expiresAfterTurns: 10,
+    presentation: {
+      title: "退潮后的铁门",
+      text: "码头搬运工说，一个替人跑腿的男孩在退潮时看见排水道深处的铁门，随后再没回来。潮水正在回涨，但这仍是一桩可以不接的麻烦。",
+      choice: { label: "趁退潮寻找铁门与失踪男孩（可选）", intent: "trigger", risk: "high" },
+    },
+    engagedStage: "find-iron-door",
+    stages: [
+      { id: "find-iron-door", transitions: [{ objectiveId: "enter-before-tide", description: "在涨潮前找到并进入排水道铁门", actionTerms: ["铁门", "排水道", "退潮", "进入"], nextStage: "rescue-dock-boy" }] },
+      { id: "rescue-dock-boy", transitions: [{ objectiveId: "rescue-dock-boy", description: "从走私者密室救出失踪男孩", actionTerms: ["救", "男孩", "走私", "密室"], nextStage: "exit-drain" }] },
+      { id: "exit-drain", transitions: [{ objectiveId: "exit-before-flood", description: "带男孩在水位封死出口前离开", actionTerms: ["离开", "撤出", "涨潮", "出口", "带.*男孩"], nextStage: "completed", complete: true }] },
+    ],
+    rewards: [
+      { id: "side.iron-door.completed", type: "fact", key: "side.ebb-iron-door.completed", value: true },
+      { id: "side.iron-door.route", type: "fact", key: "route.south-warehouse-drain", value: true },
+      { id: "side.iron-door.trust", type: "relationship", relationship: { id: "bridge-dockworkers", name: "南岸码头工人", note: "你救回了失踪的跑腿男孩，他们愿意提供潮汐、仓库和排水道消息。" }, delta: 18 },
+    ],
+  },
+];

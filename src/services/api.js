@@ -240,6 +240,17 @@ const TOOL_PARAMETER_SCHEMAS = {
       reason: { type: "string", description: "玩家本轮明确追查该事件的行动" },
     },
   },
+  "trigger.progress": {
+    type: "object",
+    additionalProperties: false,
+    required: ["instanceId", "objectiveId", "evidence", "reason"],
+    properties: {
+      instanceId: { type: "string", description: "当前进行中特殊任务的实例 ID" },
+      objectiveId: { type: "string", description: "当前阶段允许完成的目标 ID，必须来自本地任务状态" },
+      evidence: { type: "string", description: "本轮已经确认的行动结果或可靠证据" },
+      reason: { type: "string", description: "该证据为何足以推进当前阶段" },
+    },
+  },
   "trigger.abandon": {
     type: "object",
     additionalProperties: false,
@@ -247,6 +258,18 @@ const TOOL_PARAMETER_SCHEMAS = {
     properties: {
       instanceId: { type: "string", description: "玩家要明确放弃的特殊事件实例 ID" },
       reason: { type: "string", description: "玩家明确拒绝或放弃的表达" },
+    },
+  },
+  "organization.join": {
+    type: "object",
+    additionalProperties: false,
+    required: ["organizationId", "name", "kind", "evidence", "reason"],
+    properties: {
+      organizationId: { type: "string", description: "组织的稳定 ID" },
+      name: { type: "string", description: "组织名称" },
+      kind: { type: "string", enum: ["official", "unofficial"], description: "官方组织或非官方组织" },
+      evidence: { type: "string", description: "玩家完成宣誓、登记或正式接纳的剧情证据" },
+      reason: { type: "string" },
     },
   },
   "occult.reveal": {
@@ -506,7 +529,7 @@ const TOOL_PARAMETER_SCHEMAS = {
   },
 };
 
-const STATE_TOOL_NAMES = ["inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "trigger.engage", "trigger.abandon", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.grow", "location.discover", "location.move", "location.archive", "clue.add", "quest.add", "quest.update", "dice.check"];
+const STATE_TOOL_NAMES = ["inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "trigger.engage", "trigger.progress", "trigger.abandon", "organization.join", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.grow", "location.discover", "location.move", "location.archive", "clue.add", "quest.add", "quest.update", "dice.check"];
 
 const CHOICE_TOOL_SCHEMA = {
   type: "object",

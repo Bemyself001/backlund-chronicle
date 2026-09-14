@@ -30,7 +30,7 @@ export const DEFAULT_SYSTEM_PROMPT = `你是《贝克兰德纪事》的叙事者
 4. 保持悬疑、因果与资源约束；不随意赠送强力物品、能力或无代价解决危险。
 5. 这是开放世界沙盒。玩家可以无视、拒绝或离开任何案件与剧情钩子；不得用巧合、NPC 催促或突发灾难强迫玩家回到预设主线。未被玩家明确接受的委托不得添加为进行中任务。
 6. 尊重地点连续性和旅行时间。玩家可在贝克兰德各区寻找工作、居所、人脉、知识与个人目标，世界事件会继续发展，但不应围绕玩家一人运转。剧情首次产生会长期复用的街道、建筑或室内地点时，使用 location.grow 将它连接到一个已发现的锚点；只有听闻时登记为 rumored，取得可靠地址或亲自确认时登记为 discovered。不要为一次性背景、重复地点或没有剧情依据的装饰创建地图节点。仅当 temporary=true 的地点在剧情中确认失效且没有关联档案时，才使用 location.archive。
-7. 特殊事件的资格、出现、追查、阶段、过期与奖励完全由本地 triggerState 决定。看到线索不等于接受任务；只有玩家明确表示追查时才可调用 occult.contact 或 trigger.engage，明确放弃时才可调用 trigger.abandon。普通人和序列9可以获得新的非凡入口，序列8及以上不能新生成入口，但已经出现或正在追查的入口继续有效。occult.contact=1 只代表接触过非凡世界，不代表获得力量。
+7. 特殊事件的资格、出现、追查、阶段、过期与奖励完全由本地 triggerState 决定。看到线索不等于接受任务；只有玩家明确表示追查时才可调用 occult.contact 或 trigger.engage，完成当前阶段目标时必须调用 trigger.progress 并提供本轮可靠证据，明确放弃时才可调用 trigger.abandon。不得用 clue.add、quest.update 或正文叙述跳过特殊任务阶段。普通人和序列9可以获得新的非凡入口，序列8及以上不能新生成入口，但已经出现或正在追查的入口继续有效。occult.contact=1 只代表接触过非凡世界，不代表获得力量。
 8. 只有 occult.contact=1 后，才允许登记非凡知识。获得可靠魔药配方时用 clue.add 并填写 kind=potion_recipe、pathwayId 和 sequence；获得魔药时用 inventory.add 的 potion 字段保存真实途径、序列与鉴定状态，未鉴定时 name 和 description 只能描述外观。普通人只有在剧情中主动接触非凡世界、持有对应配方和已鉴定的序列9魔药，并在本轮明确决定服用魔药时，才能调用 advancement.promote 正式成为非凡者；后续晋升也必须沿当前途径逐级验证，不能用 character.update、item.use 或 inventory.remove 代替晋升。晋升结果必须等待本地确认后才能写成既成事实。
 9. ${CHOICE_RULE}
 10. 所有状态变化必须作为工具调用提议。不要在正文中伪造工具已经成功执行；等待本地引擎验证后再在后续叙事中确认。物品和资金是否获得或失去以本地审计结果为准，而不是以正文宣称为准。新增物品只有在会影响任务、案件证据、身份、非凡能力或后续剧情入口时，才将 importance 设为 important；普通消耗品、生活用品、材料和货币必须使用 normal。资金使用 money.add、money.remove，金额必须放在 amount 对象中并拆分为 pounds（镑）、solers（苏勒）、pence（便士），例如 {"amount":{"solers":2,"pence":6}}。角色数值使用 character.update 调整，patch 填写增减量而非目标值（例如 {"sanity":-2} 表示理智减少 2 点），本地引擎会把结果截断到 0 至上限，并在数值归零或恢复时自动维护对应状态。status.add 可通过 tick 字段声明该状态存在期间每轮的数值增减（例如持续伤害 {"health":-1}，单项 ±3），由本地引擎逐轮结算。
@@ -57,7 +57,7 @@ export function migrateSystemPrompt(prompt = "") {
   const previousNarrativeRule = `12. ${PREVIOUS_NARRATIVE_RULE}`;
   const nextNarrativeRule = `12. ${NARRATIVE_RULE}`;
   const previousOccultRule = "7. 普通人的 occult.contact 初始为 0；在第 5、10、15 轮等每五轮节点，可出现一次非强制的非凡入口，直到玩家主动接触后变为 1。开局选择低序列非凡者的角色 occult.contact 初始为 1。contact=1 只代表接触过非凡世界，不代表获得力量。";
-  const nextOccultRule = "7. 特殊事件的资格、出现、追查、阶段、过期与奖励完全由本地 triggerState 决定。看到线索不等于接受任务；只有玩家明确表示追查时才可调用 occult.contact 或 trigger.engage，明确放弃时才可调用 trigger.abandon。普通人和序列9可以获得新的非凡入口，序列8及以上不能新生成入口，但已经出现或正在追查的入口继续有效。occult.contact=1 只代表接触过非凡世界，不代表获得力量。";
+  const nextOccultRule = "7. 特殊事件的资格、出现、追查、阶段、过期与奖励完全由本地 triggerState 决定。看到线索不等于接受任务；只有玩家明确表示追查时才可调用 occult.contact 或 trigger.engage，完成当前阶段目标时必须调用 trigger.progress 并提供本轮可靠证据，明确放弃时才可调用 trigger.abandon。不得用 clue.add、quest.update 或正文叙述跳过特殊任务阶段。普通人和序列9可以获得新的非凡入口，序列8及以上不能新生成入口，但已经出现或正在追查的入口继续有效。occult.contact=1 只代表接触过非凡世界，不代表获得力量。";
   let migrated = String(prompt).replace(legacyIntro, nextIntro).replace(legacyProtocol, nextProtocol).replace(legacyMoney, nextMoney).replaceAll("《雾中纪事》", "《贝克兰德纪事》").replaceAll("灰檐港", "贝克兰德");
   if (!migrated.includes("本轮明确决定服用魔药")) migrated = migrated.includes(previousAdvancement) ? migrated.replace(previousAdvancement, nextAdvancement) : migrated.replace(legacyAdvancement, nextAdvancement);
   if (!migrated.includes("location.archive")) migrated = migrated.includes(previousMap) ? migrated.replace(previousMap, nextMap) : migrated.replace(legacyMap, nextMap);
@@ -67,6 +67,7 @@ export function migrateSystemPrompt(prompt = "") {
   if (!migrated.includes("【行动选项】")) migrated = migrated.includes(previousChoiceRule) ? migrated.replace(previousChoiceRule, nextChoiceRule) : migrated.replace(legacyChoiceRule, nextChoiceRule);
   if (!migrated.includes("【叙事目标】")) migrated = migrated.includes(previousNarrativeRule) ? migrated.replace(previousNarrativeRule, nextNarrativeRule) : migrated.replace(legacyNarrativeRule, nextNarrativeRule);
   if (!migrated.includes("triggerState 决定")) migrated = migrated.replace(previousOccultRule, nextOccultRule);
+  else if (!migrated.includes("trigger.progress")) migrated = migrated.replace(/7\. 特殊事件的资格[\s\S]*?occult\.contact=1 只代表接触过非凡世界，不代表获得力量。/, nextOccultRule);
   return migrated;
 }
 
@@ -148,6 +149,7 @@ export function createInitialGame(character, confirmedLoadout) {
       entryHistory: [],
     },
     triggerState: createTriggerState({ id: gameId }),
+    organizationState: { membership: null },
     inventory: [
       ...startingInventory,
       ...(talentItem ? [talentItem] : []),

@@ -13,6 +13,8 @@ function matchesSignal(signal, condition) {
   if (condition.toolName && signal.toolName !== condition.toolName) return false;
   if (condition.itemId && signal.itemId !== condition.itemId) return false;
   if (condition.factId && signal.factId !== condition.factId) return false;
+  if (condition.instanceId && signal.instanceId !== condition.instanceId) return false;
+  if (condition.objectiveId && signal.objectiveId !== condition.objectiveId) return false;
   if (condition.terms?.length && !textHasAny([signal.text, signal.action, signal.title, signal.detail].filter(Boolean).join(" "), condition.terms)) return false;
   return true;
 }
@@ -52,6 +54,8 @@ export function conditionMatches(condition = {}, context = {}) {
   let matched = false;
   switch (condition.type) {
     case "always": matched = true; break;
+    case "all": matched = allConditionsMatch(condition.conditions || [], context); break;
+    case "any": matched = anyConditionMatches(condition.conditions || [], context); break;
     case "character": {
       if (condition.kind === "ordinary") matched = advancement.type === "ordinary";
       else if (condition.kind === "extraordinary") matched = advancement.type === "extraordinary";
@@ -86,6 +90,14 @@ export function conditionMatches(condition = {}, context = {}) {
       break;
     }
     case "relationship": matched = relationMatches(game, condition); break;
+    case "organization": {
+      const membership = game.organizationState?.membership;
+      matched = Boolean(membership)
+        && (!condition.organizationId || membership.organizationId === condition.organizationId)
+        && (!condition.kind || membership.kind === condition.kind)
+        && (!condition.status || membership.status === condition.status);
+      break;
+    }
     case "clue": matched = clueMatches(game, condition); break;
     case "trigger": matched = triggerMatches(state, condition); break;
     case "turn": matched = turn >= Number(condition.min || 0) && (condition.max == null || turn <= Number(condition.max)); break;

@@ -7,9 +7,16 @@ import { normalizeInventoryItem, normalizeItemImportance } from "../system/items
 import { equipmentSlot } from "../system/loadout.js";
 import { applyAdvancement, getAdvancement, isExplicitAdvancementIntent } from "../system/character.js";
 import { getPathway } from "../content/index.js";
-import { abandonTrigger, engageTrigger } from "./triggerEngine.js";
+import { abandonTrigger, engageTrigger, progressTrigger } from "./triggerEngine.js";
 import { inspectHeirloomWatch } from "./watchTriggers.js";
 import { normalizeTriggerState } from "./triggerState.js";
+
+const OFFICIAL_ORGANIZATIONS = {
+  nighthawks: "值夜者",
+  "machinery-hivemind": "机械之心",
+  "mandated-punishers": "代罚者",
+  mi9: "军情九处",
+};
 
 export const TOOL_SCHEMAS = {
   "inventory.add": { required: ["item"], description: "新增或合并一个结构化物品实例" },
@@ -24,7 +31,9 @@ export const TOOL_SCHEMAS = {
   "item.unequip": { required: ["instanceId"], description: "卸下已装备物品" },
   "occult.contact": { required: ["entryId"], description: "确认玩家主动接触当前非凡入口" },
   "trigger.engage": { required: ["instanceId"], description: "确认玩家主动追查一个已经出现的特殊事件" },
+  "trigger.progress": { required: ["instanceId", "objectiveId", "evidence"], description: "按当前阶段登记特殊任务目标的可靠完成证据" },
   "trigger.abandon": { required: ["instanceId"], description: "确认玩家明确放弃一个已出现或正在追查的特殊事件" },
+  "organization.join": { required: ["organizationId", "name", "kind", "evidence"], description: "在玩家明确加入后登记当前组织成员身份" },
   "occult.reveal": { required: ["topic", "evidence"], description: "在已有非凡接触后揭示有限神秘知识" },
   "advancement.promote": { required: ["pathwayId", "sequence", "potionInstanceId", "recipeClueId", "evidence"], description: "验证剧情接触、配方与魔药后完成晋升" },
   "character.update": { required: ["patch"], description: "以增减量调整受限角色数值（可为负），由引擎截断到 0 至上限" },
@@ -235,8 +244,8 @@ function repairToolArgs(name, rawArgs = {}, game = null) {
     args.entryId = game.occult.currentEntry.id;
     repairNote = appendRepairNote(repairNote, "已匹配当前非凡入口");
   }
-  if (["trigger.engage", "trigger.abandon"].includes(name) && !args.instanceId && game) {
-    const available = normalizeTriggerState(game).active.filter((entry) => name === "trigger.engage" ? entry.status === "available" : ["available", "engaged"].includes(entry.status));
+  if (["trigger.engage", "trigger.progress", "trigger.abandon"].includes(name) && !args.instanceId && game) {
+    const available = normalizeTriggerState(game).active.filter((entry) => name === "trigger.engage" ? entry.status === "available" : name === "trigger.progress" ? entry.status === "engaged" : ["available", "engaged"].includes(entry.status));
     if (available.length === 1) {
       args.instanceId = available[0].instanceId;
       repairNote = appendRepairNote(repairNote, "已匹配当前特殊事件");
@@ -467,6 +476,13 @@ function executeOne(game, call, options = {}) {
       const target = findItem();
       if (!target) return fail(call.name, "找不到要使用的物品");
       if (target.potion) return fail(call.name, target.potion.identified ? "魔药不能作为普通消耗品使用；必须通过晋升验证" : "未知魔药尚未鉴定，不能直接服用");
+      if (target.itemId === "azik-copper-whistle") {
+        if (/(攻击|杀死|消灭|作战|战斗召唤|命令.*战斗)/.test(String(options.playerAction || call.reason))) return fail(call.name, "阿兹克铜哨的骸骨信使只负责送信，不能被当作战斗召唤物");
+        return succeed(call.name, `${turnLabel}：吹响「${target.name}」后，巨大的白骨信使无声出现，等待接收写给阿兹克的信件；铜哨散发的死亡气息也可能吸引亡灵、令附近尸体出现异动。`, {
+          triggerSignals: [{ kind: "azik.whistle-blown", itemId: target.itemId, instanceId: target.instanceId, text: "阿兹克的骸骨信使回应了铜哨，但不会参与战斗。" }],
+          messenger: { recipient: "阿兹克·艾格斯", combatCapable: false, attractsUndead: true },
+        });
+      }
       if (target.tags.includes("消耗品")) {
         const change = { ...target, delta: -1, reason: call.reason, importance: normalizeItemImportance(target) };
         target.quantity -= 1;
@@ -507,11 +523,30 @@ function executeOne(game, call, options = {}) {
       if (!result.ok) return fail(call.name, result.reason);
       return succeed(call.name, `${turnLabel}：开始追查「${result.instance.presentation?.title || "特殊事件"}」——${call.reason}。`, { triggerTransition: { instanceId: args.instanceId, status: "engaged", stage: result.instance.stage } });
     }
+    case "trigger.progress": {
+      const result = progressTrigger(game, args.instanceId, String(args.objectiveId || ""), game.turn + 1, options.playerAction ?? call.reason, args.evidence);
+      if (!result.ok) return fail(call.name, result.reason);
+      return succeed(call.name, `${turnLabel}：确认「${result.instance.presentation?.title || "特殊任务"}」当前目标已经推进——${args.evidence}。`, {
+        triggerTransition: { instanceId: args.instanceId, objectiveId: args.objectiveId, from: result.instance.stage, to: result.transition.nextStage || "completed" },
+        triggerSignals: [result.signal],
+      });
+    }
     case "trigger.abandon": {
       if (options.playerAction !== undefined && !/(放弃|拒绝|不再|停止追查|离开这件事)/.test(String(options.playerAction))) return fail(call.name, "玩家本轮没有明确表示放弃该事件");
       const result = abandonTrigger(game, args.instanceId, game.turn + 1);
       if (!result.ok) return fail(call.name, result.reason);
       return succeed(call.name, `${turnLabel}：你明确放弃了「${result.instance.presentation?.title || "特殊事件"}」。`, { triggerTransition: { instanceId: args.instanceId, status: "abandoned" } });
+    }
+    case "organization.join": {
+      if (options.playerAction !== undefined && !/(加入|宣誓|登记为|成为.*成员|接受招募)/.test(String(options.playerAction))) return fail(call.name, "玩家本轮没有明确同意加入该组织");
+      if (!String(args.organizationId || "").trim() || !String(args.name || "").trim()) return fail(call.name, "组织必须具有稳定 ID 与名称");
+      if (!["official", "unofficial"].includes(args.kind)) return fail(call.name, "组织性质只能是 official 或 unofficial");
+      if (args.kind === "official" && !OFFICIAL_ORGANIZATIONS[args.organizationId]) return fail(call.name, "该官方组织不在本地登记名录中");
+      if (String(args.evidence || "").trim().length < 4) return fail(call.name, "必须记录宣誓、登记或正式接纳的剧情证据");
+      if (game.organizationState?.membership?.status === "active") return fail(call.name, "角色已经拥有一个有效组织成员身份");
+      const organizationName = args.kind === "official" ? OFFICIAL_ORGANIZATIONS[args.organizationId] : String(args.name);
+      game.organizationState = { membership: { organizationId: String(args.organizationId), name: organizationName, kind: args.kind, status: "active", joinedTurn: game.turn + 1, evidence: String(args.evidence) } };
+      return succeed(call.name, `${turnLabel}：正式加入「${organizationName}」——${args.evidence}。`, { membership: structuredClone(game.organizationState.membership) });
     }
     case "occult.reveal": {
       const occult = game.occult || { contact: 0, revealLevel: 0 };

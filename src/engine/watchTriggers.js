@@ -58,15 +58,23 @@ export const WATCH_TRIGGER_DEFINITIONS = [{
     text: "怀表外壳上的浅刻痕显然不是普通划痕。你已经看见这条线索，但只有继续拆查，才会正式进入这段家族旧事。",
     choice: { label: "继续检查家传怀表的刻痕（可选）", intent: "trigger", risk: "low" },
   },
-  autoEngageWhen: [{ type: "signal", kind: "fact.discovered", factId: "watch.inscription-found" }],
   engagedStage: "inscription-found",
   stages: [
-    { id: "inscription-found", advanceWhen: [{ type: "signal", kind: "fact.discovered", factId: "watch.mechanism-opened" }], nextStage: "mechanism-opened" },
-    { id: "mechanism-opened", advanceWhen: [{ type: "signal", kind: "fact.discovered", factId: "watch.note-recovered" }], nextStage: "note-recovered" },
-    { id: "note-recovered", advanceWhen: [{ type: "signal", kind: "clue.added", terms: ["怀表", "纸条", "速记", "R.A."] }], nextStage: "decoded", complete: true },
+    { id: "inscription-found", advanceWhen: [{ type: "fact", key: "watch.mechanism-opened", value: true }], nextStage: "mechanism-opened" },
+    { id: "mechanism-opened", advanceWhen: [{ type: "fact", key: "watch.note-recovered", value: true }], nextStage: "note-recovered" },
+    {
+      id: "note-recovered",
+      transitions: [{
+        objectiveId: "decode-watch-note",
+        description: "寻找可靠的人或资料，译出夹层纸条",
+        actionTerms: ["译", "辨认", "解读", "速记", "请教", "查阅"],
+        nextStage: "decoded",
+        complete: true,
+      }],
+    },
   ],
   rewards: [
     { id: "watch.hidden-note.formal-quest", type: "fact", key: "watch.formal-quest-unlocked", value: true },
-    { id: "watch.hidden-note.decoded-clue", type: "clue", clue: { id: "clue-watch-note-decoded", title: "怀表夹层纸条的译文", detail: "可靠资料确认，这张速记纸条是一份被截断的会面记录，署名缩写为 R.A.；它为后续追查怀表来历提供了正式入口。", kind: "personal_story" } },
+    { id: "watch.hidden-note.decoded-clue", type: "clue", clue: { id: "clue-watch-note-decoded", title: "怀表夹层纸条的译文", detail: "纸条由雷金纳德·阿博特（R.A.）留下，记录了南岸货栈、被替换的整点交接暗号，以及一句仓促写下的警告：不要相信白鸢尾。", kind: "personal_story", locationId: "bridge-docks" } },
   ],
 }];
