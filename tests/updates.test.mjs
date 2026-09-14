@@ -20,20 +20,22 @@ test("a short marketing version must outrank every incremental compatibility bui
   assert.equal(compareVersions(RELEASE_VERSION, "1.3.104"), 1);
 });
 
-test("getDownloadOptions lists direct, mirrors, and release page", () => {
+test("getDownloadOptions recommends the verified domestic mirror before GitHub direct download", () => {
   const direct = "https://github.com/Bemyself001/backlund-chronicle/releases/download/v1.1.52/backlund-chronicle.apk";
   const options = getDownloadOptions({
     downloadUrl: direct,
     releaseUrl: "https://github.com/Bemyself001/backlund-chronicle/releases/tag/v1.1.52",
   });
   assert.equal(options[0].primary, true);
-  assert.equal(options[0].url, direct);
+  assert.equal(options[0].label, "镜像加速下载 1（国内推荐）");
+  assert.equal(options[0].url, `https://github.xxlab.tech/${direct}`);
   const mirrors = options.filter((option) => option.label.startsWith("镜像加速下载"));
   assert.equal(mirrors.length, 2);
-  assert.deepEqual(mirrors.map(({ label, url }) => ({ label, url })), [
-    { label: "镜像加速下载 1", url: `https://ghproxy.net/${direct}` },
-    { label: "镜像加速下载 2", url: `https://ghfast.top/${direct}` },
+  assert.deepEqual(mirrors.map(({ label, url, primary }) => ({ label, url, primary })), [
+    { label: "镜像加速下载 1（国内推荐）", url: `https://github.xxlab.tech/${direct}`, primary: true },
+    { label: "镜像加速下载 2", url: `https://ghfast.top/${direct}`, primary: false },
   ]);
+  assert.deepEqual(options[2], { key: "direct", label: "GitHub 直接下载", url: direct });
   assert.equal(options.at(-1).label, "打开发布页手动下载");
 });
 
@@ -43,6 +45,7 @@ test("getDownloadOptions skips mirrors for non-GitHub urls", () => {
     releaseUrl: "https://example.com/release",
   });
   assert.equal(options.length, 2);
+  assert.equal(options[0].primary, true);
   assert.equal(options[1].label, "打开发布页手动下载");
 });
 

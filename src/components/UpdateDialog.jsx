@@ -9,6 +9,8 @@ export default function UpdateDialog({ onClose, automatic = false }) {
   const [otaState, setOtaState] = useState("idle"); // idle | downloading | ready | failed
   const [otaBundle, setOtaBundle] = useState(null);
   const hotUpdate = canHotUpdate(result);
+  const downloadOptions = getDownloadOptions(result);
+  const primaryDownload = downloadOptions.find((option) => option.primary);
 
   const startHotUpdate = async () => {
     setOtaState("downloading");
@@ -68,7 +70,7 @@ export default function UpdateDialog({ onClose, automatic = false }) {
         <div className={styles.actions}>
           <button className="button button--ghost" type="button" onClick={onClose}>稍后</button>
           {result?.hasUpdate && <>
-            {getDownloadOptions(result).filter((option) => !option.primary).map((option) => (
+            {downloadOptions.filter((option) => hotUpdate || !option.primary).map((option) => (
               <button key={option.key} className="button button--ghost" type="button" onClick={() => openUpdateDownload(option.url)}>
                 {option.label}
               </button>
@@ -77,10 +79,10 @@ export default function UpdateDialog({ onClose, automatic = false }) {
               ? <button className="button button--primary" type="button" onClick={activateUpdate}>立即重新载入</button>
               : hotUpdate
                 ? <button className="button button--primary" type="button" disabled={otaState === "downloading"} onClick={startHotUpdate}>{otaState === "downloading" ? "热更新下载中…" : "热更新（免重装）"}</button>
-                : <button className="button button--primary" type="button" onClick={() => openUpdateDownload(result.downloadUrl)}>下载并更新</button>}
+                : <button className="button button--primary" type="button" onClick={() => openUpdateDownload(primaryDownload?.url || result.downloadUrl)}>{primaryDownload?.label || "下载并更新"}</button>}
           </>}
         </div>
-        {result?.hasUpdate && <p className={styles.mirrorHint}>若直接下载失败或速度过慢，可改用镜像加速下载，或到发布页手动获取安装包。</p>}
+        {result?.hasUpdate && <p className={styles.mirrorHint}>已优先使用国内下载镜像；WiFi 下若该通道不可用，可依次尝试备用镜像或 GitHub 直连，无需切换移动数据。</p>}
       </div>
     </Modal>
   );

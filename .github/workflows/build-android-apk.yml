@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  PRODUCT_VERSION: "1.4.6"
+  PRODUCT_VERSION: "1.4.7"
 
 jobs:
   build-release-apk:
@@ -113,5 +113,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "贝克兰德纪事 ${PRODUCT_VERSION}" \
-            --notes "1.4.6 · 镜像下载2修复：替换已返回 403 的第二个 APK 下载镜像，直接下载、镜像1、发布页与热更新通道保持不变。请下载 backlund-chronicle.apk 直接覆盖安装以保留存档，不要先卸载。" \
+            --notes "1.4.7 · WiFi 下载修复：默认改用已完成整包校验的中国国内镜像，避免部分 WiFi 网络无法访问 GitHub 安装包；备用镜像、GitHub 直链与发布页仍可手动切换。请直接覆盖安装以保留存档，不要先卸载。" \
             --latest

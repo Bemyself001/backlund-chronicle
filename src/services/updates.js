@@ -8,9 +8,9 @@ const CHECK_TIMEOUT = 8000;
 const CHECKED_AT_KEY = "backlund-update-checked-at";
 const CHECK_INTERVAL = 24 * 60 * 60 * 1000;
 
-// 公共加速镜像随时可能失效，仅作为直连失败后的备选；顺序即优先级。
+// 公共加速镜像随时可能失效；中国大陆用户默认使用已校验的国内镜像，其余通道按顺序兜底。
 const MIRROR_PREFIXES = [
-  "https://ghproxy.net/",
+  "https://github.xxlab.tech/",
   "https://ghfast.top/",
 ];
 
@@ -93,11 +93,18 @@ export function getDownloadOptions(result) {
   const options = [];
   const directUrl = result?.downloadUrl;
   if (directUrl) {
-    options.push({ key: "direct", label: "直接下载", url: directUrl, primary: true });
     if (directUrl.startsWith("https://github.com/")) {
       for (const [index, prefix] of MIRROR_PREFIXES.entries()) {
-        options.push({ key: `mirror-${index}`, label: `镜像加速下载 ${index + 1}`, url: `${prefix}${directUrl}` });
+        options.push({
+          key: `mirror-${index}`,
+          label: index === 0 ? "镜像加速下载 1（国内推荐）" : `镜像加速下载 ${index + 1}`,
+          url: `${prefix}${directUrl}`,
+          primary: index === 0,
+        });
       }
+      options.push({ key: "direct", label: "GitHub 直接下载", url: directUrl });
+    } else {
+      options.push({ key: "direct", label: "直接下载", url: directUrl, primary: true });
     }
   }
   if (result?.releaseUrl) {

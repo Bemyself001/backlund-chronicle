@@ -115,7 +115,7 @@ const RELEASE_145_UPDATE = {
   ],
 };
 
-export const LATEST_UPDATE = {
+const RELEASE_146_UPDATE = {
   date: "2026-09-14",
   dateLabel: "2026.09.14",
   title: "1.4.6 · 镜像下载2修复",
@@ -124,6 +124,20 @@ export const LATEST_UPDATE = {
     "镜像加速下载2由已返回 403 的 gh-proxy.com 切换为可正常返回最新版 APK 的 ghfast.top。",
     "直接下载、镜像加速下载1、GitHub 发布页和热更新通道保持不变；新增精确地址回归测试，防止镜像配置误改。",
     "产品版本更新为 1.4.6；Android 内部版本号递增至 30122，保持原包名、正式签名与覆盖安装兼容性。",
+  ],
+};
+
+export const LATEST_UPDATE = {
+  date: "2026-09-14",
+  dateLabel: "2026.09.14",
+  title: "1.4.7 · WiFi 安装包下载修复",
+  summary: "完整 APK 默认改走已校验的中国国内镜像，并保留备用镜像与 GitHub 直链，减少 WiFi 下载失败后切换移动数据的需要。",
+  changes: [
+    "镜像加速下载1由 ghproxy.net 切换为中国国内源 github.xxlab.tech；已完整下载正式 APK，并与官方 SHA-256 校验一致。",
+    "Android 完整安装包的主按钮改为国内镜像，不再默认打开容易受网络线路影响的 GitHub 直链。",
+    "镜像加速下载2、GitHub 直接下载与发布页继续作为独立备用通道；WiFi 下一个通道不可用时可直接切换，无需改用数据流量。",
+    "新增下载优先级、镜像地址与非 GitHub 下载行为的回归测试，避免后续改动恢复到不可用路径。",
+    "产品版本更新为 1.4.7；Android 内部版本号递增至 30123，保持原包名、正式签名与覆盖安装兼容性。",
   ],
 };
 
@@ -335,6 +349,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_146_UPDATE,
   RELEASE_145_UPDATE,
   RELEASE_144_UPDATE,
   RELEASE_143_UPDATE,
