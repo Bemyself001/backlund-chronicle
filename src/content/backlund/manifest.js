@@ -15,12 +15,16 @@ import { CONTENT_MIGRATIONS } from "./migrations.js";
 import { BACKLUND_SCENARIO_RULES } from "./narrative.js";
 import { SPECIAL_QUEST_DEFINITIONS } from "./specialQuests/index.js";
 import { PATHWAY_QUEST_DEFINITIONS } from "./pathwayQuests/index.js";
+import { SPECIAL_ACTIONS, SPECIAL_RECIPES, SPECIAL_CONTACTS } from "./specialActions.js";
 
 export const BACKLUND_CONTENT = {
   id: "backlund-core",
   name: "贝克兰德核心内容",
   schemaVersion: 2,
-  contentVersion: "2026.09.14.1",
+  contentVersion: "2026.09.15.1",
+  specialActions: SPECIAL_ACTIONS,
+  specialRecipes: SPECIAL_RECIPES,
+  specialContacts: SPECIAL_CONTACTS,
   openings: OPENINGS,
   talents: TALENTS,
   pathways: PATHWAYS,

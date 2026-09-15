@@ -9,6 +9,9 @@ import SaveManager from "./components/SaveManager.jsx";
 import UpdateDialog from "./components/UpdateDialog.jsx";
 import ChangelogDialog from "./components/ChangelogDialog.jsx";
 import WorldMap from "./components/WorldMap.jsx";
+import Modal from "./components/Modal.jsx";
+import SpecialActions from "./components/SpecialActions.jsx";
+import { resolveSpecialAction } from "./services/specialActions.js";
 import ImportantItemConfirmation from "./components/ImportantItemConfirmation.jsx";
 import { createInitialGame, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from "./system/game.js";
 import { buildRejectedToolNarrative, dedupeToolCalls, executeToolCalls, normalizeToolCalls } from "./engine/tools.js";
@@ -21,7 +24,7 @@ import { applyMemorySummary, createMemorySummaryJob, parseMemoryDigestPayload } 
 import { mockResponse } from "./services/mock.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
 import { extractNarrativePreview } from "./services/streamPreview.js";
-import { ensureMapMoveToolCall, ensureMockMapDiscoveryToolCall } from "./services/mapTravel.js";
+import { ensureMapMoveToolCall, ensureMapDiscoveryToolCall } from "./services/mapTravel.js";
 import { choiceResult, choiceValidationError, hasValidModelChoices, modelChoices, injectOccultEntryChoice } from "./services/choices.js";
 import { applyChoiceRecovery, recoverChoices } from "./services/choiceRecovery.js";
 import { createTurnResolution } from "./services/turnResolution.js";
@@ -48,6 +51,8 @@ export default function App() {
     return migrated;
   });
   const [modal, setModal] = useState(null);
+  const [mapFocus, setMapFocus] = useState(null);
+  const openMap = (locationId = null) => { setMapFocus(typeof locationId === "string" ? locationId : null); setModal("map"); };
   const [saves, setSaves] = useState(listSaves);
   const [loading, setLoading] = useState(false);
   const [streamText, setStreamText] = useState("");
@@ -210,7 +215,7 @@ export default function App() {
       let planningResponse;
       let fastPresentationTask = null;
       if (settings.mockMode) {
-        planningResponse = await mockResponse(game, action, controller.signal, handleTurnPreview);
+        planningResponse = await mockResponse(game, action, controller.signal, handleTurnPreview, options);
       } else if (fastMode) {
         // 状态规划与剧情呈现同时启动；规划一完成即可继续校验、修复和结算，
         // 不必等待仍在流式输出的剧情草稿。
@@ -236,7 +241,7 @@ export default function App() {
           { toolSet: "state", disableJsonMode: Boolean(settings.nativeTools) },
         );
       }
-      const discoveryAdjustedCalls = settings.mockMode ? ensureMockMapDiscoveryToolCall(planningResponse.toolCalls, options.mapInvestigation, game.turn + 1, game) : planningResponse.toolCalls;
+      const discoveryAdjustedCalls = ensureMapDiscoveryToolCall(normalizeToolCalls(planningResponse.toolCalls, game), options.mapInvestigation, game.turn + 1, game);
       const advancementAdjustedCalls = ensureRequestedAdvancementToolCall(discoveryAdjustedCalls, options.advancementRequest, game.turn + 1, game);
       let proposedToolCalls = dedupeToolCalls(normalizeToolCalls(ensureMapMoveToolCall(advancementAdjustedCalls, options.mapDestination, game.turn + 1), game));
 
@@ -490,6 +495,18 @@ export default function App() {
     const next = { ...execution.game, turn: game.turn, triggerState: triggerProgress.state, occult: execution.game.occult, changeLog: [...game.changeLog, ...execution.logs, ...triggerLogs].slice(-100) };
     commitGame({ ...next, lastTurnBaseline: auditBaseline, lastTurnAudit: { ...auditTurnChanges(auditBaseline, next), importantItemConfirmation: { required: false, status: "player-action", confirmed: 0, rejected: 0 } } });
   };
+  const handleSpecialAction = (request) => {
+    if (!game || busyRef.current) return { ok: false, error: "本轮正在处理中" };
+    busyRef.current = true;
+    try {
+      const next = resolveSpecialAction(game, request);
+      commitGame(next);
+      setError("");
+      return { ok: true, message: `已保存至第 ${next.turn} 轮，结果可在剧情和回合摘要查看。` };
+    } catch (err) {
+      return { ok: false, error: err.message };
+    } finally { busyRef.current = false; }
+  };
   const handleExplore = (cell) => {
     if (!game || loading) return;
     const next = structuredClone(game);
@@ -510,9 +527,10 @@ export default function App() {
     {screen === "splash" && <Splash onEnter={() => setScreen("welcome")} />}
     {screen === "welcome" && <Welcome hasSave={saves.some((slot) => slot.slotId === "autosave")} saves={saves} apiSettings={settings} onNew={() => setScreen("create")} onContinue={handleContinue} onLoadSlot={loadSlot} onImport={handleImport} onApi={() => setModal("api")} onUpdate={() => setModal("update")} onChangelog={() => setModal("changelog")} />}
     {screen === "create" && <CharacterCreation onBack={() => setScreen("welcome")} onCreate={handleCreate} settings={settings} onApi={() => setModal("api")} />}
-    {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} mockMode={Boolean(settings.mockMode)} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onRegenerateChoices={regenerateChoices} onLocalTool={runLocalTool} onOpenMap={() => setModal("map")} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => setScreen("welcome")} />}
+    {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} mockMode={Boolean(settings.mockMode)} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onRegenerateChoices={regenerateChoices} onLocalTool={runLocalTool} onOpenMap={openMap} onSpecialAction={handleSpecialAction} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => setScreen("welcome")} />}
     {itemConfirmation && <ImportantItemConfirmation changes={itemConfirmation.changes} onConfirm={(approvedKeys) => settleImportantItemConfirmation({ approvedKeys })} onCancel={() => settleImportantItemConfirmation({ cancelled: true })} />}
-    {modal === "map" && game && <WorldMap game={game} loading={loading} onClose={() => setModal(null)} onTravel={(location) => { setModal(null); return runTurn(`前往${location.name}`, { mapDestination: location }); }} onInvestigate={(location, knowledge) => { setModal(null); return runTurn(`根据地图上的传闻，调查${knowledge.note || location.district}。`, { mapInvestigation: { locationId: location.id, currentStatus: knowledge.status, rumor: knowledge.note || location.rumor } }); }} onExplore={handleExplore} onPray={handlePray} />}
+    {modal === "map" && game && <WorldMap game={game} loading={loading} initialLocationId={mapFocus} onSpecial={() => setModal("special")} onClose={() => setModal(null)} onTravel={(location) => { setModal(null); return runTurn(`前往${location.name}`, { mapDestination: location }); }} onInvestigate={(location, knowledge) => { setModal(null); return runTurn(`根据地图上的传闻，调查${knowledge.note || location.district}。`, { mapInvestigation: { locationId: location.id, currentStatus: knowledge.status, rumor: knowledge.note || location.rumor } }); }} onExplore={handleExplore} onPray={handlePray} />}
+    {modal === "special" && game && <Modal title="特殊行动" onClose={() => setModal(null)}><SpecialActions game={game} loading={loading} onExecute={handleSpecialAction} onOpenMap={openMap} /></Modal>}
     {modal === "api" && <ApiSettings settings={settings} onSave={handleSettingsSave} onClose={() => setModal(null)} />}
     {(modal === "update" || modal === "update-auto") && <UpdateDialog automatic={modal === "update-auto"} onClose={() => setModal(null)} />}
     {modal === "changelog" && <ChangelogDialog onClose={() => setModal(null)} />}

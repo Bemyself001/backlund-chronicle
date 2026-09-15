@@ -5,7 +5,7 @@ import { getMapLocation } from "../system/map.js";
 
 function includesAny(text, words) { return words.some((word) => text.includes(word)); }
 
-export async function mockResponse(game, action, signal, onChunk) {
+export async function mockResponse(game, action, signal, onChunk, options = {}) {
   await new Promise((resolve, reject) => {
     const timer = setTimeout(resolve, 650);
     signal?.addEventListener("abort", () => { clearTimeout(timer); reject(new DOMException("请求已中止", "AbortError")); }, { once: true });
@@ -17,7 +17,10 @@ export async function mockResponse(game, action, signal, onChunk) {
   const openingAction = localOpening?.actions.indexOf(action) ?? -1;
   const destination = action.startsWith("前往") ? game.discoveredLocations.find((place) => action === `前往${place.name}`) : null;
   const availableSpecial = game.triggerState?.active?.find((entry) => entry.status === "available" && entry.category !== "occult-entry");
-  if (destination && destination.id !== game.location.id) {
+  const investigation = getMapLocation(options.mapInvestigation?.locationId, game);
+  if (investigation) {
+    narrative = `你顺着已有的信息核对地名与路线，终于确认了${investigation.name}的位置，并将它清楚地标在地图上。${investigation.description}\n\n这次调查让你知道如何前往，但你目前仍在${game.location.name}；地点内部尚未接触的事务，需要到访后进一步了解。`;
+  } else if (destination && destination.id !== game.location.id) {
     narrative = `你从${game.location.name}动身，按已知路线前往${destination.name}。${getMapLocation(destination.id)?.description || "沿途街景在雨雾中逐渐变化。"}\n\n抵达后的行动由你决定：可以了解这里的生活与工作，也可以继续前往其他已知地点。`;
     toolCalls = [{ id: makeId("mock"), name: "location.move", reason: "玩家明确选择前往已发现地点", args: { locationId: destination.id } }];
   } else if (localOpening && openingAction >= 0) {

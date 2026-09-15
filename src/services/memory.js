@@ -8,7 +8,7 @@ import { progressiveContext } from "../engine/contextLookup.js";
 import { SCENARIO_RULES } from "../content/index.js";
 import { fixedNarrativeMessages, LOCAL_STATE_AUTHORITY_RULES } from "../system/narrativeContract.js";
 
-const SHARED_AUTHORITY_RULES = LOCAL_STATE_AUTHORITY_RULES;
+const SHARED_AUTHORITY_RULES = LOCAL_STATE_AUTHORITY_RULES + "【地图调查与公共常识】玩家未揭开地图迷雾只表示其个人尚未确认地点，不表示当地居民不知道该地点。圣赛缪尔教堂是黑夜女神教会的公开教堂，永恒烈阳教堂也是公开宗教场所；正常描写居民指路、公开礼拜与日常活动，不因地图未发现就编造集体不知情、避讳或秘密据点。其他公共地点同理，按身份与当地知识差异自然回应。明确的地图调查在本轮正常完成后由本地规则确认所选地点，只揭开该地点，不自动到访、加入组织或解锁内部秘密；不要把本次调查写成仍无法确认地址。快速模式草稿先写核实过程，具体确认结果留给本地结算后的叙事。";
 
 function recentMessages(game) {
   return (game.recentDialogues || []).slice(-6).map(({ role, content }) => ({ role, content }));
@@ -58,6 +58,11 @@ export function visibleGameState(game) {
     statusEffects: game.statusEffects,
     relationships: game.relationships,
     organization: game.organizationState?.membership || null,
+    specialWork: game.specialActions ? {
+      active: game.specialActions.active ? { title: game.specialActions.active.offer.title, scene: game.specialActions.active.offer.scene } : null,
+      gravekeeper: Boolean(game.specialActions.gravekeeper), reputation: game.specialActions.reputation || 0,
+      rule: "特殊行动委托、材料与制作成品由专用界面本地结算，不得通过普通工具重复发放其报酬或替代其结算。",
+    } : null,
     occult: game.occult,
     inventory: visibleInventory(game),
     knownClues: game.clues,

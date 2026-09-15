@@ -68,8 +68,9 @@ export function occultEntryForTurn(game, nextTurn) {
   return entry ? { id: entry.instanceId, turn: entry.createdTurn, ...entry.presentation } : null;
 }
 
-export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], toolResults = []) {
-  const elapsedMinutes = minutesForTurn(action, toolCalls, toolResults);
+export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], toolResults = [], options = {}) {
+  const elapsedMinutes = Number.isInteger(options.elapsedMinutes) && options.elapsedMinutes > 0
+    ? options.elapsedMinutes : minutesForTurn(action, toolCalls, toolResults);
   const dangerDelta = dangerDeltaForTurn({ action, selectedRisk, toolCalls, toolResults });
   const statusTicks = settleStatusTicks(game);
   const statusTickLogs = statusTicks.map((tick) => `状态「${tick.status}」结算：${tick.label} ${tick.before}→${tick.after}（${tick.delta > 0 ? "+" : ""}${tick.delta}）${tick.autoStatus ? `；${tick.autoStatus}` : ""}`);

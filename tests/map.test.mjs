@@ -4,7 +4,10 @@ import { createInitialGame, EMPTY_CHARACTER } from "../src/data/defaults.js";
 import { findLocationRelations, findTravelRoute, getChildLocations, getMapLocation, getMapLocations, MAP_LOCATIONS, normalizeLocationKnowledge, planDynamicLocation } from "../src/data/map.js";
 import { executeToolCalls } from "../src/engine/tools.js";
 import { minutesForTurn } from "../src/engine/turn.js";
-import { ensureMapMoveToolCall, ensureMockMapDiscoveryToolCall } from "../src/services/mapTravel.js";
+import { ensureMapMoveToolCall, ensureMapDiscoveryToolCall } from "../src/services/mapTravel.js";
+import { ensureWorld } from "../src/system/hexworld.js";
+import { mockResponse } from "../src/services/mock.js";
+import { buildPlanningContext, buildFastPresentationContext, buildRenderingContext } from "../src/services/memory.js";
 
 const known = ["east-station", "iron-gate", "soot-lamp", "queen-library"];
 const apothecary = {
@@ -55,7 +58,7 @@ test("confirmed location discovery unlocks the place and its route", () => {
 });
 
 test("map exposes connected routes without crossing undiscovered locations", () => {
-  assert.equal(MAP_LOCATIONS.length, 13);
+  assert.equal(MAP_LOCATIONS.length, 15);
   const direct = findTravelRoute("east-station", "soot-lamp", known);
   assert.equal(direct.minutes, 27);
   assert.equal(direct.grids, 3);
@@ -168,14 +171,63 @@ test("map selection repairs an AI movement call without duplicating it", () => {
   assert.equal(calls[0].id, "map-move-5-queen-library");
 });
 
-test("Mock map investigation supplies a deterministic discovery call", () => {
-  const calls = ensureMockMapDiscoveryToolCall([], { locationId: "queen-archive" }, 6);
+test("map investigation supplies a deterministic discovery call in every mode", () => {
+  const calls = ensureMapDiscoveryToolCall([], { locationId: "queen-archive" }, 6);
   assert.equal(calls[0].name, "location.discover");
   assert.deepEqual(calls[0].args, {
     locationId: "queen-archive",
     status: "discovered",
     note: "保存旧地契、人口登记与部分封存案卷的石砌建筑。",
   });
+});
+
+test("one investigation reveals each undiscovered map location without moving the player", () => {
+  const initial = createInitialGame({ ...EMPTY_CHARACTER, name: "迷雾回归" });
+  for (const location of MAP_LOCATIONS) {
+    if (initial.discoveredLocations.some((entry) => entry.id === location.id)) continue;
+    const calls = ensureMapDiscoveryToolCall([], { locationId: location.id }, 1, initial);
+    const { game, results } = executeToolCalls(initial, calls);
+    assert.ok(results.every((result) => result.ok), location.id);
+    assert.equal(game.locationKnowledge[location.id].status, "discovered", location.id);
+    assert.equal(game.location.id, initial.location.id);
+    const tile = Object.values(ensureWorld(game).tiles).find((entry) => entry.locationId === location.id);
+    assert.equal(tile.discovered, true, location.id);
+    assert.equal(ensureMapDiscoveryToolCall(calls, { locationId: location.id }, 2, game).length, 0);
+  }
+  assert.equal(initial.locationKnowledge["st-samuel"].status, "rumored");
+});
+
+test("investigation replaces duplicate target rumors but preserves unrelated discoveries", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "调查回归" });
+  const rumor = { name: "location.discover", args: { locationId: "st-samuel", status: "rumored", note: "旧传闻" } };
+  const other = { name: "location.discover", args: { locationId: "queen-archive", status: "discovered", note: "已查到档案馆地址" }, reason: "核对公开地址" };
+  const calls = ensureMapDiscoveryToolCall([rumor, other, rumor], { locationId: "st-samuel" }, 1, game);
+  assert.equal(calls.length, 2);
+  assert.equal(calls[0].args.status, "discovered");
+  assert.equal(calls[1], other);
+  assert.ok(executeToolCalls(game, calls).results.every((entry) => entry.ok));
+  assert.deepEqual(ensureMapDiscoveryToolCall([other], { locationId: "invalid-id" }, 1, game), [other]);
+  assert.deepEqual(ensureMapDiscoveryToolCall([other], null, 1, game), [other]);
+});
+
+test("dynamic rumored locations also reveal after one map investigation", () => {
+  const initial = createInitialGame({ ...EMPTY_CHARACTER, name: "动态迷雾" });
+  const grown = executeToolCalls(initial, [{ name: "location.grow", args: { location: apothecary }, reason: "听闻店铺" }]);
+  const locationId = grown.results[0].data.locationId;
+  const execution = executeToolCalls(grown.game, ensureMapDiscoveryToolCall([], { locationId }, 2, grown.game));
+  assert.equal(execution.game.locationKnowledge[locationId].status, "discovered");
+  assert.equal(Object.values(ensureWorld(execution.game).tiles).find((tile) => tile.locationId === locationId).discovered, true);
+});
+
+test("church investigation narration distinguishes public knowledge from hidden interiors", async () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "教堂调查" });
+  const options = { mapInvestigation: { locationId: "st-samuel" } };
+  const response = await mockResponse(game, "调查该区域", undefined, undefined, options);
+  assert.match(response.narrative, /圣赛缪尔教堂/);
+  assert.match(response.narrative, /公开宗教地标/);
+  for (const messages of [buildPlanningContext(game, "调查", "", options), buildFastPresentationContext(game, "调查", ""), buildRenderingContext(game, game, "调查", "", {})]) {
+    assert.ok(messages.some((message) => message.content.includes("不表示当地居民不知道该地点")));
+  }
 });
 
 test("location relations match quests, clues and NPCs by name fragments", () => {

@@ -1,4 +1,4 @@
-import { getMapLocation } from "../system/map.js";
+import { getMapLocation, isDiscoveredLocationStatus, normalizeLocationKnowledge } from "../system/map.js";
 
 export function ensureMapMoveToolCall(toolCalls = [], destination, turn) {
   if (!destination?.id) return Array.isArray(toolCalls) ? toolCalls : [];
@@ -24,17 +24,20 @@ export function ensureMapMoveToolCall(toolCalls = [], destination, turn) {
   return calls;
 }
 
-export function ensureMockMapDiscoveryToolCall(toolCalls = [], target, turn, game = {}) {
+export function ensureMapDiscoveryToolCall(toolCalls = [], target, turn, game = {}) {
   if (!target?.locationId) return Array.isArray(toolCalls) ? toolCalls : [];
-  const calls = Array.isArray(toolCalls) ? [...toolCalls] : [];
-  if (calls.some((call) => call?.name === "location.discover")) return calls;
+  let calls = Array.isArray(toolCalls) ? [...toolCalls] : [];
   const location = getMapLocation(target.locationId, game);
   if (!location) return calls;
-  calls.push({
+  // Only replace this target's discovery proposals; unrelated discoveries remain intact.
+  calls = calls.filter((call) => !(call?.name === "location.discover" && call.args?.locationId === location.id));
+  const knowledge = normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location?.id, game);
+  if (isDiscoveredLocationStatus(knowledge[location.id]?.status)) return calls;
+  calls.unshift({
     id: `map-discover-${turn}-${location.id}`,
     name: "location.discover",
     args: { locationId: location.id, status: "discovered", note: location.description },
-    reason: `玩家沿地图传闻调查并确认了${location.name}`,
+    reason: `玩家完成地图调查，确认了${location.name}的位置；不代表到访或获知内部秘密`,
   });
   return calls;
 }

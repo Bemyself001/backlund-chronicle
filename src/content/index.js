@@ -30,6 +30,9 @@ export const TRIGGER_DEFINITIONS = ACTIVE_CONTENT.triggers;
 export const LORE_ENTRIES = ACTIVE_CONTENT.lore;
 export const CONTENT_MIGRATIONS = ACTIVE_CONTENT.migrations;
 export const SCENARIO_RULES = ACTIVE_CONTENT.narrative.scenarioRules;
+export const SPECIAL_ACTIONS = ACTIVE_CONTENT.specialActions;
+export const SPECIAL_RECIPES = ACTIVE_CONTENT.specialRecipes;
+export const SPECIAL_CONTACTS = ACTIVE_CONTENT.specialContacts;
 
 const ORGANIZATIONS_BY_ID = new Map(ORGANIZATIONS.map((entry) => [entry.id, entry]));
 const ITEM_BEHAVIORS_BY_ID = new Map(ITEM_BEHAVIORS.map((entry) => [entry.itemId, entry]));
@@ -196,6 +199,27 @@ export function validateContentPack(pack = ACTIVE_CONTENT) {
   }
   if (!String(pack?.narrative?.scenarioRules || "").trim()) errors.push("内容包缺少场景规则");
   const locations = new Set(asArray(pack?.map?.locations).map((entry) => entry?.id));
+  const pathways = new Set(asArray(pack?.pathways).map((entry) => entry?.id));
+  const organizations = new Set(asArray(pack?.organizations).map((entry) => entry?.id));
+  for (const [label, entries] of [["特殊行动", pack?.specialActions], ["制作配方", pack?.specialRecipes]]) {
+    if (!Array.isArray(entries)) { errors.push(`${label}数据不是数组`); continue; }
+    if (duplicateIds(entries, "id").length) errors.push(`${label}存在空或重复ID`);
+    for (const entry of entries) {
+      if (!pathways.has(entry?.pathwayId)) errors.push(`${label}引用未知途径`);
+      if (!Number.isInteger(entry?.maxSequence) || entry.maxSequence < 0 || entry.maxSequence > 9) errors.push(`${label}序列要求无效`);
+      if (entry?.locationId && !locations.has(entry.locationId)) errors.push(`${label}引用未知地点`);
+      if (entry?.organizationId && !organizations.has(entry.organizationId)) errors.push(`${label}引用未知组织`);
+      if (!Number.isInteger(entry?.cost) || entry.cost < 0) errors.push(`${label}成本无效`);
+      if (label === "制作配方" && (!Number.isInteger(entry?.sale) || entry.sale < 0)) errors.push("制作配方售价无效");
+      if (label === "特殊行动") {
+        if (!Array.isArray(entry?.pool) || entry.pool.length < 3) errors.push("特殊行动至少需要三则固定剧情");
+        for (const scene of asArray(entry?.pool)) {
+          if (!scene?.id || !scene?.title || !scene?.scene || !Array.isArray(scene?.options) || scene.options.length < 2) errors.push("特殊行动剧情不完整");
+          for (const option of asArray(scene?.options)) if (!option?.label || !option?.ending || !Number.isInteger(option?.reward) || option.reward < 0) errors.push("特殊行动选项无效");
+        }
+      }
+    }
+  }
   for (const route of asArray(pack?.map?.routes)) {
     if (!locations.has(route?.from) || !locations.has(route?.to)) errors.push(`路线引用不存在的地点：${route?.from} → ${route?.to}`);
   }

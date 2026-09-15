@@ -9,6 +9,7 @@ import { normalizeMemoryState } from "./memoryState.js";
 import { normalizeTriggerState, syncLegacyOccult } from "../engine/triggerState.js";
 import { migrateContentState } from "../engine/contentMigrations.js";
 import { applyTalent } from "../system/talents.js";
+import { specialState } from "../engine/specialActions.js";
 
 const SAVES_KEY = "mist-chronicle-saves-v1";
 const AUTOSAVE_ID = "autosave";
@@ -116,6 +117,7 @@ export function migrateSave(raw) {
     }
   }
   result.initialStatsVersion = 1;
+  result.specialActions = specialState(result);
   result.triggerState = normalizeTriggerState(result);
   migrateContentState(result);
   syncLegacyOccult(result, result.triggerState);

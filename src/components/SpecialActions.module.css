@@ -1,0 +1,23 @@
+.panel { display: grid; gap: 1.5rem; padding: 1rem; color: inherit; overflow-wrap: anywhere; }
+.panel header, .panel section { display: grid; gap: .7rem; }
+.panel h3, .panel h4, .panel p { margin: 0; }
+.panel h3 { font-size: 1.15rem; }
+.panel h4 { font-size: 1rem; }
+.panel p { line-height: 1.7; }
+.eyebrow { color: #9b783d; font-size: .75rem; letter-spacing: .12em; }
+.meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .4rem; font-size: .78rem; opacity: .8; }
+.card, .active { display: grid; gap: .75rem; padding: 1rem; border: 1px solid #8f896e66; border-radius: .6rem; background: #8888770a; }
+.active { border-color: #b0955c; background: #b0955c10; }
+.hint { font-size: .8rem; opacity: .8; }
+.buttons { display: flex; flex-wrap: wrap; gap: .6rem; }
+.panel button { min-height: 44px; padding: .65rem .8rem; border: 1px solid #85836b; border-radius: .35rem; background: #53614b22; color: inherit; text-align: left; font: inherit; cursor: pointer; }
+.panel button:disabled { opacity: .5; cursor: not-allowed; }
+.panel button:focus-visible { outline: 2px solid #b89552; outline-offset: 3px; }
+.panel .link { border: 0; padding: .3rem 0; background: none; text-decoration: underline; font-size: .85rem; }
+.options { display: grid; gap: .65rem; }
+.options button { display: grid; gap: .35rem; }
+.options small { font-size: .75rem; line-height: 1.6; font-weight: normal; }
+.notice { padding: .8rem; border-left: 3px solid #9b783d; background: #b0955c15; }
+.history { list-style: none; padding: 0; margin: 0; display: grid; gap: .7rem; }
+.history li { display: grid; gap: .2rem; }
+.history small { opacity: .75; }

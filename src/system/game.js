@@ -124,6 +124,7 @@ export function createInitialGame(character, confirmedLoadout) {
   const game = {
     version: SAVE_VERSION,
     initialStatsVersion: 1,
+    specialActions: { version: 1, revision: 0 },
     systemVersion: GAME_SYSTEM_VERSION,
     content: { packId: ACTIVE_CONTENT.id, schemaVersion: CONTENT_SCHEMA_VERSION, contentVersion: CONTENT_VERSION },
     id: gameId,

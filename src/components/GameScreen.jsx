@@ -6,9 +6,10 @@ import { formatMoney, normalizeMoney } from "../system/money.js";
 import { APP_VERSION } from "../services/updates.js";
 import { RELEASE_NAME } from "../data/release.js";
 import styles from "./GameScreen.module.css";
+import SpecialActions from "./SpecialActions.jsx";
 
-const NAVIGATION = [["story", "剧情"], ["character", "角色"], ["inventory", "行囊"], ["journal", "手记"], ["map", "地图"]];
-const PANEL_NAMES = { character: "角色档案", inventory: "行囊", journal: "调查手记", menu: "游戏菜单" };
+const NAVIGATION = [["story", "剧情"], ["character", "角色"], ["inventory", "行囊"], ["journal", "手记"], ["map", "地图"], ["special", "特殊行动"]];
+const PANEL_NAMES = { character: "角色档案", inventory: "行囊", journal: "调查手记", menu: "游戏菜单", special: "特殊行动" };
 const PHASE_MESSAGES = {
   generating: "正在生成后续剧情", manualRetry: "正在重试这次行动", thinking: "正在思考，正文稍后抵达",
   streaming: "剧情正在抵达", budgetRecovery: "正在继续生成，请稍候", toolRetry: "正在整理行动结果",
@@ -37,7 +38,7 @@ const StoryHistory = memo(function StoryHistory({ messages }) {
     {(index === 0 || messages[index - 1].turn !== message.turn) && <div className={styles.turnDivider}><span>{message.turn === 0 ? "序章" : `第 ${message.turn} 轮`}</span><i /></div>}
     {message.role === "assistant" ? <article className={styles.narrative}>
       {message.content.split("\n").filter(Boolean).map((paragraph, i) => <p key={i}>{paragraph}</p>)}
-      <small className={styles.aiTag}>含 AI 生成内容</small>
+      <small className={styles.aiTag}>{message.source === "fixed" ? "固定事件 · 已结算" : "含 AI 生成内容"}</small>
     </article> : <blockquote className={styles.playerLine}><span>你的行动</span>{message.content}</blockquote>}
   </div>);
 });
@@ -59,7 +60,7 @@ export default function GameScreen(props) {
   return <GameSession key={props.game.id} {...props} />;
 }
 
-function GameSession({ game, loading, turnPhase, streamText, error, mockMode, onAction, onAbort, onRetry, onRegenerateChoices, onLocalTool, onOpenMap, onOpenApi, onOpenPrompt, onOpenSaves, onHome }) {
+function GameSession({ game, loading, turnPhase, streamText, error, mockMode, onAction, onAbort, onRetry, onRegenerateChoices, onLocalTool, onOpenMap, onOpenApi, onOpenPrompt, onOpenSaves, onHome, onSpecialAction }) {
   const [input, setInput] = useState("");
   const [panel, setPanel] = useState(null);
   const [journalRequest, setJournalRequest] = useState(0);
@@ -242,6 +243,7 @@ function GameSession({ game, loading, turnPhase, streamText, error, mockMode, on
         <div hidden={panel !== "character"}><CharacterPanel game={game} /></div>
         <div hidden={panel !== "inventory"}><InventoryPanel game={game} onLocalTool={onLocalTool} onAction={performAction} disabled={loading} /></div>
         <div hidden={panel !== "journal"}><JournalPanel key={journalRequest} game={game} /></div>
+        {panel === "special" && <SpecialActions game={game} loading={loading} onExecute={onSpecialAction} onOpenMap={onOpenMap} />}
         <div hidden={panel !== "menu"}><MenuPanel reading={reading} onReadingChange={updateReading} onOpenApi={onOpenApi} onOpenPrompt={onOpenPrompt} onOpenSaves={onOpenSaves} onHome={onHome} version={`${RELEASE_NAME} · ${APP_VERSION}`} />{readingNotice && <p className={styles.readingNotice} role="status">{readingNotice}</p>}</div>
       </div></aside></>}
     </div>

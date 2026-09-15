@@ -1,4 +1,5 @@
 export const CONTENT_MIGRATIONS = [
+  { id: "backlund.special-actions", fromVersion: "2026.09.14.1", toVersion: "2026.09.15.1", factRenames: [], triggerStages: [] },
   {
     id: "backlund.legacy-to-2026.09.14",
     fromVersion: "legacy",
