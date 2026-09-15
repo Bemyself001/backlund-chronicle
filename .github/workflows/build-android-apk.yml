@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  PRODUCT_VERSION: "1.4.8"
+  PRODUCT_VERSION: "1.4.9"
 
 jobs:
   build-release-apk:
@@ -111,5 +111,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "贝克兰德纪事 ${PRODUCT_VERSION}" \
-            --notes "1.4.8 · 开局满状态与教堂祷告：修复开局理智和灵性各少一点；四座教堂地图详情新增祷告按钮，按神明生成200字以内祷文并附固定环境描写，恢复2点灵性、消耗一回合，所有教堂共享五回合冷却。兼容修复符合条件的未行动旧档。请直接覆盖安装以保留存档，不要先卸载。" \
+            --notes "1.4.9 · 特殊行动与地图调查修复：新增22条途径的生计与委托、66则固定事件、炼药和组织登记；地图调查正常完成一次即可揭开所选地点迷雾，修正公开教堂的描述。保留开局满状态及五回合教堂祷告。兼容已有存档，请直接覆盖安装，不要先卸载。" \
             --latest
