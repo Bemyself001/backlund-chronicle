@@ -116,13 +116,14 @@ export function createInitialGame(character, confirmedLoadout) {
   const startingInventory = loadoutInventory(loadout);
   const { startingMoneyPence = 240, ...characterProfile } = normalizedCharacter;
   const initialMoneyPence = Math.max(0, Math.min(MAX_STARTING_MONEY_PENCE, Number(startingMoneyPence) || 0)) + talentMoneyBonus(normalizedCharacter.talent);
-  const baseStats = { health: 10, maxHealth: 10, sanity: 9, maxSanity: 10, spirituality: normalizedCharacter.extraordinary === "low" ? 7 : 4, maxSpirituality: normalizedCharacter.extraordinary === "low" ? 8 : 5 };
+  const baseStats = { health: 10, maxHealth: 10, sanity: 10, maxSanity: 10, spirituality: normalizedCharacter.extraordinary === "low" ? 8 : 5, maxSpirituality: normalizedCharacter.extraordinary === "low" ? 8 : 5 };
   const talentSpec = talentItemSpec(normalizedCharacter.talent);
   const talentItem = talentSpec ? { ...item(talentSpec.itemId, talentSpec.name, talentSpec.category, talentSpec.description, 1, talentSpec.weight, talentSpec.rarity, talentSpec.tags), hiddenInfo: talentSpec.hiddenInfo || "" } : null;
   const openingMessage = { id: makeId("msg"), role: "assistant", turn: 0, content: opening.narrative };
   const gameId = makeId("game");
   const game = {
     version: SAVE_VERSION,
+    initialStatsVersion: 1,
     systemVersion: GAME_SYSTEM_VERSION,
     content: { packId: ACTIVE_CONTENT.id, schemaVersion: CONTENT_SCHEMA_VERSION, contentVersion: CONTENT_VERSION },
     id: gameId,

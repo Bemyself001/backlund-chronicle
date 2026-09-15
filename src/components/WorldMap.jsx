@@ -3,13 +3,14 @@ import Modal from "./Modal.jsx";
 import { findLocationRelations, findTravelRoute, getChildLocations, getMapLocation, getMapLocations, isDiscoveredLocationStatus, normalizeLocationKnowledge } from "../system/map.js";
 import { cityTerrainLabel, canExploreHex, hexPolygonPoints, hexToPixel, visibleHexes } from "../system/hexworld.js";
 import styles from "./WorldMap.module.css";
+import { prayerAvailability } from "../engine/prayer.js";
 
 const KIND_LABELS = {
   street: "街道", residence: "住所", shop: "店铺", tavern: "酒馆", office: "事务所", church: "教会", warehouse: "仓库",
   station: "交通点", institution: "机构", hideout: "隐秘据点", interior: "内部地点", other: "地点", landmark: "地标",
 };
 
-export default function WorldMap({ game, loading, onClose, onTravel, onInvestigate, onExplore }) {
+export default function WorldMap({ game, loading, onClose, onTravel, onInvestigate, onExplore, onPray }) {
   const discoveredIds = useMemo(() => new Set([...game.discoveredLocations.map((location) => location.id), game.location.id]), [game.discoveredLocations, game.location.id]);
   const knowledgeById = useMemo(() => normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location.id, game), [game]);
   const allLocations = useMemo(() => getMapLocations(game), [game]);
@@ -42,6 +43,7 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
   const rumored = selected && selectedKnowledge.status === "rumored";
   const route = selected && discovered ? findTravelRoute(game.location.id, selected.id, discoveredIds, game) : null;
   const current = selected?.id === game.location.id;
+  const prayer = prayerAvailability(game, selected?.id);
   const routeNames = route?.path.map((id) => id === game.location.id ? game.location.name : getMapLocation(id, game)?.name || id).join(" → ");
   const relations = discovered ? findLocationRelations(game, selected) : null;
   const hasRelations = relations && (relations.quests.length || relations.clues.length || relations.npcs.length);
@@ -137,6 +139,10 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
           : rumored
             ? <button className="button button--primary" type="button" disabled={loading} onClick={() => onInvestigate(selected, selectedKnowledge)}>{loading ? "本轮处理中" : "调查该区域"}</button>
             : <button className="button button--primary" type="button" disabled>尚无线索</button>}
+        {discovered && prayer.church && <>
+          <button className="button button--primary" type="button" disabled={loading || !prayer.ok} onClick={() => onPray(selected.id)}>{loading ? "本轮处理中" : prayer.reason || "祷告 · 恢复 2 点灵性"}</button>
+          <small>向{prayer.church.deity}祷告，消耗一回合。每 5 回合可用一次，所有教堂共享冷却；灵性最多恢复至上限。</small>
+        </>}
         <small>{discovered ? "新地点会连接已知锚点并由本地计算路线；到访后状态会永久记录。" : rumored ? "调查会进入正常回合；只有本地确认成功后，地点才会正式解锁。" : "未知区域不会提前泄露名称与详情。"}</small>
         </>}
       </aside>

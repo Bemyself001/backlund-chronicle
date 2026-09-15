@@ -128,6 +128,20 @@ const RELEASE_146_UPDATE = {
 };
 
 export const LATEST_UPDATE = {
+  date: "2026-09-15",
+  dateLabel: "2026.09.15",
+  title: "1.4.8 · 开局满状态与教堂祷告",
+  summary: "新角色以满生命、满理智和满灵性开始冒险；四座教堂新增地图祷告按钮，每五回合可恢复两点灵性。",
+  changes: [
+    "修复开局理智与灵性各少一点的问题，天赋加成后同样满状态；兼容修复尚未行动且符合旧初始化模板的存档。",
+    "圣赛缪尔、机械之心、圣风与永恒烈阳教堂新增祷告按钮，到达后可使用；所有教堂共享五回合冷却并随档保存。",
+    "祷告消耗一回合、恢复两点灵性且不超过上限，持续状态照常结算；生成失败或取消不消耗回合及冷却。",
+    "AI 按供奉神明创作200字以内的祷文，再接各教堂固定环境描写；离线演示模式使用本地祷文。",
+    "产品版本更新为1.4.8；Android 内部版本号递增至30126，继续使用原包名与正式签名以支持覆盖升级。",
+  ],
+};
+
+const RELEASE_147_UPDATE = {
   date: "2026-09-14",
   dateLabel: "2026.09.14",
   title: "1.4.7 · WiFi 安装包下载修复",
@@ -350,6 +364,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_147_UPDATE,
   RELEASE_146_UPDATE,
   RELEASE_145_UPDATE,
   RELEASE_144_UPDATE,

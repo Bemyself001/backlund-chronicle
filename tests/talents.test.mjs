@@ -41,6 +41,7 @@ test("status.add stores a validated tick clamped to ±3 and drops invalid keys",
 
 test("status ticks settle every turn through resolveTurnProgress and respect bounds", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "结算测试员" });
+  game.character.stats.sanity = 9;
   game.statusEffects.push({ id: "bleeding", name: "失血", kind: "danger", description: "", tick: { health: -2 } });
   game.statusEffects.push({ id: "warm-soup", name: "热汤余温", kind: "positive", description: "", tick: { sanity: 1 } });
   const progress = resolveTurnProgress(game, "等待片刻", "low", [], []);

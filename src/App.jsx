@@ -33,6 +33,8 @@ import { exploreHex } from "./system/hexworld.js";
 import { ensureRequestedAdvancementToolCall } from "./services/advancement.js";
 import { launchFastModeTasks, throwIfFastTaskAborted } from "./services/fastMode.js";
 import { repairToolCallsConcurrently } from "./services/toolRepair.js";
+import { prayerAvailability, settlePrayer } from "./engine/prayer.js";
+import { generatePrayer } from "./services/prayer.js";
 
 export default function App() {
   const [screen, setScreen] = useState("splash");
@@ -56,6 +58,7 @@ export default function App() {
   const itemConfirmationResolverRef = useRef(null);
   const busyRef = useRef(false);
   const lastActionRef = useRef("");
+  const prayerRetryRef = useRef(null);
   const streamTimerRef = useRef(null);
   const pendingStreamRef = useRef("");
   const summaryJobRef = useRef(null);
@@ -173,6 +176,7 @@ export default function App() {
 
   const runTurn = async (action, options = {}) => {
     if (!game || busyRef.current || !action.trim()) return false;
+    prayerRetryRef.current = null;
     const selectedRisk = (Array.isArray(game.choices) ? game.choices : []).find((choice) => choice.label === action)?.risk;
     busyRef.current = true; lastActionRef.current = action; setLoading(true); setTurnPhase(options.manualRetry ? "manualRetry" : "generating"); setError(""); resetStreamPreview();
     const controller = new AbortController(); controllerRef.current = controller;
@@ -415,6 +419,41 @@ export default function App() {
     } finally { clearTimeout(watchdogTimer); resetStreamPreview(); setItemConfirmation(null); itemConfirmationResolverRef.current = null; setTurnPhase("idle"); setLoading(false); busyRef.current = false; controllerRef.current = null; }
   };
 
+  const handlePray = async (locationId) => {
+    if (!game || busyRef.current) return false;
+    const available = prayerAvailability(game, locationId);
+    if (!available.ok) { setError(available.reason); return false; }
+    busyRef.current = true;
+    prayerRetryRef.current = locationId;
+    setLoading(true); setTurnPhase("generating"); setError(""); setModal(null); resetStreamPreview();
+    const controller = new AbortController(); controllerRef.current = controller;
+    const timer = setTimeout(() => controller.abort(), 60000);
+    try {
+      const text = await generatePrayer(available.church, settings, controller.signal);
+      if (controller.signal.aborted) throw new DOMException("祷告已取消", "AbortError");
+      const { next, action, progress, recovered } = settlePrayer(game, locationId);
+      let narrative = `${text}\n\n${available.church.environment}`;
+      if (progress.newTrigger?.presentation) {
+        narrative += `\n\n【${progress.newTrigger.presentation.title}】${progress.newTrigger.presentation.text}`;
+      }
+      const memory = computeMemoryUpdate(game, action, narrative, null, { settledGame: next });
+      const baseline = createAuditBaseline(game, next.turn);
+      const trigger = progress.newTrigger?.presentation || next.triggerState?.active?.find((entry) => entry.status === "available")?.presentation;
+      commitGame({ ...next, ...memory.updates,
+        choices: injectOccultEntryChoice(game.choices, trigger),
+        changeLog: [...game.changeLog, ...progress.statusTickLogs, { id: makeId("log"), turn: next.turn, text: `向${available.church.deity}祷告：灵性恢复 ${recovered} 点。`, tone: "success" }].slice(-100),
+        lastTurnBaseline: baseline, lastTurnAudit: auditTurnChanges(baseline, next), lastTurnMetrics: null,
+      });
+      prayerRetryRef.current = null;
+      return true;
+    } catch (err) {
+      setError(err.name === "AbortError" ? "祷告生成已取消或超时，未消耗回合和冷却，可重试。" : `祷告未完成：${err.message} 未消耗回合和冷却。`);
+      return false;
+    } finally {
+      clearTimeout(timer); controllerRef.current = null; busyRef.current = false; setLoading(false); setTurnPhase("idle");
+    }
+  };
+
   const regenerateChoices = async () => {
     if (!game || busyRef.current || settings.mockMode) return false;
     const narrative = [...game.recentDialogues].reverse().find((message) => message.role === "assistant")?.content || "";
@@ -435,6 +474,7 @@ export default function App() {
   };
 
   const retryLastTurn = () => {
+    if (prayerRetryRef.current) return handlePray(prayerRetryRef.current);
     const action = lastActionRef.current.trim();
     if (!action) { setError("没有可以重试的上一轮行动。请在输入框中描述新的行动。"); return Promise.resolve(false); }
     return runTurn(action, { manualRetry: true });
@@ -472,7 +512,7 @@ export default function App() {
     {screen === "create" && <CharacterCreation onBack={() => setScreen("welcome")} onCreate={handleCreate} settings={settings} onApi={() => setModal("api")} />}
     {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} mockMode={Boolean(settings.mockMode)} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onRegenerateChoices={regenerateChoices} onLocalTool={runLocalTool} onOpenMap={() => setModal("map")} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => setScreen("welcome")} />}
     {itemConfirmation && <ImportantItemConfirmation changes={itemConfirmation.changes} onConfirm={(approvedKeys) => settleImportantItemConfirmation({ approvedKeys })} onCancel={() => settleImportantItemConfirmation({ cancelled: true })} />}
-    {modal === "map" && game && <WorldMap game={game} loading={loading} onClose={() => setModal(null)} onTravel={(location) => { setModal(null); return runTurn(`前往${location.name}`, { mapDestination: location }); }} onInvestigate={(location, knowledge) => { setModal(null); return runTurn(`根据地图上的传闻，调查${knowledge.note || location.district}。`, { mapInvestigation: { locationId: location.id, currentStatus: knowledge.status, rumor: knowledge.note || location.rumor } }); }} onExplore={handleExplore} />}
+    {modal === "map" && game && <WorldMap game={game} loading={loading} onClose={() => setModal(null)} onTravel={(location) => { setModal(null); return runTurn(`前往${location.name}`, { mapDestination: location }); }} onInvestigate={(location, knowledge) => { setModal(null); return runTurn(`根据地图上的传闻，调查${knowledge.note || location.district}。`, { mapInvestigation: { locationId: location.id, currentStatus: knowledge.status, rumor: knowledge.note || location.rumor } }); }} onExplore={handleExplore} onPray={handlePray} />}
     {modal === "api" && <ApiSettings settings={settings} onSave={handleSettingsSave} onClose={() => setModal(null)} />}
     {(modal === "update" || modal === "update-auto") && <UpdateDialog automatic={modal === "update-auto"} onClose={() => setModal(null)} />}
     {modal === "changelog" && <ChangelogDialog onClose={() => setModal(null)} />}

@@ -183,5 +183,5 @@ test("character.update rejects zero or empty patches", () => {
   assert.equal(zero.results[0].ok, false);
   const empty = executeToolCalls(game, [{ id: "empty", name: "character.update", args: { patch: {} }, reason: "无变化" }]);
   assert.equal(empty.results[0].ok, false);
-  assert.equal(game.character.stats.sanity, 9);
+  assert.equal(game.character.stats.sanity, 10);
 });

@@ -8,6 +8,7 @@ import { buildWorld, reconcileWorld } from "../system/hexworld.js";
 import { normalizeMemoryState } from "./memoryState.js";
 import { normalizeTriggerState, syncLegacyOccult } from "../engine/triggerState.js";
 import { migrateContentState } from "../engine/contentMigrations.js";
+import { applyTalent } from "../system/talents.js";
 
 const SAVES_KEY = "mist-chronicle-saves-v1";
 const AUTOSAVE_ID = "autosave";
@@ -104,6 +105,17 @@ export function migrateSave(raw) {
     lastTurnBaseline: migrated.lastTurnBaseline ? { ...migrated.lastTurnBaseline, inventory: (migrated.lastTurnBaseline.inventory || []).filter((item) => !isMoneyItem(item)).map(normalizeInventoryItem) } : null,
     lastTurnAudit: migrated.lastTurnAudit || null,
   };
+  // 只修复尚未行动、完整属性恰好匹配旧开局模板的档案。
+  if (!raw.initialStatsVersion && raw.turn === 0 && !raw.lastTurnBaseline && !raw.lastTurnAudit
+    && !(raw.processedToolCalls || []).length && !(raw.statusEffects || []).length
+    && !(raw.storyHistory || raw.recentDialogues || []).some((message) => message.role === "user")) {
+    const maxSpirituality = raw.character.extraordinary === "low" ? 8 : 5;
+    const legacy = applyTalent({ health: 10, maxHealth: 10, sanity: 9, maxSanity: 10, spirituality: maxSpirituality - 1, maxSpirituality }, raw.character.talent);
+    if (Object.entries(legacy).every(([key, value]) => raw.character.stats?.[key] === value)) {
+      result.character.stats = { ...raw.character.stats, sanity: legacy.maxSanity, spirituality: legacy.maxSpirituality };
+    }
+  }
+  result.initialStatsVersion = 1;
   result.triggerState = normalizeTriggerState(result);
   migrateContentState(result);
   syncLegacyOccult(result, result.triggerState);
