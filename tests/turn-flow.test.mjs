@@ -21,7 +21,7 @@ test("rejected tool-only turns can finish locally without another model request"
 test("turn duration follows the action and successful movement", () => {
   assert.equal(minutesForTurn("向报童询问最近的消息"), 10);
   assert.equal(minutesForTurn("仔细调查候车室"), 25);
-  assert.equal(minutesForTurn("睡到天亮"), 600);
+  assert.equal(minutesForTurn("睡到天亮", [], [], "1349年 10月17日 · 周二 · 23:00"), 420);
   assert.equal(minutesForTurn("前往已知地点", [{ name: "location.move" }], [{ ok: true }]), 35);
   assert.equal(minutesForTurn("前往未知地点", [{ name: "location.move" }], [{ ok: false }]), 12);
 });

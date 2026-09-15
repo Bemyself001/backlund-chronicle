@@ -1,5 +1,6 @@
 import { applyStatDelta } from "./statChanges.js";
 import { processTriggers } from "./triggerEngine.js";
+import { restMinutes } from "./restTime.js";
 
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 
@@ -16,8 +17,6 @@ export function settleStatusTicks(game) {
 }
 
 const DANGEROUS_ACTION = /(?:强行|闯入|破门|袭击|搏斗|开枪|追逐|追踪|尾随|冒险|仪式|召唤|通灵|窥探|潜入|偷窃|威胁|独自进入|不顾危险)/i;
-const OVERNIGHT_ACTION = /(?:过夜|睡到天亮|整夜休息|一觉睡到)/i;
-const LONG_REST_ACTION = /(?:睡觉|入睡|休息数小时|长时间休息)/i;
 const TRAVEL_ACTION = /(?:乘火车|搭火车|乘船|搭船|跨区|长途|前往郊外|离开贝克兰德)/i;
 const INVESTIGATE_ACTION = /(?:调查|搜查|查阅|研究|检查|检视|跟踪|打听|寻找|勘察|监听|观察)/i;
 const SOCIAL_ACTION = /(?:交谈|询问|请教|拜访|谈判|购买|购物|吃饭|用餐|喝茶|喝酒|工作|应聘)/i;
@@ -27,10 +26,10 @@ function successfulTool(toolCalls, toolResults, predicate) {
   return toolCalls.some((call, index) => toolResults[index]?.ok && predicate(call));
 }
 
-export function minutesForTurn(action, toolCalls = [], toolResults = []) {
+export function minutesForTurn(action, toolCalls = [], toolResults = [], worldTime = "") {
   const text = String(action || "");
-  if (OVERNIGHT_ACTION.test(text)) return 600;
-  if (LONG_REST_ACTION.test(text)) return 240;
+  const rest = restMinutes(text, worldTime);
+  if (rest !== null) return rest;
   if (TRAVEL_ACTION.test(text)) return 75;
   const movementIndex = toolCalls.findIndex((call, index) => call.name === "location.move" && toolResults[index]?.ok);
   if (movementIndex >= 0) return Math.max(1, Number(toolResults[movementIndex]?.data?.travelMinutes) || 35);
@@ -70,7 +69,7 @@ export function occultEntryForTurn(game, nextTurn) {
 
 export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], toolResults = [], options = {}) {
   const elapsedMinutes = Number.isInteger(options.elapsedMinutes) && options.elapsedMinutes > 0
-    ? options.elapsedMinutes : minutesForTurn(action, toolCalls, toolResults);
+    ? options.elapsedMinutes : minutesForTurn(action, toolCalls, toolResults, game.worldTime);
   const dangerDelta = dangerDeltaForTurn({ action, selectedRisk, toolCalls, toolResults });
   const statusTicks = settleStatusTicks(game);
   const statusTickLogs = statusTicks.map((tick) => `状态「${tick.status}」结算：${tick.label} ${tick.before}→${tick.after}（${tick.delta > 0 ? "+" : ""}${tick.delta}）${tick.autoStatus ? `；${tick.autoStatus}` : ""}`);

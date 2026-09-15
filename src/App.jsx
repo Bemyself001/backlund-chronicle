@@ -17,6 +17,7 @@ import { createInitialGame, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from ".
 import { buildRejectedToolNarrative, dedupeToolCalls, executeToolCalls, normalizeToolCalls } from "./engine/tools.js";
 import { auditTurnChanges, collectImportantItemConfirmations, createAuditBaseline } from "./engine/audit.js";
 import { resolveTurnProgress } from "./engine/turn.js";
+import { restMinutes } from "./engine/restTime.js";
 import { processTriggers } from "./engine/triggerEngine.js";
 import { loadApiSettings, requestAIWithReasoningFallback, saveApiSettings } from "./services/api.js";
 import { buildFastNarrativeContinuationContext, buildFastPresentationContext, buildPlanningContext, buildRenderingContext, buildSummaryContext, buildToolRepairContext, computeMemoryUpdate } from "./services/memory.js";
@@ -211,7 +212,8 @@ export default function App() {
       };
 
       const advancementIntent = isExplicitAdvancementIntent(action) && game.inventory.some((item) => item.potion);
-      const fastMode = Boolean(settings.fastMode) && !settings.mockMode && !advancementIntent;
+      // Rest narration must wait for the authoritative end time instead of streaming a speculative time jump.
+      const fastMode = Boolean(settings.fastMode) && !settings.mockMode && !advancementIntent && restMinutes(action, game.worldTime) === null;
       let planningResponse;
       let fastPresentationTask = null;
       if (settings.mockMode) {

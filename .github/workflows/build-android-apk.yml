@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  PRODUCT_VERSION: "1.4.9"
+  PRODUCT_VERSION: "1.5.0"
 
 jobs:
   build-release-apk:
@@ -111,5 +111,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "贝克兰德纪事 ${PRODUCT_VERSION}" \
-            --notes "1.4.9 · 特殊行动与地图调查修复：新增22条途径的生计与委托、66则固定事件、炼药和组织登记；地图调查正常完成一次即可揭开所选地点迷雾，修正公开教堂的描述。保留开局满状态及五回合教堂祷告。兼容已有存档，请直接覆盖安装，不要先卸载。" \
+            --notes "1.5.0 · 时间同步与下载镜像修复：休息默认1小时、睡觉默认8小时，支持明确时长、指定结束时刻和跨日推进；睡到天亮按下一个早上6点结算，休息剧情等待系统时间确认后生成。镜像下载1切换为 gh-proxy.org，保留镜像2与GitHub直链。兼容已有存档，请直接覆盖安装，不要先卸载。" \
             --latest

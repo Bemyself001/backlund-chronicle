@@ -2,6 +2,8 @@ import { makeId } from "../utils/id.js";
 import { OPENINGS } from "../content/index.js";
 import { openingChoices } from "../system/openings.js";
 import { getMapLocation } from "../system/map.js";
+import { restMinutes } from "../engine/restTime.js";
+import { advanceWorldTime } from "../engine/turn.js";
 
 function includesAny(text, words) { return words.some((word) => text.includes(word)); }
 
@@ -18,7 +20,10 @@ export async function mockResponse(game, action, signal, onChunk, options = {}) 
   const destination = action.startsWith("前往") ? game.discoveredLocations.find((place) => action === `前往${place.name}`) : null;
   const availableSpecial = game.triggerState?.active?.find((entry) => entry.status === "available" && entry.category !== "occult-entry");
   const investigation = getMapLocation(options.mapInvestigation?.locationId, game);
-  if (investigation) {
+  const rest = restMinutes(action, game.worldTime);
+  if (rest !== null) {
+    narrative = `你暂时放下手边的事，按自己的安排休息了${rest}分钟。休息结束时，时间来到${advanceWorldTime(game.worldTime, rest)}。\n\n接下来要做什么，由你决定。`;
+  } else if (investigation) {
     narrative = `你顺着已有的信息核对地名与路线，终于确认了${investigation.name}的位置，并将它清楚地标在地图上。${investigation.description}\n\n这次调查让你知道如何前往，但你目前仍在${game.location.name}；地点内部尚未接触的事务，需要到访后进一步了解。`;
   } else if (destination && destination.id !== game.location.id) {
     narrative = `你从${game.location.name}动身，按已知路线前往${destination.name}。${getMapLocation(destination.id)?.description || "沿途街景在雨雾中逐渐变化。"}\n\n抵达后的行动由你决定：可以了解这里的生活与工作，也可以继续前往其他已知地点。`;

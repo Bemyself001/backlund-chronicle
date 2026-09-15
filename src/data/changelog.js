@@ -127,7 +127,7 @@ const RELEASE_146_UPDATE = {
   ],
 };
 
-export const LATEST_UPDATE = {
+const RELEASE_149_UPDATE = {
   date: "2026-09-15",
   dateLabel: "2026.09.15",
   title: "1.4.9 · 特殊行动与地图调查修复",
@@ -145,6 +145,19 @@ export const LATEST_UPDATE = {
     "祷告消耗一回合、恢复两点灵性且不超过上限，持续状态照常结算；生成失败或取消不消耗回合及冷却。",
     "AI 按供奉神明创作200字以内的祷文，再接各教堂固定环境描写；离线演示模式使用本地祷文。",
     "产品版本更新为1.4.9；修复沿用已发布标签导致线上构建被拦截的问题。Android 内部版本号递增至30128，继续使用原包名与正式签名以支持覆盖升级。",
+  ],
+};
+
+export const LATEST_UPDATE = {
+  date: "2026-09-15",
+  dateLabel: "2026.09.15",
+  title: "1.5.0 · 时间同步与下载镜像修复",
+  summary: "统一休息剧情与系统时钟，更换响应缓慢的第一下载镜像，保留已有存档与升级兼容性。",
+  changes: [
+    "休息默认1小时、睡觉默认8小时，明确时长优先；睡到天亮按下一个早上6点计算，支持指定结束时刻及跨日推进。",
+    "休息叙事等待本地时间结算，避免剧情过去几小时而系统只推进几分钟；回合、状态结算次数及属性恢复规则保持不变。",
+    "镜像加速下载1由 github.xxlab.tech 更换为 gh-proxy.org；镜像2、GitHub直链及OTA通道保持不变。",
+    "产品版本升级至1.5.0，Android内部版本号递增至30129，沿用原包名和正式签名，可覆盖安装并保留存档。",
   ],
 };
 
@@ -371,6 +384,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_149_UPDATE,
   RELEASE_147_UPDATE,
   RELEASE_146_UPDATE,
   RELEASE_145_UPDATE,

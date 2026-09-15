@@ -10,7 +10,7 @@ const CHECK_INTERVAL = 24 * 60 * 60 * 1000;
 
 // 公共加速镜像随时可能失效；中国大陆用户默认使用已校验的国内镜像，其余通道按顺序兜底。
 const MIRROR_PREFIXES = [
-  "https://github.xxlab.tech/",
+  "https://gh-proxy.org/",
   "https://ghfast.top/",
 ];
 

@@ -8,5 +8,6 @@ export function fixedNarrativeMessages() {
   return [
     { role: "system", content: FIXED_NARRATIVE_CONTRACT },
     { role: "system", content: `${LOCAL_STATE_AUTHORITY_RULES}${FACT_DISCLOSURE_RULES}` },
+    { role: "system", content: "【时间一致性】本轮耗时与结束时刻只以本地结算 turnResolution.derivedEffects.elapsedMinutes 和 worldTime 为准。不得把几分钟写成几小时，不得擅自跳到天黑、天亮或次日；历史剧情中的错误时间不能覆盖系统时钟。休息的明确时长优先，默认休息60分钟、睡觉480分钟，睡到天亮按下一个早上6点计算。规划阶段可参考 plannedRestTime；最终叙事必须按实际结算写明休息耗时和结束时刻。尚未拿到结算的快速草稿只写行动过程，不宣称时间跳跃或休息结束。休息不自动授予未经本地确认的生命、理智或灵性恢复。" },
   ];
 }
