@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  PRODUCT_VERSION: "1.5.3"
+  PRODUCT_VERSION: "1.5.4"
 
 jobs:
   build-release-apk:
@@ -111,5 +111,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "贝克兰德纪事 ${PRODUCT_VERSION}" \
-            --notes "1.5.3 · 修复行囊检查剧情触发：在行囊内第四次检查怀表后，自动回到剧情并由AI介绍两条调查路线。已完成检查但未收到引导的存档，再次检查怀表即可补发；生成失败可重试，不额外消耗回合。兼容已有存档，请覆盖安装，不要先卸载。" \
+            --notes "1.5.4 · 补全调查线索衔接：怀表主线与三条支线每个阶段都有含蓄的剧情线索和手记方向，支线收尾后承接货栈调查，危险节点明确剩余行动次数。支持自然请教、查阅与解读，修复拍卖会购药后的独立救治出口。旧存档保留阶段、奖励及倒计时；请覆盖安装，不要先卸载。" \
             --latest

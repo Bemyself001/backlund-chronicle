@@ -151,7 +151,7 @@ test('old active definitions migrate, terminal history stays historical, reward 
   game.triggerState.rewardsClaimed = ['previous-reward'];
   game.triggerState.history.push({ ...game.triggerState.active[0], instanceId: 'old-finished', status: 'completed', stage: 'old-ending' });
   const loaded = migrateSave(game);
-  assert.equal(loaded.triggerState.active.find(e => e.instanceId === 'case').definitionVersion, 3);
+  assert.equal(loaded.triggerState.active.find(e => e.instanceId === 'case').definitionVersion, 4);
   assert.equal(stageOf(loaded), 'mercy-decision');
   assert.deepEqual(loaded.triggerState.rewardsClaimed, ['previous-reward']);
   assert.equal(loaded.triggerState.history[0].stage, 'old-ending');

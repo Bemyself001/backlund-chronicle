@@ -1,5 +1,12 @@
 export const CONTENT_MIGRATIONS = [
   {
+    id: "backlund.investigation-guidance", fromVersion: "2026.09.16.1", toVersion: "2026.09.16.2",
+    definitionRefreshes: [
+      ...["watch.heirloom.hidden-note", "watch.heirloom.late-hour"].map(definitionId => ({ definitionId, toDefinitionVersion: 4, refreshPresentation: true })),
+      ...["side.queens.renard-fall", "side.bridge.silent-detonator", "side.bridge.ebb-iron-door"].map(definitionId => ({ definitionId, toDefinitionVersion: 3, refreshPresentation: true })),
+    ],
+  },
+  {
     id: "backlund.investigation-flow", fromVersion: "2026.09.15.1", toVersion: "2026.09.16.1",
     definitionRefreshes: [
       { definitionId: "watch.heirloom.hidden-note", toDefinitionVersion: 3, refreshPresentation: true },

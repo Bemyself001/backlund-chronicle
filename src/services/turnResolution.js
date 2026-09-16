@@ -1,12 +1,12 @@
 import { playerVisibleItem } from "../system/items.js";
-import { narrativeEventsForTurn } from "./narrativeEvents.js";
+import { narrativeEventsForTurn, pendingQuestNarration } from "./narrativeEvents.js";
 
 function playerVisibleResultData(data = {}) {
   if (!data.inventoryChange) return data;
   return { ...data, inventoryChange: playerVisibleItem(data.inventoryChange) };
 }
 
-export function createTurnResolution(toolCalls = [], results = [], progress = {}) {
+export function createTurnResolution(toolCalls = [], results = [], progress = {}, game = null) {
   const entries = toolCalls.map((call, index) => {
     const result = results[index] || { ok: false, reason: "本地引擎没有返回执行结果" };
     return {
@@ -22,7 +22,10 @@ export function createTurnResolution(toolCalls = [], results = [], progress = {}
     accepted: entries.filter((entry) => entry.ok),
     rejected: entries.filter((entry) => !entry.ok),
     derivedEffects: {
-      narrativeEvents: narrativeEventsForTurn(progress.triggerSignals),
+      narrativeEvents: game ? pendingQuestNarration(game, [
+        ...(progress.triggerEvents?.completed || []), ...(progress.triggerEvents?.failed || []),
+        ...(progress.triggerEvents?.expired || []), ...(progress.triggerEvents?.abandoned || []),
+      ]) : narrativeEventsForTurn(progress.triggerSignals),
       elapsedMinutes: progress.elapsedMinutes || 0,
       worldTime: progress.worldTime || "",
       dangerDelta: progress.dangerDelta || 0,

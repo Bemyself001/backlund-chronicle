@@ -1,11 +1,43 @@
+import { triggerGuidance } from "../engine/triggerGuidance.js";
+
 export function pendingWatchNarration(game) {
-  if (!game.triggerState?.facts?.['watch.note-recovered']?.value || game.narrativeEventsDelivered?.['watch.investigation-routes']) return [];
+  if (!game.triggerState?.facts?.['watch.note-recovered']?.value || game.triggerState?.facts?.['watch.formal-quest-unlocked']?.value || game.narrativeEventsDelivered?.['watch.investigation-routes']) return [];
   // Recover saves whose inventory inspection settled without ever rendering the event.
   return narrativeEventsForTurn([{ kind: 'fact.discovered', factId: 'watch.note-recovered' }]);
 }
 
+export function pendingQuestNarration(game, terminalEvents = []) {
+  if (!game) return [];
+  const events = pendingWatchNarration(game);
+  const instances = [
+    ...(game.triggerState?.active || []).filter(entry => ['available', 'engaged'].includes(entry.status)),
+    ...terminalEvents,
+  ];
+  for (const instance of instances) {
+    // The initial watch directions have one stable legacy delivery ID.
+    if (instance.definitionId === 'watch.heirloom.hidden-note' && ['available', 'engaged'].includes(instance.status)) continue;
+    const guidance = triggerGuidance(game, instance);
+    if (!guidance.enabled || !guidance.text) continue;
+    const timerKey = guidance.timers.map(timer => `${timer.id}:${timer.remaining <= 3 ? timer.remaining : 'running'}`).join(',');
+    const id = `quest-guidance:${instance.instanceId}:${instance.status}:${guidance.key}:${timerKey}`;
+    if (game.narrativeEventsDelivered?.[id]) continue;
+    events.push({ id, triggerDefinitionId: instance.definitionId, title: instance.presentation?.title,
+      reason: instance.status === 'completed' ? '调查告一段落，承接已确认的结果' : '当前线索方向发生变化或此前未呈现',
+      direction: guidance.text, narrativeCue: guidance.narrativeCue, timers: guidance.timers,
+      constraints: '只以当前可感知线索给出方向；不要列操作清单，不泄露后续阶段、不替玩家移动、接受任务或发放奖励。未亲临地点时以已有记录与回忆表达，不让远处人物突然对话。',
+    });
+  }
+  return events;
+}
+
 export function markNarrativeEventsDelivered(game, events) {
   return { ...game, narrativeEventsDelivered: { ...game.narrativeEventsDelivered, ...Object.fromEntries(events.map(event => [event.id, true])) } };
+}
+
+export function eventDirections(events) {
+  return events.map(event => [event.direction || event.routes?.map(route => `${route.name}：${route.purpose}`).join('；'),
+    ...(event.timers || []).map(timer => `剩余 ${timer.remaining} 次行动。${timer.remaining <= 1 ? '出口或退路已迫在眉睫。' : '请留意撤离所需的时间。'}`),
+  ].filter(Boolean).join('\n')).join('\n\n');
 }
 
 // Only successful local discoveries can request an authoritative story beat.
@@ -23,4 +55,4 @@ export function narrativeEventsForTurn(signals = []) {
   }];
 }
 
-export const NARRATIVE_EVENT_RULE = "【本轮剧情触发】若 turnResolution.derivedEffects.narrativeEvents 非空，必须在本轮剧情正文中自然生成对应引导段落，明确介绍事件给出的每一条路线、前往地点及可以如何调查；具体措辞、人物回忆与衔接由你创作，不能只放在任务手记、行动选项或工具日志中。遵守事件的信息边界，不替玩家选择路线。只处理本轮事件，不因历史记录再次重复引导。";
+export const NARRATIVE_EVENT_RULE = "【本轮剧情触发】若 turnResolution.derivedEffects.narrativeEvents 非空，必须在本轮剧情正文中自然生成对应引导段落。采用含蓄风格：把方向融入已接触人物的话、报纸、记录、现场痕迹或角色回忆；不列任务步骤、不说必须先完成某支线、不揭示未发生的真相。每条给定路线都须留下可辨认的地点或人物线索，具体措辞由你创作，不能只放在手记或选项里。危险计时例外：明确说明剩余行动次数和撤离压力。多条相关事件合并成一段自然衔接，不复述整条任务线、不替玩家选择。只处理本轮事件；没有新事件时不重复播报旧引导。";

@@ -102,14 +102,16 @@ function mapGrowthAnchors(game) {
 }
 
 function privatePlanningState(game, options = {}) {
-  const triggerObjectives = (game.triggerState?.active || []).filter((entry) => entry.status === "engaged").map((entry) => {
+  const triggerObjectives = (game.triggerState?.active || []).filter((entry) => ["available", "engaged"].includes(entry.status)).map((entry) => {
     const definition = getInstanceTriggerDefinition(entry, game);
-    const stage = (definition?.stages || []).find((candidate) => candidate.id === entry.stage);
+    const stage = (definition?.stages || []).find((candidate) => candidate.id === (entry.status === "available" ? definition.engagedStage || entry.stage : entry.stage));
     return {
       instanceId: entry.instanceId,
       definitionId: entry.definitionId,
       title: entry.presentation?.title || "特殊任务",
       stage: entry.stage,
+      requiresEngagement: entry.status === "available",
+      engagementRule: "玩家明确解读、请教、查阅或追查该线索时，可先trigger.engage，再按本轮真实结果决定是否trigger.progress；不必让玩家再说一次接受任务。仅看消息、问路或路过不自动接取，不因引导出现而自动完成目标。",
       guidance: stage?.guidance || "",
       timers: (definition.timers || []).filter(timer => timer.stages.includes(entry.stage)).map(timer => ({ id: timer.id, remainingActions: entry.timers?.[timer.id] ? Math.max(0, entry.timers[timer.id].deadline - Number(game.turn || 0)) : timer.turns, message: timer.message })),
       objectives: (stage?.transitions || []).map(({ objectiveId, description, requirements, requirementMessage, actionTerms, rejectActionTerms }) => ({
