@@ -15,14 +15,14 @@ const itemReward = (id, name, description, category, properties = {}) => ({ id: 
 } });
 
 export function configureWatchFlow(discovery, main) {
-  discovery.version = 4;
+  discovery.version = 5;
   discovery.presentation.text += " 可去皇后区公共图书馆查旧式速记资料，或到希尔斯顿区商会街打听舅舅工作过的钟表行。";
   discovery.stages[0].guidance = "去公共图书馆查行业速记，或到商会街寻找舅舅的旧同事；两条路线任选其一。";
   const decode = discovery.stages[0].transitions[0];
   decode.requirements.push({ type: "any", conditions: ["queen-library", "hillston-market"].map(locationId => ({ type: "location", locationId, includeChildren: true })) });
   decode.description = "在公共图书馆解读速记，或在商会街钟表行请教旧同事；AI首次生成的钟表行名称须以location.grow登记，后续沿用，不要求两条路线都完成";
   decode.requirementMessage = "请先实际到达皇后区公共图书馆或商会街（含钟表行）解读纸条";
-  main.version = 4;
+  main.version = 5;
   main.failWhen = [{ type: "stat", key: "health", max: 0 }];
   const s = Object.fromEntries(main.stages.map(stage => [stage.id, stage]));
   const mercy = s["mercy-decision"].transitions[0];

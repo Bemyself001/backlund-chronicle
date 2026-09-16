@@ -4,7 +4,7 @@ export const LORE_ENTRIES = [
   {
     id: "lore.watch.fixed-note", type: "loreFact", alwaysInclude: true,
     revealWhen: [{ type: "fact", key: "watch.formal-quest-unlocked", value: true }],
-    relevance: { terms: ["纸条", "译文", "雷金纳德", "白蔷薇", "账本", "南岸"] },
+    relevance: { terms: ["纸条", "译文", "雷金纳德", "白鸢尾", "账本", "南岸"] },
     text: WATCH_NOTE_RULE,
   },
   {

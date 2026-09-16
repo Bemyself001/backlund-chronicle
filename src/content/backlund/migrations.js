@@ -2,6 +2,15 @@ import { WATCH_NOTE_DETAIL } from "./watchNote.js";
 
 export const CONTENT_MIGRATIONS = [
   {
+    id: "backlund.watch-note-white-iris", fromVersion: "2026.09.16.3", toVersion: "2026.09.16.4",
+    cluePatches: [{ id: "clue-watch-note-decoded", patch: { detail: WATCH_NOTE_DETAIL } }],
+    definitionRefreshes: [
+      ...["watch.heirloom.hidden-note", "watch.heirloom.late-hour"].map(definitionId => ({ definitionId, toDefinitionVersion: 6, refreshPresentation: true })),
+    ],
+    textReplacementFields: ["recentDialogues", "storyHistory", "longTermSummary", "memoryState", "memoryNotes", "clues", "quests", "questJournal", "triggerState", "inventory", "changeLog", "choices"],
+    textReplacements: [{ from: "白蔷薇", to: "白鸢尾" }],
+  },
+  {
     id: "backlund.fixed-watch-note", fromVersion: "2026.09.16.2", toVersion: "2026.09.16.3",
     cluePatches: [{ id: "clue-watch-note-decoded", patch: { detail: WATCH_NOTE_DETAIL } }],
     definitionRefreshes: [

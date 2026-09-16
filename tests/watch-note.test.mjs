@@ -52,6 +52,33 @@ test('local decoding reward and quest guidance share the fixed text', () => {
   const definition = getContentTrigger('watch.heirloom.hidden-note');
   assert.equal(definition.rewards.find(entry => entry.type === 'clue').clue.detail, WATCH_NOTE_DETAIL);
   assert.ok(definition.completionGuidance.guidance.includes(WATCH_NOTE_TEXT));
-  assert.equal(definition.version, 5);
+  assert.equal(definition.version, 6);
   assert.ok(getContentTrigger('watch.heirloom.late-hour').presentation.text.includes(WATCH_NOTE_TEXT));
+});
+
+test('version 1.6.0 saves correct white rose to white iris across clues, journal and memory without replaying progress', () => {
+  assert.equal(WATCH_NOTE_TEXT, '不要相信白鸢尾，账本已经交还到南岸货站。');
+  const game = make();
+  game.content.contentVersion = '2026.09.16.3';
+  game.turn = 42;
+  mark(game, 'watch.formal-quest-unlocked');
+  game.clues.push({ id: 'clue-watch-note-decoded', title: '纸条', detail: '不要相信白蔷薇，账本已经交还到南岸货站。' });
+  game.longTermSummary = '纸条警告不要相信白蔷薇。';
+  game.storyHistory = [{ role: 'assistant', content: game.longTermSummary }];
+  const definition = getContentTrigger('watch.heirloom.late-hour');
+  game.triggerState.active.push({ instanceId: 'old-watch', definitionId: definition.id, definitionVersion: 5,
+    definitionSnapshot: structuredClone(definition), status: 'engaged', stage: 'trace-uncle', createdTurn: 3,
+    presentation: { title: definition.presentation.title, text: game.longTermSummary },
+    lastProgressEvidence: '从白蔷薇的警告中确认货站方向', stageHistory: [], timers: { preserved: { deadline: 50 } },
+  });
+  game.triggerState.rewardsClaimed = ['watch.hidden-note.formal-quest'];
+  const migrated = migrateSave(game);
+  assert.equal(migrated.content.contentVersion, '2026.09.16.4');
+  assert.doesNotMatch(JSON.stringify(migrated), /白蔷薇/);
+  assert.match(migrated.questJournal.entries['old-watch'].summary, /白鸢尾/);
+  assert.equal(migrated.triggerState.active.find(entry => entry.instanceId === 'old-watch').stage, 'trace-uncle');
+  assert.deepEqual(migrated.triggerState.active.find(entry => entry.instanceId === 'old-watch').timers, { preserved: { deadline: 50 } });
+  assert.deepEqual(migrated.triggerState.rewardsClaimed, game.triggerState.rewardsClaimed);
+  assert.equal(migrated.turn, 42);
+  assert.deepEqual(migrateSave(migrated).clues, migrated.clues);
 });
