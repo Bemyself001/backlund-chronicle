@@ -57,6 +57,9 @@ function normalizeInstance(instance = {}, fallbackStatus = "available") {
     stageHistory: Array.isArray(instance.stageHistory) ? instance.stageHistory.map((entry) => ({ ...entry })) : [],
     definitionVersion: instance.definitionVersion == null ? null : Math.max(1, Number(instance.definitionVersion) || 1),
     definitionSnapshot: instance.definitionSnapshot && typeof instance.definitionSnapshot === "object" ? structuredClone(instance.definitionSnapshot) : undefined,
+    timers: instance.timers && typeof instance.timers === "object" ? structuredClone(instance.timers) : {},
+    progressTurn: Number.isInteger(instance.progressTurn) ? instance.progressTurn : null,
+    processedTurn: Number.isInteger(instance.processedTurn) ? instance.processedTurn : null,
   };
 }
 

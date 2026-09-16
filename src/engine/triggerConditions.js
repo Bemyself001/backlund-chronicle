@@ -1,4 +1,5 @@
 import { getAdvancement } from "../system/character.js";
+import { moneyToPence } from "../system/money.js";
 
 const list = (value) => Array.isArray(value) ? value : value == null ? [] : [value];
 const normalizedText = (value) => String(value || "").toLowerCase().replace(/\s+/g, "");
@@ -67,13 +68,16 @@ export function conditionMatches(condition = {}, context = {}) {
       }
       break;
     }
-    case "item": matched = (game.inventory || []).some((item) => (!condition.itemId || item.itemId === condition.itemId) && (!condition.instanceId || item.instanceId === condition.instanceId)); break;
+    case "item": matched = (game.inventory || []).some((item) => Number(item.quantity) > 0 && (!condition.itemId || item.itemId === condition.itemId) && (!condition.instanceId || item.instanceId === condition.instanceId)); break;
+    case "money": matched = moneyToPence(game.money || {}) >= Number(condition.minPence || 0); break;
+    case "stat": matched = Number.isFinite(game.character?.stats?.[condition.key]) && (condition.max == null || game.character.stats[condition.key] <= Number(condition.max)) && (condition.min == null || game.character.stats[condition.key] >= Number(condition.min)); break;
     case "fact": matched = Boolean(state.facts?.[condition.key]) && (condition.value === undefined || state.facts[condition.key].value === condition.value); break;
     case "action": matched = textHasAny(action, condition.terms || []); break;
     case "signal": matched = signals.some((signal) => matchesSignal(signal, condition)); break;
     case "location": {
       const location = game.location || {};
-      matched = (!condition.locationId || location.id === condition.locationId)
+      const child = condition.includeChildren && (game.mapExtensions?.locations || []).some(entry => entry.id === location.id && entry.parentId === condition.locationId);
+      matched = (!condition.locationId || location.id === condition.locationId || child)
         && (!condition.districts?.length || condition.districts.some((district) => String(location.district || "").includes(district)))
         && (!condition.terms?.length || textHasAny(`${location.name || ""} ${location.district || ""}`, condition.terms));
       break;

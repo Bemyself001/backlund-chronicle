@@ -28,6 +28,8 @@ function successfulTool(toolCalls, toolResults, predicate) {
 
 export function minutesForTurn(action, toolCalls = [], toolResults = [], worldTime = "") {
   const text = String(action || "");
+  const taskMinutes = toolResults.filter(result => result?.ok).map(result => result.data?.taskMinutes).filter(value => Number.isInteger(value) && value > 0);
+  if (taskMinutes.length) return Math.max(...taskMinutes);
   const rest = restMinutes(text, worldTime);
   if (rest !== null) return rest;
   if (TRAVEL_ACTION.test(text)) return 75;

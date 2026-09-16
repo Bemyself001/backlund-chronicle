@@ -1,5 +1,11 @@
 export const LORE_ENTRIES = [
   {
+    id: "lore.renard.deep-control", type: "loreFact",
+    revealWhen: [{ type: "fact", key: "knowledge.deep-control-irreversible", value: true }],
+    relevance: { terms: ["药师", "治疗", "救治", "用药", "舅舅", "雷金纳德", "控制", "唤醒", "埃德蒙"] },
+    text: "本任务特定的长期深度控制可能摧毁记忆与自我，不泛指所有魅惑。若主角是药师，由主角自述；否则由埃德蒙·维尔说明：‘让一个人继续呼吸，和让他重新认得自己的家人，是两回事。有些人，我们救得活，却带不回来。’不要因此认定富家小姐也被深度控制。",
+  },
+  {
     id: "lore.occult.local-authority",
     type: "loreFact",
     revealWhen: [{ type: "fact", key: "occult.contact", value: true }],
@@ -25,7 +31,7 @@ export const LORE_ENTRIES = [
     type: "loreFact",
     revealWhen: [{ type: "trigger", definitionId: "watch.heirloom.late-hour", status: "engaged", stage: "white-iris-confrontation" }],
     relevance: { terms: ["白鸢尾", "魔女", "交手", "逃", "支援"], definitionIds: ["watch.heirloom.late-hour"] },
-    text: "白鸢尾是明显强于当前主角的序列7魔女，本次只会短暂交手。官方组织成员可以坚持到所属组织支援抵达；没有官方支援时必须逃生。白鸢尾不会在此战死亡。",
+    text: "白鸢尾是序列7魔女。官方已锁定货栈并按自身计划突入，排水道撬痕来自其先遣人员。组织身份有助接应，但不保证撑到救援。之后官方可能击退白鸢尾，由他们处理，不要求玩家参战，也不计为玩家战绩。白鸢尾不在此战死亡。",
   },
   {
     id: "lore.azik-copper-whistle.known-use",

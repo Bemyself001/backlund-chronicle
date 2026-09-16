@@ -517,7 +517,7 @@ function executeOne(game, call, options = {}) {
       return succeed(call.name, `${turnLabel}：你开始追查「${result.instance.presentation?.title || "非凡入口"}」——${call.reason}。`, { contact: 1, entryId: args.entryId, triggerTransition: { instanceId: args.entryId, status: "engaged" } });
     }
     case "trigger.engage": {
-      if (options.playerAction !== undefined && !/(追查|继续|深入|验证|调查|接受|着手|查明|拆查|检查)/.test(String(options.playerAction))) return fail(call.name, "玩家本轮没有明确表示追查该事件");
+      if (options.playerAction !== undefined && !/(追查|继续|深入|验证|调查|接受|着手|查明|拆查|检查|回应|接取|救助|救治)/.test(String(options.playerAction))) return fail(call.name, "玩家本轮没有明确表示追查该事件");
       const result = engageTrigger(game, args.instanceId, game.turn + 1, call.reason);
       if (!result.ok) return fail(call.name, result.reason);
       return succeed(call.name, `${turnLabel}：开始追查「${result.instance.presentation?.title || "特殊事件"}」——${call.reason}。`, { triggerTransition: { instanceId: args.instanceId, status: "engaged", stage: result.instance.stage } });
@@ -528,6 +528,7 @@ function executeOne(game, call, options = {}) {
       return succeed(call.name, `${turnLabel}：确认「${result.instance.presentation?.title || "特殊任务"}」当前目标已经推进——${args.evidence}。`, {
         triggerTransition: { instanceId: args.instanceId, objectiveId: args.objectiveId, from: result.instance.stage, to: result.transition.nextStage || "completed" },
         triggerSignals: [result.signal],
+        taskMinutes: result.elapsedMinutes,
       });
     }
     case "trigger.abandon": {

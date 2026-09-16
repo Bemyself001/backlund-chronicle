@@ -4,6 +4,7 @@ import { playerVisibleItem } from "../system/items.js";
 import { appendMemoryEpisode, createMemoryEpisode, memoryPromptState } from "./memoryState.js";
 import { playerVisibleTriggers } from "../engine/triggerState.js";
 import { getInstanceTriggerDefinition } from "../engine/triggerDefinitions.js";
+import { triggerGuidance } from "../engine/triggerGuidance.js";
 import { progressiveContext } from "../engine/contextLookup.js";
 import { SCENARIO_RULES } from "../content/index.js";
 import { fixedNarrativeMessages, LOCAL_STATE_AUTHORITY_RULES } from "../system/narrativeContract.js";
@@ -70,6 +71,7 @@ export function visibleGameState(game) {
     knownClues: game.clues,
     activeQuests: game.quests,
     specialEvents: playerVisibleTriggers(game.triggerState || { active: [] }),
+    taskGuidance: (game.triggerState?.active || []).filter(entry => ["available", "engaged"].includes(entry.status)).map(entry => triggerGuidance(game, entry)),
     lastTurnAudit: game.lastTurnAudit || null,
   };
 }
@@ -107,11 +109,14 @@ function privatePlanningState(game, options = {}) {
       definitionId: entry.definitionId,
       title: entry.presentation?.title || "特殊任务",
       stage: entry.stage,
-      objectives: (stage?.transitions || []).map(({ objectiveId, description, requirements, requirementMessage }) => ({
+      guidance: stage?.guidance || "",
+      timers: (definition.timers || []).filter(timer => timer.stages.includes(entry.stage)).map(timer => ({ id: timer.id, remainingActions: entry.timers?.[timer.id] ? Math.max(0, entry.timers[timer.id].deadline - Number(game.turn || 0)) : timer.turns, message: timer.message })),
+      objectives: (stage?.transitions || []).map(({ objectiveId, description, requirements, requirementMessage, actionTerms, rejectActionTerms }) => ({
         objectiveId,
         description,
         requirements: requirements || [],
         requirementMessage: requirementMessage || undefined,
+        actionTerms, rejectActionTerms,
       })),
     };
   });

@@ -100,7 +100,7 @@ function containsRuntimeValue(value, ancestors = new Set()) {
 }
 
 const asArray = (value) => Array.isArray(value) ? value : [];
-const CONDITION_TYPES = new Set(["always", "all", "any", "character", "item", "fact", "action", "signal", "location", "time", "weather", "relationship", "organization", "clue", "trigger", "turn", "available-slot"]);
+const CONDITION_TYPES = new Set(["always", "all", "any", "character", "item", "money", "stat", "fact", "action", "signal", "location", "time", "weather", "relationship", "organization", "clue", "trigger", "turn", "available-slot"]);
 const REWARD_TYPES = new Set(["fact", "clue", "item", "item-remove", "item-update", "money", "relationship"]);
 const ITEM_EFFECT_TYPES = new Set(["discover-fact", "signal"]);
 
@@ -114,6 +114,7 @@ function validateConditions(conditions, label, errors) {
 function definitionRewards(definition) {
   return [
     ...asArray(definition.rewards),
+    ...asArray(definition.timers).flatMap(timer => asArray(timer.rewards)),
     ...asArray(definition.stages).flatMap((stage) => [
       ...asArray(stage.rewards),
       ...asArray(stage.transitions).flatMap((transition) => asArray(transition.rewards)),
@@ -134,6 +135,9 @@ function validateTriggerContent(triggers, errors) {
     validateConditions(definition?.failWhen, `触发 ${definition?.id}`, errors);
     const stages = asArray(definition?.stages);
     const stageIds = new Set(stages.map((stage) => stage?.id));
+    for (const timer of asArray(definition.timers)) {
+      if (!timer.id || !Number.isInteger(timer.turns) || timer.turns < 1 || !timer.stages?.length || timer.stages.some(id => !stageIds.has(id)) || (!timer.fail && !stageIds.has(timer.nextStage))) errors.push(`${definition.id} 的回合计时定义无效`);
+    }
     if (definition?.engagedStage && !stageIds.has(definition.engagedStage)) errors.push(`${definition.id} 的 engagedStage 不存在：${definition.engagedStage}`);
     for (const stage of stages) {
       if (!stage?.id) errors.push(`${definition.id} 存在缺少 ID 的阶段`);
@@ -150,8 +154,8 @@ function validateTriggerContent(triggers, errors) {
     for (const reward of definitionRewards(definition)) {
       if (!reward?.id || !REWARD_TYPES.has(reward?.type)) errors.push(`${definition.id} 使用了无效奖励：${reward?.id || "未填写"}`);
       const previous = rewardOwners.get(reward?.id);
-      if (previous) errors.push(`奖励 ID 重复：${reward.id}（${previous}、${definition.id}）`);
-      else if (reward?.id) rewardOwners.set(reward.id, definition.id);
+      if (previous && !(reward.shared && previous.owner === definition.id && previous.value === JSON.stringify(reward))) errors.push(`奖励 ID 重复：${reward.id}（${previous.owner}、${definition.id}）`);
+      else if (reward?.id) rewardOwners.set(reward.id, { owner: definition.id, value: JSON.stringify(reward) });
     }
   }
 }

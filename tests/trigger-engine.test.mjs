@@ -122,7 +122,8 @@ test("heirloom watch inspection advances one local fact at a time and rewards on
   ({ game } = processTurn(game, 5, "主动追查舅舅留下的纸条", [{ id: "engage-watch", name: "trigger.engage", args: { instanceId: watchEvent.instanceId }, reason: "明确追查舅舅失踪的线索" }]));
   watchEvent = game.triggerState.active.find((item) => item.definitionId === "watch.heirloom.hidden-note");
   assert.equal(watchEvent.status, "engaged");
-  const decodeCall = { id: "decode-watch", name: "trigger.progress", args: { instanceId: watchEvent.instanceId, objectiveId: "decode-watch-note", evidence: "用市政档案馆的旧速记表逐句核对出完整译文" }, reason: "找到可靠资料并完成辨认" };
+  game.location = { id: "queen-library", name: "公共图书馆", district: "皇后区" };
+  const decodeCall = { id: "decode-watch", name: "trigger.progress", args: { instanceId: watchEvent.instanceId, objectiveId: "decode-watch-note", evidence: "用公共图书馆的旧速记表逐句核对出完整译文" }, reason: "找到可靠资料并完成辨认" };
   ({ game } = processTurn(game, 6, "查阅旧速记表并译出怀表纸条", [decodeCall]));
   assert.equal(game.triggerState.history.find((item) => item.instanceId === watchEvent.instanceId)?.status, "completed");
   assert.ok(game.triggerState.facts["watch.formal-quest-unlocked"]);
@@ -152,6 +153,8 @@ test("special task progress is stage-bound and the watch main quest resolves thr
 
   progress(3, "trace-uncle", "追查舅舅雷金纳德·斯帕罗的档案记录");
   game.location = { id: "bridge-docks", name: "桥区·南岸货栈", district: "贝克兰德桥区" };
+  game.triggerState.facts["side.renard.completed"] = { value: true, firstTurn: 0, evidenceIds: ["test"] };
+  game.triggerState.facts["side.silent-detonator.completed"] = { value: true, firstTurn: 0, evidenceIds: ["test"] };
   progress(4, "enter-south-warehouse", "进入南岸货栈仓库");
   progress(5, "survive-warehouse-bomb", "辨认引线后绕开仓库炸弹");
   progress(6, "find-uncle-alive", "搜查仓库并找到舅舅雷金纳德·斯帕罗");
@@ -165,8 +168,10 @@ test("special task progress is stage-bound and the watch main quest resolves thr
   progress(9, "release-uncle", "我明确开枪结束他的生命，让舅舅雷金纳德·斯帕罗解脱", "玩家明确作出不可逆的解脱决定并亲手执行");
   assert.equal(game.triggerState.facts["watch.uncle-released"].value, true);
   assert.ok(game.inventory.some((item) => item.itemId === "archaeologist-characteristic"));
+  assert.equal(game.inventory.some((item) => item.itemId === "azik-copper-whistle"), false);
+  progress(10, "search-warehouse-evidence", "搜查藏品柜与账册桌");
   assert.ok(game.inventory.some((item) => item.itemId === "azik-copper-whistle"));
-  progress(10, "escape-white-iris", "无法战胜白鸢尾，立刻撤退逃生", "没有官方支援，主角从短暂交手中脱身，白鸢尾仍然存活");
+  progress(11, "escape-white-iris", "无法战胜白鸢尾，立刻撤退逃生", "没有个人接应，主角趁官方突入后的混乱脱身，白鸢尾仍然存活");
 
   assert.equal(game.triggerState.history.find((item) => item.instanceId === quest.instanceId)?.status, "completed");
   assert.equal(game.triggerState.facts["demoness.white-iris.true-name"].value, "塞西莉亚·沃恩");
@@ -186,12 +191,15 @@ test("Renard's daughter supports apothecary, shared-fee, and healing-draught out
     ({ game } = processTurn(game, 1, "查看隐秘组织中雷纳德寻找药师的委托消息"));
     const quest = game.triggerState.active.find((item) => item.definitionId === "side.queens.renard-fall");
     ({ game } = processTurn(game, 2, "接受并调查雷纳德女儿坠落事件", [{ id: `renard-engage-${index}`, name: "trigger.engage", args: { instanceId: quest.instanceId }, reason: "明确回应求医消息" }]));
+    game.location = { id: "queen-archive", name: "皇后区宅邸附近", district: "皇后区" };
     ({ game } = processTurn(game, 3, "抵达宅邸检查伤势", [{ id: `renard-assess-${index}`, name: "trigger.progress", args: { instanceId: quest.instanceId, objectiveId: "assess-renard-injury", evidence: "确认骨折与内伤仍在可治疗窗口内" }, reason: "完成伤情评估" }]));
     const before = moneyToPence(game.money);
 
     if (scenario.objective === "shared") {
-      ({ game } = processTurn(game, 4, "寻找并说服一名药师合作", [{ id: "renard-recruit", name: "trigger.progress", args: { instanceId: quest.instanceId, objectiveId: "recruit-apothecary", evidence: "找到一名药师并谈妥平分二十镑酬金" }, reason: "药师同意合作" }]));
-      ({ game } = processTurn(game, 5, scenario.action, [{ id: "renard-shared", name: "trigger.progress", args: { instanceId: quest.instanceId, objectiveId: "complete-shared-treatment", evidence: "两人合作稳定伤势并完成治疗" }, reason: "治疗完成" }]));
+      for (const [turn, objectiveId, action] of [[4, "attend-renard-auction", "参加拍卖会"], [5, "meet-edmund", "与药师交谈"], [6, "recruit-apothecary", "与药师合作"]]) {
+        ({ game } = processTurn(game, turn, action, [{ id: `renard-${objectiveId}`, name: "trigger.progress", args: { instanceId: quest.instanceId, objectiveId, evidence: "实际完成现场交谈和下一步安排" }, reason: "推进求医" }]));
+      }
+      ({ game } = processTurn(game, 7, scenario.action, [{ id: "renard-shared", name: "trigger.progress", args: { instanceId: quest.instanceId, objectiveId: "complete-shared-treatment", evidence: "两人合作稳定伤势并完成治疗" }, reason: "治疗完成" }]));
     } else {
       if (scenario.objective === "use-healing-medicine") game.inventory.push({ instanceId: "test-healing", itemId: "renard-healing-draught", name: "重伤治疗药剂", description: "适合内伤与骨折的治疗药剂", category: "药剂", quantity: 1, weight: 0.1, rarity: "少见", condition: "完好", tags: ["消耗品"], importance: "normal" });
       ({ game } = processTurn(game, 4, scenario.action, [{ id: `renard-finish-${index}`, name: "trigger.progress", args: { instanceId: quest.instanceId, objectiveId: scenario.objective, evidence: "治疗已经完成，伤者脱离危险" }, reason: "完成治疗" }]));
@@ -212,7 +220,7 @@ test("official membership unlocks support while Azik's whistle cannot be used as
   game.triggerState.active.push({ instanceId: "official-final", definitionId: "watch.heirloom.late-hour", category: "personal-story", status: "engaged", stage: "white-iris-confrontation", createdTurn: 1, expiresTurn: null, engagedTurn: 1, completedTurn: null, source: { action: "", evidenceIds: [] }, presentation: { title: "家传怀表：迟到的整点" }, stageHistory: [] });
   const support = processTurn(game, 1, "发出信号并坚持到值夜者支援赶到", [{ id: "official-support", name: "trigger.progress", args: { instanceId: "official-final", objectiveId: "survive-until-official-support", evidence: "所属官方组织的支援抵达，白鸢尾因暴露风险撤退" }, reason: "坚持等待支援" }]);
   assert.equal(support.results[0].ok, true);
-  assert.equal(support.game.triggerState.facts["watch.white-iris-outcome"].value, "official-support-forced-retreat");
+  assert.equal(support.game.triggerState.facts["watch.white-iris-outcome"].value, "escaped-with-official-escort");
 
   const whistleGame = structuredClone(support.game);
   whistleGame.inventory.push({ instanceId: "whistle-test", itemId: "azik-copper-whistle", name: "阿兹克铜哨", description: "古老铜哨", category: "非凡物品", quantity: 1, weight: 0.05, rarity: "唯一", condition: "完好", tags: ["非凡物品", "可使用"], importance: "important" });

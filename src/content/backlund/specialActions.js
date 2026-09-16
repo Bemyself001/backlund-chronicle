@@ -121,8 +121,8 @@ export const SPECIAL_ACTIONS = Object.entries(pools).map(([pathwayId, entries]) 
   pool: entries.map(([title, scene, labelA, endingA, labelB, endingB, clue], index) => ({
     id: `${pathwayId}-${index}`, title, scene, clue: clue || null,
     options: [
-      { id: "careful", label: labelA, ending: endingA, reward: pathwayId === "monster" ? 0 : 18 + index * 3, health: pathwayId === "prisoner" ? -2 : 0, reputation: 1 },
-      { id: "limited", label: labelB, ending: endingB, reward: pathwayId === "monster" ? 6 : 9 + index * 2, health: 0, reputation: pathwayId === "criminal" || (pathwayId === "marauder" && index === 1) ? -1 : 0 },
+      { id: "careful", label: labelA, ending: endingA, reward: pathwayId === "monster" ? 0 : 120 + index * 30, health: pathwayId === "prisoner" ? -2 : 0, reputation: 1 },
+      { id: "limited", label: labelB, ending: endingB, reward: pathwayId === "monster" ? 6 : 60 + index * 15, health: 0, reputation: pathwayId === "criminal" || (pathwayId === "marauder" && index === 1) ? -1 : 0 },
     ],
   })),
 }));
@@ -132,8 +132,8 @@ SPECIAL_ACTIONS.push({
   pool: ["正午合唱", "追思献唱", "节庆排练"].map((title, index) => ({ id: `ceremony-${index}`, title,
     scene: `永恒烈阳教堂的司仪邀请你参加${title}。乐谱已经备好，这次工作只需要你完成指定的歌唱部分。`,
     options: [
-      { id: "careful", label: "与司仪核对曲目后献唱", ending: `${title}在温暖的烛光中完成，司仪将演出酬劳交到你手上。`, reward: 18, reputation: 1 },
-      { id: "limited", label: "承担其中一段合唱", ending: "你完成了分配的声部，领取协助费用。", reward: 9 },
+      { id: "careful", label: "与司仪核对曲目后献唱", ending: `${title}在温暖的烛光中完成，司仪将演出酬劳交到你手上。`, reward: 120 + index * 30, reputation: 1 },
+      { id: "limited", label: "承担其中一段合唱", ending: "你完成了分配的声部，领取协助费用。", reward: 60 + index * 15 },
     ],
   })),
 });
@@ -149,6 +149,10 @@ export const SPECIAL_CONTACTS = {
   registrationLocation: "city-cemetery", organizationLocation: "st-samuel", organizationId: "nighthawks",
   watchOutcomeFact: "watch.white-iris-outcome",
   watchContacts: {
+    "escaped-with-official-escort": "你曾在南岸得到官方接应；联络人谨慎地把工作限制在外围文书范围。",
+    "escaped-with-priority-escort": "你的组织身份与子爵人情使联络人保持距离，本次只谈外围合作。",
+    "escaped-during-official-raid": "你趁南岸官方行动中的混乱脱身；联络人只愿安排有限交易，冲突并未消失。",
+    "escaped-double-ambush": "联络人听闻你曾从南岸夹攻中脱身，只愿安排有限的外围工作。这不意味着白鸢尾与你和解。",
     "escaped-without-support": "外围联络人提起南岸旧事，只愿谈有限的交易。你与白鸢尾的冲突没有因此消失。",
     "escaped-via-known-drain": "联络人知道你曾从南岸排水道脱身，因而特别要求这次交接保留回执。合作不等于和解。",
     "official-support-forced-retreat": "联络人记得官方曾介入南岸事件，谨慎地把工作限制在公开文书范围。",

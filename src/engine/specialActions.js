@@ -133,7 +133,7 @@ export function executeSpecialAction(game, request) {
         reward = active.roll < 45 ? active.stake * 2 : active.roll < 65 ? active.stake : 0;
         narrative += `\n\n本局${reward > active.stake ? "小有收获" : reward === active.stake ? "打平" : "失利"}，扣除预留赌注后净收入 ${reward - active.stake} 便士。`;
       }
-      if (!active.stake) reward += Math.min(12, (9 - getAdvancement(next.character).sequence) * 2);
+      if (!active.stake) reward += Math.min(72, Math.max(0, 9 - getAdvancement(next.character).sequence) * 12);
       if (option.health) {
         const delta = applyStatDelta(next, "health", option.health);
         if (delta) logs.push(`竞技损耗：生命 ${delta.before}→${delta.after}`);

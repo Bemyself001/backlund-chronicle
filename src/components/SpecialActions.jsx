@@ -46,7 +46,7 @@ export default function SpecialActions({ game, loading, onExecute, onOpenMap }) 
         const offer = commissionOffer(game, definition);
         const disabledReason = reason || (state.active ? "已有进行中的委托" : remaining ? `还需 ${remaining} 回合接新单` : money < (definition.stake || 0) ? "赌注不足" : "");
         return <article key={definition.id} className={styles.card}><div className={styles.meta}><span>{definition.name}</span><span>{definition.pool.length}则固定剧情</span></div><h4>{offer.title}</h4><p>{offer.scene}</p>
-          <p className={styles.hint}>{definition.stake ? "预留6便士，仅一局小赌；45%赢6便士、20%打平、35%输6便士。" : `基础报酬 ${Math.min(...offer.options.map((option) => option.reward))}—${Math.max(...offer.options.map((option) => option.reward))} 便士；每晋升一级额外2便士，最多12便士。`}</p>
+          <p className={styles.hint}>{definition.stake ? "预留6便士，仅一局小赌；45%赢6便士、20%打平、35%输6便士。" : `基础报酬 ${Math.min(...offer.options.map((option) => option.reward))}—${Math.max(...offer.options.map((option) => option.reward))} 便士；每晋升一级额外1苏勒，最多6苏勒（1苏勒=12便士）。`}</p>
           {locationLink(definition.locationId || (definition.organizationId ? SPECIAL_CONTACTS.organizationLocation : null))}
           <button type="button" className="button button--primary" disabled={loading || Boolean(disabledReason)} onClick={() => execute("accept", definition.id)}>{disabledReason || "接取委托"}</button>
         </article>;

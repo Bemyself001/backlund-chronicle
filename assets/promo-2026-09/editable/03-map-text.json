@@ -1,0 +1,141 @@
+{
+  "boxes": [
+    {
+      "text": "贝克兰德纪事",
+      "x": 120,
+      "y": 76,
+      "width": 440,
+      "height": 47,
+      "font_size": 30,
+      "font": "SimSun",
+      "fill": "#EFE7D1"
+    },
+    {
+      "text": "游戏特点  /  03",
+      "x": 720,
+      "y": 80,
+      "width": 276,
+      "height": 38,
+      "font_size": 23,
+      "font": "Microsoft YaHei",
+      "fill": "#C3AE7E",
+      "align": "right"
+    },
+    {
+      "text": "城市探索  /  BACKLUND CHRONICLE",
+      "x": 84,
+      "y": 157,
+      "width": 850,
+      "height": 42,
+      "font_size": 22,
+      "font": "Microsoft YaHei",
+      "fill": "#BFA772"
+    },
+    {
+      "text": "走进迷雾",
+      "x": 80,
+      "y": 207,
+      "width": 924,
+      "height": 105,
+      "font_size": 78,
+      "font": "SimSun",
+      "fill": "#EFE7D1"
+    },
+    {
+      "text": "发现另一座城",
+      "x": 80,
+      "y": 304,
+      "width": 924,
+      "height": 105,
+      "font_size": 78,
+      "font": "SimSun",
+      "fill": "#DFC182"
+    },
+    {
+      "text": "在六边形城区图上探索、移动与调查。\n逐步发现地点，让新的故事连接成路线。",
+      "x": 84,
+      "y": 409,
+      "width": 925,
+      "height": 80,
+      "font_size": 27,
+      "font": "Microsoft YaHei",
+      "fill": "#C6C6B3",
+      "line_spacing": 4
+    },
+    {
+      "text": "界 面 实 录",
+      "x": 84,
+      "y": 507,
+      "width": 450,
+      "height": 34,
+      "font_size": 20,
+      "font": "Microsoft YaHei",
+      "fill": "#AFA98F"
+    },
+    {
+      "text": "FEATURE  03 / 07",
+      "x": 700,
+      "y": 507,
+      "width": 296,
+      "height": 34,
+      "font_size": 20,
+      "font": "Microsoft YaHei",
+      "fill": "#AFA98F",
+      "align": "right"
+    },
+    {
+      "text": "六边形地图",
+      "x": 84,
+      "y": 1752,
+      "width": 292,
+      "height": 40,
+      "font_size": 24,
+      "font": "Microsoft YaHei",
+      "fill": "#D6C495",
+      "align": "center"
+    },
+    {
+      "text": "迷雾探索",
+      "x": 394,
+      "y": 1752,
+      "width": 292,
+      "height": 40,
+      "font_size": 24,
+      "font": "Microsoft YaHei",
+      "fill": "#D6C495",
+      "align": "center"
+    },
+    {
+      "text": "剧情地点",
+      "x": 704,
+      "y": 1752,
+      "width": 292,
+      "height": 40,
+      "font_size": 24,
+      "font": "Microsoft YaHei",
+      "fill": "#D6C495",
+      "align": "center"
+    },
+    {
+      "text": "AI 文字沙盒 · 单人叙事",
+      "x": 84,
+      "y": 1841,
+      "width": 590,
+      "height": 35,
+      "font_size": 23,
+      "font": "Microsoft YaHei",
+      "fill": "#C5B17E"
+    },
+    {
+      "text": "实机截图 · 演示档案",
+      "x": 625,
+      "y": 1843,
+      "width": 371,
+      "height": 34,
+      "font_size": 20,
+      "font": "Microsoft YaHei",
+      "fill": "#ABA994",
+      "align": "right"
+    }
+  ]
+}

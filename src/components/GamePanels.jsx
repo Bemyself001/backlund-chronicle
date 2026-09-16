@@ -5,6 +5,7 @@ import { STAT_LABELS } from "../engine/statChanges.js";
 import { formatMoney } from "../system/money.js";
 import { getPotionAdvancementEligibility } from "../services/advancement.js";
 import { getAuditRows } from "./gameUi.js";
+import { triggerGuidance } from "../engine/triggerGuidance.js";
 import styles from "./GamePanels.module.css";
 
 export const CharacterPanel = memo(function CharacterPanel({ game }) {
@@ -87,7 +88,10 @@ export const JournalPanel = memo(function JournalPanel({ game }) {
   return <div className={styles.content}>
     <nav className={styles.filtersNav} aria-label="手记类别">{[["changes", "记录"], ["quests", "任务"], ["clues", "线索"], ["people", "人物"]].map(([id, label]) => <button type="button" key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>{label}</button>)}</nav>
     {tab === "changes" && <><AuditPanel game={game} /><details><summary>近期变更记录</summary><ol className={styles.logs}>{game.changeLog.slice().reverse().map((entry, i) => <li key={entry.id || `entry-${i}`} data-tone={entry.tone}><small>{typeof entry === "string" ? "探索" : `第 ${entry.turn} 轮`}</small><p>{typeof entry === "string" ? entry : entry.text}</p></li>)}</ol></details><p className={styles.muted}>此处展示近期记录；完整历史正文尚未归档。</p></>}
-    {tab === "quests" && <section><h3>案件任务 <small>{game.quests.length + specialEvents.length}</small></h3>{specialEvents.map(event => <article className={styles.record} key={event.instanceId}><small>{event.status === "available" ? "可选线索 · 尚未追查" : `正在追查 · ${event.stage}`}</small><h4>{event.presentation?.title || "特殊事件"}</h4><p>{event.status === "available" ? event.presentation?.text : "该事件由本地阶段规则推进，普通任务工具不会跳过其目标。"}</p></article>)}{game.quests.map(quest => <article className={styles.record} key={quest.id}><small>{quest.status}</small><h4>{quest.title}</h4><p>{quest.summary}</p></article>)}{!game.quests.length && !specialEvents.length && <p className={styles.empty}>尚未接受委托。你可以按自己的意愿探索。</p>}</section>}
+    {tab === "quests" && <section><h3>案件任务 <small>{game.quests.length + specialEvents.length}</small></h3>{specialEvents.map(event => {
+      const guidance = triggerGuidance(game, event);
+      return <article className={styles.record} key={event.instanceId}><small>{event.status === "available" ? "可选线索 · 尚未追查" : "正在追查"}</small><h4>{event.presentation?.title || "特殊事件"}</h4><p>{guidance.text || "根据当前线索继续调查。"}</p>{guidance.timers.map(timer => <p key={timer.id} role="status"><strong>剩余 {timer.remaining} 次行动</strong>{timer.remaining <= 1 ? " · 请立即脱离危险" : timer.remaining <= 3 ? " · 请准备撤离" : ""}</p>)}</article>;
+    })}{game.quests.map(quest => <article className={styles.record} key={quest.id}><small>{quest.status}</small><h4>{quest.title}</h4><p>{quest.summary}</p></article>)}{!game.quests.length && !specialEvents.length && <p className={styles.empty}>尚未接受委托。你可以按自己的意愿探索。</p>}</section>}
     {tab === "clues" && <section><h3>已确认线索 <small>{game.clues.length}</small></h3>{game.clues.length ? game.clues.map(clue => <article className={styles.record} key={clue.id}><h4>{clue.title}</h4><p>{clue.detail}</p><small>{clue.discoveredAt}</small></article>) : <p className={styles.empty}>尚未确认任何线索。</p>}</section>}
     {tab === "people" && <section><h3>人物关系 <small>{game.relationships.length}</small></h3>{game.relationships.length ? game.relationships.map(npc => <article className={styles.record} key={npc.id}><h4>{npc.name}<span>{npc.value >= 0 ? "+" : ""}{npc.value}</span></h4><small>{npc.role}</small><p>{npc.note}</p></article>) : <p className={styles.empty}>尚未建立人物关系。</p>}</section>}
   </div>;

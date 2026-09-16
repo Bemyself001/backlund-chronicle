@@ -10,6 +10,9 @@ function refreshDefinitions(game, step) {
     if (!definition) continue;
     for (const instance of [...(state.active || []), ...(state.history || [])]) {
       if (instance.definitionId !== refresh.definitionId) continue;
+      // Completed stories are historical records, never re-open or rewrite them.
+      if (!["eligible", "available", "engaged"].includes(instance.status)) continue;
+      if (refresh.clearExpiry) instance.expiresTurn = null;
       const shouldDefer = instance.status === "available" && refresh.deferAvailableUntil?.length
         && !allConditionsMatch(refresh.deferAvailableUntil, { game, state, signals: [], action: "", turn: Number(game.turn || 0), instance });
       if (shouldDefer) {

@@ -183,6 +183,8 @@ function advanceExisting(game, state, signals, action, turn, events) {
       events.engaged.push(structuredClone(instance));
     }
     if (instance.status !== "engaged") continue;
+    if (instance.processedTurn != null && instance.processedTurn >= turn) continue;
+    instance.processedTurn = turn;
     const stage = (definition.stages || []).find((entry) => entry.id === instance.stage);
     const failWhen = stage?.failWhen || definition.failWhen || [];
     if (failWhen.length && allConditionsMatch(failWhen, context)) {
@@ -194,9 +196,12 @@ function advanceExisting(game, state, signals, action, turn, events) {
       signal.kind === "trigger.progress"
       && signal.instanceId === instance.instanceId
       && signal.objectiveId === entry.objectiveId
-    )) && allConditionsMatch(entry.when || [], { ...context, instance }));
+    )) && allConditionsMatch([...(entry.when || []), ...(entry.requirements || [])], { ...context, instance }));
     const advanceWhen = stage?.advanceWhen || [];
-    if (!transition && (!advanceWhen.length || !allConditionsMatch(advanceWhen, { ...context, instance }))) continue;
+    if (!transition && (!advanceWhen.length || !allConditionsMatch(advanceWhen, { ...context, instance }))) {
+      settleTimers(game, state, instance, definition, turn, events);
+      continue;
+    }
     const previousStage = instance.stage;
     instance.stage = transition?.nextStage || stage.nextStage || instance.stage;
     instance.stageHistory.push({ id: `${instance.instanceId}:${previousStage}:${instance.stage}`, from: previousStage, to: instance.stage, turn, evidenceIds: signals.map((signal) => signal.id) });
@@ -206,6 +211,27 @@ function advanceExisting(game, state, signals, action, turn, events) {
       if (failed) events.failed.push(failed);
     } else if (transition?.complete || stage.complete) completeInstance(game, state, instance, definition, turn, events, transition?.rewards || []);
     else for (const reward of transition?.rewards || []) applyReward(game, state, reward, turn);
+    if (instance.status === "engaged" && state.active.some(entry => entry.instanceId === instance.instanceId)) settleTimers(game, state, instance, definition, turn, events);
+  }
+}
+
+// Timers belong to content definitions, not to model prose. The last permitted
+// action settles before expiry; reloading or repeating a turn never resets them.
+function settleTimers(game, state, instance, definition, turn, events) {
+  instance.timers ||= {};
+  for (const timer of definition.timers || []) {
+    if (!timer.stages.includes(instance.stage)) continue;
+    if (!instance.timers[timer.id]) instance.timers[timer.id] = { startedTurn: turn, deadline: turn + timer.turns };
+    if (turn < instance.timers[timer.id].deadline) continue;
+    const from = instance.stage;
+    instance.stage = timer.nextStage || instance.stage;
+    instance.stageHistory.push({ id: `${instance.instanceId}:timer:${timer.id}`, from, to: instance.stage, turn, evidenceIds: [`timer:${timer.id}`] });
+    for (const reward of timer.rewards || []) applyReward(game, state, reward, turn);
+    events.advanced.push({ instanceId: instance.instanceId, definitionId: instance.definitionId, from, to: instance.stage, turn, reason: timer.message });
+    if (timer.fail) {
+      const failed = terminalTrigger(state, instance, "failed", turn);
+      if (failed) events.failed.push(failed);
+    }
   }
 }
 
@@ -285,14 +311,23 @@ export function progressTrigger(game, instanceId, objectiveId, turn, action = ""
   const stage = (definition?.stages || []).find((entry) => entry.id === instance.stage);
   const transition = (stage?.transitions || []).find((entry) => entry.objectiveId === objectiveId);
   if (!transition) return { ok: false, reason: "该目标不属于任务当前阶段，不能跳过或倒退" };
+  if (Number(game.character?.stats?.health) <= 0 && !transition.fail) return { ok: false, reason: "生命归零，不能继续完成任务或领取奖励" };
+  if (instance.progressTurn != null && instance.progressTurn >= turn) return { ok: false, reason: "同一任务每回合只能推进一个目标；搜查和救援不能合并结算" };
+  if ((definition.timers || []).some(timer => timer.stages.includes(instance.stage) && instance.timers?.[timer.id] && turn > instance.timers[timer.id].deadline)) return { ok: false, reason: "行动窗口已经结束，不能继续在原阶段领取奖励" };
+  if (transition.rejectActionTerms?.length && hasActionTerms(action, transition.rejectActionTerms)) return { ok: false, reason: "玩家没有明确选择该行动，不能把拒绝或犹豫解释为同意" };
   if (transition.actionTerms?.length && !hasActionTerms(action, transition.actionTerms)) return { ok: false, reason: "玩家本轮行动没有明确完成当前目标" };
   if (String(evidence || "").trim().length < 4) return { ok: false, reason: "任务推进必须说明本轮已经确认的证据或结果" };
   const context = { game, state, signals: [], action, turn, instance };
   if (!allConditionsMatch(transition.requirements || [], context)) return { ok: false, reason: transition.requirementMessage || "本地状态尚不满足这条任务分支" };
+  instance.progressTurn = turn;
   return {
     ok: true,
     instance,
     transition,
+    elapsedMinutes: transition.elapsedMinutes || (transition.untilHour != null ? Math.max(5, Number(transition.untilHour) * 60 - (() => {
+      const match = String(game.worldTime || "").match(/·\s*(\d{1,2}):(\d{2})\s*$/);
+      return match ? Number(match[1]) * 60 + Number(match[2]) : Number(transition.untilHour) * 60;
+    })()) : undefined),
     signal: {
       id: `signal:${turn}:trigger-progress:${instanceId}:${objectiveId}`,
       kind: "trigger.progress",
