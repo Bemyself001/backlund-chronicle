@@ -1,7 +1,8 @@
 import { getInstanceTriggerDefinition, getTriggerDefinition } from "./triggerDefinitions.js";
+import { inspectQuestRoutes } from "./questRoutes.js";
 import { triggerGuidance } from "./triggerGuidance.js";
 
-export const QUEST_ENGINE_RULE = "【最高优先级：任务引擎契约】任何已开始任务必须通过工具登记名称、简要信息、当前目标；禁止只在正文宣称接受、推进、完成任务。已有特殊任务使用quest.resolve，新产生的普通任务使用quest.add并提供summary和objective。每次与任务相关的行动都调用quest.resolve：引用玩家原话actionQuote，说明实际结果evidence；steps仅包含本轮真实完成的目标，普通阶段可连续至多三个，重大选择、危险、倒计时、终章必须单独行动。自然语言等价行动不必匹配固定关键词，但不得把否定、假设、意图当作完成。失败或受阻也要登记outcome=failed或blocked；休息、闲逛和无关行动不登记。连续两次无进展明确提示，第三次提供可执行的替代调查途径；普通失败可花时间整理证据并寻求帮助，选择恢复路线后用outcome=recover登记已取得的具体线索，仍须满足全部本地前置条件。终章和危险阶段没有保成功、免代价或自动解围兜底。叙事、手记和行动选项必须服从本地确认的任务状态及当前目标；不得提前透露后续真相。";
+export const QUEST_ENGINE_RULE = "【最高优先级：任务引擎契约】任何已开始任务必须通过工具登记名称、简要信息、当前目标；禁止只在正文宣称接受、推进、完成任务。已有特殊任务使用quest.resolve，新产生的普通任务使用quest.add并提供summary和objective。每次与任务相关的行动都调用quest.resolve：引用玩家原话actionQuote，说明实际结果evidence；steps仅包含本轮真实完成的目标，普通阶段可连续至多三个，重大选择、危险、倒计时、终章必须单独行动。自然语言等价行动不必匹配固定关键词，但不得把否定、假设、意图当作完成。失败或受阻也要登记outcome=failed或blocked；休息、闲逛和无关行动不登记。连续两次无进展明确提示，第三次提供可执行的替代调查途径；普通失败可花时间整理证据并寻求帮助，恢复路线必须经过本地条件验证，玩家明确选择后才结算。普通任务推进必须提供新登记线索的evidenceIds，不能靠改写summary或objective伪造进展。连续碰壁不得增加无依据的新障碍，不得重复推荐已被本地拒绝的行动；先说明实际缺少的条件。恢复失败不能清空停滞次数。终章和危险阶段没有保成功、免代价或自动解围兜底。叙事、手记和行动选项必须服从本地确认的任务状态及当前目标；不得提前透露后续真相。";
 
 const text = value => typeof value === "string" ? value.trim() : "";
 const active = status => ["available", "engaged"].includes(status);
@@ -63,7 +64,7 @@ export function recordQuestAttempt(game, id, { outcome, evidence = "", stage, tu
   const previous = journal.attempts[id] || {};
   if (previous.lastTurn === turn) return;
   const progressed = outcome === "progress" || previous.stage && previous.stage !== entry.stage;
-  const stalled = progressed || outcome === "recover" ? 0 : (previous.stage === entry.stage ? Number(previous.stalled || 0) : 0) + 1;
+  const stalled = progressed ? 0 : (previous.stage === entry.stage ? Number(previous.stalled || 0) : 0) + 1;
   journal.attempts[id] = {
     stage: entry.stage, lastTurn: turn, stalled, hintLevel: Math.min(3, stalled), outcome,
     evidence: text(evidence), recoveryUsed: progressed ? false : previous.recoveryUsed || outcome === "recover",
@@ -76,45 +77,69 @@ export function questAssistance(game, entry) {
   const attempt = game.questJournal?.attempts?.[entry.id];
   if (!attempt || attempt.stage !== entry.stage || entry.status !== "engaged") return null;
   const level = attempt.hintLevel || 0;
-  const recoverable = entry.policy.canRecover && !attempt.recoveryUsed && (level >= 3 || attempt.outcome === "failed");
-  const recoveryAction = `花20分钟整理「${entry.title}」的已知证据，向知情人请教下一步`;
-  return { level, recoverable, recoveryAction, recoveryCostMinutes: 20,
-    text: attempt.recoveryLead ? `新的调查方向：${attempt.recoveryLead}`
-      : level >= 2 ? `${entry.objective}${recoverable ? `\n可以${recoveryAction}；不会跳过前置条件。` : entry.policy.isolated ? "\n这是关键或危险阶段，请依据现有条件选择行动，后果不会被自动改写。" : "\n请核对当前线索、所在地点和仍缺少的条件。"}` : "",
+  const inspection = inspectQuestRoutes(game, entry);
+  const routes = level >= 3 ? inspection.routes.filter(route => route.automatic) : [];
+  const recoveryAction = routes[0] ? `花${routes[0].costMinutes}分钟${routes[0].label}` : "";
+  const blocker = inspection.blockers.join("；") || attempt.evidence;
+  return { level, recoverable: routes.length > 0, recoveryAction,
+    recoveryCostMinutes: routes[0]?.costMinutes || 20, routes, availableActions: inspection.routes, blockers: inspection.blockers,
+    text: level >= 2 ? `${entry.objective}\n${blocker ? `当前阻碍：${blocker}。` : ""}${routes.length ? "已有可行的行动路线，可以选择其中一条继续。" : entry.policy.isolated ? "这是关键或危险阶段，需要权衡当前条件与行动后果。" : "请先解决上述条件；仅仅重复打听并不能带来新的进展。"}` : "",
   };
 }
 
-export function settleQuestAttempts(game, calls, results, turn) {
+export function settleQuestAttempts(game, calls, results, turn, action = "") {
   syncQuestJournal(game);
   const attempts = new Map();
   const priority = { blocked: 0, failed: 1, recover: 2, progress: 3 };
   for (const [index, call] of calls.entries()) {
     const result = results[index];
     let attempt = result?.data?.questAttempt;
-    if (!attempt && ["trigger.progress", "quest.update"].includes(call.name)) {
+    if (!attempt && ["trigger.progress", "quest.update", "quest.resolve"].includes(call.name)) {
       const id = call.name === "quest.update" ? `quest:${call.args?.questId}` : call.args?.instanceId;
-      attempt = { id, outcome: result?.ok ? "progress" : "blocked", evidence: result?.reason || call.args?.evidence };
+      attempt = { id, outcome: "blocked", evidence: result?.reason || call.args?.evidence };
     }
     if (attempt && (!attempts.has(attempt.id) || priority[attempt.outcome] >= priority[attempts.get(attempt.id).outcome])) attempts.set(attempt.id, attempt);
+  }
+  for (const result of results.slice(calls.length)) {
+    const attempt = result?.data?.questAttempt;
+    if (attempt) attempts.set(attempt.id, attempt);
+  }
+  // Recover focused attempts even when the model omits or rejects its tool call.
+  if (!/暂时搁置|放弃|休息|睡觉|闲逛|不要|不想|不愿|是否|如果/.test(action)) {
+    for (const entry of Object.values(game.questJournal.entries)) {
+      if (entry.status !== "engaged" || attempts.has(entry.id)) continue;
+      const instance = game.triggerState?.active?.find(item => item.instanceId === entry.id);
+      const definition = instance && getInstanceTriggerDefinition(instance, game);
+      const stage = definition?.stages?.find(item => item.id === instance.stage);
+      const words = `${entry.objective}${entry.title}`;
+      const specific = Array.from(words).some((_, index) => {
+        const word = words.slice(index, index + 2);
+        return /^[\u4e00-\u9fff]{2}$/.test(word) && !/调查|询问|了解|线索|继续|查找|记录|寻找|前往|查阅|确认|已经|相关|资料|完成|任务|当前|一步|进行|处理/.test(word) && action.includes(word);
+      });
+      const matches = specific && (/调查|询问|寻找|查阅|检查|打听|核对|请教|帮忙|查看|交谈/.test(action) || stage?.transitions?.some(transition => transition.actionTerms?.some(term => term.length >= 2 && action.includes(term))));
+      if (action.includes(entry.title) || matches) attempts.set(entry.id, { id: entry.id, outcome: "blocked", evidence: "本轮未确认阶段推进或新增任务证据" });
+    }
   }
   for (const attempt of attempts.values()) {
     const instance = game.triggerState?.active?.find(entry => entry.instanceId === attempt.id);
     const advanced = instance?.stageHistory?.some(entry => entry.turn === turn && entry.from !== entry.to && !["eligible", "available"].includes(entry.from));
-    recordQuestAttempt(game, attempt.id, { ...attempt, outcome: advanced ? "progress" : attempt.outcome, turn });
+    const quest = game.quests?.find(item => `quest:${item.id}` === attempt.id);
+    const confirmed = advanced || quest?.lastProgressTurn === turn || attempt.localProgress;
+    recordQuestAttempt(game, attempt.id, { ...attempt, outcome: confirmed ? "progress" : attempt.outcome === "progress" ? "blocked" : attempt.outcome, turn });
   }
 }
 
 export function questJournalEvents(game) {
   return visibleQuestJournal(game).filter(entry => entry.status !== "available").flatMap(entry => {
     const assistance = questAssistance(game, entry);
-    const id = `task-journal:${entry.id}:${entry.revision}:${assistance?.level || 0}:${game.questJournal?.attempts?.[entry.id]?.recoveryLead || ""}`;
+    const id = `task-journal:${entry.id}:${entry.revision}:${assistance?.level || 0}:${assistance?.level >= 2 ? game.questJournal?.attempts?.[entry.id]?.lastTurn : ""}:${JSON.stringify(assistance?.routes || [])}`;
     if (game.narrativeEventsDelivered?.[id]) return [];
     const engaged = entry.status === "engaged";
     return [{ id, title: entry.title, questId: entry.id, reason: "任务状态与当前方向已由本地引擎确认",
       direction: assistance?.text || entry.objective, narrativeCue: "承接刚取得的结果，只描写当前已知目标，不重复开局或提前揭露后续。",
       choices: engaged ? [
-        { label: `继续调查「${entry.title}」：${entry.objective}`, intent: "investigate", risk: entry.policy.isolated ? "medium" : "low" },
-        { label: assistance?.recoverable ? assistance.recoveryAction : `梳理「${entry.title}」的已有线索，确认仍缺少的条件`, intent: "investigate", risk: "low" },
+        { label: assistance?.recoverable ? assistance.recoveryAction : assistance?.level >= 2 && assistance.availableActions[0] ? assistance.availableActions[0].label : assistance?.level >= 2 && assistance.blockers[0] ? `先解决「${entry.title}」的条件：${assistance.blockers[0]}` : `继续调查「${entry.title}」：${entry.objective}`, intent: "investigate", risk: entry.policy.isolated ? "medium" : "low" },
+        { label: assistance?.routes?.[1] ? `花${assistance.routes[1].costMinutes}分钟${assistance.routes[1].label}` : `梳理「${entry.title}」的已有线索，确认仍缺少的条件`, intent: "investigate", risk: "low" },
         { label: `暂时搁置「${entry.title}」，处理其他事情`, intent: "redirect", risk: "low" },
       ] : [
         { label: `回顾「${entry.title}」的调查结果`, intent: "observe", risk: "low" },

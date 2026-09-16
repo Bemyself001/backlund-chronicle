@@ -34,7 +34,7 @@ export const ITEM_BEHAVIORS = [
           id: "watch.recover-note",
           when: [{ type: "fact", key: "watch.note-recovered", not: true }],
           result: {
-            text: "移开隔板后，一卷极薄的纸条从机芯夹层里松脱出来；纸上是陌生的速记符号，末尾重复着内盖上的羽毛笔记号。指腹碰到那个记号时，一段尘封的记忆忽然清晰：这枚怀表最后属于你的舅舅雷金纳德{characterSurnameSuffix}。他在数年前毫无征兆地失踪，此后再没有回家；怀表却在不久后被人无声送回，家里始终没人知道送表的人是谁。",
+            text: "移开隔板后，一卷极薄的纸条从机芯夹层里松脱出来；一些鲁恩文字错落地夹在神秘符号之间，共同组成一句话，末尾重复着内盖上的羽毛笔记号。指腹碰到那个记号时，一段尘封的记忆忽然清晰：这枚怀表最后属于你的舅舅雷金纳德{characterSurnameSuffix}。他在数年前毫无征兆地失踪，此后再没有回家；怀表却在不久后被人无声送回，家里始终没人知道送表的人是谁。",
             appendDiscovery: true,
             effects: [
               { type: "discover-fact", factId: "watch.note-recovered" },
@@ -47,7 +47,7 @@ export const ITEM_BEHAVIORS = [
           id: "watch.inspect-complete",
           fallback: true,
           result: {
-            text: "怀表的刻字、整点迟滞与机芯夹层都已经检查过。你已经想起它最后属于失踪的舅舅雷金纳德{characterSurnameSuffix}；那卷速记纸条仍需要可靠的人或资料来辨认。",
+            text: "怀表的刻字、整点迟滞与机芯夹层都已经检查过。你已经想起它最后属于失踪的舅舅雷金纳德{characterSurnameSuffix}；那卷文字与神秘符号交错的纸条仍需要可靠的人或资料来辨认。",
           },
         },
       ],

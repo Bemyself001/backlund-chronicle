@@ -502,6 +502,7 @@ const TOOL_PARAMETER_SCHEMAS = {
       evidence: { type: "string", description: "实际结果、受阻原因或付出时间后得到的具体新线索" },
       start: { type: "boolean", description: "玩家明确开始追查可选线索时为true" },
       nextObjective: { type: "string", description: "普通任务推进后的当前目标" },
+      evidenceIds: { type: "array", items: { type: "string" }, description: "普通任务推进时，引用本轮clue.add成功登记的新增证据ID；不接受重复旧线索" },
       steps: { type: "array", maxItems: 3, items: { type: "object", additionalProperties: false, required: ["objectiveId", "actionQuote", "evidence"], properties: {
         objectiveId: { type: "string" }, actionQuote: { type: "string" }, evidence: { type: "string" },
       } } },

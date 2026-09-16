@@ -272,7 +272,7 @@ export function processTriggers(game, { action = "", toolCalls = [], toolResults
     events.available.push(structuredClone(instance));
   }
   syncLegacyOccult(game, state);
-  settleQuestAttempts(game, toolCalls, toolResults, turn);
+  settleQuestAttempts(game, toolCalls, toolResults, turn, action);
   return { state, signals, events, newTrigger: events.available[0] || null, occultEntry: events.available.find((entry) => entry.category === "occult-entry") || null };
 }
 

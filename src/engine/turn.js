@@ -1,6 +1,7 @@
 import { applyStatDelta } from "./statChanges.js";
 import { processTriggers } from "./triggerEngine.js";
 import { restMinutes } from "./restTime.js";
+import { resolveSelectedQuestRoute } from "./questActions.js";
 
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
 
@@ -70,6 +71,9 @@ export function occultEntryForTurn(game, nextTurn) {
 }
 
 export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], toolResults = [], options = {}) {
+  // Execute the player's exact local route even when the AI omitted quest.resolve.
+  const recovery = resolveSelectedQuestRoute(game, action, Number(game.turn || 0) + 1);
+  if (recovery) toolResults = [...toolResults, { ok: recovery.ok, data: recovery }];
   const elapsedMinutes = Number.isInteger(options.elapsedMinutes) && options.elapsedMinutes > 0
     ? options.elapsedMinutes : minutesForTurn(action, toolCalls, toolResults, game.worldTime);
   const dangerDelta = dangerDeltaForTurn({ action, selectedRisk, toolCalls, toolResults });

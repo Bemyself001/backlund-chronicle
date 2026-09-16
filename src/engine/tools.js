@@ -723,7 +723,7 @@ function executeOne(game, call, options = {}) {
         if (!getPathway(args.clue.pathwayId) || !Number.isInteger(Number(args.clue.sequence)) || Number(args.clue.sequence) < 0 || Number(args.clue.sequence) > 9) return fail(call.name, "魔药配方必须包含本地登记的 pathwayId 与 0—9 序列");
         if (Number(game.occult?.contact) !== 1) return fail(call.name, "尚未接触非凡世界，不能把未经验证的信息登记为魔药配方");
       }
-      game.clues.push({ detail: "", ...args.clue, discoveredAt: turnLabel, isNew: true });
+      game.clues.push({ detail: "", ...args.clue, discoveredAt: turnLabel, discoveredTurn: game.turn + 1, isNew: true });
       return succeed(call.name, `${turnLabel}：发现线索「${args.clue.title}」——${call.reason}。`);
     }
     case "quest.add": {
@@ -740,6 +740,7 @@ function executeOne(game, call, options = {}) {
       if (!quest) return fail(call.name, "任务不存在");
       if (quest.source === "特殊行动") return fail(call.name, "此委托由特殊行动引擎独立结算，不能改写任务记录");
       const allowed = ["status", "summary", "objective"];
+      if (args.patch?.objective && args.patch.objective.trim() !== quest.objective) return fail(call.name, "改变当前目标请使用quest.resolve并引用本轮新增证据，不能仅改写任务说明");
       if (["已完成", "已失败", "失败", "已放弃", "completed", "failed", "abandoned"].includes(quest.status)) return fail(call.name, "已结束任务保留最终记录，不能重复修改结局");
       if (args.patch?.status && !["进行中", "已完成", "已失败", "失败", "已放弃", "engaged", "completed", "failed", "abandoned"].includes(args.patch.status)) return fail(call.name, "无效的任务状态");
       Object.entries(args.patch || {}).forEach(([key, value]) => { if (allowed.includes(key) && typeof value === "string" && value.trim()) quest[key] = value.trim(); });

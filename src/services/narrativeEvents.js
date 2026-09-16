@@ -61,13 +61,13 @@ export function narrativeEventsForTurn(signals = []) {
   return [{
     id: "watch.investigation-routes",
     triggerDefinitionId: "watch.heirloom.hidden-note",
-    reason: "第四次怀表检查完成，首次取出陌生速记纸条并想起失踪的舅舅",
+    reason: "第四次怀表检查完成，首次取出鲁恩文字与神秘符号交错的纸条并想起失踪的舅舅",
     routes: [
-      { locationId: "queen-library", name: "皇后区公共图书馆", purpose: "查阅速记资料或请教馆员，寻找解读纸条的方法" },
+      { locationId: "queen-library", name: "皇后区公共图书馆", purpose: "查阅文字与符号资料或请教馆员，寻找解读纸条的方法" },
       { locationId: "hillston-market", name: "希尔斯顿区商会街", purpose: "向钟表行业从业者打听舅舅曾工作的钟表行，寻找旧同事帮助辨认纸条" },
     ],
     choices: [
-      { label: "前往皇后区公共图书馆，查找速记资料", intent: "investigate", risk: "low" },
+      { label: "前往皇后区公共图书馆，查找文字与符号资料", intent: "investigate", risk: "low" },
       { label: "前往希尔斯顿区商会街，打听舅舅工作过的钟表行", intent: "investigate", risk: "low" },
       { label: "暂时收起纸条，处理其他事情", intent: "redirect", risk: "low" },
     ],

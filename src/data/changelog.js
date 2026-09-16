@@ -149,6 +149,18 @@ const RELEASE_149_UPDATE = {
 };
 
 export const LATEST_UPDATE = {
+  date: "2026-09-16", dateLabel: "2026.09.16",
+  title: "1.6.2 · 实际进展与防停滞",
+  summary: "本地核验任务的实际进展和可执行路线，修复无效提示清空停滞记录，并更新怀表纸条文字设定。",
+  changes: [
+    "任务相关行动漏调或调错工具时仍记录停滞；改写说明、重复旧证据和失败的恢复路线不再算作推进。",
+    "第三次停滞时核验当前阶段的可行路线，明确选择后由本地结算实际步骤与时间；条件不符时说明阻碍，终章、危险与重大决定仍保留风险。",
+    "普通任务推进要求本轮新登记证据，阶段、手记、行动选项及存档保持同步。",
+    "怀表纸条改为鲁恩文字错落在神秘符号之间，共同组成原有那句话；同步调查引导与旧存档，白鸢尾及南岸货站的完整句意保持不变。",
+  ],
+};
+
+const RELEASE_161_UPDATE = {
   date: "2026-09-16",
   dateLabel: "2026.09.16",
   title: "1.6.1 · 修正纸条称呼",
@@ -436,6 +448,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_161_UPDATE,
   RELEASE_160_UPDATE,
   RELEASE_155_UPDATE,
   RELEASE_154_UPDATE,

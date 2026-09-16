@@ -8,7 +8,7 @@ const pair = (text, cue = text) => ({ guidance: text, narrativeCue: cue });
 // Player-facing directions only. No future objectives or concealed identities.
 const stages = {
   "watch.heirloom.hidden-note": {
-    "note-recovered": pair("陌生的速记与舅舅雷金纳德{characterSurnameSuffix}的旧职业有关。皇后区公共图书馆、希尔斯顿区商会街，都可能有人认得。", "借纸条的字迹与舅舅的职业回忆，自然带出图书馆的旧资料和商会街钟表从业者两条线索，不替玩家作决定。"),
+    "note-recovered": pair("一些鲁恩文字错落地夹在神秘符号之间，共同组成一句话，或许与舅舅雷金纳德{characterSurnameSuffix}的经历有关。皇后区公共图书馆、希尔斯顿区商会街，都可能有人认得。", "借纸条的字迹与舅舅的职业回忆，自然带出图书馆的旧资料和商会街钟表从业者两条线索，不替玩家作决定。"),
   },
   "watch.heirloom.late-hour": {
     "trace-uncle": pair(`译文写着“${WATCH_NOTE_TEXT}”南岸货站指向桥区南岸货栈。舅舅雷金纳德{characterSurnameSuffix}的工作记录或熟悉他的从业者，或许能补上这段空白。`, "由纸条中白鸢尾的警告与账本已交还南岸货站的原文承接调查，不添加暗号或交接时间，留下旧工作记录和知情人的方向；未抵达就不描写现场。"),

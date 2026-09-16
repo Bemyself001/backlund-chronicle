@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  PRODUCT_VERSION: "1.6.1"
+  PRODUCT_VERSION: "1.6.2"
 
 jobs:
   build-release-apk:
@@ -111,5 +111,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "贝克兰德纪事 ${PRODUCT_VERSION}" \
-            --notes "1.6.1 · 修正纸条称呼：雷金纳德纸条固定为「不要相信白鸢尾，账本已经交还到南岸货站。」同步修正任务引导与AI上下文，旧存档中的纸条、手记及历史记忆自动更正，保留任务阶段、倒计时与奖励记录。请覆盖安装，不要先卸载。" \
+            --notes "1.6.2 · 任务引擎防停滞：核验实际进展、补记漏调工具的任务尝试，并提供由本地结算的可行路线；终章风险保留。怀表纸条改为鲁恩文字错落于神秘符号之间，完整句意保持不变，并迁移旧存档。请覆盖安装，不要先卸载。" \
             --latest

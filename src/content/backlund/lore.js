@@ -24,8 +24,8 @@ export const LORE_ENTRIES = [
     id: "lore.watch.recovered-note", alwaysInclude: true,
     type: "loreFact",
     revealWhen: [{ type: "fact", key: "watch.note-recovered", value: true }, { type: "fact", key: "watch.formal-quest-unlocked", not: true }],
-    relevance: { terms: ["怀表", "纸条", "速记", "羽毛笔记号"], itemIds: ["heirloom-watch"] },
-    text: "怀表夹层纸条已经被取出，但在译出之前只能确认其使用陌生速记符号，并带有羽毛笔形记号；不得提前透露或编造译文、可辨认的词语、额外字迹或暗号；只有本地解读成功后才能引用固定译文。",
+    relevance: { terms: ["怀表", "纸条", "鲁恩文", "神秘符号", "羽毛笔记号"], itemIds: ["heirloom-watch"] },
+    text: "怀表夹层纸条已经被取出，但在译出之前只能确认其使用鲁恩文字与神秘符号交错组成的文字，并带有羽毛笔形记号；可描述能辨认出鲁恩文字，但不得在解读前拼出完整句意，也不得编造额外字迹或暗号；只有本地解读成功后才能引用固定译文。",
   },
   {
     id: "lore.watch.missing-uncle-memory",

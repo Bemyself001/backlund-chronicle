@@ -31,7 +31,7 @@ test('inventory button inspections at the same turn queue narration, recover mis
   assert.deepEqual(game.choices, originalChoices, 'pending narration must not replace choices before success');
   game = migrateSave(markNarrativeEventsDelivered(game, events));
   assert.deepEqual(game.choices.map(choice => choice.label), [
-    '前往皇后区公共图书馆，查找速记资料',
+    '前往皇后区公共图书馆，查找文字与符号资料',
     '前往希尔斯顿区商会街，打听舅舅工作过的钟表行',
     '暂时收起纸条，处理其他事情',
   ]);

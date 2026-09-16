@@ -2,6 +2,20 @@ import { WATCH_NOTE_DETAIL } from "./watchNote.js";
 
 export const CONTENT_MIGRATIONS = [
   {
+    id: "backlund.watch-note-runic-text", fromVersion: "2026.09.16.4", toVersion: "2026.09.16.5",
+    cluePatches: [{ id: "clue-watch-note-decoded", patch: { detail: WATCH_NOTE_DETAIL } }],
+    definitionRefreshes: [
+      ...["watch.heirloom.hidden-note", "watch.heirloom.late-hour"].map(definitionId => ({ definitionId, toDefinitionVersion: 7, refreshPresentation: true })),
+    ],
+    textReplacementFields: ["recentDialogues", "storyHistory", "longTermSummary", "memoryState", "memoryNotes", "clues", "quests", "questJournal", "triggerState", "inventory", "changeLog", "choices"],
+    textReplacements: [
+      { from: "舅舅的速记", to: "鲁恩文字与神秘符号交错组成的文字" },
+      { from: "陌生的速记符号", to: "错落在神秘符号之间的鲁恩文字" },
+      { from: "陌生速记符号", to: "错落在神秘符号之间的鲁恩文字" },
+      { from: "速记", to: "鲁恩文字与神秘符号" },
+    ],
+  },
+  {
     id: "backlund.watch-note-white-iris", fromVersion: "2026.09.16.3", toVersion: "2026.09.16.4",
     cluePatches: [{ id: "clue-watch-note-decoded", patch: { detail: WATCH_NOTE_DETAIL } }],
     definitionRefreshes: [

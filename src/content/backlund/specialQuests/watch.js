@@ -58,7 +58,7 @@ export const WATCH_DISCOVERY_QUESTS = [{
       transitions: [{
         objectiveId: "decode-watch-note",
         description: "寻找可靠的人或资料，译出夹层纸条",
-        actionTerms: ["译", "辨认", "解读", "速记", "请教", "查阅"],
+        actionTerms: ["译", "辨认", "解读", "鲁恩文", "神秘符号", "请教", "查阅"],
         requirements: [{ type: "fact", key: "watch.note-recovered", value: true }],
         requirementMessage: "必须先完成怀表检查并取出机芯夹层里的纸条",
         nextStage: "decoded",

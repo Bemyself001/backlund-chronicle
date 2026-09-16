@@ -138,7 +138,7 @@ test("heirloom watch inspection advances one local fact at a time and rewards on
   assert.match(watchEvent.presentation.text, /舅舅雷金纳德·莫雷蒂/);
   assert.ok(game.triggerState.facts["watch.owner-is-maternal-uncle"]);
   assert.ok(game.triggerState.facts["watch.uncle-missing-remembered"]);
-  assert.match(game.inventory.find((item) => item.instanceId === watch.instanceId).discoveredInfo, /速记符号/);
+  assert.match(game.inventory.find((item) => item.instanceId === watch.instanceId).discoveredInfo, /鲁恩文字/);
 
   ({ game } = processTurn(game, 5, "主动追查舅舅留下的纸条", [{ id: "engage-watch", name: "trigger.engage", args: { instanceId: watchEvent.instanceId }, reason: "明确追查舅舅失踪的线索" }]));
   watchEvent = game.triggerState.active.find((item) => item.definitionId === "watch.heirloom.hidden-note");

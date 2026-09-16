@@ -14,7 +14,7 @@ test('note stays hidden until local decoding, then remains pinned for unrelated 
   const game = make();
   mark(game, 'watch.note-recovered');
   assert.ok(!JSON.stringify(progressiveContext(game, '继续')).includes(WATCH_NOTE_TEXT));
-  assert.match(JSON.stringify(progressiveContext(game, '继续')), /不得提前透露或编造译文/);
+  assert.match(JSON.stringify(progressiveContext(game, '继续')), /不得在解读前拼出完整句意/);
   assert.equal(lookupContext(game, { ids: ['lore.watch.fixed-note'] }).entries.length, 0);
   mark(game, 'watch.formal-quest-unlocked');
   const context = progressiveContext(game, '休息');
@@ -52,7 +52,7 @@ test('local decoding reward and quest guidance share the fixed text', () => {
   const definition = getContentTrigger('watch.heirloom.hidden-note');
   assert.equal(definition.rewards.find(entry => entry.type === 'clue').clue.detail, WATCH_NOTE_DETAIL);
   assert.ok(definition.completionGuidance.guidance.includes(WATCH_NOTE_TEXT));
-  assert.equal(definition.version, 6);
+  assert.equal(definition.version, 7);
   assert.ok(getContentTrigger('watch.heirloom.late-hour').presentation.text.includes(WATCH_NOTE_TEXT));
 });
 
@@ -73,7 +73,7 @@ test('version 1.6.0 saves correct white rose to white iris across clues, journal
   });
   game.triggerState.rewardsClaimed = ['watch.hidden-note.formal-quest'];
   const migrated = migrateSave(game);
-  assert.equal(migrated.content.contentVersion, '2026.09.16.4');
+  assert.equal(migrated.content.contentVersion, '2026.09.16.5');
   assert.doesNotMatch(JSON.stringify(migrated), /白蔷薇/);
   assert.match(migrated.questJournal.entries['old-watch'].summary, /白鸢尾/);
   assert.equal(migrated.triggerState.active.find(entry => entry.instanceId === 'old-watch').stage, 'trace-uncle');
@@ -81,4 +81,18 @@ test('version 1.6.0 saves correct white rose to white iris across clues, journal
   assert.deepEqual(migrated.triggerState.rewardsClaimed, game.triggerState.rewardsClaimed);
   assert.equal(migrated.turn, 42);
   assert.deepEqual(migrateSave(migrated).clues, migrated.clues);
+});
+
+test('current saves migrate shorthand into interspersed Loen words without exposing the decoded sentence', () => {
+  const game = make();
+  game.content.contentVersion = '2026.09.16.4';
+  mark(game, 'watch.note-recovered');
+  game.storyHistory = [{ text: '舅舅的速记：纸上是陌生的速记符号。' }];
+  const migrated = migrateSave(game);
+  assert.match(JSON.stringify(migrated.storyHistory), /鲁恩文字/);
+  assert.doesNotMatch(JSON.stringify(migrated.storyHistory), /速记/);
+  assert.equal(migrated.triggerState.facts['watch.formal-quest-unlocked'], undefined);
+  assert.ok(!JSON.stringify(progressiveContext(migrated, '查看纸条')).includes(WATCH_NOTE_TEXT));
+  assert.match(JSON.stringify(progressiveContext(migrated, '查看纸条')), /鲁恩文字/);
+  assert.deepEqual(migrateSave(migrated).storyHistory, migrated.storyHistory);
 });
