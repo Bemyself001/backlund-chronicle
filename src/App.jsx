@@ -29,6 +29,7 @@ import { ensureMapMoveToolCall, ensureMapDiscoveryToolCall } from "./services/ma
 import { choiceResult, choiceValidationError, hasValidModelChoices, modelChoices, injectOccultEntryChoice } from "./services/choices.js";
 import { applyChoiceRecovery, recoverChoices } from "./services/choiceRecovery.js";
 import { createTurnResolution } from "./services/turnResolution.js";
+import { pendingWatchNarration, markNarrativeEventsDelivered } from "./services/narrativeEvents.js";
 import { makeId } from "./utils/id.js";
 import { canHotUpdate, checkForUpdate, downloadAndApplyOta, isNativeAndroid } from "./services/updates.js";
 import { finishTurnMetrics, markTurnMetric, recordModelRequest, startTurnMetrics } from "./services/turnMetrics.js";
@@ -398,7 +399,7 @@ export default function App() {
       const auditBaseline = createAuditBaseline(game, game.turn + 1);
       const automaticAudit = { ...auditTurnChanges(auditBaseline, resolvedGame), importantItemConfirmation: confirmationStatus };
       const next = {
-        ...resolvedGame, ...memoryPlan.updates, choices: nextChoices, choiceMeta,
+        ...markNarrativeEventsDelivered(resolvedGame, resolution.derivedEffects.narrativeEvents), ...memoryPlan.updates, choices: nextChoices, choiceMeta,
         worldEvents: [...game.worldEvents, ...(appearedTrigger ? [{ id: makeId("event"), turn: game.turn + 1, text: `特殊事件出现：${appearedTrigger.title}` }] : [])].slice(-40),
         changeLog: [...game.changeLog, ...execution.logs, ...(progress.statusTickLogs || [])].slice(-100),
         lastTurnBaseline: auditBaseline,
@@ -488,8 +489,8 @@ export default function App() {
     return runTurn(action, { manualRetry: true });
   };
 
-  const runLocalTool = (name, args, reason) => {
-    if (!game || loading) return;
+  const runLocalTool = async (name, args, reason, showStory) => {
+    if (!game || busyRef.current) return;
     const auditBaseline = createAuditBaseline(game, game.turn);
     const call = { id: makeId("local"), name, args, reason };
     const execution = executeToolCalls({ ...game, turn: game.turn - 1 }, [call]);
@@ -497,6 +498,29 @@ export default function App() {
     const triggerLogs = triggerProgress.events.available.map((entry) => ({ id: makeId("log"), turn: game.turn, text: `发现可选事件「${entry.presentation?.title || "特殊事件"}」。`, tone: "neutral" }));
     const next = { ...execution.game, turn: game.turn, triggerState: triggerProgress.state, occult: execution.game.occult, changeLog: [...game.changeLog, ...execution.logs, ...triggerLogs].slice(-100) };
     commitGame({ ...next, lastTurnBaseline: auditBaseline, lastTurnAudit: { ...auditTurnChanges(auditBaseline, next), importantItemConfirmation: { required: false, status: "player-action", confirmed: 0, rejected: 0 } } });
+    const inspectedWatch = name === "item.inspect" && execution.results[0]?.ok && game.inventory.some(item => item.instanceId === args.instanceId && item.itemId === "heirloom-watch");
+    const events = inspectedWatch ? pendingWatchNarration(next) : [];
+    if (!events.length) return;
+    busyRef.current = true; setLoading(true); setTurnPhase("finalizing"); setError(""); resetStreamPreview();
+    showStory?.();
+    const controller = new AbortController(); controllerRef.current = controller;
+    const timer = setTimeout(() => controller.abort(), 150000);
+    try {
+      const resolution = createTurnResolution([call], execution.results, { triggerSignals: triggerProgress.signals });
+      resolution.derivedEffects.narrativeEvents = events;
+      resolution.derivedEffects.worldTime = next.worldTime;
+      const response = settings.mockMode
+        ? { hasNarrative: true, narrative: "纸条上的陌生速记让你想起失踪的舅舅。若想继续调查，你可以前往皇后区公共图书馆，查阅速记资料或请教馆员；也可以去希尔斯顿区商会街，向钟表行业从业者打听舅舅曾工作的钟表行，再请旧同事辨认纸条。两条路任选其一，也可以暂时收好怀表，处理别的事情。" }
+        : await requestAIWithReasoningFallback(settings, buildRenderingContext(game, next, reason, prompt, resolution, { nativeTools: false }), controller.signal, queueStreamPreview, { disableTools: true });
+      if (controller.signal.aborted) throw new DOMException("已取消", "AbortError");
+      if (!response.hasNarrative) throw new Error("模型没有返回剧情正文");
+      const memory = computeMemoryUpdate({ ...next, turn: next.turn - 1 }, reason, response.narrative, resolution, { settledGame: next });
+      commitGame({ ...markNarrativeEventsDelivered(next, events), ...memory.updates });
+    } catch (err) {
+      setError(`怀表检查已保存，但引导生成未完成：${err.message}。请回到行囊再次检查怀表以重试，不需要新建存档。`);
+    } finally {
+      clearTimeout(timer); controllerRef.current = null; busyRef.current = false; setLoading(false); setTurnPhase("idle"); resetStreamPreview();
+    }
   };
   const handleSpecialAction = (request) => {
     if (!game || busyRef.current) return { ok: false, error: "本轮正在处理中" };

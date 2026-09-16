@@ -6,6 +6,28 @@ import { resolveTurnProgress } from '../src/engine/turn.js';
 import { createTurnResolution } from '../src/services/turnResolution.js';
 import { buildRenderingContext, buildFastNarrativeContinuationContext } from '../src/services/memory.js';
 import { migrateSave } from '../src/services/storage.js';
+import { processTriggers } from '../src/engine/triggerEngine.js';
+import { pendingWatchNarration, markNarrativeEventsDelivered } from '../src/services/narrativeEvents.js';
+
+test('inventory button inspections at the same turn queue narration, recover missed saves and retry until delivered', () => {
+  let game = createInitialGame({ ...EMPTY_CHARACTER, name: '行囊测试', talent: 'heirloom-watch' });
+  const instanceId = game.inventory.find(item => item.itemId === 'heirloom-watch').instanceId;
+  const originalTurn = game.turn;
+  for (let i = 0; i < 4; i++) {
+    const calls = [{ id: `local-${i}`, name: 'item.inspect', args: { instanceId }, reason: '检查家传怀表' }];
+    const execution = executeToolCalls({ ...game, turn: originalTurn - 1 }, calls);
+    processTriggers(execution.game, { action: '检查家传怀表', toolCalls: calls, toolResults: execution.results, turn: originalTurn });
+    game = { ...execution.game, turn: originalTurn };
+    assert.equal(pendingWatchNarration(game).length, i === 3 ? 1 : 0);
+  }
+  game = migrateSave(structuredClone(game));
+  assert.equal(pendingWatchNarration(game).length, 1);
+  const events = pendingWatchNarration(game);
+  assert.equal(pendingWatchNarration(game).length, 1, 'failed/cancelled generation must not acknowledge delivery');
+  game = migrateSave(markNarrativeEventsDelivered(game, events));
+  assert.deepEqual(pendingWatchNarration(game), []);
+  assert.equal(game.turn, originalTurn);
+});
 
 test('fourth watch inspection emits one story event in both rendering modes, survives reload without repeating', () => {
   let game = createInitialGame({ ...EMPTY_CHARACTER, name: '调查员', talent: 'heirloom-watch' });

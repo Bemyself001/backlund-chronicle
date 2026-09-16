@@ -241,7 +241,7 @@ function GameSession({ game, loading, turnPhase, streamText, error, mockMode, on
       </section>
       {panelOpen && <><button className={styles.panelScrim} type="button" onClick={closePanel} aria-label="关闭资料面板" tabIndex={-1} /><aside id="game-dossier" className={styles.dossier} aria-label={PANEL_NAMES[panel]}><div className={styles.dossierHeading}><div><small>PRIVATE DOSSIER</small><h2>{PANEL_NAMES[panel]}</h2></div><button ref={closeRef} type="button" onClick={closePanel} aria-label="关闭资料，返回剧情">返回剧情 <span aria-hidden="true">×</span></button></div><div className={styles.dossierScroll} ref={paneRef}>
         <div hidden={panel !== "character"}><CharacterPanel game={game} /></div>
-        <div hidden={panel !== "inventory"}><InventoryPanel game={game} onLocalTool={onLocalTool} onAction={performAction} disabled={loading} /></div>
+        <div hidden={panel !== "inventory"}><InventoryPanel game={game} onLocalTool={(name, args, reason) => onLocalTool(name, args, reason, () => setPanel(null))} onAction={performAction} disabled={loading} /></div>
         <div hidden={panel !== "journal"}><JournalPanel key={journalRequest} game={game} /></div>
         {panel === "special" && <SpecialActions game={game} loading={loading} onExecute={onSpecialAction} onOpenMap={onOpenMap} />}
         <div hidden={panel !== "menu"}><MenuPanel reading={reading} onReadingChange={updateReading} onOpenApi={onOpenApi} onOpenPrompt={onOpenPrompt} onOpenSaves={onOpenSaves} onHome={onHome} version={`${RELEASE_NAME} · ${APP_VERSION}`} />{readingNotice && <p className={styles.readingNotice} role="status">{readingNotice}</p>}</div>

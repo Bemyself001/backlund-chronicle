@@ -1,3 +1,13 @@
+export function pendingWatchNarration(game) {
+  if (!game.triggerState?.facts?.['watch.note-recovered']?.value || game.narrativeEventsDelivered?.['watch.investigation-routes']) return [];
+  // Recover saves whose inventory inspection settled without ever rendering the event.
+  return narrativeEventsForTurn([{ kind: 'fact.discovered', factId: 'watch.note-recovered' }]);
+}
+
+export function markNarrativeEventsDelivered(game, events) {
+  return { ...game, narrativeEventsDelivered: { ...game.narrativeEventsDelivered, ...Object.fromEntries(events.map(event => [event.id, true])) } };
+}
+
 // Only successful local discoveries can request an authoritative story beat.
 export function narrativeEventsForTurn(signals = []) {
   if (!signals.some(signal => signal.kind === "fact.discovered" && signal.factId === "watch.note-recovered")) return [];
