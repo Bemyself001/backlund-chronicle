@@ -99,6 +99,27 @@ test("sequence 8 creates no new entry but can continue an entry that appeared at
   assert.equal(game.triggerState.active.some((item) => item.category === "occult-entry" && item.status === "available"), false);
 });
 
+test("choosing to investigate the watch reveals one task without advancing discoveries", () => {
+  let game = createInitialGame({ ...EMPTY_CHARACTER, name: "怀表测试员", talent: "heirloom-watch" });
+  const watchTasks = state => state.triggerState.active.filter(entry => entry.definitionId === "watch.heirloom.hidden-note" && ["available", "engaged"].includes(entry.status));
+  assert.equal(watchTasks(game).length, 0);
+  ({ game } = processTurn(game, 1, "调查怀表"));
+  assert.equal(watchTasks(game).length, 1);
+  assert.equal(watchTasks(game)[0].presentation.title, "家传怀表：失踪的舅舅");
+  assert.equal(game.triggerState.facts["watch.note-recovered"], undefined);
+  const instanceId = watchTasks(game)[0].instanceId;
+  game = migrateSave(structuredClone(game));
+  ({ game } = processTurn(game, 2, "调查怀表"));
+  assert.deepEqual(watchTasks(game).map(entry => entry.instanceId), [instanceId]);
+  ({ game } = processTurn(game, 3, "追查怀表", [{ id: "early-engage", name: "trigger.engage", args: { instanceId } }]));
+  game.location = { id: "queen-library", name: "公共图书馆" };
+  const attempt = processTurn(game, 4, "解读速记纸条", [{ id: "early-decode", name: "trigger.progress", args: { instanceId, objectiveId: "decode-watch-note", evidence: "试图解读尚未取出的纸条" } }]);
+  assert.equal(attempt.results[0].ok, false);
+  assert.equal(attempt.game.triggerState.facts["watch.formal-quest-unlocked"], undefined);
+  const withoutWatch = createInitialGame({ ...EMPTY_CHARACTER, name: "普通旅客" });
+  assert.equal(watchTasks(processTurn(withoutWatch, 1, "调查怀表").game).length, 0);
+});
+
 test("heirloom watch inspection advances one local fact at a time and rewards only once", () => {
   let game = createInitialGame({ ...EMPTY_CHARACTER, name: "克莱恩·莫雷蒂", talent: "heirloom-watch" });
   const watch = game.inventory.find((item) => item.itemId === "heirloom-watch");
@@ -108,8 +129,8 @@ test("heirloom watch inspection advances one local fact at a time and rewards on
     game = settled.game;
     assert.equal(settled.results[0].ok, true);
     assert.ok(game.triggerState.facts[fact]);
-    if (index < 3) assert.equal(game.triggerState.active.find((item) => item.definitionId === "watch.heirloom.hidden-note")?.status, "eligible");
-    else assert.match(settled.results[0].log, /舅舅雷金纳德·莫雷蒂/);
+    assert.equal(game.triggerState.active.find((item) => item.definitionId === "watch.heirloom.hidden-note")?.status, "available");
+    if (index === 3) assert.match(settled.results[0].log, /舅舅雷金纳德·莫雷蒂/);
   }
   let watchEvent = game.triggerState.active.find((item) => item.definitionId === "watch.heirloom.hidden-note");
   assert.equal(watchEvent.status, "available");

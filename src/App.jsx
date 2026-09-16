@@ -399,14 +399,14 @@ export default function App() {
       const memoryPlan = computeMemoryUpdate(execution.game, action, occultNarrative, resolution, { settledGame: resolvedGame });
       const auditBaseline = createAuditBaseline(game, game.turn + 1);
       const automaticAudit = { ...auditTurnChanges(auditBaseline, resolvedGame), importantItemConfirmation: confirmationStatus };
-      const next = {
-        ...markNarrativeEventsDelivered(resolvedGame, resolution.derivedEffects.narrativeEvents), ...memoryPlan.updates, choices: nextChoices, choiceMeta,
+      const next = markNarrativeEventsDelivered({
+        ...resolvedGame, ...memoryPlan.updates, choices: nextChoices, choiceMeta,
         worldEvents: [...game.worldEvents, ...(appearedTrigger ? [{ id: makeId("event"), turn: game.turn + 1, text: `特殊事件出现：${appearedTrigger.title}` }] : [])].slice(-40),
         changeLog: [...game.changeLog, ...execution.logs, ...(progress.statusTickLogs || [])].slice(-100),
         lastTurnBaseline: auditBaseline,
         lastTurnAudit: automaticAudit,
         lastTurnMetrics: finishTurnMetrics(metrics),
-      };
+      }, resolution.derivedEffects.narrativeEvents);
       resetStreamPreview(); commitGame(next);
       // Narrative and settlement are durable before any optional suggestion request.
       clearTimeout(watchdogTimer);

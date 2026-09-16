@@ -37,7 +37,11 @@ export const WATCH_DISCOVERY_QUESTS = [{
   priority: 80,
   oncePerSave: true,
   eligibility: [{ type: "item", itemId: "heirloom-watch" }],
-  appearWhen: [{ type: "signal", kind: "fact.discovered", factId: "watch.note-recovered" }],
+  appearWhen: [{ type: "any", conditions: [
+    { type: "action", terms: ["调查怀表", "调查家传怀表"] },
+    { type: "fact", key: "watch.exterior-inspected", value: true },
+    { type: "fact", key: "watch.note-recovered", value: true },
+  ] }],
   initialStage: "note-recovered",
   expiresAfterTurns: null,
   presentation: {

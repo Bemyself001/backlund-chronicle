@@ -31,7 +31,11 @@ export function pendingQuestNarration(game, terminalEvents = []) {
 }
 
 export function markNarrativeEventsDelivered(game, events) {
-  return { ...game, narrativeEventsDelivered: { ...game.narrativeEventsDelivered, ...Object.fromEntries(events.map(event => [event.id, true])) } };
+  const choices = events.find(event => event.choices?.length === 3)?.choices;
+  return { ...game,
+    ...(choices ? { choices: structuredClone(choices), choiceMeta: { source: "story-event", fallback: false, reason: "", attempts: [] } } : {}),
+    narrativeEventsDelivered: { ...game.narrativeEventsDelivered, ...Object.fromEntries(events.map(event => [event.id, true])) },
+  };
 }
 
 export function eventDirections(events) {
@@ -50,6 +54,11 @@ export function narrativeEventsForTurn(signals = []) {
     routes: [
       { locationId: "queen-library", name: "皇后区公共图书馆", purpose: "查阅速记资料或请教馆员，寻找解读纸条的方法" },
       { locationId: "hillston-market", name: "希尔斯顿区商会街", purpose: "向钟表行业从业者打听舅舅曾工作的钟表行，寻找旧同事帮助辨认纸条" },
+    ],
+    choices: [
+      { label: "前往皇后区公共图书馆，查找速记资料", intent: "investigate", risk: "low" },
+      { label: "前往希尔斯顿区商会街，打听舅舅工作过的钟表行", intent: "investigate", risk: "low" },
+      { label: "暂时收起纸条，处理其他事情", intent: "redirect", risk: "low" },
     ],
     constraints: "两条路线任选其一，也可以暂时搁置；当前仅提出调查方向，尚未译出纸条、找到旧同事或抵达目的地。不要提前透露货栈、白鸢尾或任务后续。钟表行名称可由AI在实际调查时生成并沿用。",
   }];

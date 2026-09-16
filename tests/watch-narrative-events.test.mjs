@@ -8,6 +8,7 @@ import { buildRenderingContext, buildFastNarrativeContinuationContext } from '..
 import { migrateSave } from '../src/services/storage.js';
 import { processTriggers } from '../src/engine/triggerEngine.js';
 import { pendingWatchNarration, markNarrativeEventsDelivered } from '../src/services/narrativeEvents.js';
+import { hasValidModelChoices } from '../src/services/choices.js';
 
 test('inventory button inspections at the same turn queue narration, recover missed saves and retry until delivered', () => {
   let game = createInitialGame({ ...EMPTY_CHARACTER, name: '行囊测试', talent: 'heirloom-watch' });
@@ -23,9 +24,23 @@ test('inventory button inspections at the same turn queue narration, recover mis
   game = migrateSave(structuredClone(game));
   assert.equal(pendingWatchNarration(game).length, 1);
   const events = pendingWatchNarration(game);
+  const originalChoices = structuredClone(game.choices);
+  const originalLocation = structuredClone(game.location);
+  const originalTriggers = structuredClone(game.triggerState);
   assert.equal(pendingWatchNarration(game).length, 1, 'failed/cancelled generation must not acknowledge delivery');
+  assert.deepEqual(game.choices, originalChoices, 'pending narration must not replace choices before success');
   game = migrateSave(markNarrativeEventsDelivered(game, events));
+  assert.deepEqual(game.choices.map(choice => choice.label), [
+    '前往皇后区公共图书馆，查找速记资料',
+    '前往希尔斯顿区商会街，打听舅舅工作过的钟表行',
+    '暂时收起纸条，处理其他事情',
+  ]);
+  assert.equal(game.choiceMeta.source, 'story-event');
+  assert.ok(hasValidModelChoices(game), 'valid story choices must not trigger AI replacement');
+  assert.deepEqual(game.location, originalLocation);
+  assert.deepEqual(game.triggerState, originalTriggers);
   assert.deepEqual(pendingWatchNarration(game), []);
+  assert.deepEqual(markNarrativeEventsDelivered(game, []).choices, game.choices);
   assert.equal(game.turn, originalTurn);
 });
 
@@ -52,7 +67,9 @@ test('fourth watch inspection emits one story event in both rendering modes, sur
         assert.match(payload, /希尔斯顿区商会街/);
         assert.match(payload, /任选其一/);
       }
-      game = migrateSave(structuredClone(game));
+      game = migrateSave(markNarrativeEventsDelivered(game, [event]));
+      assert.deepEqual(game.choices, event.choices);
+      assert.notEqual(game.choices, event.choices);
     }
   }
 });
