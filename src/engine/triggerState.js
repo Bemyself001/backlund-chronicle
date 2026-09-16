@@ -60,6 +60,10 @@ function normalizeInstance(instance = {}, fallbackStatus = "available") {
     timers: instance.timers && typeof instance.timers === "object" ? structuredClone(instance.timers) : {},
     progressTurn: Number.isInteger(instance.progressTurn) ? instance.progressTurn : null,
     processedTurn: Number.isInteger(instance.processedTurn) ? instance.processedTurn : null,
+    chainTurn: Number.isInteger(instance.chainTurn) ? instance.chainTurn : null,
+    chainCount: Math.max(0, Math.min(3, Number(instance.chainCount) || 0)),
+    chainIsolated: Boolean(instance.chainIsolated),
+    lastProgressEvidence: String(instance.lastProgressEvidence || ""),
   };
 }
 

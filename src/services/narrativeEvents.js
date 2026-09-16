@@ -1,4 +1,5 @@
 import { triggerGuidance } from "../engine/triggerGuidance.js";
+import { questJournalEvents } from "../engine/questRuntime.js";
 
 export function pendingWatchNarration(game) {
   if (!game.triggerState?.facts?.['watch.note-recovered']?.value || game.triggerState?.facts?.['watch.formal-quest-unlocked']?.value || game.narrativeEventsDelivered?.['watch.investigation-routes']) return [];
@@ -21,11 +22,21 @@ export function pendingQuestNarration(game, terminalEvents = []) {
     const timerKey = guidance.timers.map(timer => `${timer.id}:${timer.remaining <= 3 ? timer.remaining : 'running'}`).join(',');
     const id = `quest-guidance:${instance.instanceId}:${instance.status}:${guidance.key}:${timerKey}`;
     if (game.narrativeEventsDelivered?.[id]) continue;
-    events.push({ id, triggerDefinitionId: instance.definitionId, title: instance.presentation?.title,
+    events.push({ id, instanceId: instance.instanceId, triggerDefinitionId: instance.definitionId, title: instance.presentation?.title,
       reason: instance.status === 'completed' ? '调查告一段落，承接已确认的结果' : '当前线索方向发生变化或此前未呈现',
       direction: guidance.text, narrativeCue: guidance.narrativeCue, timers: guidance.timers,
       constraints: '只以当前可感知线索给出方向；不要列操作清单，不泄露后续阶段、不替玩家移动、接受任务或发放奖励。未亲临地点时以已有记录与回忆表达，不让远处人物突然对话。',
     });
+  }
+  for (const journalEvent of questJournalEvents(game)) {
+    const instance = [...(game.triggerState?.active || []), ...(game.triggerState?.history || [])].find(entry => entry.instanceId === journalEvent.questId);
+    const existing = events.find(event => event.instanceId === journalEvent.questId || event.id === 'watch.investigation-routes' && event.triggerDefinitionId === instance?.definitionId);
+    if (!existing) events.push(journalEvent);
+    else {
+      existing.choices ||= journalEvent.choices;
+      existing.deliveryIds = [...(existing.deliveryIds || []), journalEvent.id];
+      if (journalEvent.direction && journalEvent.direction !== existing.direction) existing.direction = [existing.direction || existing.routes?.map(route => `${route.name}：${route.purpose}`).join('；'), journalEvent.direction].filter(Boolean).join('\n');
+    }
   }
   return events;
 }
@@ -34,7 +45,7 @@ export function markNarrativeEventsDelivered(game, events) {
   const choices = events.find(event => event.choices?.length === 3)?.choices;
   return { ...game,
     ...(choices ? { choices: structuredClone(choices), choiceMeta: { source: "story-event", fallback: false, reason: "", attempts: [] } } : {}),
-    narrativeEventsDelivered: { ...game.narrativeEventsDelivered, ...Object.fromEntries(events.map(event => [event.id, true])) },
+    narrativeEventsDelivered: { ...game.narrativeEventsDelivered, ...Object.fromEntries(events.flatMap(event => [event.id, ...(event.deliveryIds || [])].map(id => [id, true]))) },
   };
 }
 
@@ -60,7 +71,7 @@ export function narrativeEventsForTurn(signals = []) {
       { label: "前往希尔斯顿区商会街，打听舅舅工作过的钟表行", intent: "investigate", risk: "low" },
       { label: "暂时收起纸条，处理其他事情", intent: "redirect", risk: "low" },
     ],
-    constraints: "两条路线任选其一，也可以暂时搁置；当前仅提出调查方向，尚未译出纸条、找到旧同事或抵达目的地。不要提前透露货栈、白鸢尾或任务后续。钟表行名称可由AI在实际调查时生成并沿用。",
+    constraints: "两条路线任选其一，也可以暂时搁置；当前仅提出调查方向，尚未译出纸条、找到旧同事或抵达目的地。不要提前透露纸条译文、货栈、白蔷薇或任务后续，也不得编造纸条字句。钟表行名称可由AI在实际调查时生成并沿用。",
   }];
 }
 

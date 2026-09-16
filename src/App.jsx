@@ -452,11 +452,11 @@ export default function App() {
       const memory = computeMemoryUpdate(game, action, narrative, resolution, { settledGame: next });
       const baseline = createAuditBaseline(game, next.turn);
       const trigger = progress.newTrigger?.presentation || next.triggerState?.active?.find((entry) => entry.status === "available")?.presentation;
-      commitGame({ ...markNarrativeEventsDelivered(next, resolution.derivedEffects.narrativeEvents), ...memory.updates,
+      commitGame(markNarrativeEventsDelivered({ ...next, ...memory.updates,
         choices: injectOccultEntryChoice(game.choices, trigger),
         changeLog: [...game.changeLog, ...progress.statusTickLogs, { id: makeId("log"), turn: next.turn, text: `向${available.church.deity}祷告：灵性恢复 ${recovered} 点。`, tone: "success" }].slice(-100),
         lastTurnBaseline: baseline, lastTurnAudit: auditTurnChanges(baseline, next), lastTurnMetrics: null,
-      });
+      }, resolution.derivedEffects.narrativeEvents));
       prayerRetryRef.current = null;
       return true;
     } catch (err) {

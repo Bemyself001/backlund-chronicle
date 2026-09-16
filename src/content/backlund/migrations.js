@@ -1,4 +1,13 @@
+import { WATCH_NOTE_DETAIL } from "./watchNote.js";
+
 export const CONTENT_MIGRATIONS = [
+  {
+    id: "backlund.fixed-watch-note", fromVersion: "2026.09.16.2", toVersion: "2026.09.16.3",
+    cluePatches: [{ id: "clue-watch-note-decoded", patch: { detail: WATCH_NOTE_DETAIL } }],
+    definitionRefreshes: [
+      ...["watch.heirloom.hidden-note", "watch.heirloom.late-hour"].map(definitionId => ({ definitionId, toDefinitionVersion: 5, refreshPresentation: true })),
+    ],
+  },
   {
     id: "backlund.investigation-guidance", fromVersion: "2026.09.16.1", toVersion: "2026.09.16.2",
     definitionRefreshes: [
@@ -67,7 +76,7 @@ export const CONTENT_MIGRATIONS = [
       },
     ],
     cluePatches: [
-      { id: "clue-watch-note-decoded", patch: { title: "雷金纳德{characterSurnameSuffix}留下的怀表纸条", detail: "纸条由主角失踪的舅舅雷金纳德{characterSurnameSuffix}留下，记录了南岸货栈、被替换的整点交接暗号，以及一句仓促写下的警告：不要相信白鸢尾。" } },
+      { id: "clue-watch-note-decoded", patch: { title: "雷金纳德{characterSurnameSuffix}留下的怀表纸条", detail: WATCH_NOTE_DETAIL } },
       { id: "clue-reginald-abbott-history", patch: { id: "clue-missing-uncle-history", title: "雷金纳德{characterSurnameSuffix}失踪前的旧档", detail: "主角的舅舅雷金纳德{characterSurnameSuffix}曾是通识者途径序列9，失踪前在南岸货栈追查魔女会的军火与文物交接。" } },
       { id: "clue-reginald-forced-advancement", patch: { id: "clue-uncle-forced-advancement", detail: "雷金纳德{characterSurnameSuffix}已被魔女会强行从序列9通识者晋升为序列8考古学家；他仍会使用机械、枪械与炸药，却已失去自主行动能力。" } },
     ],

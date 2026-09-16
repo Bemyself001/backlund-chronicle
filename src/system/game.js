@@ -161,6 +161,7 @@ export function createInitialGame(character, confirmedLoadout) {
     equipment: Object.fromEntries(startingInventory.filter((entry) => entry.equipped).map((entry) => [equipmentSlot(entry), entry.instanceId])),
     statusEffects: [],
     quests: [],
+    questJournal: { version: 1, entries: {}, attempts: {} },
     clues: [],
     availableClues: structuredClone(opening.clues),
     relationships: [],

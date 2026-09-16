@@ -46,9 +46,12 @@ export function lookupContext(game, { query = "", ids = [], limit = 6 } = {}) {
 
 export function progressiveContext(game, action = "") {
   const state = normalizeTriggerState(game);
+  // Keep authored evidence even for vague actions such as “继续”.
+  const pinned = LORE_ENTRIES.filter(entry => entry.alwaysInclude && visibleLore(game, entry)).map(entry => playerSafeLore(game, entry));
+  const relevant = lookupContext(game, { query: action, limit: 6 }).entries;
   return {
     hardFacts: Object.fromEntries(Object.entries(state.facts || {}).map(([id, fact]) => [id, fact?.value ?? true])),
-    loreFacts: lookupContext(game, { query: action, limit: 6 }).entries,
+    loreFacts: [...pinned, ...relevant.filter(entry => !pinned.some(fact => fact.id === entry.id))],
     sceneDetailPolicy: "可补充不影响机制的临时场景细节；不得把临场细节当作永久事实、任务条件或奖励依据。",
   };
 }

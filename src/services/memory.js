@@ -11,6 +11,7 @@ import { fixedNarrativeMessages, LOCAL_STATE_AUTHORITY_RULES } from "../system/n
 import { NARRATIVE_EVENT_RULE } from "./narrativeEvents.js";
 import { restMinutes } from "../engine/restTime.js";
 import { advanceWorldTime } from "../engine/turn.js";
+import { visibleQuestJournal, questAssistance, questStagePolicy } from "../engine/questRuntime.js";
 
 const SHARED_AUTHORITY_RULES = LOCAL_STATE_AUTHORITY_RULES + "【地图调查与公共常识】玩家未揭开地图迷雾只表示其个人尚未确认地点，不表示当地居民不知道该地点。圣赛缪尔教堂是黑夜女神教会的公开教堂，永恒烈阳教堂也是公开宗教场所；正常描写居民指路、公开礼拜与日常活动，不因地图未发现就编造集体不知情、避讳或秘密据点。其他公共地点同理，按身份与当地知识差异自然回应。明确的地图调查在本轮正常完成后由本地规则确认所选地点，只揭开该地点，不自动到访、加入组织或解锁内部秘密；不要把本次调查写成仍无法确认地址。快速模式草稿先写核实过程，具体确认结果留给本地结算后的叙事。";
 
@@ -71,6 +72,7 @@ export function visibleGameState(game) {
     inventory: visibleInventory(game),
     knownClues: game.clues,
     activeQuests: game.quests,
+    taskJournal: visibleQuestJournal(game).map(entry => ({ ...entry, assistance: questAssistance(game, entry) })),
     specialEvents: playerVisibleTriggers(game.triggerState || { active: [] }),
     taskGuidance: (game.triggerState?.active || []).filter(entry => ["available", "engaged"].includes(entry.status)).map(entry => triggerGuidance(game, entry)),
     lastTurnAudit: game.lastTurnAudit || null,
@@ -111,7 +113,9 @@ function privatePlanningState(game, options = {}) {
       title: entry.presentation?.title || "特殊任务",
       stage: entry.stage,
       requiresEngagement: entry.status === "available",
-      engagementRule: "玩家明确解读、请教、查阅或追查该线索时，可先trigger.engage，再按本轮真实结果决定是否trigger.progress；不必让玩家再说一次接受任务。仅看消息、问路或路过不自动接取，不因引导出现而自动完成目标。",
+      taskPolicy: questStagePolicy(definition, stage),
+      consecutiveObjectives: consecutiveQuestObjectives(definition, stage),
+      engagementRule: "优先使用quest.resolve引用玩家原话；主动追查时start=true，steps按本轮真实结果列出。兼容旧接口trigger.engage及trigger.progress，不必让玩家再说一次接受任务。仅看消息、问路或路过不自动接取。没有transitions的信号任务按advanceWhen使用对应工具产生本地事实。",
       guidance: stage?.guidance || "",
       timers: (definition.timers || []).filter(timer => timer.stages.includes(entry.stage)).map(timer => ({ id: timer.id, remainingActions: entry.timers?.[timer.id] ? Math.max(0, entry.timers[timer.id].deadline - Number(game.turn || 0)) : timer.turns, message: timer.message })),
       objectives: (stage?.transitions || []).map(({ objectiveId, description, requirements, requirementMessage, actionTerms, rejectActionTerms }) => ({
@@ -151,6 +155,22 @@ function planningProtocol(nativeTools) {
   return nativeTools
     ? "只判断本轮是否需要状态变化。需要时仅调用原生状态工具；不需要时回复 NO_STATE_CHANGE。不要生成最终剧情、行动选项、记忆或世界事件。"
     : "只判断本轮状态变化，并只返回精简 JSON：{\"toolCalls\":[]}。不要生成最终剧情、行动选项、记忆或世界事件。";
+}
+
+// Private planning only: enough lookahead for one coherent action, never a full
+// task graph in the player's rendering context.
+function consecutiveQuestObjectives(definition, initialStage) {
+  const result = [];
+  let stage = initialStage;
+  for (let depth = 0; stage && depth < 3; depth++) {
+    if (depth > 0 && !questStagePolicy(definition, stage).canChain) break;
+    result.push({ stage: stage.id, objectives: stage.transitions || [], advanceWhen: stage.advanceWhen || [] });
+    if (!questStagePolicy(definition, stage).canChain || stage.transitions?.length !== 1) break;
+    const transition = stage.transitions[0];
+    if (transition.complete || transition.fail || transition.nextStage === stage.id) break;
+    stage = definition.stages.find(entry => entry.id === transition.nextStage);
+  }
+  return result;
 }
 
 const DYNAMIC_NARRATIVE_RULE = "篇幅服从行动复杂度：简单观察、购买、移动或简短交谈约 120—250 字；交涉、调查、冲突或重要发现约 250—500 字；重大转折、仪式、战斗、晋升或章节高潮可写 500—800 字。内容完整后立即结束，不为达到字数重复环境、心理或已知信息。先直接回应玩家行动，再写过程、阻力和反馈，并至少推进一项有意义的结果、关系、信息、局势或可选方向。已经建立过的城市氛围只有发生变化、影响行动或承载新线索时才再次描写。";

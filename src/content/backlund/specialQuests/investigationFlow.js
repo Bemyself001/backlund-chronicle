@@ -15,14 +15,14 @@ const itemReward = (id, name, description, category, properties = {}) => ({ id: 
 } });
 
 export function configureWatchFlow(discovery, main) {
-  discovery.version = 3;
+  discovery.version = 4;
   discovery.presentation.text += " 可去皇后区公共图书馆查旧式速记资料，或到希尔斯顿区商会街打听舅舅工作过的钟表行。";
   discovery.stages[0].guidance = "去公共图书馆查行业速记，或到商会街寻找舅舅的旧同事；两条路线任选其一。";
   const decode = discovery.stages[0].transitions[0];
   decode.requirements.push({ type: "any", conditions: ["queen-library", "hillston-market"].map(locationId => ({ type: "location", locationId, includeChildren: true })) });
   decode.description = "在公共图书馆解读速记，或在商会街钟表行请教旧同事；AI首次生成的钟表行名称须以location.grow登记，后续沿用，不要求两条路线都完成";
   decode.requirementMessage = "请先实际到达皇后区公共图书馆或商会街（含钟表行）解读纸条";
-  main.version = 3;
+  main.version = 4;
   main.failWhen = [{ type: "stat", key: "health", max: 0 }];
   const s = Object.fromEntries(main.stages.map(stage => [stage.id, stage]));
   const mercy = s["mercy-decision"].transitions[0];
@@ -70,6 +70,10 @@ export function configureWatchFlow(discovery, main) {
     ] }, s["white-iris-confrontation"]];
   main.timers = [{ id: "approaching-enemy", turns: 2, stages: ["last-chance"], nextStage: "double-ambush", message: warning, rewards: [award("watch.ambush-triggered")] }];
   main.stages.find(stage => stage.id === "empty-warehouse").transitions.find(entry => entry.objectiveId === "stakeout-warehouse").elapsedMinutes = 60;
+  for (const stage of main.stages) {
+    if (["warehouse-bomb", "find-uncle", "identify-sequence", "confirm-control", "mercy-decision", "last-chance", "outside-warehouse", "double-ambush", "white-iris-confrontation"].includes(stage.id)) stage.finale = true;
+    if (["enter-south-warehouse", "empty-warehouse"].includes(stage.id)) stage.dangerous = true;
+  }
   shareRewards(main);
 }
 
@@ -120,4 +124,10 @@ export function configureSideQuests(quests) {
   drain.timers = [{ id: "rising-tide", turns: 10, stages: ["rescue-dock-boy", "exit-drain"], nextStage: "flooded", fail: true, message: "进入后十回合。救人一至两回合，搜查每次一回合，撤离一回合；到期出口被淹、任务失败，不再补发奖励。" }];
   shareRewards(renard);
   shareRewards(drain);
+  for (const stage of renard.stages) {
+    if (["heal-renard-daughter", "shared-treatment", "auction-box", "secure-treatment"].includes(stage.id)) stage.majorDecision = true;
+  }
+  for (const stage of detonator.stages) {
+    if (stage.id === "disarm-live-detonator") stage.dangerous = true;
+  }
 }

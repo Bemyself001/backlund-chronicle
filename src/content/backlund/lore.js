@@ -1,4 +1,12 @@
+import { WATCH_NOTE_RULE } from "./watchNote.js";
+
 export const LORE_ENTRIES = [
+  {
+    id: "lore.watch.fixed-note", type: "loreFact", alwaysInclude: true,
+    revealWhen: [{ type: "fact", key: "watch.formal-quest-unlocked", value: true }],
+    relevance: { terms: ["纸条", "译文", "雷金纳德", "白蔷薇", "账本", "南岸"] },
+    text: WATCH_NOTE_RULE,
+  },
   {
     id: "lore.renard.deep-control", type: "loreFact",
     revealWhen: [{ type: "fact", key: "knowledge.deep-control-irreversible", value: true }],
@@ -13,11 +21,11 @@ export const LORE_ENTRIES = [
     text: "非凡知识必须来自角色已经取得的线索、经历或可靠资料；不知道的途径能力、配方与组织内幕应保持未知。",
   },
   {
-    id: "lore.watch.recovered-note",
+    id: "lore.watch.recovered-note", alwaysInclude: true,
     type: "loreFact",
-    revealWhen: [{ type: "fact", key: "watch.note-recovered", value: true }],
+    revealWhen: [{ type: "fact", key: "watch.note-recovered", value: true }, { type: "fact", key: "watch.formal-quest-unlocked", not: true }],
     relevance: { terms: ["怀表", "纸条", "速记", "羽毛笔记号"], itemIds: ["heirloom-watch"] },
-    text: "怀表夹层纸条已经被取出，但在译出之前只能确认其使用陌生速记符号，并带有羽毛笔形记号；不得提前透露译文。",
+    text: "怀表夹层纸条已经被取出，但在译出之前只能确认其使用陌生速记符号，并带有羽毛笔形记号；不得提前透露或编造译文、可辨认的词语、额外字迹或暗号；只有本地解读成功后才能引用固定译文。",
   },
   {
     id: "lore.watch.missing-uncle-memory",

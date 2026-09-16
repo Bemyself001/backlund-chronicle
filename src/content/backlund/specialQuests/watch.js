@@ -1,3 +1,5 @@
+import { WATCH_NOTE_DETAIL } from "../watchNote.js";
+
 const CHARACTERISTIC_REWARD = { id: "watch.late-hour.characteristic", type: "item", item: {
     instanceId: "reward-watch-archaeologist-characteristic",
     itemId: "archaeologist-characteristic",
@@ -66,7 +68,7 @@ export const WATCH_DISCOVERY_QUESTS = [{
   ],
   rewards: [
     { id: "watch.hidden-note.formal-quest", type: "fact", key: "watch.formal-quest-unlocked", value: true },
-    { id: "watch.hidden-note.decoded-clue", type: "clue", clue: { id: "clue-watch-note-decoded", title: "雷金纳德{characterSurnameSuffix}留下的怀表纸条", detail: "纸条由主角失踪的舅舅雷金纳德{characterSurnameSuffix}留下，记录了南岸货栈、被替换的整点交接暗号，以及一句仓促写下的警告：不要相信白鸢尾。", kind: "personal_story", locationId: "bridge-docks" } },
+    { id: "watch.hidden-note.decoded-clue", type: "clue", clue: { id: "clue-watch-note-decoded", title: "雷金纳德{characterSurnameSuffix}留下的怀表纸条", detail: WATCH_NOTE_DETAIL, kind: "personal_story", locationId: "bridge-docks" } },
   ],
 }];
 

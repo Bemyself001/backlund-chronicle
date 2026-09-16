@@ -15,7 +15,7 @@ test("version 1 saves migrate from Grayharbor to Backlund without losing progres
   });
   assert.equal(migrated.version, 13);
   assert.equal(migrated.systemVersion, 2);
-  assert.deepEqual(migrated.content, { packId: "backlund-core", schemaVersion: 2, contentVersion: "2026.09.16.2" });
+  assert.deepEqual(migrated.content, { packId: "backlund-core", schemaVersion: 2, contentVersion: "2026.09.16.3" });
   assert.equal(migrated.turn, 8);
   assert.equal(migrated.title, "艾琳的贝克兰德档案");
   assert.equal(migrated.location.district, "贝克兰德桥区·旧钟街");
@@ -148,7 +148,7 @@ test("watch story content migration inherits the player surname and defers prema
     },
   });
 
-  assert.equal(migrated.content.contentVersion, "2026.09.16.2");
+  assert.equal(migrated.content.contentVersion, "2026.09.16.3");
   const discovery = migrated.triggerState.active.find((entry) => entry.instanceId === "watch-discovery-old");
   assert.equal(discovery.status, "eligible");
   assert.equal(discovery.stage, "eligible");

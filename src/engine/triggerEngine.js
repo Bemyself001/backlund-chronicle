@@ -14,6 +14,7 @@ import {
 import { buildTriggerSignals } from "./triggerSignals.js";
 import { moneyFromPence, moneyToPence } from "../system/money.js";
 import { renderContentData } from "./contentTemplates.js";
+import { questStagePolicy, settleQuestAttempts, syncQuestJournal } from "./questRuntime.js";
 
 function definitionEligible(definition, context) {
   if (!allConditionsMatch(definition.eligibility || [], context)) return false;
@@ -204,6 +205,7 @@ function advanceExisting(game, state, signals, action, turn, events) {
     }
     const previousStage = instance.stage;
     instance.stage = transition?.nextStage || stage.nextStage || instance.stage;
+    instance.lastProgressEvidence = signals.find(signal => signal.kind === "trigger.progress" && signal.instanceId === instance.instanceId && signal.objectiveId === transition?.objectiveId)?.evidenceIds?.[0] || instance.lastProgressEvidence;
     instance.stageHistory.push({ id: `${instance.instanceId}:${previousStage}:${instance.stage}`, from: previousStage, to: instance.stage, turn, evidenceIds: signals.map((signal) => signal.id) });
     events.advanced.push({ instanceId: instance.instanceId, definitionId: instance.definitionId, from: previousStage, to: instance.stage, turn });
     if (transition?.fail) {
@@ -270,6 +272,7 @@ export function processTriggers(game, { action = "", toolCalls = [], toolResults
     events.available.push(structuredClone(instance));
   }
   syncLegacyOccult(game, state);
+  settleQuestAttempts(game, toolCalls, toolResults, turn);
   return { state, signals, events, newTrigger: events.available[0] || null, occultEntry: events.available.find((entry) => entry.category === "occult-entry") || null };
 }
 
@@ -289,6 +292,7 @@ export function engageTrigger(game, instanceId, turn, action = "") {
     setTriggerFact(state, "occult.contact", turn, [instance.instanceId]);
   }
   syncLegacyOccult(game, state);
+  syncQuestJournal(game);
   return { ok: true, instance, definition, action };
 }
 
@@ -299,10 +303,11 @@ export function abandonTrigger(game, instanceId, turn) {
   if (!instance || !["available", "engaged"].includes(instance.status)) return { ok: false, reason: "当前没有匹配的可放弃事件" };
   const abandoned = terminalTrigger(state, instance, "abandoned", turn);
   syncLegacyOccult(game, state);
+  syncQuestJournal(game);
   return { ok: true, instance: abandoned };
 }
 
-export function progressTrigger(game, instanceId, objectiveId, turn, action = "", evidence = "") {
+export function progressTrigger(game, instanceId, objectiveId, turn, action = "", evidence = "", assessment = {}) {
   const state = normalizeTriggerState(game);
   game.triggerState = state;
   const instance = state.active.find((entry) => entry.instanceId === instanceId && entry.status === "engaged");
@@ -312,13 +317,15 @@ export function progressTrigger(game, instanceId, objectiveId, turn, action = ""
   const transition = (stage?.transitions || []).find((entry) => entry.objectiveId === objectiveId);
   if (!transition) return { ok: false, reason: "该目标不属于任务当前阶段，不能跳过或倒退" };
   if (Number(game.character?.stats?.health) <= 0 && !transition.fail) return { ok: false, reason: "生命归零，不能继续完成任务或领取奖励" };
-  if (instance.progressTurn != null && instance.progressTurn >= turn) return { ok: false, reason: "同一任务每回合只能推进一个目标；搜查和救援不能合并结算" };
+  const policy = questStagePolicy(definition, stage);
+  const chaining = assessment.chain && policy.canChain && instance.chainTurn === turn && !instance.chainIsolated && instance.chainCount < 3;
+  if (instance.progressTurn != null && instance.progressTurn >= turn && !chaining) return { ok: false, reason: "同一任务每回合只能推进一个目标；搜查和救援不能合并结算（普通调查可通过任务引擎连续结算）" };
   if ((definition.timers || []).some(timer => timer.stages.includes(instance.stage) && instance.timers?.[timer.id] && turn > instance.timers[timer.id].deadline)) return { ok: false, reason: "行动窗口已经结束，不能继续在原阶段领取奖励" };
   if (transition.rejectActionTerms?.length && hasActionTerms(action, transition.rejectActionTerms)) return { ok: false, reason: "玩家没有明确选择该行动，不能把拒绝或犹豫解释为同意" };
-  if (transition.actionTerms?.length && !hasActionTerms(action, transition.actionTerms)) return { ok: false, reason: "玩家本轮行动没有明确完成当前目标" };
+  if (transition.actionTerms?.length && !hasActionTerms(action, transition.actionTerms) && !assessment.semantic) return { ok: false, reason: "玩家本轮行动没有明确完成当前目标" };
   if (String(evidence || "").trim().length < 4) return { ok: false, reason: "任务推进必须说明本轮已经确认的证据或结果" };
   const context = { game, state, signals: [], action, turn, instance };
-  if (!allConditionsMatch(transition.requirements || [], context)) return { ok: false, reason: transition.requirementMessage || "本地状态尚不满足这条任务分支" };
+  if (!allConditionsMatch([...(transition.when || []), ...(transition.requirements || [])], context)) return { ok: false, reason: transition.requirementMessage || "本地状态尚不满足这条任务分支" };
   instance.progressTurn = turn;
   return {
     ok: true,
@@ -337,4 +344,33 @@ export function progressTrigger(game, instanceId, objectiveId, turn, action = ""
       text: `${action} ${evidence}`.trim(),
     },
   };
+}
+
+// Sequential execution is reserved for the semantic task tool. Legacy signals
+// remain supported; confirmed transitions are applied here before the next step.
+export function settleQuestStep(game, instanceId, objectiveId, turn, action, evidence, actionQuote) {
+  const instance = game.triggerState?.active?.find(entry => entry.instanceId === instanceId);
+  const definition = getInstanceTriggerDefinition(instance, game);
+  const stage = definition?.stages?.find(entry => entry.id === instance?.stage);
+  const policy = questStagePolicy(definition, stage);
+  const quote = String(actionQuote || "").trim();
+  if (quote.length < 2 || !String(action).includes(quote)) return { ok: false, reason: "必须引用本轮玩家的真实行动原话" };
+  if (/不要|不愿|不想|不再|拒绝|是否|能否|如果|假如/.test(quote) && !stage?.transitions?.find(entry => entry.objectiveId === objectiveId)?.actionTerms?.some(term => quote.includes(term) && /不|拒绝|放弃/.test(term))) return { ok: false, reason: "否定或假设不能被解释为实际完成" };
+  const result = progressTrigger(game, instanceId, objectiveId, turn, action, evidence, { semantic: !policy.isolated, chain: true });
+  if (!result.ok) return result;
+  const state = game.triggerState;
+  const current = state.active.find(entry => entry.instanceId === instanceId);
+  const from = current.stage;
+  current.chainCount = current.chainTurn === turn ? Number(current.chainCount || 0) + 1 : 1;
+  current.chainTurn = turn;
+  current.chainIsolated = policy.isolated;
+  current.stage = result.transition.nextStage || current.stage;
+  current.lastProgressEvidence = evidence;
+  current.stageHistory.push({ id: `${instanceId}:${turn}:${objectiveId}`, from, to: current.stage, turn, evidenceIds: [evidence] });
+  const events = { completed: [] };
+  if (result.transition.fail) terminalTrigger(state, current, "failed", turn);
+  else if (result.transition.complete || stage.complete) completeInstance(game, state, current, definition, turn, events, result.transition.rewards || []);
+  else for (const reward of result.transition.rewards || []) applyReward(game, state, reward, turn);
+  syncQuestJournal(game);
+  return { ok: true, from, to: current.stage, taskMinutes: result.elapsedMinutes, isolated: policy.isolated };
 }

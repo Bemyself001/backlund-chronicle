@@ -7,6 +7,7 @@ import { getMapLocations, normalizeLocationKnowledge, normalizeMapExtensions } f
 import { buildWorld, reconcileWorld } from "../system/hexworld.js";
 import { normalizeMemoryState } from "./memoryState.js";
 import { normalizeTriggerState, syncLegacyOccult } from "../engine/triggerState.js";
+import { syncQuestJournal } from "../engine/questRuntime.js";
 import { migrateContentState } from "../engine/contentMigrations.js";
 import { applyTalent } from "../system/talents.js";
 import { specialState } from "../engine/specialActions.js";
@@ -121,6 +122,7 @@ export function migrateSave(raw) {
   result.triggerState = normalizeTriggerState(result);
   migrateContentState(result);
   syncLegacyOccult(result, result.triggerState);
+  syncQuestJournal(result);
   result.memoryState = normalizeMemoryState(result);
   // 六边形世界：旧存档保留已有迷雾进度，再以注册表对齐；无 world 字段时现场重建
   if (result.world && typeof result.world.seed === "number" && result.world.tiles) {

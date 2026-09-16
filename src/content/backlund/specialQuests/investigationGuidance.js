@@ -1,3 +1,5 @@
+import { WATCH_NOTE_TEXT } from "../watchNote.js";
+
 const fact = key => ({ type: "fact", key, value: true });
 const missing = key => ({ type: "fact", key, not: true });
 const here = { type: "location", locationId: "bridge-docks", includeChildren: true };
@@ -9,7 +11,7 @@ const stages = {
     "note-recovered": pair("陌生的速记与舅舅雷金纳德{characterSurnameSuffix}的旧职业有关。皇后区公共图书馆、希尔斯顿区商会街，都可能有人认得。", "借纸条的字迹与舅舅的职业回忆，自然带出图书馆的旧资料和商会街钟表从业者两条线索，不替玩家作决定。"),
   },
   "watch.heirloom.late-hour": {
-    "trace-uncle": pair("译文提到桥区南岸货栈和整点交接。舅舅雷金纳德{characterSurnameSuffix}的工作记录或熟悉他的从业者，或许能补上这段空白。", "由译文中已经确认的南岸货栈与交接字句承接调查，留下旧工作记录和知情人的方向；未抵达就不描写现场。"),
+    "trace-uncle": pair(`译文写着“${WATCH_NOTE_TEXT}”南岸货站指向桥区南岸货栈。舅舅雷金纳德{characterSurnameSuffix}的工作记录或熟悉他的从业者，或许能补上这段空白。`, "由纸条中白蔷薇的警告与账本已交还南岸货站的原文承接调查，不添加暗号或交接时间，留下旧工作记录和知情人的方向；未抵达就不描写现场。"),
     "enter-south-warehouse": pair("桥区南岸货栈是目前最明确的去向。码头的消息，往往先传到工人和报童那里。"),
     "empty-warehouse": pair("货栈眼下无人，使用痕迹却很新。交接记录、内部布局和进出动静仍值得留意。"),
     "warehouse-bomb": pair("货栈入口附近的引线与装置挡住了去路。要继续往里，得先确认能否安全通过。", "让玩家看见引线或异常装置的可察觉痕迹，交代阻挡的位置；只给游戏层面的危险反馈，不写现实爆炸物制作或拆解教程。"),
@@ -79,7 +81,7 @@ export function configureInvestigationGuidance(definitions) {
   stage(renard, 'auction-box').guidanceRules = [branch('has-medicine', [{ type: 'item', itemId: 'renard-healing-draught' }], '子爵提出合作，而你手中已有适用的药剂。如何安排救治，仍可在包厢里谈清楚。')];
   // A purchased medicine must not leave the player stranded in the auction stage.
   stage(renard, 'auction-conversation').transitions.push({ ...stage(renard, 'secure-treatment').transitions.find(entry => entry.objectiveId === 'use-healing-medicine') });
-  byId['watch.heirloom.hidden-note'].completionGuidance = pair('译文中的桥区南岸货栈是新的线索。舅舅失踪前的工作记录，也许能说明他为何去那里。');
+  byId['watch.heirloom.hidden-note'].completionGuidance = pair(`纸条完整译文：“${WATCH_NOTE_TEXT}”桥区南岸货栈与舅舅的旧工作记录是可继续调查的方向。`);
   main.completionGuidance = pair('你已离开货栈。手里真正带出的物品与记录，才是这场旧事留下的东西；其余疑点仍没有答案。');
   main.failureGuidance = pair('货栈中的追查在危险里中断。已经发生的损失不会因等待救援而消失。');
   renard.completionGuidance = pair('雷纳德宅邸的求医有了结果，子爵记下了这份人情。未了的调查仍留在你的手记里。', '回应已确认的治疗和酬金；玩家是药师时由其自身认识承接深度控制伏笔，否则由埃德蒙谈起，不让尚未见过的NPC凭空出现。');

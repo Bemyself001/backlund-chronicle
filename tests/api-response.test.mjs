@@ -391,6 +391,22 @@ test("targeted tool repair sends only the failing state tool schema", async (con
   assert.deepEqual(requestBody.tools.map((tool) => tool.function.name), ["status__add"]);
 });
 
+test("task engine is exposed through native tool transport with bounded step evidence", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  let requestBody;
+  globalThis.fetch = async (_url, init) => {
+    requestBody = JSON.parse(init.body);
+    return new Response(JSON.stringify({ choices: [{ message: { content: "NO_STATE_CHANGE" } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  await requestAI({ ...settings, nativeTools: true }, [{ role: "user", content: "请门房看看信件" }], undefined, undefined, { toolSet: "state", allowedToolNames: ["quest.resolve"] });
+  const definition = requestBody.tools[0].function;
+  assert.equal(definition.name, "quest__resolve");
+  assert.equal(definition.parameters.properties.steps.maxItems, 3);
+  assert.ok(definition.parameters.required.includes("actionQuote"));
+  assert.deepEqual(definition.parameters.properties.outcome.enum, ["progress", "blocked", "failed", "recover"]);
+});
+
 test("map state tools expose strict growth, discovery, movement and archive parameters", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });

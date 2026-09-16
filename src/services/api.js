@@ -492,6 +492,22 @@ const TOOL_PARAMETER_SCHEMAS = {
       reason: { type: "string" },
     },
   },
+  "quest.resolve": {
+    type: "object", additionalProperties: false,
+    required: ["instanceId", "actionQuote", "outcome", "evidence", "reason"],
+    properties: {
+      instanceId: { type: "string", description: "taskJournal中的id，特殊任务实例ID或quest:普通任务ID" },
+      actionQuote: { type: "string", description: "玩家本轮行动原话" },
+      outcome: { type: "string", enum: ["progress", "blocked", "failed", "recover"] },
+      evidence: { type: "string", description: "实际结果、受阻原因或付出时间后得到的具体新线索" },
+      start: { type: "boolean", description: "玩家明确开始追查可选线索时为true" },
+      nextObjective: { type: "string", description: "普通任务推进后的当前目标" },
+      steps: { type: "array", maxItems: 3, items: { type: "object", additionalProperties: false, required: ["objectiveId", "actionQuote", "evidence"], properties: {
+        objectiveId: { type: "string" }, actionQuote: { type: "string" }, evidence: { type: "string" },
+      } } },
+      reason: { type: "string" },
+    },
+  },
   "quest.add": {
     type: "object",
     additionalProperties: false,
@@ -505,6 +521,10 @@ const TOOL_PARAMETER_SCHEMAS = {
           id: { type: "string", description: "稳定且可去重的任务 ID" },
           title: { type: "string" },
           summary: { type: "string" },
+          objective: { type: "string", description: "当前可行动的目标，不含后续剧透" },
+          finale: { type: "boolean" },
+          dangerous: { type: "boolean" },
+          majorDecision: { type: "boolean" },
           status: { type: "string" },
         },
       },
@@ -523,6 +543,7 @@ const TOOL_PARAMETER_SCHEMAS = {
         properties: {
           status: { type: "string" },
           summary: { type: "string" },
+          objective: { type: "string" },
         },
       },
       reason: { type: "string" },
@@ -540,7 +561,7 @@ const TOOL_PARAMETER_SCHEMAS = {
   },
 };
 
-const STATE_TOOL_NAMES = ["context.lookup", "inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "trigger.engage", "trigger.progress", "trigger.abandon", "organization.join", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.grow", "location.discover", "location.move", "location.archive", "clue.add", "quest.add", "quest.update", "dice.check"];
+const STATE_TOOL_NAMES = ["context.lookup", "inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "trigger.engage", "trigger.progress", "trigger.abandon", "organization.join", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.grow", "location.discover", "location.move", "location.archive", "clue.add", "quest.add", "quest.update", "quest.resolve", "dice.check"];
 
 const CHOICE_TOOL_SCHEMA = {
   type: "object",

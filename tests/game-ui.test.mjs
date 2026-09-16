@@ -46,14 +46,14 @@ test("UI summaries use actual confirmed audit deltas and ignore narrative claims
   assert.equal(rows.length, 3);
 });
 
-test("release 1.5.4 keeps product metadata while content and save formats advance", () => {
+test("release metadata remains aligned across UI, package, changelog and APK workflow", () => {
   const pkg = JSON.parse(readFileSync(new URL("../package.json", import.meta.url), "utf8"));
-  assert.equal(RELEASE_NAME, "1.5.4");
-  assert.equal(RELEASE_VERSION, "1.5.4");
+  assert.equal(RELEASE_NAME, RELEASE_VERSION);
+  assert.match(RELEASE_VERSION, /^\d+\.\d+\.\d+$/);
   assert.equal(pkg.version, RELEASE_VERSION);
   assert.equal(GAME_SYSTEM_VERSION, 2);
   assert.equal(SAVE_VERSION, 13);
-  assert.ok(LATEST_UPDATE.title.startsWith("1.5.4"));
+  assert.ok(LATEST_UPDATE.title.startsWith(`${RELEASE_VERSION} ·`));
   assert.ok(PREVIOUS_UPDATES.some(update => update.title.startsWith("1.4.9 ·")));
   assert.ok(PREVIOUS_UPDATES.some(update => update.title.startsWith("1.4.7 ·")));
   assert.ok(PREVIOUS_UPDATES.some(update => update.title.startsWith("1.4.6 ·")));

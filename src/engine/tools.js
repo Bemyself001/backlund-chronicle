@@ -11,6 +11,8 @@ import { abandonTrigger, engageTrigger, progressTrigger } from "./triggerEngine.
 import { normalizeTriggerState } from "./triggerState.js";
 import { executeItemContentAction } from "./itemActions.js";
 import { lookupContext } from "./contextLookup.js";
+import { resolveQuestAction } from "./questActions.js";
+import { syncQuestJournal } from "./questRuntime.js";
 
 export const TOOL_SCHEMAS = {
   "inventory.add": { required: ["item"], description: "新增或合并一个结构化物品实例" },
@@ -41,6 +43,7 @@ export const TOOL_SCHEMAS = {
   "location.archive": { required: ["locationId", "evidence"], description: "归档不再使用且无关联档案的临时动态地点" },
   "clue.add": { required: ["clue"], description: "添加一条新线索" },
   "quest.add": { required: ["quest"], description: "添加任务" },
+  "quest.resolve": { required: ["instanceId", "actionQuote", "outcome", "evidence"], description: "任务引擎：登记自然语言行动结果、连续普通步骤、受阻或付出时间后的新线索；本地核验阶段与条件" },
   "quest.update": { required: ["questId", "patch"], description: "更新任务进度" },
   "dice.check": { required: ["difficulty"], description: "执行 1d20 检定" },
 };
@@ -726,15 +729,26 @@ function executeOne(game, call, options = {}) {
     case "quest.add": {
       if (!args.quest?.id || !args.quest?.title) return fail(call.name, "任务必须包含 id 与 title");
       if (game.quests.some((quest) => quest.id === args.quest.id)) return fail(call.name, "任务已存在");
-      game.quests.push({ status: "进行中", summary: "", ...args.quest });
+      const summary = String(args.quest.summary || call.reason || `开始调查「${args.quest.title}」`).trim();
+      const objective = String(args.quest.objective || summary).trim();
+      game.quests.push({ id: args.quest.id, title: args.quest.title, status: "进行中", summary, objective,
+        finale: Boolean(args.quest.finale), dangerous: Boolean(args.quest.dangerous), majorDecision: Boolean(args.quest.majorDecision) });
       return succeed(call.name, `${turnLabel}：新增任务「${args.quest.title}」。`);
     }
     case "quest.update": {
       const quest = game.quests.find((entry) => entry.id === args.questId);
       if (!quest) return fail(call.name, "任务不存在");
-      const allowed = ["status", "summary"];
-      Object.entries(args.patch || {}).forEach(([key, value]) => { if (allowed.includes(key)) quest[key] = value; });
+      if (quest.source === "特殊行动") return fail(call.name, "此委托由特殊行动引擎独立结算，不能改写任务记录");
+      const allowed = ["status", "summary", "objective"];
+      if (["已完成", "已失败", "失败", "已放弃", "completed", "failed", "abandoned"].includes(quest.status)) return fail(call.name, "已结束任务保留最终记录，不能重复修改结局");
+      if (args.patch?.status && !["进行中", "已完成", "已失败", "失败", "已放弃", "engaged", "completed", "failed", "abandoned"].includes(args.patch.status)) return fail(call.name, "无效的任务状态");
+      Object.entries(args.patch || {}).forEach(([key, value]) => { if (allowed.includes(key) && typeof value === "string" && value.trim()) quest[key] = value.trim(); });
       return succeed(call.name, `${turnLabel}：任务「${quest.title}」已更新为${quest.status}。`);
+    }
+    case "quest.resolve": {
+      const result = resolveQuestAction(game, args, options.playerAction ?? call.reason, game.turn + 1);
+      if (!result.ok) return fail(call.name, result.reason);
+      return succeed(call.name, `${turnLabel}：任务行动已记录（${result.outcome}）${result.blockedReason ? `：${result.blockedReason}` : `：${args.evidence}`}。`, result);
     }
     case "dice.check": {
       const difficulty = Math.max(2, Math.min(20, Number(args.difficulty)));
@@ -769,6 +783,7 @@ export function executeToolCalls(currentGame, calls = [], options = {}) {
     processed.add(callId);
   }
   game.processedToolCalls = [...processed].slice(-120);
+  syncQuestJournal(game);
   const logs = results.map((result) => ({ id: makeId("log"), turn: game.turn + 1, text: result.log, tone: result.ok ? "success" : "danger" }));
   return { game, results, logs };
 }
