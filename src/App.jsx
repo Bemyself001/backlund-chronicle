@@ -336,7 +336,7 @@ export default function App() {
       };
       let needsFullRendering = !settings.mockMode && (!fastMode || !fastPresentationResponse?.hasNarrative || advancementProposed);
 
-      if (!settings.mockMode && fastMode && fastPresentationResponse?.hasNarrative && proposedToolCalls.length && !advancementProposed) {
+      if (!settings.mockMode && fastMode && fastPresentationResponse?.hasNarrative && (proposedToolCalls.length || resolution.derivedEffects.narrativeEvents.length) && !advancementProposed) {
         setTurnPhase("finalizing");
         const finalTasks = launchFastModeTasks({
           continuation: () => requestModel(
@@ -384,7 +384,8 @@ export default function App() {
       const { choices, choiceMeta } = choiceResult(modelChoices(response), choiceValidationError(response));
 
       const appearedTrigger = progress.newTrigger ? { id: progress.newTrigger.instanceId, ...progress.newTrigger.presentation } : null;
-      const occultNarrative = appearedTrigger && !response.narrative.includes(appearedTrigger.title)
+      const generatedTriggerNarrative = !settings.mockMode && resolution.derivedEffects.narrativeEvents.some(event => event.triggerDefinitionId === progress.newTrigger?.definitionId);
+      const occultNarrative = appearedTrigger && !generatedTriggerNarrative && !response.narrative.includes(appearedTrigger.title)
         ? `${response.narrative}\n\n【${appearedTrigger.title}】${appearedTrigger.text}`
         : response.narrative;
       const availableTrigger = progress.newTrigger?.presentation

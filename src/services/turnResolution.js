@@ -1,4 +1,5 @@
 import { playerVisibleItem } from "../system/items.js";
+import { narrativeEventsForTurn } from "./narrativeEvents.js";
 
 function playerVisibleResultData(data = {}) {
   if (!data.inventoryChange) return data;
@@ -21,6 +22,7 @@ export function createTurnResolution(toolCalls = [], results = [], progress = {}
     accepted: entries.filter((entry) => entry.ok),
     rejected: entries.filter((entry) => !entry.ok),
     derivedEffects: {
+      narrativeEvents: narrativeEventsForTurn(progress.triggerSignals),
       elapsedMinutes: progress.elapsedMinutes || 0,
       worldTime: progress.worldTime || "",
       dangerDelta: progress.dangerDelta || 0,
