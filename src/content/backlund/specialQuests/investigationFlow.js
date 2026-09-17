@@ -15,14 +15,14 @@ const itemReward = (id, name, description, category, properties = {}) => ({ id: 
 } });
 
 export function configureWatchFlow(discovery, main) {
-  discovery.version = 6;
+  discovery.version = 7;
   discovery.presentation.text += " 可去皇后区公共图书馆查文字与神秘符号的相关资料，或到希尔斯顿区商会街打听舅舅工作过的钟表行。";
   discovery.stages[0].guidance = "去公共图书馆查文字与符号的对应资料，或到商会街寻找舅舅的旧同事；两条路线任选其一。";
   const decode = discovery.stages[0].transitions[0];
   decode.requirements.push({ type: "any", conditions: ["queen-library", "hillston-market"].map(locationId => ({ type: "location", locationId, includeChildren: true })) });
   decode.description = "在公共图书馆解读纸条上的文字与符号，或在商会街钟表行请教旧同事；两条路线任选其一";
   decode.requirementMessage = "请先实际到达皇后区公共图书馆或商会街（含钟表行）解读纸条";
-  main.version = 6;
+  main.version = 7;
   main.failWhen = [{ type: "stat", key: "health", max: 0 }];
   const s = Object.fromEntries(main.stages.map(stage => [stage.id, stage]));
   const mercy = s["mercy-decision"].transitions[0];
@@ -79,11 +79,22 @@ export function configureWatchFlow(discovery, main) {
 
 export function configureSideQuests(quests) {
   const [renard, detonator, drain] = quests;
-  for (const quest of quests) { quest.version = 2; quest.expiresAfterTurns = null; }
+  const originalAppearWhen = new Map(quests.map(quest => [quest.id, quest.appearWhen]));
+  for (const quest of quests) {
+    quest.version = 3;
+    quest.priority = 115;
+    quest.expiresAfterTurns = null;
+    quest.revealGroup = "south-docks-arrival";
+    quest.appearWhen = [{ type: "any", conditions: [
+      { type: "all", conditions: originalAppearWhen.get(quest.id) || [] },
+      { type: "all", conditions: [atDocks, fact("watch.formal-quest-unlocked")] },
+    ] }];
+  }
   renard.eligibility = [];
-  renard.appearWhen = [{ type: "any", conditions: [{ type: "action", terms: ["雷纳德", "求医", "药师", "富家小姐", "号外", "拍卖会"] }, { type: "all", conditions: [atDocks, fact("watch.formal-quest-unlocked")] }] }];
-  renard.presentation.text = "号外：雷纳德子爵之女高空坠落，伤势暂时稳定，悬赏二十镑求医。买报或询问获得宅邸地址；非药师可由子爵引荐参加今晚拍卖会。回应后才算接受。";
-  renard.stages[0].guidance = "前往皇后区宅邸确认伤势。药师可以亲自治疗；非药师请子爵引荐拍卖会，没钱也可找固定药师合作。";
+  renard.availableRewards = [{ id: "side.renard.discover-estate", type: "location-discover", locationId: "queen-renard-estate", note: "求医号外印着雷纳德子爵在皇后区百合街的宅邸地址。" }];
+  renard.autoEngageWhen = [{ type: "location", locationId: "queen-renard-estate", includeChildren: true }];
+  renard.presentation.text = "报童高喊号外：雷纳德子爵之女从高窗坠落，普通医生只能暂时维持伤势，子爵悬赏二十镑求助。报纸印着皇后区百合街宅邸的地址；回应后才算接受。";
+  renard.stages[0].guidance = "前往皇后区百合街的雷纳德子爵宅邸，在门厅与子爵本人交谈。药师可以亲自治疗；其他人也可寻找药剂或可信药师协助。";
   const secure = renard.stages.find(stage => stage.id === "secure-treatment");
   const recruit = secure.transitions.find(entry => entry.objectiveId === "recruit-apothecary");
   secure.transitions = secure.transitions.filter(entry => entry !== recruit);
@@ -100,10 +111,11 @@ export function configureSideQuests(quests) {
     { id: "auction-box", guidance: "子爵请两人合作救治，明确平分二十镑。可以接受，也可用已买到的药剂独立救治。", transitions: [purchase("auction-box"), { ...recruit, description: "在包厢与埃德蒙明确约定合作并返回宅邸", actionTerms: ["合作", "同意", "接受", "药师"], rewards: [award("side.renard.cooperation-agreed")] }, { ...secure.transitions.find(entry => entry.objectiveId === "use-healing-medicine") }] },
   );
   secure.transitions.find(entry => entry.objectiveId === "attend-renard-auction").untilHour = 20;
-  renard.stages[0].transitions[0].requirements = [{ type: "location", districts: ["皇后区"] }];
-  renard.stages[0].transitions[0].requirementMessage = "先抵达皇后区雷纳德宅邸评估伤势";
-  detonator.presentation.text += " 货栈旁工人可以指出承包商所在的拆除工地。";
-  detonator.appearWhen = [{ type: "any", conditions: [{ type: "all", conditions: detonator.appearWhen }, { type: "all", conditions: [atDocks, fact("watch.drain-found"), { type: "action", terms: ["工人", "打听", "询问", "工具", "入口"] }] }] }];
+  renard.stages[0].transitions[0].description = "在百合街宅邸与雷纳德子爵交谈，确认普通医术只能暂时维持伤势，救治必须借助非凡力量";
+  renard.stages[0].transitions[0].actionTerms = ["交谈", "询问", "伤势", "女儿", "求医", "普通医生", "非凡力量"];
+  renard.stages[0].transitions[0].requirements = [{ type: "location", locationId: "queen-renard-estate", includeChildren: true }];
+  renard.stages[0].transitions[0].requirementMessage = "先实际抵达皇后区百合街的雷纳德子爵宅邸，并与子爵本人交谈";
+  detonator.presentation.text = "两名停工的码头工人正在争论一批没有响的雷管：桥区拆除承包商怀疑整箱货被人调换，工人可以指出工地的位置。回应后才算接受。";
   drain.presentation.text = "跑腿男孩在河岸排水道失踪。河岸入口与货栈支路铁栅不同，可以独立进入。进入后十回合：救人一至两回合、每次搜查一回合、撤离一回合。";
   const rescue = drain.stages.find(stage => stage.id === "rescue-dock-boy");
   const exit = drain.stages.find(stage => stage.id === "exit-drain");

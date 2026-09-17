@@ -11,7 +11,7 @@ const stages = {
     "note-recovered": pair("一些鲁恩文字错落地夹在神秘符号之间，共同组成一句话，或许与舅舅雷金纳德{characterSurnameSuffix}的经历有关。皇后区公共图书馆、希尔斯顿区商会街，都可能有人认得。", "借纸条的字迹与舅舅的职业回忆，自然带出图书馆的旧资料和商会街钟表从业者两条线索，不替玩家作决定。"),
   },
   "watch.heirloom.late-hour": {
-    "trace-uncle": pair(`译文写着“${WATCH_NOTE_TEXT}”南岸货站指向桥区南岸货栈。舅舅雷金纳德{characterSurnameSuffix}的工作记录或熟悉他的从业者，或许能补上这段空白。`, "由纸条中白鸢尾的警告与账本已交还南岸货站的原文承接调查，不添加暗号或交接时间，留下旧工作记录和知情人的方向；未抵达就不描写现场。"),
+    "trace-uncle": pair(`译文写着“${WATCH_NOTE_TEXT}”舅舅雷金纳德{characterSurnameSuffix}的工作记录或熟悉他的从业者，或许能补上这段空白。`, "由纸条中白鸢尾的警告与账本已交还南岸货栈的原文承接调查，不添加暗号或交接时间，留下旧工作记录和知情人的方向；未抵达就不描写现场。"),
     "enter-south-warehouse": pair("桥区南岸货栈是目前最明确的去向。码头的消息，往往先传到工人和报童那里。"),
     "empty-warehouse": pair("货栈眼下无人，使用痕迹却很新。交接记录、内部布局和进出动静仍值得留意。"),
     "warehouse-bomb": pair("货栈入口附近的引线与装置挡住了去路。要继续往里，得先确认能否安全通过。", "让玩家看见引线或异常装置的可察觉痕迹，交代阻挡的位置；只给游戏层面的危险反馈，不写现实爆炸物制作或拆解教程。"),
@@ -25,8 +25,8 @@ const stages = {
     "white-iris-confrontation": pair("新的来人挡住去路，外面的动静也在逼近。保持距离、寻找出口，比停在原地更紧迫。", "用脚步、呼喊和冲突呈现官方介入造成的混乱；围绕玩家能察觉的脱身机会续写，不宣布官方已经击败对手。"),
   },
   "side.queens.renard-fall": {
-    "assess-injury": pair("求医消息指向皇后区雷纳德宅邸。报纸的告示和子爵的门房，应当知道这场急症的详情。"),
-    "secure-treatment": pair("普通治疗难以应付这些伤势。子爵提起今晚的一场私人拍卖会，那里或许有药剂，也有懂得用药的人。", "从子爵的引荐和当晚拍卖会传闻给线索；不要把资金不足写成无路可走，药剂和结识药师是不同可能。"),
+    "assess-injury": pair("求医号外印着皇后区百合街的地址。抵达雷纳德子爵宅邸后，应先在门厅与子爵本人交谈。"),
+    "secure-treatment": pair("子爵已隐晦说明：普通医术救不了女儿，必须借助非凡力量。玩家本人不必先晋升；药师的能力、合适的治疗药剂或可信药师的协助都可以成为救治路线。", "承接门厅谈话，让子爵以贵族的克制口吻提及普通医生束手无策，并引出今晚的私人拍卖会；不要要求玩家本人必须先成为非凡者，也不要把资金不足写成无路可走。"),
     "auction-conversation": pair("会场里有治疗药剂的拍卖，也有一位名叫埃德蒙·维尔的药师。他似乎留意到了你的来意。"),
     "auction-box": pair("侍者引来的包厢里，子爵希望你与埃德蒙共同救治女儿。报酬与分工还有待你们说定。"),
     "shared-treatment": pair("合作已经谈妥，雷纳德宅邸里仍有人等着救治。埃德蒙愿意同行。"),
@@ -76,6 +76,9 @@ export function configureInvestigationGuidance(definitions) {
   stage(renard, 'secure-treatment').guidanceRules = [
     branch('apothecary', [{ type: 'character', kind: 'extraordinary', pathwayId: 'apothecary' }], '这些伤势需要药师的本领，而你自己就具备这方面的知识。子爵正等着你的判断。'),
     branch('medicine', [{ type: 'item', itemId: 'renard-healing-draught' }], '手中的重伤治疗药剂与小姐的伤势相符。雷纳德宅邸仍在等候消息。'),
+  ];
+  stage(renard, 'assess-injury').guidanceRules = [
+    branch('at-estate', [{ type: 'location', locationId: 'queen-renard-estate', includeChildren: true }], '你在百合街宅邸门厅遇见正在询问病情的雷纳德子爵。他与仆人的短暂交谈透露：普通医生只能维持女儿的生命，真正的救治需要某种不能公开谈论的力量。子爵随后注意到你，等待你说明来意。'),
   ];
   stage(renard, 'auction-conversation').guidanceRules = [branch('bought', [fact('side.renard.medicine-bought')], '治疗药剂已经到手。会场里的埃德蒙仍愿意交谈，雷纳德宅邸的伤者也还在等候。')];
   stage(renard, 'auction-box').guidanceRules = [branch('has-medicine', [{ type: 'item', itemId: 'renard-healing-draught' }], '子爵提出合作，而你手中已有适用的药剂。如何安排救治，仍可在包厢里谈清楚。')];

@@ -109,7 +109,7 @@ export const SIDE_QUEST_DEFINITIONS = [
     expiresAfterTurns: 10,
     presentation: {
       title: "退潮后的铁门",
-      text: "码头搬运工说，一个替人跑腿的男孩在退潮时看见排水道深处的铁门，随后再没回来。潮水正在回涨，但这仍是一桩可以不接的麻烦。",
+      text: "码头搬运工压低声音说，一个替人跑腿的男孩在退潮时看见排水道深处的铁门，随后再没回来。潮水正在回涨，但这仍是一桩可以不接的麻烦。",
       choice: { label: "趁退潮寻找铁门与失踪男孩（可选）", intent: "trigger", risk: "high" },
     },
     engagedStage: "find-iron-door",

@@ -2,6 +2,7 @@ import { ACTIVE_CONTENT, CONTENT_SCHEMA_VERSION, CONTENT_VERSION } from "../cont
 import { getTriggerDefinition, hydrateActiveTriggerDefinitions } from "./triggerDefinitions.js";
 import { allConditionsMatch } from "./triggerConditions.js";
 import { renderContentData } from "./contentTemplates.js";
+import { getMapLocation, normalizeLocationKnowledge } from "../system/map.js";
 
 function refreshDefinitions(game, step) {
   const state = game.triggerState;
@@ -63,6 +64,15 @@ function patchStoryRecords(game, step) {
     const item = (game.inventory || []).find((entry) => entry.itemId === update.itemId);
     if (!item || (update.requiredTags || []).some((tag) => !(item.tags || []).includes(tag))) continue;
     Object.assign(item, renderContentData(update.patch || {}, { game, item }));
+  }
+  for (const discovery of step.locationDiscoveries || []) {
+    if (!allConditionsMatch(discovery.when || [], { game, state: game.triggerState, signals: [], action: "", turn: Number(game.turn || 0) })) continue;
+    const location = getMapLocation(discovery.locationId, game);
+    if (!location) continue;
+    game.discoveredLocations = Array.isArray(game.discoveredLocations) ? game.discoveredLocations : [];
+    game.locationKnowledge = normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location?.id, game);
+    game.locationKnowledge[location.id] = { ...game.locationKnowledge[location.id], status: "discovered", note: discovery.note || location.description, source: "内容迁移" };
+    if (!game.discoveredLocations.some((entry) => entry.id === location.id)) game.discoveredLocations.push({ id: location.id, name: location.name, note: discovery.note || location.description });
   }
 }
 

@@ -101,7 +101,7 @@ function containsRuntimeValue(value, ancestors = new Set()) {
 
 const asArray = (value) => Array.isArray(value) ? value : [];
 const CONDITION_TYPES = new Set(["always", "all", "any", "character", "item", "money", "stat", "fact", "action", "signal", "location", "time", "weather", "relationship", "organization", "clue", "trigger", "turn", "available-slot"]);
-const REWARD_TYPES = new Set(["fact", "clue", "item", "item-remove", "item-update", "money", "relationship"]);
+const REWARD_TYPES = new Set(["fact", "clue", "item", "item-remove", "item-update", "money", "relationship", "location-discover"]);
 const ITEM_EFFECT_TYPES = new Set(["discover-fact", "signal"]);
 
 function validateConditions(conditions, label, errors) {
@@ -113,6 +113,7 @@ function validateConditions(conditions, label, errors) {
 
 function definitionRewards(definition) {
   return [
+    ...asArray(definition.availableRewards),
     ...asArray(definition.rewards),
     ...asArray(definition.timers).flatMap(timer => asArray(timer.rewards)),
     ...asArray(definition.stages).flatMap((stage) => [

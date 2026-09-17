@@ -2,6 +2,21 @@ import { WATCH_NOTE_DETAIL } from "./watchNote.js";
 
 export const CONTENT_MIGRATIONS = [
   {
+    id: "backlund.south-docks-and-renard-estate", fromVersion: "2026.09.16.5", toVersion: "2026.09.17.1",
+    cluePatches: [{ id: "clue-watch-note-decoded", patch: { detail: WATCH_NOTE_DETAIL } }],
+    definitionRefreshes: [
+      ...["watch.heirloom.hidden-note", "watch.heirloom.late-hour"].map(definitionId => ({ definitionId, toDefinitionVersion: 8, refreshPresentation: true })),
+      ...["side.queens.renard-fall", "side.bridge.silent-detonator", "side.bridge.ebb-iron-door"].map(definitionId => ({ definitionId, toDefinitionVersion: 4, refreshPresentation: true, clearExpiry: true })),
+    ],
+    locationDiscoveries: [{
+      locationId: "queen-renard-estate",
+      note: "求医号外印着雷纳德子爵在皇后区百合街的宅邸地址。",
+      when: [{ type: "trigger", definitionId: "side.queens.renard-fall", status: ["available", "engaged"] }],
+    }],
+    textReplacementFields: ["recentDialogues", "storyHistory", "longTermSummary", "memoryState", "memoryNotes", "clues", "quests", "questJournal", "triggerState", "inventory", "changeLog", "choices"],
+    textReplacements: [{ from: "南岸货站", to: "南岸货栈" }],
+  },
+  {
     id: "backlund.watch-note-runic-text", fromVersion: "2026.09.16.4", toVersion: "2026.09.16.5",
     cluePatches: [{ id: "clue-watch-note-decoded", patch: { detail: WATCH_NOTE_DETAIL } }],
     definitionRefreshes: [

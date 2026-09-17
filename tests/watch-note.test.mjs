@@ -52,12 +52,12 @@ test('local decoding reward and quest guidance share the fixed text', () => {
   const definition = getContentTrigger('watch.heirloom.hidden-note');
   assert.equal(definition.rewards.find(entry => entry.type === 'clue').clue.detail, WATCH_NOTE_DETAIL);
   assert.ok(definition.completionGuidance.guidance.includes(WATCH_NOTE_TEXT));
-  assert.equal(definition.version, 7);
+  assert.equal(definition.version, 8);
   assert.ok(getContentTrigger('watch.heirloom.late-hour').presentation.text.includes(WATCH_NOTE_TEXT));
 });
 
 test('version 1.6.0 saves correct white rose to white iris across clues, journal and memory without replaying progress', () => {
-  assert.equal(WATCH_NOTE_TEXT, '不要相信白鸢尾，账本已经交还到南岸货站。');
+  assert.equal(WATCH_NOTE_TEXT, '不要相信白鸢尾，账本已经交还到南岸货栈。');
   const game = make();
   game.content.contentVersion = '2026.09.16.3';
   game.turn = 42;
@@ -73,8 +73,9 @@ test('version 1.6.0 saves correct white rose to white iris across clues, journal
   });
   game.triggerState.rewardsClaimed = ['watch.hidden-note.formal-quest'];
   const migrated = migrateSave(game);
-  assert.equal(migrated.content.contentVersion, '2026.09.16.5');
+  assert.equal(migrated.content.contentVersion, '2026.09.17.1');
   assert.doesNotMatch(JSON.stringify(migrated), /白蔷薇/);
+  assert.doesNotMatch(JSON.stringify(migrated), /南岸货站/);
   assert.match(migrated.questJournal.entries['old-watch'].summary, /白鸢尾/);
   assert.equal(migrated.triggerState.active.find(entry => entry.instanceId === 'old-watch').stage, 'trace-uncle');
   assert.deepEqual(migrated.triggerState.active.find(entry => entry.instanceId === 'old-watch').timers, { preserved: { deadline: 50 } });
@@ -95,4 +96,18 @@ test('current saves migrate shorthand into interspersed Loen words without expos
   assert.ok(!JSON.stringify(progressiveContext(migrated, '查看纸条')).includes(WATCH_NOTE_TEXT));
   assert.match(JSON.stringify(progressiveContext(migrated, '查看纸条')), /鲁恩文字/);
   assert.deepEqual(migrateSave(migrated).storyHistory, migrated.storyHistory);
+});
+
+test('active Renard leads in current saves gain the fixed Lily Street estate address', () => {
+  const game = make();
+  game.content.contentVersion = '2026.09.16.5';
+  const definition = getContentTrigger('side.queens.renard-fall');
+  game.triggerState.active.push({
+    instanceId: 'old-renard', definitionId: definition.id, definitionVersion: 3,
+    definitionSnapshot: structuredClone(definition), status: 'available', stage: definition.initialStage,
+    createdTurn: 3, presentation: structuredClone(definition.presentation), stageHistory: [],
+  });
+  const migrated = migrateSave(game);
+  assert.ok(migrated.discoveredLocations.some(entry => entry.id === 'queen-renard-estate'));
+  assert.equal(migrated.locationKnowledge['queen-renard-estate'].status, 'discovered');
 });

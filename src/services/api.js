@@ -788,7 +788,7 @@ function estimatePromptTokens(messages = []) {
 
 function availableMaxTokens(settings, messages = []) {
   const contextLength = Number(settings.contextLength);
-  const contextLimit = Number.isFinite(contextLength) && contextLength > 0 ? contextLength : 12000;
+  const contextLimit = Number.isFinite(contextLength) && contextLength > 0 ? contextLength : DEFAULT_API_SETTINGS.contextLength;
   const promptTokens = estimatePromptTokens(messages);
   const safetyMargin = Math.max(512, Math.ceil(contextLimit * 0.08));
   return Math.max(128, contextLimit - promptTokens - safetyMargin);

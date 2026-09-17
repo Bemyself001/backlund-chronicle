@@ -15,6 +15,7 @@ import { buildTriggerSignals } from "./triggerSignals.js";
 import { moneyFromPence, moneyToPence } from "../system/money.js";
 import { renderContentData } from "./contentTemplates.js";
 import { questStagePolicy, settleQuestAttempts, syncQuestJournal } from "./questRuntime.js";
+import { getMapLocation, normalizeLocationKnowledge } from "../system/map.js";
 
 function definitionEligible(definition, context) {
   if (!allConditionsMatch(definition.eligibility || [], context)) return false;
@@ -159,6 +160,21 @@ function applyReward(game, state, reward, turn) {
     } else if (reward.relationship?.id && reward.relationship?.name) {
       game.relationships.push({ value: Math.max(-100, Math.min(100, Number(reward.delta || 0))), ...structuredClone(reward.relationship) });
     }
+  } else if (reward.type === "location-discover") {
+    const location = getMapLocation(reward.locationId, game);
+    if (!location) return null;
+    game.discoveredLocations = Array.isArray(game.discoveredLocations) ? game.discoveredLocations : [];
+    game.locationKnowledge = normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location?.id, game);
+    game.locationKnowledge[location.id] = {
+      ...game.locationKnowledge[location.id],
+      status: "discovered",
+      note: String(reward.note || location.description),
+      discoveredAt: `第 ${turn} 轮`,
+      source: "特殊事件",
+    };
+    if (!game.discoveredLocations.some((entry) => entry.id === location.id)) {
+      game.discoveredLocations.push({ id: location.id, name: location.name, note: String(reward.note || location.description) });
+    }
   }
   state.rewardsClaimed.push(rewardId);
   return rewardId;
@@ -245,13 +261,16 @@ function expireAvailable(state, turn, events) {
   }
 }
 
-function selectNewDefinition(game, state, signals, action, turn) {
+function selectNewDefinitions(game, state, signals, action, turn) {
   if (signals.some((signal) => ["trigger.engaged", "trigger.abandoned"].includes(signal.kind))) return null;
   if ([...state.active, ...state.history].some((entry) => entry.status !== "eligible" && entry.createdTurn === turn)) return null;
   const context = { game, state, signals, action, turn };
-  return TRIGGER_DEFINITIONS
+  const candidates = TRIGGER_DEFINITIONS
     .filter((definition) => definitionCanAppear(definition, context))
-    .sort((left, right) => candidateScore(right, context) - candidateScore(left, context) || left.id.localeCompare(right.id))[0] || null;
+    .sort((left, right) => candidateScore(right, context) - candidateScore(left, context) || left.id.localeCompare(right.id));
+  const first = candidates[0];
+  if (!first) return [];
+  return first.revealGroup ? candidates.filter((definition) => definition.revealGroup === first.revealGroup) : [first];
 }
 
 export function processTriggers(game, { action = "", toolCalls = [], toolResults = [], turn = Number(game.turn || 0) + 1 } = {}) {
@@ -264,10 +283,11 @@ export function processTriggers(game, { action = "", toolCalls = [], toolResults
   advanceExisting(game, state, signals, action, turn, events);
   expireAvailable(state, turn, events);
   refreshEligibility(game, state, signals, action, turn);
-  const definition = selectNewDefinition(game, state, signals, action, turn);
-  if (definition) {
+  const definitions = selectNewDefinitions(game, state, signals, action, turn) || [];
+  for (const definition of definitions) {
     const instance = makeAvailableInstance(game, state, definition, turn, action, signals);
     if (!state.active.some((entry) => entry.instanceId === instance.instanceId)) state.active.push(instance);
+    for (const reward of definition.availableRewards || []) applyReward(game, state, reward, turn);
     if (definition.category === "occult-entry" && Number(game.occult?.contact) !== 1) setTriggerFact(state, "occult.initial-entry-offered", turn, [instance.instanceId]);
     events.available.push(structuredClone(instance));
   }

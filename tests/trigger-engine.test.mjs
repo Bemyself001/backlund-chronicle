@@ -212,7 +212,7 @@ test("Renard's daughter supports apothecary, shared-fee, and healing-draught out
     ({ game } = processTurn(game, 1, "查看隐秘组织中雷纳德寻找药师的委托消息"));
     const quest = game.triggerState.active.find((item) => item.definitionId === "side.queens.renard-fall");
     ({ game } = processTurn(game, 2, "接受并调查雷纳德女儿坠落事件", [{ id: `renard-engage-${index}`, name: "trigger.engage", args: { instanceId: quest.instanceId }, reason: "明确回应求医消息" }]));
-    game.location = { id: "queen-archive", name: "皇后区宅邸附近", district: "皇后区" };
+    game.location = { id: "queen-renard-estate", name: "皇后区·百合街·雷纳德子爵宅邸", district: "皇后区" };
     ({ game } = processTurn(game, 3, "抵达宅邸检查伤势", [{ id: `renard-assess-${index}`, name: "trigger.progress", args: { instanceId: quest.instanceId, objectiveId: "assess-renard-injury", evidence: "确认骨折与内伤仍在可治疗窗口内" }, reason: "完成伤情评估" }]));
     const before = moneyToPence(game.money);
 
@@ -231,6 +231,35 @@ test("Renard's daughter supports apothecary, shared-fee, and healing-draught out
     assert.ok(game.relationships.some((entry) => entry.id === "viscount-renard"));
     if (scenario.objective === "use-healing-medicine") assert.equal(game.inventory.some((item) => item.itemId === "renard-healing-draught"), false);
   }
+});
+
+test("arriving at the south docks reveals all three local leads and records Renard's estate", () => {
+  let game = createInitialGame({ ...EMPTY_CHARACTER, name: "南岸到场测试员", talent: "heirloom-watch" });
+  game.triggerState.facts["watch.formal-quest-unlocked"] = { value: true, firstTurn: 0, evidenceIds: ["test"] };
+  ({ game } = processTurn(game, 1, "查看南岸货栈的家族旧事"));
+  const watch = game.triggerState.active.find((entry) => entry.definitionId === "watch.heirloom.late-hour");
+  ({ game } = processTurn(game, 2, "开始追查南岸货栈", [{ id: "engage-watch", name: "trigger.engage", args: { instanceId: watch.instanceId }, reason: "主动追查舅舅" }]));
+  watch.stage = "enter-south-warehouse";
+  game.location = { id: "bridge-docks", name: "桥区·南岸货栈", district: "贝克兰德桥区" };
+
+  const arrival = processTurn(game, 3, "抵达桥区南岸货栈");
+  const available = arrival.game.triggerState.active.filter((entry) => entry.status === "available").map((entry) => entry.definitionId);
+  assert.deepEqual(available.sort(), ["side.bridge.ebb-iron-door", "side.bridge.silent-detonator", "side.queens.renard-fall"].sort());
+  assert.equal(arrival.progress.events.available.length, 3);
+  assert.ok(arrival.game.discoveredLocations.some((entry) => entry.id === "queen-renard-estate"));
+  assert.equal(arrival.game.locationKnowledge["queen-renard-estate"].status, "discovered");
+});
+
+test("going to the Lily Street estate accepts the plea and opens the foyer meeting", () => {
+  let game = createInitialGame({ ...EMPTY_CHARACTER, name: "宅邸会面测试员" });
+  game.location = { id: "bridge-docks", name: "桥区·南岸货栈", district: "贝克兰德桥区" };
+  game.triggerState.facts["watch.formal-quest-unlocked"] = { value: true, firstTurn: 0, evidenceIds: ["test"] };
+  ({ game } = processTurn(game, 1, "抵达南岸货栈"));
+  const renard = game.triggerState.active.find((entry) => entry.definitionId === "side.queens.renard-fall");
+  const moved = processTurn(game, 2, "按号外地址前往百合街宅邸", [{ id: "move-renard", name: "location.move", args: { locationId: "queen-renard-estate" }, reason: "按求医号外登门" }]);
+  assert.equal(moved.results[0].ok, true);
+  assert.equal(moved.game.triggerState.active.find((entry) => entry.instanceId === renard.instanceId).status, "engaged");
+  assert.equal(moved.game.triggerState.active.find((entry) => entry.instanceId === renard.instanceId).stage, "assess-injury");
 });
 
 test("official membership unlocks support while Azik's whistle cannot be used as a combat summon", () => {

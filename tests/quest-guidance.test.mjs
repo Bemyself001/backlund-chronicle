@@ -102,6 +102,16 @@ test('time warnings update at three, two and one actions, and reload does not re
   }
 });
 
+test('Renard estate arrival presents the viscount speaking with a servant before treatment routes', () => {
+  const game = make(RENARD, 'assess-injury');
+  game.location = { id: 'queen-renard-estate', name: '皇后区·百合街·雷纳德子爵宅邸', district: '贝克兰德皇后区' };
+  const direction = eventDirections(pendingQuestNarration(game));
+  assert.match(direction, /雷纳德子爵/);
+  assert.match(direction, /仆人/);
+  assert.match(direction, /普通医生/);
+  assert.match(direction, /不能公开谈论的力量/);
+});
+
 test('auction purchase leads straight to treatment; treatment guidance respects player pathway', () => {
   const game = make(RENARD, 'auction-conversation');
   game.inventory.push({ instanceId: 'medicine', itemId: 'renard-healing-draught', quantity: 1 });

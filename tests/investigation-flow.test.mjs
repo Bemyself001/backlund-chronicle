@@ -48,6 +48,15 @@ test('ordinary entrance requires preparation; apprentice can scout and stake out
   assert.equal(minutesForTurn('蹲守等待交接', waited.calls, waited.results), 60);
 });
 
+test('Renard assessment requires the fixed Lily Street estate rather than any Queens location', () => {
+  let game = fresh(RENARD, 'assess-injury');
+  game.location = { id: 'queen-archive', name: '皇后区·市政档案馆', district: '皇后区' };
+  assert.equal(act(game, 'assess-renard-injury', '询问雷纳德女儿的伤势').results[0].ok, false);
+  game.location = { id: 'queen-renard-estate', name: '皇后区·百合街·雷纳德子爵宅邸', district: '皇后区' };
+  ({ game } = act(game, 'assess-renard-injury', '在门厅与子爵交谈，询问女儿的伤势'));
+  assert.equal(stageOf(game), 'secure-treatment');
+});
+
 test('rescue and search interleave, take one objective per turn, persist and total 7.5 pounds plus materials', () => {
   let game = fresh(DRAIN, 'find-iron-door');
   ({ game } = act(game, 'enter-before-tide', '进入排水道铁门'));
