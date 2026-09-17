@@ -25,6 +25,11 @@ function matchingAction(actions, context) {
     || null;
 }
 
+export function hasItemContentAction(item, actionName) {
+  const actions = getItemBehavior(item?.itemId)?.actions?.[actionName];
+  return Array.isArray(actions) && actions.length > 0;
+}
+
 export function executeItemContentAction(game, item, actionName, { turn, playerAction = "" } = {}) {
   const behavior = getItemBehavior(item?.itemId);
   const actions = behavior?.actions?.[actionName];

@@ -4,7 +4,7 @@ import { createInitialGame, EMPTY_CHARACTER } from '../src/system/game.js';
 import { executeToolCalls } from '../src/engine/tools.js';
 import { resolveTurnProgress } from '../src/engine/turn.js';
 import { createTurnResolution } from '../src/services/turnResolution.js';
-import { buildRenderingContext, buildFastNarrativeContinuationContext } from '../src/services/memory.js';
+import { buildRenderingContext, buildFastNarrativeContinuationContext, buildItemInspectionContext } from '../src/services/memory.js';
 import { migrateSave } from '../src/services/storage.js';
 import { processTriggers } from '../src/engine/triggerEngine.js';
 import { pendingWatchNarration, markNarrativeEventsDelivered } from '../src/services/narrativeEvents.js';
@@ -81,4 +81,20 @@ test('rejected inspections and unrelated turns cannot request watch narration', 
   const progress = resolveTurnProgress(execution.game, '检查怀表', 'low', calls, execution.results);
   assert.deepEqual(createTurnResolution(calls, execution.results, progress).derivedEffects.narrativeEvents, []);
   assert.deepEqual(createTurnResolution().derivedEffects.narrativeEvents, []);
+});
+
+test('special item inspection prompt requests a short story without exposing hidden item data', () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: '短篇测试员', talent: 'heirloom-watch' });
+  const watch = game.inventory.find(item => item.itemId === 'heirloom-watch');
+  const calls = [{ id: 'inspect-short-story', name: 'item.inspect', args: { instanceId: watch.instanceId }, reason: '检查家传怀表' }];
+  const execution = executeToolCalls(game, calls);
+  const inspection = execution.results[0].data.itemInspection;
+  const resolution = createTurnResolution(calls, execution.results);
+  const messages = buildItemInspectionContext(game, execution.game, '检查家传怀表', '', resolution, inspection);
+  const prompt = messages.map(message => message.content).join('\n');
+  assert.match(prompt, /目标约100字/);
+  assert.match(prompt, /80—140个中文字符/);
+  assert.match(prompt, /不得输出JSON、行动选项或调用工具/);
+  assert.match(prompt, new RegExp(inspection.observation));
+  assert.doesNotMatch(prompt, /机芯夹层里藏着一小卷纸条/);
 });

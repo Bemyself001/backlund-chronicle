@@ -89,6 +89,23 @@ test("item tools repair flat item proposals and resolve unique inventory referen
   assert.equal(added.game.inventory.some((item) => item.name === "风化的铜哨" && item.itemId.startsWith("item-")), true);
 });
 
+test("inventory inspections distinguish direct descriptions from narrative quest items", () => {
+  const ordinary = createInitialGame({ ...EMPTY_CHARACTER, name: "检查测试员" });
+  const coat = ordinary.inventory.find((item) => item.name === "旧呢外套");
+  const coatResult = executeToolCalls(ordinary, [{ id: "inspect-coat", name: "item.inspect", args: { instanceId: coat.instanceId }, reason: "检查旧呢外套" }]).results[0];
+  assert.equal(coatResult.ok, true);
+  assert.equal(coatResult.data.itemInspection.observation, coat.description);
+  assert.equal(coatResult.data.itemInspection.narrative, false);
+
+  const withWatch = createInitialGame({ ...EMPTY_CHARACTER, name: "怀表检查员", talent: "heirloom-watch" });
+  const watch = withWatch.inventory.find((item) => item.itemId === "heirloom-watch");
+  const watchResult = executeToolCalls(withWatch, [{ id: "inspect-watch", name: "item.inspect", args: { instanceId: watch.instanceId }, reason: "检查家传怀表" }]).results[0];
+  assert.equal(watchResult.ok, true);
+  assert.equal(watchResult.data.itemInspection.narrative, true);
+  assert.equal(watchResult.data.itemInspection.itemId, "heirloom-watch");
+  assert.match(watchResult.data.itemInspection.observation, /表盖|刻痕/);
+});
+
 test("important inventory changes expose confirmation metadata and can be blocked", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "重要物品测试员" });
   const call = {

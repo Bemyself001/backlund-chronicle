@@ -3,13 +3,13 @@ import { applyStatDelta } from "./statChanges.js";
 import { findLocationRelations, getMapLocation, getMapLocations, isDiscoveredLocationStatus, normalizeLocationKnowledge, normalizeMapExtensions, planDynamicLocation } from "../system/map.js";
 import { ensureWorld, travelToLocation } from "../system/hexworld.js";
 import { amountToPence, formatMoney, moneyFromPence, moneyToPence } from "../system/money.js";
-import { normalizeInventoryItem, normalizeItemImportance } from "../system/items.js";
+import { isImportantNonMoneyItem, normalizeInventoryItem, normalizeItemImportance } from "../system/items.js";
 import { equipmentSlot } from "../system/loadout.js";
 import { applyAdvancement, getAdvancement, isExplicitAdvancementIntent } from "../system/character.js";
 import { getOrganization, getPathway } from "../content/index.js";
 import { abandonTrigger, engageTrigger, progressTrigger } from "./triggerEngine.js";
 import { normalizeTriggerState } from "./triggerState.js";
-import { executeItemContentAction } from "./itemActions.js";
+import { executeItemContentAction, hasItemContentAction } from "./itemActions.js";
 import { lookupContext } from "./contextLookup.js";
 import { resolveQuestAction } from "./questActions.js";
 import { syncQuestJournal } from "./questRuntime.js";
@@ -466,14 +466,25 @@ function executeOne(game, call, options = {}) {
         const recipe = (game.clues || []).find((clue) => clue.kind === "potion_recipe" && clue.pathwayId === target.potion.pathwayId && Number(clue.sequence) === target.potion.sequence);
         if (!samePathKnowledge && !recipe) return fail(call.name, "缺少与这份魔药对应的已确认配方，无法鉴定其途径与序列");
         target.potion = { ...target.potion, identified: true };
-        return succeed(call.name, `${turnLabel}：依据${recipe ? `配方「${recipe.title}」` : "同途径经验"}，确认「${target.name}」是${target.potion.pathwayName}途径序列${target.potion.sequence}魔药。`, { identifiedPotion: { ...target.potion, instanceId: target.instanceId } });
+        const observation = `依据${recipe ? `配方「${recipe.title}」` : "同途径经验"}，确认「${target.name}」是${target.potion.pathwayName}途径序列${target.potion.sequence}魔药。`;
+        return succeed(call.name, `${turnLabel}：${observation}`, {
+          identifiedPotion: { ...target.potion, instanceId: target.instanceId },
+          itemInspection: { instanceId: target.instanceId, itemId: target.itemId, name: target.name, observation, narrative: false },
+        });
       }
+      const narrativeInspection = hasItemContentAction(target, "inspect") || isImportantNonMoneyItem(target);
       const contentAction = executeItemContentAction(game, target, "inspect", { turn: game.turn + 1, playerAction: options.playerAction ?? call.reason });
       if (contentAction?.handled) {
         if (!contentAction.ok) return fail(call.name, contentAction.reason);
-        return succeed(call.name, `${turnLabel}：检查「${target.name}」——${contentAction.text}`, contentAction.data);
+        return succeed(call.name, `${turnLabel}：检查「${target.name}」——${contentAction.text}`, {
+          ...contentAction.data,
+          itemInspection: { instanceId: target.instanceId, itemId: target.itemId, name: target.name, observation: contentAction.text, narrative: narrativeInspection, actionId: contentAction.actionId },
+        });
       }
-      return succeed(call.name, `${turnLabel}：检查「${target.name}」——${target.discoveredInfo || target.description}`);
+      const observation = target.discoveredInfo || target.description || `这是一件名为「${target.name}」的物品。`;
+      return succeed(call.name, `${turnLabel}：检查「${target.name}」——${observation}`, {
+        itemInspection: { instanceId: target.instanceId, itemId: target.itemId, name: target.name, observation, narrative: narrativeInspection },
+      });
     }
     case "item.use": {
       const target = findItem();

@@ -20,7 +20,7 @@ import { resolveTurnProgress } from "./engine/turn.js";
 import { restMinutes } from "./engine/restTime.js";
 import { processTriggers } from "./engine/triggerEngine.js";
 import { loadApiSettings, requestAIWithReasoningFallback, saveApiSettings } from "./services/api.js";
-import { buildFastNarrativeContinuationContext, buildFastPresentationContext, buildPlanningContext, buildRenderingContext, buildSummaryContext, buildToolRepairContext, computeMemoryUpdate } from "./services/memory.js";
+import { buildFastNarrativeContinuationContext, buildFastPresentationContext, buildItemInspectionContext, buildPlanningContext, buildRenderingContext, buildSummaryContext, buildToolRepairContext, computeMemoryUpdate } from "./services/memory.js";
 import { applyMemorySummary, createMemorySummaryJob, parseMemoryDigestPayload } from "./services/memoryState.js";
 import { mockResponse } from "./services/mock.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
@@ -501,27 +501,35 @@ export default function App() {
     const triggerProgress = processTriggers(execution.game, { action: reason, toolCalls: [call], toolResults: execution.results, turn: game.turn });
     const triggerLogs = triggerProgress.events.available.map((entry) => ({ id: makeId("log"), turn: game.turn, text: `发现可选事件「${entry.presentation?.title || "特殊事件"}」。`, tone: "neutral" }));
     const next = { ...execution.game, turn: game.turn, triggerState: triggerProgress.state, occult: execution.game.occult, changeLog: [...game.changeLog, ...execution.logs, ...triggerLogs].slice(-100) };
-    commitGame({ ...next, lastTurnBaseline: auditBaseline, lastTurnAudit: { ...auditTurnChanges(auditBaseline, next), importantItemConfirmation: { required: false, status: "player-action", confirmed: 0, rejected: 0 } } });
-    const inspectedItem = name === "item.inspect" && execution.results[0]?.ok;
-    const events = inspectedItem ? pendingQuestNarration(next) : [];
-    if (!events.length) return;
-    busyRef.current = true; setLoading(true); setTurnPhase("finalizing"); setError(""); resetStreamPreview();
+    const settled = { ...next, lastTurnBaseline: auditBaseline, lastTurnAudit: { ...auditTurnChanges(auditBaseline, next), importantItemConfirmation: { required: false, status: "player-action", confirmed: 0, rejected: 0 } } };
+    commitGame(settled);
+    const inspection = name === "item.inspect" && execution.results[0]?.ok ? execution.results[0].data?.itemInspection : null;
+    if (!inspection) return;
     showStory?.();
+    const resolution = createTurnResolution([call], execution.results, { triggerSignals: triggerProgress.signals });
+    resolution.derivedEffects.worldTime = next.worldTime;
+    if (!inspection.narrative) {
+      const memory = computeMemoryUpdate({ ...settled, turn: settled.turn - 1 }, reason, inspection.observation, resolution, { settledGame: settled });
+      commitGame({ ...settled, ...memory.updates });
+      return;
+    }
+    const events = pendingQuestNarration(next);
+    busyRef.current = true; setLoading(true); setTurnPhase("finalizing"); setError(""); resetStreamPreview();
     const controller = new AbortController(); controllerRef.current = controller;
     const timer = setTimeout(() => controller.abort(), 150000);
     try {
-      const resolution = createTurnResolution([call], execution.results, { triggerSignals: triggerProgress.signals });
       resolution.derivedEffects.narrativeEvents = events;
-      resolution.derivedEffects.worldTime = next.worldTime;
       const response = settings.mockMode
-        ? { hasNarrative: true, narrative: eventDirections(events) }
-        : await requestAIWithReasoningFallback(settings, buildRenderingContext(game, next, reason, prompt, resolution, { nativeTools: false }), controller.signal, queueStreamPreview, { disableTools: true });
+        ? { hasNarrative: true, narrative: [inspection.observation, eventDirections(events)].filter(Boolean).join("\n\n") }
+        : await requestAIWithReasoningFallback(settings, buildItemInspectionContext(game, next, reason, prompt, resolution, inspection), controller.signal, queueStreamPreview, { disableTools: true, disableJsonMode: true });
       if (controller.signal.aborted) throw new DOMException("已取消", "AbortError");
       if (!response.hasNarrative) throw new Error("模型没有返回剧情正文");
-      const memory = computeMemoryUpdate({ ...next, turn: next.turn - 1 }, reason, response.narrative, resolution, { settledGame: next });
-      commitGame({ ...markNarrativeEventsDelivered(next, events), ...memory.updates });
+      const memory = computeMemoryUpdate({ ...settled, turn: settled.turn - 1 }, reason, response.narrative, resolution, { settledGame: settled });
+      commitGame({ ...markNarrativeEventsDelivered(settled, events), ...memory.updates });
     } catch (err) {
-      setError(`检查已保存，但线索提示生成未完成：${err.message}。再次检查或继续剧情可重试，不需要新建存档。`);
+      const fallback = computeMemoryUpdate({ ...settled, turn: settled.turn - 1 }, reason, inspection.observation, resolution, { settledGame: settled });
+      commitGame({ ...settled, ...fallback.updates });
+      setError(`检查已保存，但百字剧情生成未完成：${err.message}。已显示本地检查结果，再次检查即可重试。`);
     } finally {
       clearTimeout(timer); controllerRef.current = null; busyRef.current = false; setLoading(false); setTurnPhase("idle"); resetStreamPreview();
     }
