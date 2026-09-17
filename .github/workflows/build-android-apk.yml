@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  PRODUCT_VERSION: "1.6.3"
+  PRODUCT_VERSION: "1.6.4"
 
 jobs:
   build-release-apk:
@@ -111,5 +111,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "贝克兰德纪事 ${PRODUCT_VERSION}" \
-            --notes "1.6.3 · 物品检查：普通物品直接显示本地描述，家传怀表及重要任务物品生成约一百字的检查短篇；生成失败时自动显示本地结果。请覆盖安装，不要先卸载。" \
+            --notes "1.6.4 · 剧情与检查更新：抵达南岸货栈即可遇见报童号外和码头工人的闲谈，铺开三条可选支线；前往百合街雷纳德子爵宅邸会先遇见正在与仆人交谈的子爵，并得知救治女儿需要非凡力量。物品栏检查普通物品会直接显示描述，家传怀表及重要任务物品会生成约一百字的检查短篇。请覆盖安装，不要先卸载。" \
             --latest
