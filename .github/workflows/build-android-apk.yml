@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  PRODUCT_VERSION: "1.6.2"
+  PRODUCT_VERSION: "1.6.3"
 
 jobs:
   build-release-apk:
@@ -111,5 +111,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "贝克兰德纪事 ${PRODUCT_VERSION}" \
-            --notes "1.6.2 · 任务引擎防停滞：核验实际进展、补记漏调工具的任务尝试，并提供由本地结算的可行路线；终章风险保留。怀表纸条改为鲁恩文字错落于神秘符号之间，完整句意保持不变，并迁移旧存档。请覆盖安装，不要先卸载。" \
+            --notes "1.6.3 · 物品检查：普通物品直接显示本地描述，家传怀表及重要任务物品生成约一百字的检查短篇；生成失败时自动显示本地结果。请覆盖安装，不要先卸载。" \
             --latest
