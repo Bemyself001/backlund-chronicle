@@ -1,3 +1,4 @@
+import { appendStoryMessages } from "./storyHistory.js";
 import { getMapLocations, isDiscoveredLocationStatus, normalizeLocationKnowledge } from "../system/map.js";
 import { hexContext } from "../system/hexworld.js";
 import { playerVisibleItem } from "../system/items.js";
@@ -351,11 +352,7 @@ export function computeMemoryUpdate(game, action, narrative, resolution = null, 
     { id: `msg-user-${Date.now()}`, role: "user", turn, content: action },
     { id: `msg-ai-${Date.now()}`, role: "assistant", turn, content: narrative },
   ];
-  const storyHistory = [
-    ...((game.storyHistory?.length ? game.storyHistory : game.recentDialogues) || []),
-    ...newMessages,
-  ];
-  const recentDialogues = storyHistory.slice(-10);
+  const { storyHistory, recentDialogues } = appendStoryMessages(game, newMessages);
   const episode = createMemoryEpisode(game, action, narrative, resolution, options.settledGame || game);
   const memoryState = appendMemoryEpisode(game, episode);
   const accepted = (resolution?.accepted || []).map((entry) => entry.name).filter(Boolean);

@@ -15,7 +15,7 @@ function formatSavedAt(iso) {
   return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-export default function Welcome({ hasSave, saves = [], apiSettings, onNew, onContinue, onLoadSlot, onImport, onApi, onUpdate, onChangelog }) {
+export default function Welcome({ hasSave, saves = [], loading = false, apiSettings, onNew, onContinue, onLoadSlot, onImport, onApi, onUpdate, onChangelog }) {
   const inputRef = useRef(null);
   const [importError, setImportError] = useState("");
   const [archiveOpen, setArchiveOpen] = useState(false);
@@ -24,15 +24,18 @@ export default function Welcome({ hasSave, saves = [], apiSettings, onNew, onCon
   const latest = archives[0];
   const canContinue = latest ? Boolean(onLoadSlot || (latest.slotId === "autosave" && onContinue)) : Boolean(hasSave && onContinue);
   const continueLatest = () => {
-    if (latest && onLoadSlot) onLoadSlot(latest.slotId);
-    else if (canContinue) onContinue();
+    try {
+      if (latest && onLoadSlot) onLoadSlot(latest.slotId);
+      else if (canContinue) onContinue();
+    } catch (error) { setImportError(error.message); }
   };
   const chooseFile = async (event) => {
-    const file = event.target.files?.[0];
+    const input = event.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
     try { setImportError(""); await onImport(file); }
     catch (error) { setImportError(error.message); }
-    finally { event.target.value = ""; }
+    finally { input.value = ""; }
   };
 
   return (
@@ -66,12 +69,12 @@ export default function Welcome({ hasSave, saves = [], apiSettings, onNew, onCon
           <p className={styles.subtitle}>雾已入城。<br />{latest ? "灯还亮着，你的故事尚未写完。" : "你的名字，尚未写入档案。"}</p>
 
           <nav className={styles.actions} aria-label="开始调查">
-            <button className={styles.primaryAction} type="button" onClick={canContinue ? continueLatest : onNew}>
+            <button className={styles.primaryAction} type="button" disabled={loading} onClick={canContinue ? continueLatest : onNew}>
               <span className={styles.actionNo} aria-hidden="true">01</span>
               <span><strong>{canContinue ? "继续调查" : "建立新档案"}</strong><small>{canContinue ? "回到尚未结束的故事" : "以你的名字，开启一段非凡人生"}</small></span>
               <span className={styles.actionArrow} aria-hidden="true">→</span>
             </button>
-            {canContinue && <button className={styles.newAction} type="button" onClick={onNew}><span aria-hidden="true">＋</span>建立新档案<span className={styles.newHint}>另一段人生</span></button>}
+            {canContinue && <button className={styles.newAction} type="button" disabled={loading} onClick={onNew}><span aria-hidden="true">＋</span>建立新档案<span className={styles.newHint}>另一段人生</span></button>}
           </nav>
           <p className={styles.heroNote}>单人叙事 <span aria-hidden="true">/</span> 自由行动 <span aria-hidden="true">/</span> 本地存档</p>
         </section>
@@ -98,21 +101,21 @@ export default function Welcome({ hasSave, saves = [], apiSettings, onNew, onCon
 
       <footer className={styles.footer}>
         <div className={styles.minorActions} aria-label="辅助操作">
-          <button type="button" onClick={() => inputRef.current?.click()}>导入存档</button>
+          <button type="button" disabled={loading} onClick={() => inputRef.current?.click()}>导入存档</button>
           <button type="button" onClick={onApi}>API 设置</button>
           <button type="button" onClick={onChangelog}>更新日志</button>
           <a href="https://bemyself001.github.io/backlund-chronicle/privacy.html" target="_blank" rel="noreferrer">隐私政策<span className="sr-only">（新窗口打开）</span></a>
           <button type="button" aria-pressed={stillScene} onClick={() => setStillScene((current) => !current)}>静态场景{stillScene ? " · 开" : " · 关"}</button>
         </div>
         <span className={styles.version}>{`VER ${APP_VERSION}`}{!isNativeAndroid() && ` · WEB ${WEB_BUILD}`}</span>
-        <input ref={inputRef} className="sr-only" tabIndex={-1} aria-label="选择存档文件" type="file" accept="application/json,.json" onChange={chooseFile} />
+        <input ref={inputRef} className="sr-only" disabled={loading} tabIndex={-1} aria-label="选择存档文件" type="file" accept="application/json,.json" onChange={chooseFile} />
         {importError && <p className={styles.error} role="alert">{importError}</p>}
       </footer>
 
       {archiveOpen && <Modal title="私人档案柜" eyebrow={`PRIVATE ARCHIVES / 在册 ${archives.length} 份`} onClose={() => setArchiveOpen(false)}>
         {archives.length ? <ol className={styles.ledger}>
           {archives.map((slot, index) => <li key={slot.slotId}>
-            <button type="button" disabled={!onLoadSlot} onClick={() => onLoadSlot?.(slot.slotId)}>
+            <button type="button" disabled={loading || !onLoadSlot} onClick={() => { try { onLoadSlot?.(slot.slotId); } catch (error) { setImportError(error.message); setArchiveOpen(false); } }}>
               <span className={styles.ledgerNo}>{String(index + 1).padStart(2, "0")}</span>
               <span className={styles.ledgerMain}><strong>{slot.characterName || "未命名档案"}</strong><small>{archiveLocation(slot)} · 第 {slot.turn ?? 0} 轮</small><small>{slot.label || "私人档案"}{slot.slotId === "autosave" ? " · 自动" : ""} · {formatSavedAt(slot.updatedAt)}</small></span>
               <span aria-hidden="true">→</span>

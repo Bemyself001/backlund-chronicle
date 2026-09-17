@@ -14,6 +14,7 @@ import { specialState } from "../engine/specialActions.js";
 
 const SAVES_KEY = "mist-chronicle-saves-v1";
 const AUTOSAVE_ID = "autosave";
+export const MAX_MANUAL_SAVES = 8;
 
 function cleanGame(game) {
   const cloned = structuredClone(game);
@@ -23,21 +24,27 @@ function cleanGame(game) {
 }
 
 export function listSaves() {
-  try { return JSON.parse(localStorage.getItem(SAVES_KEY) || "[]"); }
+  try {
+    const saves = JSON.parse(localStorage.getItem(SAVES_KEY) || "[]");
+    return Array.isArray(saves) ? saves.filter((slot) => slot && typeof slot.slotId === "string" && slot.game) : [];
+  }
   catch { return []; }
 }
 
 export function saveGame(game, slotId = AUTOSAVE_ID, label = "自动存档") {
   const saves = listSaves().filter((slot) => slot.slotId !== slotId);
+  if (slotId !== AUTOSAVE_ID && saves.filter((slot) => slot.slotId !== AUTOSAVE_ID).length >= MAX_MANUAL_SAVES) {
+    throw new Error("手动存档已满，请选择覆盖已有档案，或先导出并删除不需要的档案。");
+  }
   const safeGame = cleanGame({ ...game, updatedAt: new Date().toISOString() });
   saves.unshift({ slotId, label, updatedAt: safeGame.updatedAt, turn: safeGame.turn, characterName: safeGame.character?.name, game: safeGame });
-  localStorage.setItem(SAVES_KEY, JSON.stringify(saves.slice(0, 8)));
+  localStorage.setItem(SAVES_KEY, JSON.stringify(saves));
   return safeGame;
 }
 
 export function loadGame(slotId = AUTOSAVE_ID) {
   const slot = listSaves().find((entry) => entry.slotId === slotId);
-  return slot ? migrateSave(slot.game) : null;
+  return slot ? validatePlayableSave(migrateSave(slot.game)) : null;
 }
 
 export function deleteSave(slotId) {
@@ -107,6 +114,9 @@ export function migrateSave(raw) {
     lastTurnBaseline: migrated.lastTurnBaseline ? { ...migrated.lastTurnBaseline, inventory: (migrated.lastTurnBaseline.inventory || []).filter((item) => !isMoneyItem(item)).map(normalizeInventoryItem) } : null,
     lastTurnAudit: migrated.lastTurnAudit || null,
   };
+  for (const key of ["statusEffects", "clues", "relationships", "quests", "changeLog", "worldEvents", "choices", "recentDialogues"]) {
+    if (result[key] == null) result[key] = [];
+  }
   // 只修复尚未行动、完整属性恰好匹配旧开局模板的档案。
   if (!raw.initialStatsVersion && raw.turn === 0 && !raw.lastTurnBaseline && !raw.lastTurnAudit
     && !(raw.processedToolCalls || []).length && !(raw.statusEffects || []).length
@@ -148,8 +158,33 @@ export async function importSave(file) {
   const text = await file.text();
   let raw;
   try { raw = JSON.parse(text); } catch { throw new Error("文件不是有效的 JSON 存档。"); }
-  const game = migrateSave(raw.game || raw);
+  const game = validatePlayableSave(migrateSave(raw?.game || raw));
   return saveGame(game, AUTOSAVE_ID, "导入存档");
+}
+
+// Validate before replacing a playable archive. Migration alone also accepts partial legacy data.
+export function validatePlayableSave(game) {
+  const fail = (field) => { throw new Error(`存档中的「${field}」数据不完整或格式错误，原存档未被覆盖。`); };
+  if (typeof game.id !== "string" || !game.id) fail("档案编号");
+  if (!Number.isInteger(game.turn) || game.turn < 0) fail("回合");
+  if (typeof game.character?.name !== "string" || !game.character.name.trim()) fail("角色姓名");
+  for (const key of ["health", "maxHealth", "sanity", "maxSanity", "spirituality", "maxSpirituality"]) {
+    if (!Number.isFinite(game.character.stats?.[key])) fail("角色属性");
+  }
+  if (!Number.isFinite(game.chapter?.number) || typeof game.chapter?.title !== "string") fail("章节");
+  if (typeof game.location?.id !== "string" || typeof game.location?.name !== "string") fail("地点");
+  if (typeof game.worldTime !== "string") fail("时间");
+  if (!Number.isFinite(game.capacity?.maxWeight) || game.capacity.maxWeight <= 0) fail("负重");
+  for (const key of ["statusEffects", "clues", "relationships", "quests", "worldEvents", "choices", "recentDialogues", "storyHistory", "memoryNotes", "processedToolCalls", "changeLog"]) {
+    if (!Array.isArray(game[key])) fail(key);
+    if (game[key].some((entry) => entry == null)) fail(key);
+  }
+  for (const key of ["recentDialogues", "storyHistory"]) {
+    if (game[key].some((entry) => typeof entry.content !== "string" || !["user", "assistant"].includes(entry.role))) fail("剧情记录");
+  }
+  if (game.statusEffects.some((entry) => typeof entry !== "object" || typeof entry.name !== "string")) fail("状态效果");
+  if (game.choices.some((entry) => typeof entry.label !== "string")) fail("行动建议");
+  return game;
 }
 
 export { AUTOSAVE_ID };

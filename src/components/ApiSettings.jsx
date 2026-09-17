@@ -1,10 +1,11 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Modal from "./Modal.jsx";
 import styles from "./Forms.module.css";
 import { listApiModels, testApiConnection } from "../services/api.js";
 import { API_PROVIDER_PRESETS, createProviderProfile, getApiProvider } from "../services/apiProviders.js";
 import { isNativeAndroid } from "../services/updates.js";
 import { LATEST_UPDATE } from "../data/changelog.js";
+import { applyModelCatalog } from "../services/modelCatalog.js";
 
 function captureProfile(settings) {
   return {
@@ -35,6 +36,8 @@ export default function ApiSettings({ settings, onSave, onClose }) {
   const [testing, setTesting] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
   const [modelQuery, setModelQuery] = useState("");
+  const modelRequestRef = useRef(null);
+  useEffect(() => () => modelRequestRef.current?.abort(), []);
   const nativeAndroid = isNativeAndroid();
   const provider = getApiProvider(draft.provider);
   const models = useMemo(
@@ -52,10 +55,15 @@ export default function ApiSettings({ settings, onSave, onClose }) {
     return models.filter((model) => !query || model.toLowerCase().includes(query)).slice(0, 80);
   }, [modelQuery, models]);
 
-  const update = (key, value) => setDraft((current) => ({ ...current, [key]: value }));
+  const cancelModels = () => { modelRequestRef.current?.abort(); modelRequestRef.current = null; setLoadingModels(false); };
+  const update = (key, value) => {
+    if (["baseUrl", "apiKey", "customHeaders", "mockMode"].includes(key)) { cancelModels(); setStatus(""); }
+    setDraft((current) => ({ ...current, [key]: value }));
+  };
 
   const chooseProvider = (providerId) => {
     if (providerId === draft.provider) return;
+    cancelModels();
     setDraft((current) => {
       const profiles = { ...(current.profiles || {}), [current.provider]: captureProfile(current) };
       const nextProfile = { ...createProviderProfile(providerId), ...(profiles[providerId] || {}) };
@@ -66,19 +74,21 @@ export default function ApiSettings({ settings, onSave, onClose }) {
   };
 
   const loadModels = async () => {
+    modelRequestRef.current?.abort();
+    const controller = new AbortController();
+    modelRequestRef.current = controller;
+    const source = draft;
     setLoadingModels(true);
     setStatus("");
     try {
-      const nextModels = await listApiModels(draft);
-      setDraft((current) => ({
-        ...current,
-        modelCatalogs: { ...(current.modelCatalogs || {}), [current.provider]: nextModels },
-      }));
+      const nextModels = await listApiModels(source, controller.signal);
+      if (controller.signal.aborted || modelRequestRef.current !== controller) return;
+      setDraft((current) => applyModelCatalog(current, source, nextModels));
       setStatus(`已读取 ${nextModels.length} 个模型。输入关键词即可筛选。`);
     } catch (error) {
-      setStatus(error.message);
+      if (!controller.signal.aborted && modelRequestRef.current === controller) setStatus(error.message);
     } finally {
-      setLoadingModels(false);
+      if (modelRequestRef.current === controller) { modelRequestRef.current = null; setLoadingModels(false); }
     }
   };
 

@@ -100,10 +100,10 @@ export const JournalPanel = memo(function JournalPanel({ game }) {
   </div>;
 });
 
-export function MenuPanel({ reading, onReadingChange, onOpenApi, onOpenPrompt, onOpenSaves, onHome, version }) {
+export function MenuPanel({ loading, reading, onReadingChange, onOpenApi, onOpenPrompt, onOpenSaves, onHome, version }) {
   return <div className={styles.content}>
     <section><h3>阅读外观</h3><div className={styles.filtersNav}>{[["paper", "纸色"], ["night", "夜读"]].map(([id, label]) => <button type="button" key={id} aria-pressed={reading.theme === id} onClick={() => onReadingChange({ ...reading, theme: id })}>{label}</button>)}</div><label className={styles.fontControl}><span>正文字号 <strong>{reading.fontSize}px</strong></span><input type="range" min="16" max="22" step="1" value={reading.fontSize} onChange={e => onReadingChange({ ...reading, fontSize: Number(e.target.value) })} /></label></section>
-    <div className={styles.menuActions}><button type="button" onClick={onOpenSaves}>存档柜 <span>保存、读取与导出 ↗</span></button><button type="button" onClick={onOpenApi}>API 设置 <span>模型连接 ↗</span></button><button type="button" onClick={onOpenPrompt}>提示词 <span>查看与编辑 ↗</span></button><button type="button" onClick={onHome}>返回档案首页 <span>你的进度已自动保存 ↗</span></button></div>
+    <div className={styles.menuActions}><button type="button" onClick={onOpenSaves}>存档柜 <span>保存、读取与导出 ↗</span></button><button type="button" onClick={onOpenApi}>API 设置 <span>模型连接 ↗</span></button><button type="button" onClick={onOpenPrompt}>提示词 <span>查看与编辑 ↗</span></button><button type="button" disabled={loading} onClick={onHome}>返回档案首页 <span>你的进度已自动保存 ↗</span></button></div>
     <p className={styles.muted}>贝克兰德纪事 · {version}</p>
   </div>;
 }

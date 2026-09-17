@@ -40,6 +40,8 @@ import { launchFastModeTasks, throwIfFastTaskAborted } from "./services/fastMode
 import { repairToolCallsConcurrently } from "./services/toolRepair.js";
 import { prayerAvailability, settlePrayer } from "./engine/prayer.js";
 import { generatePrayer } from "./services/prayer.js";
+import { actionRequest, retryRequest } from "./services/actionRequest.js";
+import { appendStoryMessages } from "./services/storyHistory.js";
 
 export default function App() {
   const [screen, setScreen] = useState("splash");
@@ -64,7 +66,7 @@ export default function App() {
   const controllerRef = useRef(null);
   const itemConfirmationResolverRef = useRef(null);
   const busyRef = useRef(false);
-  const lastActionRef = useRef("");
+  const lastActionRef = useRef(null);
   const prayerRetryRef = useRef(null);
   const streamTimerRef = useRef(null);
   const pendingStreamRef = useRef("");
@@ -113,9 +115,16 @@ export default function App() {
     setGame(saved);
     refreshSaves();
   };
-  const handleCreate = (character, loadout) => { const next = createInitialGame(character, loadout); commitGame(next); setScreen("game"); };
-  const handleContinue = () => { const loaded = loadGame(); if (loaded) { setGame(loaded); setScreen("game"); } };
-  const handleImport = async (file) => { const imported = await importSave(file); setGame(imported); refreshSaves(); setScreen("game"); };
+  const resetAction = () => { lastActionRef.current = null; prayerRetryRef.current = null; setError(""); resetStreamPreview(); };
+  const requireIdle = () => { if (busyRef.current) throw new Error("请先中止生成或等待本轮完成，再切换档案。"); };
+  const handleCreate = (character, loadout) => { requireIdle(); const next = createInitialGame(character, loadout); commitGame(next); resetAction(); setScreen("game"); };
+  const handleContinue = () => loadSlot("autosave");
+  const handleImport = async (file) => {
+    requireIdle();
+    busyRef.current = true; setLoading(true);
+    try { const imported = await importSave(file); setGame(imported); resetAction(); refreshSaves(); setScreen("game"); }
+    finally { busyRef.current = false; setLoading(false); }
+  };
   const handleSettingsSave = (next) => { setSettings(saveApiSettings(next)); };
   const handlePromptSave = (next) => { localStorage.setItem("mist-system-prompt", next); setPrompt(next); };
 
@@ -185,7 +194,7 @@ export default function App() {
     if (!game || busyRef.current || !action.trim()) return false;
     prayerRetryRef.current = null;
     const selectedRisk = (Array.isArray(game.choices) ? game.choices : []).find((choice) => choice.label === action)?.risk;
-    busyRef.current = true; lastActionRef.current = action; setLoading(true); setTurnPhase(options.manualRetry ? "manualRetry" : "generating"); setError(""); resetStreamPreview();
+    busyRef.current = true; lastActionRef.current = actionRequest(action, options); setLoading(true); setTurnPhase(options.manualRetry ? "manualRetry" : "generating"); setError(""); resetStreamPreview();
     const controller = new AbortController(); controllerRef.current = controller;
     const metrics = startTurnMetrics();
     let timedOut = false;
@@ -407,6 +416,7 @@ export default function App() {
         lastTurnAudit: automaticAudit,
         lastTurnMetrics: finishTurnMetrics(metrics),
       }, resolution.derivedEffects.narrativeEvents);
+      if (controller.signal.aborted) throw new DOMException("请求已中止", "AbortError");
       resetStreamPreview(); commitGame(next);
       // Narrative and settlement are durable before any optional suggestion request.
       clearTimeout(watchdogTimer);
@@ -488,9 +498,9 @@ export default function App() {
 
   const retryLastTurn = () => {
     if (prayerRetryRef.current) return handlePray(prayerRetryRef.current);
-    const action = lastActionRef.current.trim();
-    if (!action) { setError("没有可以重试的上一轮行动。请在输入框中描述新的行动。"); return Promise.resolve(false); }
-    return runTurn(action, { manualRetry: true });
+    const request = retryRequest(lastActionRef.current);
+    if (!request?.action.trim()) { setError("没有可以重试的上一轮行动。请在输入框中描述新的行动。"); return Promise.resolve(false); }
+    return runTurn(request.action, request.options);
   };
 
   const runLocalTool = async (name, args, reason, showStory) => {
@@ -547,26 +557,26 @@ export default function App() {
     } finally { busyRef.current = false; }
   };
   const handleExplore = (cell) => {
-    if (!game || loading) return;
+    if (!game || busyRef.current) return;
     const next = structuredClone(game);
     const result = exploreHex(next, cell.q, cell.r);
     if (!result.ok) return;
-    const message = { id: makeId("msg"), role: "assistant", turn: game.turn, content: result.narrative };
-    next.recentDialogues = [...next.recentDialogues, message].slice(-30);
+    const message = { id: makeId("msg"), role: "assistant", turn: game.turn, content: result.narrative, source: "fixed" };
+    Object.assign(next, appendStoryMessages(next, [message]));
     next.changeLog = [...next.changeLog, `探索了${next.location.name}，耗时约 ${result.minutes} 分钟`].slice(-100);
     commitGame(next);
     setModal(null);
   };
   const saveSlot = (slotId, label) => { if (game) saveGame(game, slotId, label); refreshSaves(); };
-  const loadSlot = (slotId) => { const loaded = loadGame(slotId); if (loaded) { setGame(loaded); setScreen("game"); setModal(null); } };
+  const loadSlot = (slotId) => { requireIdle(); const loaded = loadGame(slotId); if (loaded) { setGame(loaded); resetAction(); setScreen("game"); setModal(null); } };
   const removeSlot = (slotId) => { deleteSave(slotId); refreshSaves(); };
 
   return <>
     <a className="skip-link" href="#main">跳到主要内容</a>
     {screen === "splash" && <Splash onEnter={() => setScreen("welcome")} />}
-    {screen === "welcome" && <Welcome hasSave={saves.some((slot) => slot.slotId === "autosave")} saves={saves} apiSettings={settings} onNew={() => setScreen("create")} onContinue={handleContinue} onLoadSlot={loadSlot} onImport={handleImport} onApi={() => setModal("api")} onUpdate={() => setModal("update")} onChangelog={() => setModal("changelog")} />}
+    {screen === "welcome" && <Welcome loading={loading} hasSave={saves.some((slot) => slot.slotId === "autosave")} saves={saves} apiSettings={settings} onNew={() => { if (!busyRef.current) setScreen("create"); }} onContinue={handleContinue} onLoadSlot={loadSlot} onImport={handleImport} onApi={() => setModal("api")} onUpdate={() => setModal("update")} onChangelog={() => setModal("changelog")} />}
     {screen === "create" && <CharacterCreation onBack={() => setScreen("welcome")} onCreate={handleCreate} settings={settings} onApi={() => setModal("api")} />}
-    {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} mockMode={Boolean(settings.mockMode)} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onRegenerateChoices={regenerateChoices} onLocalTool={runLocalTool} onOpenMap={openMap} onSpecialAction={handleSpecialAction} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => setScreen("welcome")} />}
+    {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} mockMode={Boolean(settings.mockMode)} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onRegenerateChoices={regenerateChoices} onLocalTool={runLocalTool} onOpenMap={openMap} onSpecialAction={handleSpecialAction} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => { if (!busyRef.current) { resetAction(); setScreen("welcome"); } }} />}
     {itemConfirmation && <ImportantItemConfirmation changes={itemConfirmation.changes} onConfirm={(approvedKeys) => settleImportantItemConfirmation({ approvedKeys })} onCancel={() => settleImportantItemConfirmation({ cancelled: true })} />}
     {modal === "map" && game && <WorldMap game={game} loading={loading} initialLocationId={mapFocus} onSpecial={() => setModal("special")} onClose={() => setModal(null)} onTravel={(location) => { setModal(null); return runTurn(`前往${location.name}`, { mapDestination: location }); }} onInvestigate={(location, knowledge) => { setModal(null); return runTurn(`根据地图上的传闻，调查${knowledge.note || location.district}。`, { mapInvestigation: { locationId: location.id, currentStatus: knowledge.status, rumor: knowledge.note || location.rumor } }); }} onExplore={handleExplore} onPray={handlePray} />}
     {modal === "special" && game && <Modal title="特殊行动" onClose={() => setModal(null)}><SpecialActions game={game} loading={loading} onExecute={handleSpecialAction} onOpenMap={openMap} /></Modal>}
@@ -574,6 +584,6 @@ export default function App() {
     {(modal === "update" || modal === "update-auto") && <UpdateDialog automatic={modal === "update-auto"} onClose={() => setModal(null)} />}
     {modal === "changelog" && <ChangelogDialog onClose={() => setModal(null)} />}
     {modal === "prompt" && <PromptEditor value={prompt} onSave={handlePromptSave} onClose={() => setModal(null)} />}
-    {modal === "saves" && game && <SaveManager saves={saves} game={game} onSave={saveSlot} onLoad={loadSlot} onDelete={removeSlot} onExport={exportSave} onImport={handleImport} onClose={() => setModal(null)} />}
+    {modal === "saves" && game && <SaveManager loading={loading} saves={saves} game={game} onSave={saveSlot} onLoad={loadSlot} onDelete={removeSlot} onExport={exportSave} onImport={handleImport} onClose={() => setModal(null)} />}
   </>;
 }

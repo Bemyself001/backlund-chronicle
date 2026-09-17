@@ -244,7 +244,7 @@ function GameSession({ game, loading, turnPhase, streamText, error, mockMode, on
         <div hidden={panel !== "inventory"}><InventoryPanel game={game} onLocalTool={(name, args, reason) => onLocalTool(name, args, reason, () => setPanel(null))} onAction={performAction} disabled={loading} /></div>
         <div hidden={panel !== "journal"}><JournalPanel key={journalRequest} game={game} /></div>
         {panel === "special" && <SpecialActions game={game} loading={loading} onExecute={onSpecialAction} onOpenMap={onOpenMap} />}
-        <div hidden={panel !== "menu"}><MenuPanel reading={reading} onReadingChange={updateReading} onOpenApi={onOpenApi} onOpenPrompt={onOpenPrompt} onOpenSaves={onOpenSaves} onHome={onHome} version={`${RELEASE_NAME} · ${APP_VERSION}`} />{readingNotice && <p className={styles.readingNotice} role="status">{readingNotice}</p>}</div>
+        <div hidden={panel !== "menu"}><MenuPanel loading={loading} reading={reading} onReadingChange={updateReading} onOpenApi={onOpenApi} onOpenPrompt={onOpenPrompt} onOpenSaves={onOpenSaves} onHome={onHome} version={`${RELEASE_NAME} · ${APP_VERSION}`} />{readingNotice && <p className={styles.readingNotice} role="status">{readingNotice}</p>}</div>
       </div></aside></>}
     </div>
   </main>;
