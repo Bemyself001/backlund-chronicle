@@ -30,6 +30,16 @@ export default function SpecialActions({ game, loading, onExecute, onOpenMap }) 
       <div className={styles.meta}><span>工作声誉 {state.reputation}</span><span>持有 {money} 便士</span></div>
     </header>
     {notice && <p role="status" className={styles.notice}>{notice}</p>}
+    <section aria-label="休息与药剂"><h3>休息与药剂</h3>
+      <article className={styles.card}><h4>雾鸦旅店 · 睡眠恢复</h4><p>休息每满2小时恢复1点生命和理智，单次最多各4点，不超过上限；持续状态照常结算。</p>
+        {locationLink("soot-lamp")}
+        <button type="button" disabled={loading || game.location.id !== "soot-lamp"} onClick={() => execute("sleep", "soot-lamp")}>{game.location.id === "soot-lamp" ? "睡觉8小时 · 1回合" : "到达雾鸦旅店后可睡觉"}</button>
+      </article>
+      {SPECIAL_RECIPES.filter(recipe => recipe.stat).map(recipe => <article key={recipe.id} className={styles.card}><h4>{recipe.name}</h4><p>{recipe.description}</p>
+        <button type="button" disabled={loading || money < recipe.sale} onClick={() => execute("buy-medicine", recipe.id)}>购买成品 · {recipe.sale}便士 · 1回合</button>
+      </article>)}
+      <p className={styles.hint}>所有途径均可购买和使用成品；药师可自行制作。药剂每次消耗一份，对应属性已满时不会消耗。</p>
+    </section>
     {state.active && <section className={styles.active} aria-label="当前委托">
       <p className={styles.eyebrow}>正在进行 · 接单内容已保存</p><h3>{state.active.offer.title}</h3><p>{state.active.offer.scene}</p>
       {activeReason && <p>{activeReason}</p>}

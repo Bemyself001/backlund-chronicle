@@ -140,9 +140,10 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
           : rumored
             ? <button className="button button--primary" type="button" disabled={loading} onClick={() => onInvestigate(selected, selectedKnowledge)}>{loading ? "本轮处理中" : "调查该区域"}</button>
             : <button className="button button--primary" type="button" disabled>尚无线索</button>}
+        {discovered && selected.id === "soot-lamp" && <button type="button" className="button button--primary" disabled={loading} onClick={onSpecial}>旅店休息 · 恢复生命与理智</button>}
         {discovered && prayer.church && <>
-          <button className="button button--primary" type="button" disabled={loading || !prayer.ok} onClick={() => onPray(selected.id)}>{loading ? "本轮处理中" : prayer.reason || "祷告 · 恢复 2 点灵性"}</button>
-          <small>向{prayer.church.deity}祷告，消耗一回合。每 5 回合可用一次，所有教堂共享冷却；灵性最多恢复至上限。</small>
+          <button className="button button--primary" type="button" disabled={loading || !prayer.ok} onClick={() => onPray(selected.id)}>{loading ? "本轮处理中" : prayer.reason || "祷告 · 理智与灵性各恢复 2 点"}</button>
+          <small>向{prayer.church.deity}祷告，消耗一回合。每 5 回合可用一次，所有教堂共享冷却；恢复不超过各自上限。</small>
         </>}
         {discovered && (SPECIAL_ACTIONS.some((entry) => entry.locationId === selected.id) || selected.id === SPECIAL_CONTACTS.organizationLocation) && <button type="button" className="button button--primary" disabled={loading} onClick={onSpecial}>特殊行动 · 工作与登记</button>}
         <small>{discovered ? "新地点会连接已知锚点并由本地计算路线；到访后状态会永久记录。" : rumored ? "调查会进入正常回合；只有本地确认成功后，地点才会正式解锁。" : "未知区域不会提前泄露名称与详情。"}</small>

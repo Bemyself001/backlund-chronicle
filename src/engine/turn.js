@@ -1,6 +1,7 @@
 import { applyStatDelta } from "./statChanges.js";
 import { processTriggers } from "./triggerEngine.js";
 import { restMinutes } from "./restTime.js";
+import { settleInnRest } from "./recovery.js";
 import { resolveSelectedQuestRoute } from "./questActions.js";
 
 const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
@@ -78,14 +79,17 @@ export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], 
     ? options.elapsedMinutes : minutesForTurn(action, toolCalls, toolResults, game.worldTime);
   const dangerDelta = dangerDeltaForTurn({ action, selectedRisk, toolCalls, toolResults });
   const statusTicks = settleStatusTicks(game);
+  const restRecovery = settleInnRest(game, action, elapsedMinutes);
   const statusTickLogs = statusTicks.map((tick) => `状态「${tick.status}」结算：${tick.label} ${tick.before}→${tick.after}（${tick.delta > 0 ? "+" : ""}${tick.delta}）${tick.autoStatus ? `；${tick.autoStatus}` : ""}`);
   const nextTurn = Number(game.turn || 0) + 1;
+  statusTickLogs.push(...restRecovery.map(change => `旅馆休息：${change.label} ${change.before}→${change.after}`));
   const worldTime = advanceWorldTime(game.worldTime, elapsedMinutes);
   game.worldTime = worldTime;
   const triggerProgress = processTriggers(game, { action, toolCalls, toolResults, turn: nextTurn });
   const occultEntry = triggerProgress.occultEntry ? { id: triggerProgress.occultEntry.instanceId, turn: triggerProgress.occultEntry.createdTurn, ...triggerProgress.occultEntry.presentation } : null;
   return {
     elapsedMinutes,
+    restRecovery,
     dangerDelta,
     statusTicks,
     statusTickLogs,

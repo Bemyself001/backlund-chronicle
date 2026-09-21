@@ -18,8 +18,9 @@ export function settlePrayer(game, locationId) {
   const action = `向${available.church.deity}祷告`;
   const progress = resolveTurnProgress(next, action, "low");
   const recovery = applyStatDelta(next, "spirituality", 2);
+  const sanityRecovery = applyStatDelta(next, "sanity", 2);
   next.turn = game.turn + 1;
   next.hiddenDanger = progress.hiddenDanger;
   next.prayer = { lastTurn: game.turn, locationId };
-  return { next, action, progress, recovered: recovery?.delta || 0 };
+  return { next, action, progress, recovered: recovery?.delta || 0, sanityRecovered: sanityRecovery?.delta || 0 };
 }

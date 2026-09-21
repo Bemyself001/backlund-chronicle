@@ -1,4 +1,5 @@
 import { makeId } from "../utils/id.js";
+import { medicineRecipe, consumeMedicine } from "./recovery.js";
 import { applyStatDelta } from "./statChanges.js";
 import { findLocationRelations, getMapLocation, getMapLocations, isDiscoveredLocationStatus, normalizeLocationKnowledge, normalizeMapExtensions, planDynamicLocation } from "../system/map.js";
 import { ensureWorld, travelToLocation } from "../system/hexworld.js";
@@ -489,7 +490,13 @@ function executeOne(game, call, options = {}) {
     case "item.use": {
       const target = findItem();
       if (!target) return fail(call.name, "找不到要使用的物品");
-      if (game.specialActions?.products?.[target.instanceId]) return fail(call.name, "制作成品请在特殊行动中使用，以按配方结算效果和回合");
+      if (medicineRecipe(target)) {
+        const inventoryChange = { ...target, delta: -1, reason: call.reason };
+        try {
+          const change = consumeMedicine(game, target);
+          return succeed(call.name, `使用「${target.name}」：${change.label} ${change.before}→${change.after}。`, { inventoryChange, statChange: change });
+        } catch (error) { return fail(call.name, error.message); }
+      }
       if (target.potion) return fail(call.name, target.potion.identified ? "魔药不能作为普通消耗品使用；必须通过晋升验证" : "未知魔药尚未鉴定，不能直接服用");
       const contentAction = executeItemContentAction(game, target, "use", { turn: game.turn + 1, playerAction: options.playerAction ?? call.reason });
       if (contentAction?.handled) {

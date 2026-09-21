@@ -4,6 +4,7 @@ import { moneyFromPence, moneyToPence } from "../system/money.js";
 import { applyStatDelta } from "./statChanges.js";
 import { resolveTurnProgress } from "./turn.js";
 import { makeId } from "../utils/id.js";
+import { medicineRecipe, consumeMedicine } from "./recovery.js";
 
 export function specialState(game) {
   const raw = game.specialActions || {};
@@ -98,7 +99,12 @@ export function executeSpecialAction(game, request) {
     requireHealthy(next);
     requireCondition(!state.active, "请先完成或放弃当前委托");
   }
-  if (operation === "accept") {
+  if (operation === "sleep") {
+    requireCondition(next.location.id === "soot-lamp", "需到达雾鸦旅店才能睡觉");
+    action = "在雾鸦旅店睡觉8小时";
+    narrative = "你在雾鸦旅店安静睡了八小时，起身时检查了自己的身体与精神状况。";
+    minutes = 480;
+  } else if (operation === "accept") {
     const definition = SPECIAL_ACTIONS.find((entry) => entry.id === request.id);
     const reason = actionGate(next, definition);
     requireCondition(!reason, reason);
@@ -172,9 +178,9 @@ export function executeSpecialAction(game, request) {
       narrative = "你确认愿意接受值夜者的纪律与任务安排，完成身份说明和正式登记。值班人员将基础委托册交给你，提醒你遇到超出能力的异常必须报告。";
     }
     minutes = 30;
-  } else if (operation === "buy" || operation === "craft") {
+  } else if (operation === "buy" || operation === "craft" || operation === "buy-medicine") {
     const recipe = SPECIAL_RECIPES.find((entry) => entry.id === request.id);
-    const reason = actionGate(next, recipe);
+    const reason = operation === "buy-medicine" && recipe?.stat ? "" : actionGate(next, recipe);
     requireCondition(!reason, reason);
     if (operation === "buy") {
       pay(next, recipe.cost);
@@ -182,22 +188,28 @@ export function executeSpecialAction(game, request) {
       action = `购买${recipe.material}`;
       narrative = `你通过本城供货渠道购买一份${recipe.material}，花费 ${recipe.cost} 便士。材料已放入特殊行动的制作储备。`;
     } else {
-      requireCondition(state.materials[recipe.id] > 0, "缺少对应材料包，请先购买材料");
+      requireCondition(operation === "buy-medicine" ? recipe.stat : state.materials[recipe.id] > 0, "缺少对应材料包，请先购买材料");
       const weight = next.inventory.reduce((sum, item) => sum + (Number(item.weight) || 0) * (Number(item.quantity) || 0), 0);
       requireCondition(weight + recipe.weight <= (next.capacity?.maxWeight || 12), "行囊负重不足，请先整理物品");
-      state.materials[recipe.id] -= 1;
+      if (operation === "buy-medicine") pay(next, recipe.sale);
+      else state.materials[recipe.id] -= 1;
       const instanceId = makeId("crafted");
       next.inventory.push({ instanceId, itemId: `special-${recipe.id}`, name: recipe.name, description: recipe.description,
         category: recipe.stat ? "消耗品" : "武器", quantity: 1, weight: recipe.weight, rarity: "普通", importance: "normal",
-        tags: recipe.stat ? ["普通药剂"] : ["装备"], condition: "良好", equipped: false, properties: {}, source: "特殊行动制作", acquiredAt: `第 ${next.turn + 1} 轮`, isNew: true });
+        tags: recipe.stat ? ["普通药剂", "消耗品"] : ["装备"], condition: "良好", equipped: false, properties: {}, source: operation === "buy-medicine" ? "购买药剂" : "特殊行动制作", acquiredAt: `第 ${next.turn + 1} 轮`, isNew: true });
       state.products[instanceId] = recipe.id;
       action = `制作${recipe.name}`;
       narrative = `你消耗一份${recipe.material}，完成了${recipe.name}。${recipe.description}\n\n成品已放入行囊，可在特殊行动中自用或出售。`;
       minutes = 30;
+      if (operation === "buy-medicine") {
+        action = `购买${recipe.name}`;
+        narrative = `你花费 ${recipe.sale} 便士购买了一份${recipe.name}。${recipe.description}可在行囊或特殊行动中使用。`;
+        minutes = 10;
+      }
     }
   } else if (operation === "sell" || operation === "use") {
-    const recipe = SPECIAL_RECIPES.find((entry) => entry.id === state.products[request.id]);
     const item = next.inventory.find((entry) => entry.instanceId === request.id && entry.quantity > 0);
+    const recipe = SPECIAL_RECIPES.find((entry) => entry.id === state.products[request.id]) || (operation === "use" && medicineRecipe(item));
     requireCondition(recipe && item, "该制作成品已不在行囊中");
     requireCondition(!item.equipped, "请先卸下装备再出售");
     if (operation === "sell") {
@@ -206,18 +218,18 @@ export function executeSpecialAction(game, request) {
       narrative = `你把${recipe.name}交给本城收购商，获得 ${recipe.sale} 便士。`;
     } else {
       requireCondition(recipe.stat, "该成品不是可服用药剂");
-      const delta = applyStatDelta(next, recipe.stat, recipe.delta);
-      requireCondition(delta, "对应属性已满，无需消耗药剂");
+      const delta = consumeMedicine(next, item);
       action = `使用${recipe.name}`;
       narrative = `${recipe.name}已经使用，${delta.label} ${delta.before}→${delta.after}。`;
     }
-    item.quantity -= 1;
+    if (operation === "sell") item.quantity -= 1;
     next.inventory = next.inventory.filter((entry) => entry.quantity > 0);
     if (!item.quantity) delete state.products[request.id];
   } else throw new Error("未知特殊行动");
 
   state.revision += 1;
   const progress = resolveTurnProgress(next, action, "low", [], [], { elapsedMinutes: minutes });
+  if (operation === "sleep") narrative += `\n\n${progress.restRecovery.map(change => `${change.label} ${change.before}→${change.after}`).join("；") || "生命与理智均已达到上限。"}`;
   next.turn = game.turn + 1;
   next.hiddenDanger = progress.hiddenDanger;
   if (next.world) next.world.turn = next.turn;

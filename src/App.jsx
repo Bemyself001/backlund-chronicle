@@ -12,6 +12,8 @@ import WorldMap from "./components/WorldMap.jsx";
 import Modal from "./components/Modal.jsx";
 import SpecialActions from "./components/SpecialActions.jsx";
 import { resolveSpecialAction } from "./services/specialActions.js";
+import { medicineRecipe } from "./engine/recovery.js";
+import { specialState } from "./engine/specialActions.js";
 import ImportantItemConfirmation from "./components/ImportantItemConfirmation.jsx";
 import { createInitialGame, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from "./system/game.js";
 import { buildRejectedToolNarrative, dedupeToolCalls, executeToolCalls, normalizeToolCalls } from "./engine/tools.js";
@@ -451,7 +453,7 @@ export default function App() {
     try {
       const text = await generatePrayer(available.church, settings, controller.signal);
       if (controller.signal.aborted) throw new DOMException("祷告已取消", "AbortError");
-      const { next, action, progress, recovered } = settlePrayer(game, locationId);
+      const { next, action, progress, recovered, sanityRecovered } = settlePrayer(game, locationId);
       let narrative = `${text}\n\n${available.church.environment}`;
       if (progress.newTrigger?.presentation) {
         narrative += `\n\n【${progress.newTrigger.presentation.title}】${progress.newTrigger.presentation.text}`;
@@ -464,7 +466,7 @@ export default function App() {
       const trigger = progress.newTrigger?.presentation || next.triggerState?.active?.find((entry) => entry.status === "available")?.presentation;
       commitGame(markNarrativeEventsDelivered({ ...next, ...memory.updates,
         choices: injectOccultEntryChoice(game.choices, trigger),
-        changeLog: [...game.changeLog, ...progress.statusTickLogs, { id: makeId("log"), turn: next.turn, text: `向${available.church.deity}祷告：灵性恢复 ${recovered} 点。`, tone: "success" }].slice(-100),
+        changeLog: [...game.changeLog, ...progress.statusTickLogs, { id: makeId("log"), turn: next.turn, text: `向${available.church.deity}祷告：理智恢复 ${sanityRecovered} 点，灵性恢复 ${recovered} 点。`, tone: "success" }].slice(-100),
         lastTurnBaseline: baseline, lastTurnAudit: auditTurnChanges(baseline, next), lastTurnMetrics: null,
       }, resolution.derivedEffects.narrativeEvents));
       prayerRetryRef.current = null;
@@ -505,6 +507,11 @@ export default function App() {
 
   const runLocalTool = async (name, args, reason, showStory) => {
     if (!game || busyRef.current) return;
+    if (name === "item.use" && medicineRecipe(game.inventory.find(item => item.instanceId === args.instanceId))) {
+      const result = handleSpecialAction({ operation: "use", id: args.instanceId, revision: specialState(game).revision });
+      if (!result.ok) setError(result.error);
+      return;
+    }
     const auditBaseline = createAuditBaseline(game, game.turn);
     const call = { id: makeId("local"), name, args, reason };
     const execution = executeToolCalls({ ...game, turn: game.turn - 1 }, [call]);

@@ -1,4 +1,5 @@
 import { memo, useRef, useState } from "react";
+import { medicineRecipe } from "../engine/recovery.js";
 import { getAdvancement } from "../system/character.js";
 import { getTalent } from "../content/index.js";
 import { STAT_LABELS } from "../engine/statChanges.js";
@@ -56,7 +57,7 @@ export const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, 
       <div className={styles.itemActions}>
         {eligible && <button className={styles.primary} type="button" disabled={disabled} onClick={() => onAction(`服用${selected.name}并正式晋升至${selected.potion.pathwayName}序列${selected.potion.sequence}`, { advancementRequest: { potionInstanceId: selected.instanceId } })}>服用并晋升</button>}
         <button type="button" disabled={disabled} onClick={() => onLocalTool("item.inspect", { instanceId: selected.instanceId }, `检查${selected.name}`)}>检查</button>
-        {selected.tags.includes("消耗品") && !selected.potion && <button type="button" disabled={disabled} onClick={() => onLocalTool("item.use", { instanceId: selected.instanceId }, `主动使用${selected.name}`)}>使用</button>}
+        {(selected.tags.includes("消耗品") || medicineRecipe(selected)) && !selected.potion && <button type="button" disabled={disabled} onClick={() => onLocalTool("item.use", { instanceId: selected.instanceId }, `主动使用${selected.name}`)}>使用</button>}
         {selected.tags.includes("装备") && <button type="button" disabled={disabled} onClick={() => onLocalTool(selected.equipped ? "item.unequip" : "item.equip", { instanceId: selected.instanceId }, `玩家${selected.equipped ? "卸下" : "装备"}${selected.name}`)}>{selected.equipped ? "卸下" : "装备"}</button>}
         <button type="button" className={styles.danger} disabled={disabled} onClick={() => { if (window.confirm(`丢弃一件“${selected.name}”？`)) { onLocalTool("inventory.remove", { instanceId: selected.instanceId, quantity: 1 }, `玩家主动丢弃${selected.name}`); returnToList(); } }}>丢弃</button>
       </div>

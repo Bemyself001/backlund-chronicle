@@ -146,7 +146,9 @@ test("crafting deducts money and materials, yields sellable usable products and 
       assert.equal(used.character.stats[recipe.stat], recipe.delta);
       assert.ok(!used.inventory.find((entry) => entry.instanceId === item.instanceId));
       const ordinaryUse = executeToolCalls(game, [{ id: "bypass", name: "item.use", args: { instanceId: item.instanceId }, reason: "使用制作成品" }]);
-      assert.equal(ordinaryUse.results[0].ok, false);
+      assert.equal(ordinaryUse.results[0].ok, true);
+      assert.equal(ordinaryUse.game.character.stats[recipe.stat], recipe.delta);
+      assert.ok(!ordinaryUse.game.inventory.some(entry => entry.instanceId === item.instanceId));
     }
   }
   const early = fresh("generalist", 8);
