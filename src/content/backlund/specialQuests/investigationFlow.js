@@ -1,3 +1,5 @@
+import { RENARD_AUCTION_MEDICINE } from "./renardAuction.js";
+
 // Story-specific revisions; the shared engine only executes generic conditions,
 // rewards and timers. All currency values below are pence.
 const fact = (key, value = true) => ({ type: "fact", key, value });
@@ -91,6 +93,7 @@ export function configureSideQuests(quests) {
     ] }];
   }
   renard.eligibility = [];
+  renard.version = 5;
   renard.availableRewards = [{ id: "side.renard.discover-estate", type: "location-discover", locationId: "queen-renard-estate", note: "求医号外印着雷纳德子爵在皇后区百合街的宅邸地址。" }];
   renard.autoEngageWhen = [{ type: "location", locationId: "queen-renard-estate", includeChildren: true }];
   renard.presentation.text = "报童高喊号外：雷纳德子爵之女从高窗坠落，普通医生只能暂时维持伤势，子爵悬赏二十镑求助。报纸印着皇后区百合街宅邸的地址；回应后才算接受。";
@@ -100,15 +103,41 @@ export function configureSideQuests(quests) {
   secure.transitions = secure.transitions.filter(entry => entry !== recruit);
   secure.guidance = "药师直接救治；有适用药剂也可治疗，否则由子爵引荐今晚拍卖会。药剂可选购买，合作路线无需先付钱。";
   secure.transitions.push(step("attend-renard-auction", "由子爵引荐并参加当晚拍卖会；药剂起拍3镑，本场成交4镑，固定药师埃德蒙·维尔主动交谈", ["拍卖", "引荐", "非凡者圈子", "晚会"], "auction-conversation", { rewards: [award("side.renard.auction-invited")] }));
-  const medicine = itemReward("renard-healing-draught", "重伤治疗药剂", "适合本次骨折和内伤，不是晋升魔药。", "药剂");
-  medicine.item.tags = ["消耗品"];
-  const purchase = nextStage => step("buy-renard-medicine", "明确以4镑买下重伤治疗药剂；可跳过购买直接合作", ["买", "竞拍", "出价", "购买"], nextStage, { requirements: [{ type: "money", minPence: 960 }, missing("side.renard.medicine-bought")], requirementMessage: "需4镑且未购买；资金不足可直接与药师合作", rewards: [{ id: "side.renard.auction-cost", type: "money", amountPence: -960 }, medicine, award("side.renard.medicine-bought")] });
+  const medicine = itemReward(RENARD_AUCTION_MEDICINE.itemId, RENARD_AUCTION_MEDICINE.name, RENARD_AUCTION_MEDICINE.description, RENARD_AUCTION_MEDICINE.category);
+  medicine.item.tags = [...RENARD_AUCTION_MEDICINE.tags];
+  const estate = { type: "location", locationId: "queen-renard-estate", includeChildren: true };
+  const healing = secure.transitions.find(entry => entry.objectiveId === "use-healing-medicine");
+  healing.requirements.push(estate);
+  healing.requirementMessage = "需在雷纳德宅邸且持有任务专用的重伤治疗药剂；普通外伤药膏不能治疗骨折和内伤";
+  healing.actionTerms = ["治疗", "救治", "给伤者使用", "给小姐服下"];
+  const handoff = step("submit-healing-medicine", "在宅邸将重伤治疗药剂交给子爵用于治疗女儿，领取全部二十镑", ["提交", "交给", "交付", "递交"], "completed-medicine", {
+    requirements: [{ type: "item", itemId: "renard-healing-draught" }, estate],
+    requirementMessage: healing.requirementMessage,
+    complete: true,
+    rewards: healing.rewards,
+  });
+  secure.transitions.push(handoff);
+  const selfTreatment = secure.transitions.find(entry => entry.objectiveId === "treat-as-apothecary");
+  selfTreatment.requirements.push(estate);
+  selfTreatment.requirementMessage = "药师本人需在雷纳德宅邸实际治疗小姐，才能领取二十镑";
+  const shared = renard.stages.find(stage => stage.id === "shared-treatment");
+  const completeShared = shared.transitions.find(entry => entry.objectiveId === "complete-shared-treatment");
+  completeShared.requirements = [estate];
+  completeShared.requirementMessage = "需与已约定合作的药师返回雷纳德宅邸完成治疗；报酬按约定平分";
+  completeShared.actionTerms = ["共同治疗", "合作治疗", "完成治疗", "救治", "平分酬金"];
+  shared.transitions.push(step("submit-shared-medicine", "在宅邸将重伤治疗药剂交给合作药师救治小姐，按约定领取十镑", ["提交", "交给", "交付", "递交"], "completed-shared", {
+    requirements: [{ type: "item", itemId: "renard-healing-draught" }, estate],
+    requirementMessage: "需在雷纳德宅邸持有任务专用的重伤治疗药剂，并与合作药师完成救治",
+    complete: true,
+    rewards: [{ id: "side.renard.consume-medicine", type: "item-remove", itemId: "renard-healing-draught", quantity: 1 }, ...completeShared.rewards],
+  }));
+  const purchase = nextStage => step("buy-renard-medicine", "明确以4镑买下本场唯一的重伤治疗药剂；可跳过购买直接合作", ["买", "竞拍", "出价", "购买"], nextStage, { requirements: [{ type: "money", minPence: RENARD_AUCTION_MEDICINE.pricePence }, missing("side.renard.medicine-bought")], requirementMessage: "需4镑且未购买；资金不足可直接与药师合作", rewards: [{ id: "side.renard.auction-cost", type: "money", amountPence: -RENARD_AUCTION_MEDICINE.pricePence }, medicine, award("side.renard.medicine-bought")] });
   const warning = award("knowledge.deep-control-irreversible");
   renard.rewards.push(warning);
-  renard.stages.find(stage => stage.id === "shared-treatment").guidance = "与埃德蒙返回宅邸合作治疗，平分二十镑。他解释长期深度控制可能损伤自我，救活身体不等于找回原来的人。";
+  shared.guidance = "与埃德蒙返回宅邸完成治疗，或将任务专用的重伤治疗药剂交给他救治；按已约定的分工各得十镑。他解释长期深度控制可能损伤自我。";
   renard.stages.push(
     { id: "auction-conversation", guidance: "固定药师埃德蒙·维尔主动询问求医目的，并谈及深度控制难以逆转。可买药，也可直接交谈。", transitions: [purchase("auction-conversation"), step("meet-edmund", "与埃德蒙交谈后，侍者邀请两人进入子爵包厢", ["交谈", "药师", "埃德蒙", "询问", "包厢"], "auction-box", { rewards: [award("side.renard.apothecary-met"), warning] })] },
-    { id: "auction-box", guidance: "子爵请两人合作救治，明确平分二十镑。可以接受，也可用已买到的药剂独立救治。", transitions: [purchase("auction-box"), { ...recruit, description: "在包厢与埃德蒙明确约定合作并返回宅邸", actionTerms: ["合作", "同意", "接受", "药师"], rewards: [award("side.renard.cooperation-agreed")] }, { ...secure.transitions.find(entry => entry.objectiveId === "use-healing-medicine") }] },
+    { id: "auction-box", guidance: "子爵请两人合作救治，明确平分二十镑。可以接受，也可用已买到的药剂独立救治。", transitions: [purchase("auction-box"), { ...recruit, description: "在包厢与埃德蒙明确约定合作并返回宅邸", actionTerms: ["合作", "同意", "接受", "药师"], rewards: [award("side.renard.cooperation-agreed")] }, healing, handoff] },
   );
   secure.transitions.find(entry => entry.objectiveId === "attend-renard-auction").untilHour = 20;
   renard.stages[0].transitions[0].description = "在百合街宅邸与雷纳德子爵交谈，确认普通医术只能暂时维持伤势，救治必须借助非凡力量";

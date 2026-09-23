@@ -73,7 +73,7 @@ test('version 1.6.0 saves correct white rose to white iris across clues, journal
   });
   game.triggerState.rewardsClaimed = ['watch.hidden-note.formal-quest'];
   const migrated = migrateSave(game);
-  assert.equal(migrated.content.contentVersion, '2026.09.17.1');
+  assert.equal(migrated.content.contentVersion, '2026.09.23.1');
   assert.doesNotMatch(JSON.stringify(migrated), /白蔷薇/);
   assert.doesNotMatch(JSON.stringify(migrated), /南岸货站/);
   assert.match(migrated.questJournal.entries['old-watch'].summary, /白鸢尾/);

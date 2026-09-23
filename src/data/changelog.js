@@ -149,6 +149,18 @@ const RELEASE_149_UPDATE = {
 };
 
 export const LATEST_UPDATE = {
+  date: "2026-09-23", dateLabel: "2026.09.23",
+  title: "1.6.10 · 高窗之下治疗药剂交付修复",
+  summary: "高窗之下拍卖会只产出同一ID的重伤治疗药剂；取得药剂或找到药师后，回宅邸自动完成救治与酬金结算。",
+  changes: [
+    "拍卖会的数据层只定义一份重伤治疗药剂，物品ID固定为 renard-healing-draught；系统拒绝AI在拍卖阶段另造药剂或绕过任务购买。",
+    "任务新增可存档的治疗准备值：取得指定药剂或找到药师后从0变为1，返回雷纳德宅邸固定触发救治成功。",
+    "玩家独立取得药剂可获全部二十镑；与药师合作时子爵支付二十镑，玩家按约定获得十镑。",
+    "任务药剂只能由本地任务结算扣除；旧存档中进行中的任务会获得新规则，酬金仅发放一次。",
+  ],
+};
+
+const RELEASE_169_UPDATE = {
   date: "2026-09-21", dateLabel: "2026.09.21",
   title: "1.6.9 · 睡眠、祷告与药剂恢复",
   summary: "新增旅店睡眠恢复生命与理智，教堂祷告同时恢复理智与灵性，并打通药剂购买、制作和背包使用。",
@@ -505,6 +517,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_169_UPDATE,
   RELEASE_165_UPDATE,
   RELEASE_164_UPDATE,
   RELEASE_163_UPDATE,

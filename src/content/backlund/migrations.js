@@ -2,6 +2,10 @@ import { WATCH_NOTE_DETAIL } from "./watchNote.js";
 
 export const CONTENT_MIGRATIONS = [
   {
+    id: "backlund.renard-medicine-handoff", fromVersion: "2026.09.17.1", toVersion: "2026.09.23.1",
+    definitionRefreshes: [{ definitionId: "side.queens.renard-fall", toDefinitionVersion: 6 }],
+  },
+  {
     id: "backlund.south-docks-and-renard-estate", fromVersion: "2026.09.16.5", toVersion: "2026.09.17.1",
     cluePatches: [{ id: "clue-watch-note-decoded", patch: { detail: WATCH_NOTE_DETAIL } }],
     definitionRefreshes: [

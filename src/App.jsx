@@ -31,7 +31,7 @@ import { ensureMapMoveToolCall, ensureMapDiscoveryToolCall } from "./services/ma
 import { choiceResult, choiceValidationError, hasValidModelChoices, modelChoices, injectOccultEntryChoice } from "./services/choices.js";
 import { applyChoiceRecovery, recoverChoices } from "./services/choiceRecovery.js";
 import { createTurnResolution } from "./services/turnResolution.js";
-import { pendingQuestNarration, markNarrativeEventsDelivered, eventDirections } from "./services/narrativeEvents.js";
+import { pendingQuestNarration, markNarrativeEventsDelivered, eventDirections, appendFixedRenardTreatmentScene } from "./services/narrativeEvents.js";
 import { makeId } from "./utils/id.js";
 import { canHotUpdate, checkForUpdate, downloadAndApplyOta, isNativeAndroid } from "./services/updates.js";
 import { finishTurnMetrics, markTurnMetric, recordModelRequest, startTurnMetrics } from "./services/turnMetrics.js";
@@ -394,6 +394,7 @@ export default function App() {
       }
 
       if (settings.mockMode && resolution.derivedEffects.narrativeEvents.length) response = { ...response, narrative: `${response.narrative}\n\n${eventDirections(resolution.derivedEffects.narrativeEvents)}` };
+      response = { ...response, narrative: appendFixedRenardTreatmentScene(response.narrative, progress) };
       const { choices, choiceMeta } = choiceResult(modelChoices(response), choiceValidationError(response));
 
       const appearedTrigger = progress.newTrigger ? { id: progress.newTrigger.instanceId, ...progress.newTrigger.presentation } : null;

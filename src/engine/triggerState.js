@@ -64,6 +64,7 @@ function normalizeInstance(instance = {}, fallbackStatus = "available") {
     chainCount: Math.max(0, Math.min(3, Number(instance.chainCount) || 0)),
     chainIsolated: Boolean(instance.chainIsolated),
     lastProgressEvidence: String(instance.lastProgressEvidence || ""),
+    treatmentReady: instance.definitionId === "side.queens.renard-fall" && Number(instance.treatmentReady) === 1 ? 1 : 0,
   };
 }
 

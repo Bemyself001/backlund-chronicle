@@ -26,6 +26,7 @@ function journalEntry(game, instance) {
     id: instance.instanceId, source: "trigger", title: text(instance.presentation?.title) || text(definition?.presentation?.title) || "未命名调查",
     summary: text(instance.lastProgressEvidence) || text(instance.presentation?.text) || text(goal), objective: text(goal),
     status: instance.status, stage: instance.stage, revision: `${instance.status}:${instance.stage}:${instance.stageHistory?.length || 0}:${guidance.key}`,
+    ...(instance.definitionId === "side.queens.renard-fall" ? { treatmentReady: instance.treatmentReady === 1 ? 1 : 0 } : {}),
     startedTurn: instance.engagedTurn ?? instance.createdTurn, updatedTurn: game.turn,
     policy: questStagePolicy(definition, stage),
   };

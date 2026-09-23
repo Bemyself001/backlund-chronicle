@@ -1,5 +1,15 @@
 import { triggerGuidance } from "../engine/triggerGuidance.js";
 import { questJournalEvents } from "../engine/questRuntime.js";
+import { RENARD_TREATMENT_SCENES } from "../content/index.js";
+
+export function appendFixedRenardTreatmentScene(narrative, progress) {
+  const completed = progress?.triggerEvents?.completed?.find(event => event.definitionId === "side.queens.renard-fall"
+    && event.stageHistory?.at(-1)?.id?.endsWith(":prepared-treatment"));
+  if (!completed) return narrative;
+  const shared = completed.rewards?.includes("side.renard.pay-shared");
+  const scene = shared ? RENARD_TREATMENT_SCENES.shared : RENARD_TREATMENT_SCENES.solo;
+  return `${String(narrative || "").trim()}\n\n${scene}`.trim();
+}
 
 export function pendingWatchNarration(game) {
   if (!game.triggerState?.facts?.['watch.note-recovered']?.value || game.triggerState?.facts?.['watch.formal-quest-unlocked']?.value || game.narrativeEventsDelivered?.['watch.investigation-routes']) return [];

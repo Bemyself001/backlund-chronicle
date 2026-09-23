@@ -33,6 +33,8 @@ export const SCENARIO_RULES = ACTIVE_CONTENT.narrative.scenarioRules;
 export const SPECIAL_ACTIONS = ACTIVE_CONTENT.specialActions;
 export const SPECIAL_RECIPES = ACTIVE_CONTENT.specialRecipes;
 export const SPECIAL_CONTACTS = ACTIVE_CONTENT.specialContacts;
+export const RENARD_AUCTION_MEDICINE = ACTIVE_CONTENT.renardAuctionMedicine;
+export const RENARD_TREATMENT_SCENES = ACTIVE_CONTENT.renardTreatmentScenes;
 
 const ORGANIZATIONS_BY_ID = new Map(ORGANIZATIONS.map((entry) => [entry.id, entry]));
 const ITEM_BEHAVIORS_BY_ID = new Map(ITEM_BEHAVIORS.map((entry) => [entry.itemId, entry]));

@@ -16,6 +16,7 @@ import { moneyFromPence, moneyToPence } from "../system/money.js";
 import { renderContentData } from "./contentTemplates.js";
 import { questStagePolicy, settleQuestAttempts, syncQuestJournal } from "./questRuntime.js";
 import { getMapLocation, normalizeLocationKnowledge } from "../system/map.js";
+import { RENARD_AUCTION_MEDICINE } from "../content/index.js";
 
 function definitionEligible(definition, context) {
   if (!allConditionsMatch(definition.eligibility || [], context)) return false;
@@ -186,8 +187,41 @@ function completeInstance(game, state, instance, definition, turn, events, trans
   if (completed) events.completed.push({ ...completed, rewards });
 }
 
+function updateRenardTreatmentReady(game, state) {
+  for (const instance of state.active) {
+    if (instance.definitionId !== "side.queens.renard-fall" || instance.status !== "engaged") continue;
+    const hasMedicine = game.inventory.some(item => item.itemId === RENARD_AUCTION_MEDICINE.itemId && Number(item.quantity) > 0);
+    const hasApothecary = Boolean(state.facts["side.renard.apothecary-met"]?.value) || instance.stage === "shared-treatment";
+    instance.treatmentReady = hasMedicine || hasApothecary ? 1 : 0;
+  }
+}
+
+function completePreparedRenardTreatment(game, state, instance, definition, turn, events) {
+  if (instance.definitionId !== "side.queens.renard-fall" || instance.treatmentReady !== 1 || game.location?.id !== "queen-renard-estate" || Number(game.character?.stats?.health) <= 0) return false;
+  const hasMedicine = game.inventory.some(item => item.itemId === RENARD_AUCTION_MEDICINE.itemId && Number(item.quantity) > 0);
+  const cooperation = instance.stage === "shared-treatment" || Boolean(state.facts["side.renard.cooperation-agreed"]?.value);
+  const assisted = cooperation || !hasMedicine;
+  const objectiveId = cooperation && hasMedicine ? "submit-shared-medicine" : assisted ? "complete-shared-treatment" : "submit-healing-medicine";
+  const rewardStage = definition.stages.find(stage => stage.id === (assisted ? "shared-treatment" : "secure-treatment"));
+  const transition = rewardStage?.transitions.find(entry => entry.objectiveId === objectiveId);
+  const rewards = transition?.rewards;
+  if (!rewards) return false;
+  const from = instance.stage;
+  instance.stage = assisted ? "completed-shared" : "completed-medicine";
+  instance.progressTurn = turn;
+  instance.processedTurn = turn;
+  instance.lastProgressEvidence = hasMedicine
+    ? cooperation ? "玩家将重伤治疗药剂交给埃德蒙，二人完成救治；子爵支付二十镑，玩家按约定分得十镑。" : "玩家取得重伤治疗药剂并带回宅邸，小姐获救；子爵将二十镑交给玩家。"
+    : "埃德蒙随玩家返回宅邸完成救治；子爵支付二十镑，玩家按约定分得十镑。";
+  instance.stageHistory.push({ id: `${instance.instanceId}:${turn}:prepared-treatment`, from, to: instance.stage, turn, evidenceIds: [instance.lastProgressEvidence] });
+  events.advanced.push({ instanceId: instance.instanceId, definitionId: instance.definitionId, from, to: instance.stage, turn });
+  completeInstance(game, state, instance, definition, turn, events, rewards);
+  return true;
+}
+
 function advanceExisting(game, state, signals, action, turn, events) {
   const context = { game, state, signals, action, turn };
+  updateRenardTreatmentReady(game, state);
   for (const instance of [...state.active]) {
     const definition = getInstanceTriggerDefinition(instance, game);
     if (!definition) continue;
@@ -200,6 +234,7 @@ function advanceExisting(game, state, signals, action, turn, events) {
       events.engaged.push(structuredClone(instance));
     }
     if (instance.status !== "engaged") continue;
+    if (completePreparedRenardTreatment(game, state, instance, definition, turn, events)) continue;
     if (instance.processedTurn != null && instance.processedTurn >= turn) continue;
     instance.processedTurn = turn;
     const stage = (definition.stages || []).find((entry) => entry.id === instance.stage);
@@ -231,6 +266,7 @@ function advanceExisting(game, state, signals, action, turn, events) {
     else for (const reward of transition?.rewards || []) applyReward(game, state, reward, turn);
     if (instance.status === "engaged" && state.active.some(entry => entry.instanceId === instance.instanceId)) settleTimers(game, state, instance, definition, turn, events);
   }
+  updateRenardTreatmentReady(game, state);
 }
 
 // Timers belong to content definitions, not to model prose. The last permitted

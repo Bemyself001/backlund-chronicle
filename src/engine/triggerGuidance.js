@@ -6,8 +6,10 @@ export function triggerGuidance(game, instance) {
   const stage = definition?.stages?.find(entry => entry.id === instance.stage);
   const context = { game, state: game.triggerState, action: "", turn: game.turn, instance };
   const override = (stage?.guidanceRules || []).find(rule => allConditionsMatch(rule.conditions, context));
-  const terminal = instance.status === "completed" ? definition?.completionGuidance
-    : ["failed", "expired", "abandoned"].includes(instance.status) ? definition?.failureGuidance : null;
+  const renardOutcome = instance.definitionId === "side.queens.renard-fall" && instance.status === "completed" && instance.lastProgressEvidence?.includes("二十镑")
+    ? { guidance: instance.lastProgressEvidence, narrativeCue: "在宅邸明确描写小姐获救、子爵当场支付二十镑；药师合作时玩家按约定获得十镑。" } : null;
+  const terminal = renardOutcome || (instance.status === "completed" ? definition?.completionGuidance
+    : ["failed", "expired", "abandoned"].includes(instance.status) ? definition?.failureGuidance : null);
   return {
     instanceId: instance.instanceId,
     key: override?.id || instance.stage,

@@ -115,8 +115,9 @@ test('Renard estate arrival presents the viscount speaking with a servant before
 test('auction purchase leads straight to treatment; treatment guidance respects player pathway', () => {
   const game = make(RENARD, 'auction-conversation');
   game.inventory.push({ instanceId: 'medicine', itemId: 'renard-healing-draught', quantity: 1 });
+  game.location = { id: 'queen-renard-estate', name: '雷纳德子爵宅邸', district: '皇后区' };
   const { resolution } = settle(game, 'use-healing-medicine', '返回宅邸用治疗药剂救治小姐');
-  assert.match(eventDirections(resolution.derivedEffects.narrativeEvents), /求医有了结果/);
+  assert.match(eventDirections(resolution.derivedEffects.narrativeEvents), /求医有了结果|小姐获救/);
   const apothecary = make(RENARD, 'secure-treatment');
   apothecary.character = createInitialGame({ ...EMPTY_CHARACTER, extraordinary: 'low', pathway: '药师（序列9）' }).character;
   assert.match(triggerGuidance(apothecary, apothecary.triggerState.active[0]).text, /你自己/);

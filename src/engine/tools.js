@@ -7,7 +7,7 @@ import { amountToPence, formatMoney, moneyFromPence, moneyToPence } from "../sys
 import { isImportantNonMoneyItem, normalizeInventoryItem, normalizeItemImportance } from "../system/items.js";
 import { equipmentSlot } from "../system/loadout.js";
 import { applyAdvancement, getAdvancement, isExplicitAdvancementIntent } from "../system/character.js";
-import { getOrganization, getPathway } from "../content/index.js";
+import { getOrganization, getPathway, RENARD_AUCTION_MEDICINE } from "../content/index.js";
 import { abandonTrigger, engageTrigger, progressTrigger } from "./triggerEngine.js";
 import { normalizeTriggerState } from "./triggerState.js";
 import { executeItemContentAction, hasItemContentAction } from "./itemActions.js";
@@ -392,6 +392,12 @@ function executeOne(game, call, options = {}) {
   switch (call.name) {
     case "inventory.add": {
       const source = args.item;
+      const renardAuction = game.triggerState?.active?.some(entry => entry.definitionId === "side.queens.renard-fall"
+        && ["available", "engaged"].includes(entry.status)
+        && (["auction-conversation", "auction-box"].includes(entry.stage) || /拍卖|竞拍|出价/.test(String(options.playerAction || call.reason || ""))));
+      const auctionMedicine = source?.itemId === RENARD_AUCTION_MEDICINE.itemId || (renardAuction
+        && (source?.category === "药剂" || source?.potion || /药剂|魔药|药膏|治疗药/.test(`${source?.name || ""} ${source?.description || ""}`)));
+      if (auctionMedicine) return fail(call.name, "高窗之下拍卖会只有一份任务专用重伤治疗药剂；请通过任务的购买目标结算，由本地内容登记唯一物品ID与四镑费用");
       const quantity = Number(source?.quantity ?? 1);
       if (!source?.itemId || !source?.name || !source?.description) return fail(call.name, "新物品必须包含 itemId、name 与 description");
       if (source.potion && !normalizeInventoryItem(source).potion) return fail(call.name, "魔药必须使用本地登记的 pathwayId 与 0—9 序列");
@@ -417,6 +423,7 @@ function executeOne(game, call, options = {}) {
       const target = findItem();
       const quantity = Number(args.quantity);
       if (!target) return fail(call.name, "背包中不存在该物品实例");
+      if (target.itemId === RENARD_AUCTION_MEDICINE.itemId && game.triggerState?.active?.some(entry => entry.definitionId === "side.queens.renard-fall" && entry.status === "engaged")) return fail(call.name, "任务药剂由高窗之下结算时扣除，不能先从行囊移除");
       if (target.potion && /服用|喝下|饮下|吞下|摄入|晋升|消耗/.test(call.reason)) return fail(call.name, "魔药不能通过普通物品移除来服用；必须经过晋升确认");
       if (!Number.isInteger(quantity) || quantity < 1 || quantity > target.quantity) return fail(call.name, "移除数量无效或超过持有数量");
       const change = { ...target, delta: -quantity, reason: call.reason, importance: normalizeItemImportance(target) };
@@ -497,6 +504,7 @@ function executeOne(game, call, options = {}) {
           return succeed(call.name, `使用「${target.name}」：${change.label} ${change.before}→${change.after}。`, { inventoryChange, statChange: change });
         } catch (error) { return fail(call.name, error.message); }
       }
+      if (target.itemId === RENARD_AUCTION_MEDICINE.itemId) return fail(call.name, "这份重伤治疗药剂用于「高窗之下」；持有药剂返回雷纳德宅邸后，任务会自动结算救治和酬金");
       if (target.potion) return fail(call.name, target.potion.identified ? "魔药不能作为普通消耗品使用；必须通过晋升验证" : "未知魔药尚未鉴定，不能直接服用");
       const contentAction = executeItemContentAction(game, target, "use", { turn: game.turn + 1, playerAction: options.playerAction ?? call.reason });
       if (contentAction?.handled) {

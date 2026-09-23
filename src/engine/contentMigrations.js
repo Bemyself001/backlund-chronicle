@@ -1,4 +1,4 @@
-import { ACTIVE_CONTENT, CONTENT_SCHEMA_VERSION, CONTENT_VERSION } from "../content/index.js";
+import { ACTIVE_CONTENT, CONTENT_SCHEMA_VERSION, CONTENT_VERSION, RENARD_AUCTION_MEDICINE } from "../content/index.js";
 import { getTriggerDefinition, hydrateActiveTriggerDefinitions } from "./triggerDefinitions.js";
 import { allConditionsMatch } from "./triggerConditions.js";
 import { renderContentData } from "./contentTemplates.js";
@@ -34,6 +34,11 @@ function refreshDefinitions(game, step) {
         }
       }
       instance.definitionVersion = Number(refresh.toDefinitionVersion || definition.version || 1);
+      if (instance.definitionId === "side.queens.renard-fall" && instance.status === "engaged") {
+        const hasMedicine = game.inventory.some(item => item.itemId === RENARD_AUCTION_MEDICINE.itemId && Number(item.quantity) > 0);
+        const hasApothecary = Boolean(state.facts?.["side.renard.apothecary-met"]?.value) || instance.stage === "shared-treatment";
+        instance.treatmentReady = hasMedicine || hasApothecary ? 1 : 0;
+      }
       delete instance.definitionSnapshot;
     }
   }

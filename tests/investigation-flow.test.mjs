@@ -7,9 +7,11 @@ import { getTriggerDefinition } from '../src/engine/triggerDefinitions.js';
 import { migrateSave } from '../src/services/storage.js';
 import { moneyToPence, moneyFromPence } from '../src/system/money.js';
 import { triggerGuidance } from '../src/engine/triggerGuidance.js';
-import { minutesForTurn } from '../src/engine/turn.js';
+import { minutesForTurn, resolveTurnProgress } from '../src/engine/turn.js';
 import { SPECIAL_ACTIONS, ACTIVE_CONTENT, validateContentPack } from '../src/content/index.js';
+import { RENARD_AUCTION_MEDICINE } from '../src/content/index.js';
 import { executeSpecialAction } from '../src/engine/specialActions.js';
+import { appendFixedRenardTreatmentScene } from '../src/services/narrativeEvents.js';
 
 const WATCH = 'watch.heirloom.late-hour';
 const DRAIN = 'side.bridge.ebb-iron-door';
@@ -138,18 +140,115 @@ test('auction supports poor cooperation and optional paid medicine without dupli
   assert.ok(minutesForTurn('参加拍卖会', attended.calls, attended.results, game.worldTime) >= 5);
   assert.equal(act(game, 'buy-renard-medicine', '买药剂').results[0].ok, false);
   ({ game } = act(game, 'meet-edmund', '与埃德蒙交谈进入包厢'));
+  assert.equal(game.triggerState.active.find(item => item.instanceId === 'case').treatmentReady, 1);
   ({ game } = act(game, 'recruit-apothecary', '同意与药师合作'));
-  ({ game } = act(game, 'complete-shared-treatment', '共同治疗小姐'));
+  game.location = { id: 'queen-renard-estate', name: '雷纳德子爵宅邸', district: '皇后区' };
+  ({ game } = act(game, null, '返回雷纳德子爵宅邸'));
   assert.equal(moneyToPence(game.money), 2400);
   assert.ok(game.triggerState.facts['knowledge.deep-control-irreversible']);
   game = fresh(RENARD, 'auction-conversation'); game.money = moneyFromPence(1200);
   ({ game } = act(game, 'buy-renard-medicine', '购买药剂'));
   assert.equal(moneyToPence(game.money), 240);
+  assert.equal(game.inventory.find(item => item.itemId === RENARD_AUCTION_MEDICINE.itemId)?.name, RENARD_AUCTION_MEDICINE.name);
+  assert.equal(game.triggerState.active.find(item => item.instanceId === 'case').treatmentReady, 1);
   assert.equal(act(game, 'buy-renard-medicine', '再买药剂').results[0].ok, false);
   ({ game } = act(game, 'meet-edmund', '与药师交谈'));
-  ({ game } = act(game, 'use-healing-medicine', '返回宅邸用药救治小姐'));
+  game.location = { id: 'queen-renard-estate', name: '雷纳德子爵宅邸', district: '皇后区' };
+  ({ game } = act(game, null, '返回宅邸'));
   assert.equal(moneyToPence(game.money), 5040);
   assert.equal(game.inventory.some(item => item.itemId === 'renard-healing-draught'), false);
+});
+
+test('auction potion names cannot mint another item and the fixed purchase keeps one ID', () => {
+  const game = fresh(RENARD, 'auction-conversation');
+  game.money = moneyFromPence(1200);
+  for (const name of ['灵性治疗药剂', '创伤治疗药剂', '重伤治疗药剂']) {
+    const added = executeToolCalls(game, [{ id: `invent-${name}`, name: 'inventory.add', args: { item: { itemId: `invented-${name}`, name, description: '拍卖所得药剂', category: '药剂', quantity: 1 } }, reason: '拍卖获得药剂' }]);
+    assert.equal(added.results[0].ok, false, name);
+    assert.equal(added.game.inventory.length, game.inventory.length);
+  }
+  const spoof = executeToolCalls(game, [{ id: 'spoof', name: 'inventory.add', args: { item: { itemId: RENARD_AUCTION_MEDICINE.itemId, name: '创伤治疗药剂', description: '仿冒任务药剂' } }, reason: '绕过拍卖' }]);
+  assert.equal(spoof.results[0].ok, false);
+  const early = fresh(RENARD, 'secure-treatment');
+  const inventedBeforeAuction = executeToolCalls(early, [{ id: 'early', name: 'inventory.add', args: { item: { itemId: 'other-treatment', name: '灵性治疗药剂', description: '另一份治疗药剂', category: '药剂' } }, reason: '拍卖中取得' }], { playerAction: '参加拍卖会' });
+  assert.equal(inventedBeforeAuction.results[0].ok, false);
+  const bought = act(game, 'buy-renard-medicine', '花四镑购买拍卖会药剂').game;
+  assert.equal(bought.inventory.filter(item => item.itemId === RENARD_AUCTION_MEDICINE.itemId).length, 1);
+  assert.equal(bought.inventory.some(item => item.name === '灵性治疗药剂'), false);
+  assert.equal(moneyToPence(bought.money), 240);
+});
+
+test('meeting the auction apothecary sets readiness and returning to the estate pays ten pounds', () => {
+  let game = fresh(RENARD, 'auction-conversation');
+  const balance = moneyToPence(game.money);
+  assert.equal(game.triggerState.active[0].treatmentReady ?? 0, 0);
+  ({ game } = act(game, 'meet-edmund', '与序列九药师埃德蒙交谈'));
+  assert.equal(game.triggerState.active[0].treatmentReady, 1);
+  assert.equal(moneyToPence(game.money), balance);
+  game.location = { id: 'queen-renard-estate', name: '雷纳德子爵宅邸', district: '皇后区' };
+  ({ game } = act(game, null, '返回子爵宅邸'));
+  assert.equal(game.triggerState.history.find(item => item.instanceId === 'case').status, 'completed');
+  assert.equal(moneyToPence(game.money) - balance, 2400);
+  assert.match(game.triggerState.history.find(item => item.instanceId === 'case').lastProgressEvidence, /子爵支付二十镑/);
+});
+
+test('handing over the quest medicine at the estate completes treatment and pays once', () => {
+  const game = fresh(RENARD, 'secure-treatment');
+  game.location = { id: 'queen-renard-estate', name: '雷纳德子爵宅邸', district: '皇后区' };
+  game.inventory.push({ instanceId: 'renard-dose', itemId: 'renard-healing-draught', name: '重伤治疗药剂', quantity: 1, tags: ['消耗品'], weight: 0.1 });
+  const directUse = executeToolCalls(game, [{ id: 'use', name: 'item.use', args: { instanceId: 'renard-dose' }, reason: '使用药剂' }]);
+  assert.equal(directUse.results[0].ok, false);
+  assert.equal(directUse.game.inventory.some(item => item.instanceId === 'renard-dose'), true);
+  const next = structuredClone(game);
+  const progress = resolveTurnProgress(next, '把重伤治疗药剂提交给雷纳德子爵', 'low');
+  assert.ok(progress);
+  assert.match(appendFixedRenardTreatmentScene('你返回了宅邸。', progress), /子爵当场将二十镑酬金交给你/);
+  assert.equal(next.triggerState.active.some(item => item.instanceId === 'case'), false);
+  assert.equal(next.triggerState.history.find(item => item.instanceId === 'case').status, 'completed');
+  assert.equal(next.inventory.some(item => item.instanceId === 'renard-dose'), false);
+  assert.equal(moneyToPence(next.money) - moneyToPence(game.money), 4800);
+  assert.equal(next.triggerState.facts['side.renard.completed'].value, true);
+  resolveTurnProgress(next, '再次提交药剂', 'low');
+  assert.equal(moneyToPence(next.money) - moneyToPence(game.money), 4800);
+});
+
+test('medicine handoff needs the quest dose and estate; agreed cooperation pays the agreed share', () => {
+  const game = fresh(RENARD, 'shared-treatment');
+  game.inventory.push({ instanceId: 'salve', itemId: 'special-wound-salve', name: '外伤药膏', quantity: 1 });
+  const missing = structuredClone(game);
+  resolveTurnProgress(missing, '提交药剂', 'low');
+  assert.equal(stageOf(missing), 'shared-treatment');
+  game.inventory.push({ instanceId: 'renard-dose', itemId: 'renard-healing-draught', name: '重伤治疗药剂', quantity: 1 });
+  const away = structuredClone(game);
+  resolveTurnProgress(away, '提交药剂', 'low');
+  assert.equal(stageOf(away), 'shared-treatment');
+  game.location = { id: 'queen-renard-estate', name: '雷纳德子爵宅邸', district: '皇后区' };
+  const next = structuredClone(game);
+  const progress = resolveTurnProgress(next, '提交药剂', 'low');
+  assert.match(appendFixedRenardTreatmentScene('你返回了宅邸。', progress), /你得到十镑/);
+  assert.equal(moneyToPence(next.money) - moneyToPence(game.money), 2400);
+  assert.equal(next.inventory.some(item => item.instanceId === 'renard-dose'), false);
+  assert.equal(next.triggerState.history.find(item => item.instanceId === 'case').status, 'completed');
+});
+
+test('existing 1.6.9 save upgrades its active Renard definition without rewriting history', () => {
+  const game = fresh(RENARD, 'secure-treatment');
+  game.content.contentVersion = '2026.09.17.1';
+  game.triggerState.active[0].definitionVersion = 1;
+  game.triggerState.active[0].definitionSnapshot = { id: RENARD, version: 1, stages: [{ id: 'secure-treatment', transitions: [] }] };
+  game.inventory.push({ instanceId: 'auction-dose', itemId: RENARD_AUCTION_MEDICINE.itemId, name: '创伤治疗药剂', quantity: 1, weight: 0.1 });
+  const loaded = migrateSave(game);
+  const current = loaded.triggerState.active.find(item => item.instanceId === 'case');
+  assert.equal(current.definitionVersion, getTriggerDefinition(RENARD).version);
+  assert.ok(current.definitionSnapshot.stages.find(stage => stage.id === 'secure-treatment').transitions.some(item => item.objectiveId === 'submit-healing-medicine'));
+  assert.equal(current.stage, 'secure-treatment');
+  assert.equal(current.treatmentReady, 1);
+  assert.equal(loaded.inventory.find(item => item.instanceId === 'auction-dose').name, '创伤治疗药剂');
+  loaded.location = { id: 'queen-renard-estate', name: '雷纳德子爵宅邸', district: '皇后区' };
+  const before = moneyToPence(loaded.money);
+  resolveTurnProgress(loaded, '返回雷纳德宅邸', 'low');
+  assert.equal(moneyToPence(loaded.money) - before, 4800);
+  assert.equal(loaded.inventory.some(item => item.instanceId === 'auction-dose'), false);
 });
 
 test('old active definitions migrate, terminal history stays historical, reward claims persist', () => {

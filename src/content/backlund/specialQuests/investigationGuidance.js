@@ -26,10 +26,10 @@ const stages = {
   },
   "side.queens.renard-fall": {
     "assess-injury": pair("求医号外印着皇后区百合街的地址。抵达雷纳德子爵宅邸后，应先在门厅与子爵本人交谈。"),
-    "secure-treatment": pair("子爵已隐晦说明：普通医术救不了女儿，必须借助非凡力量。玩家本人不必先晋升；药师的能力、合适的治疗药剂或可信药师的协助都可以成为救治路线。", "承接门厅谈话，让子爵以贵族的克制口吻提及普通医生束手无策，并引出今晚的私人拍卖会；不要要求玩家本人必须先成为非凡者，也不要把资金不足写成无路可走。"),
-    "auction-conversation": pair("会场里有治疗药剂的拍卖，也有一位名叫埃德蒙·维尔的药师。他似乎留意到了你的来意。"),
+    "secure-treatment": pair("子爵已说明普通医术救不了女儿。药师本人可在宅邸治疗；拿到任务专用的重伤治疗药剂后，在宅邸交给子爵即可视为开始并完成救治，独立路线当回合结算二十镑。普通外伤药膏不适用。", "说明药剂交付即可开始并成功完成救治，无需再让玩家声明治疗成功。"),
+    "auction-conversation": pair("会场本轮唯一的治疗药剂拍品是适合骨折与内伤的重伤治疗药剂，成交价四镑；药师埃德蒙·维尔也在场。药剂取得后即可准备回宅邸救治。", "拍卖会只有这一种可用于高窗之下的药剂，不生成另一类灵性药剂或替代拍品。"),
     "auction-box": pair("侍者引来的包厢里，子爵希望你与埃德蒙共同救治女儿。报酬与分工还有待你们说定。"),
-    "shared-treatment": pair("合作已经谈妥，雷纳德宅邸里仍有人等着救治。埃德蒙愿意同行。"),
+    "shared-treatment": pair("合作已谈妥。与埃德蒙回雷纳德宅邸完成治疗；若已拿到任务专用的重伤治疗药剂，在宅邸交给他即可开始并完成救治，玩家按约定领取十镑。"),
   },
   "side.bridge.silent-detonator": {
     "inspect-dud": pair("码头工人能指认桥区的拆除工地。承包商留下的哑火品和原包装，是调包事件的起点。"),
@@ -84,6 +84,7 @@ export function configureInvestigationGuidance(definitions) {
   stage(renard, 'auction-box').guidanceRules = [branch('has-medicine', [{ type: 'item', itemId: 'renard-healing-draught' }], '子爵提出合作，而你手中已有适用的药剂。如何安排救治，仍可在包厢里谈清楚。')];
   // A purchased medicine must not leave the player stranded in the auction stage.
   stage(renard, 'auction-conversation').transitions.push({ ...stage(renard, 'secure-treatment').transitions.find(entry => entry.objectiveId === 'use-healing-medicine') });
+  stage(renard, 'auction-conversation').transitions.push({ ...stage(renard, 'secure-treatment').transitions.find(entry => entry.objectiveId === 'submit-healing-medicine') });
   byId['watch.heirloom.hidden-note'].completionGuidance = pair(`纸条完整译文：“${WATCH_NOTE_TEXT}”桥区南岸货栈与舅舅的旧工作记录是可继续调查的方向。`);
   main.completionGuidance = pair('你已离开货栈。手里真正带出的物品与记录，才是这场旧事留下的东西；其余疑点仍没有答案。');
   main.failureGuidance = pair('货栈中的追查在危险里中断。已经发生的损失不会因等待救援而消失。');
