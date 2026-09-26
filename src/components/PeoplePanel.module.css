@@ -1,0 +1,30 @@
+.people { min-width: 0; }
+.people .intro { margin: -.25rem 0 1rem; color: #bdbeaa; font-size: .8rem; }
+.list { display: grid; gap: .9rem; }
+.card { min-width: 0; padding: 1rem; border: 1px solid #58664e; border-top: 2px solid #baaa77; background: #253429; }
+.heading { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+.heading > div { min-width: 0; }
+.heading h4 { color: #f0e2c3; font-size: 1.05rem; }
+.heading .alias { margin: 0; color: #cdb67f; font-size: .75rem; }
+.contact { flex-shrink: 0; border: 1px solid #80906d; padding: .15rem .4rem; color: #d1d4bc; font-size: .7rem; }
+.contact[data-contact="met"] { background: #354c38; border-color: #94ac7d; color: #e0eaca; }
+.card p { color: #d4d5c2; font-size: .85rem; }
+.card .role { margin-top: .35rem; color: #c6b88d; font-size: .8rem; }
+.card .status { display: inline-block; margin: .3rem 0; padding: .1rem .45rem; background: #394332; color: #ece0bb; font-size: .75rem; }
+.recent { padding-top: .55rem; border-top: 1px solid #526047; }
+.recent strong, .location strong { display: block; margin-bottom: .15rem; color: #bfc2aa; font-size: .72rem; font-weight: 400; }
+.card .location { font-size: .78rem; }
+.quests { display: grid; gap: .35rem; margin-top: .8rem; }
+.quests button { display: flex; justify-content: space-between; align-items: center; gap: .5rem; width: 100%; text-align: left; font-size: .78rem; }
+.quests span { flex-shrink: 0; color: #d9c28d; }
+.card .history { margin-top: .35rem; padding-bottom: 0; border-bottom: 0; }
+.history ol { margin: 0; padding-left: 1.1rem; }
+.history li { margin: .7rem 0; padding-left: .2rem; }
+.history li::marker { color: #bda772; }
+.history small, .history .relation { color: #b9bea5; font-size: .72rem; }
+.history li p { margin: .15rem 0; font-size: .8rem; }
+.empty { padding: 1rem; border: 1px dashed #728265; color: #bfc4ad; }
+.legacy { margin-top: 1rem; }
+.legacy article { padding: .7rem 0; border-top: 1px solid #536149; }
+.legacy small { color: #b9bea5; }
+@media (max-width: 400px) { .card { padding: .8rem; } }

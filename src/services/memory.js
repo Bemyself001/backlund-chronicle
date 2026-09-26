@@ -13,6 +13,7 @@ import { NARRATIVE_EVENT_RULE } from "./narrativeEvents.js";
 import { restMinutes } from "../engine/restTime.js";
 import { advanceWorldTime } from "../engine/turn.js";
 import { visibleQuestJournal, questAssistance, questStagePolicy } from "../engine/questRuntime.js";
+import { visiblePeopleContext } from "../engine/people.js";
 
 const SHARED_AUTHORITY_RULES = LOCAL_STATE_AUTHORITY_RULES + "【地图调查与公共常识】玩家未揭开地图迷雾只表示其个人尚未确认地点，不表示当地居民不知道该地点。圣赛缪尔教堂是黑夜女神教会的公开教堂，永恒烈阳教堂也是公开宗教场所；正常描写居民指路、公开礼拜与日常活动，不因地图未发现就编造集体不知情、避讳或秘密据点。其他公共地点同理，按身份与当地知识差异自然回应。明确的地图调查在本轮正常完成后由本地规则确认所选地点，只揭开该地点，不自动到访、加入组织或解锁内部秘密；不要把本次调查写成仍无法确认地址。快速模式草稿先写核实过程，具体确认结果留给本地结算后的叙事。";
 
@@ -62,7 +63,8 @@ export function visibleGameState(game) {
     character: game.character,
     money: game.money,
     statusEffects: game.statusEffects,
-    relationships: game.relationships,
+    relationships: visiblePeopleContext(game),
+    peopleRule: "人物档案只包含玩家已经获知的信息。heard仅为听闻，known为旧识，met为实际见面；不得把听闻当作相识或交情，不得补写未确认真名、序列、去向。lastKnownLocation是历史线索，不是实时位置。固定剧情人物由本地任务节点登记，同一人物的代号与真名共用档案。",
     organization: game.organizationState?.membership || null,
     specialWork: game.specialActions ? {
       active: game.specialActions.active ? { title: game.specialActions.active.offer.title, scene: game.specialActions.active.offer.scene } : null,

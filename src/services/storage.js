@@ -11,6 +11,8 @@ import { syncQuestJournal } from "../engine/questRuntime.js";
 import { migrateContentState } from "../engine/contentMigrations.js";
 import { applyTalent } from "../system/talents.js";
 import { specialState } from "../engine/specialActions.js";
+import { syncKnownPeople } from "../engine/people.js";
+import { saveExportFileName, writeSaveExport } from "./saveExport.js";
 
 const SAVES_KEY = "mist-chronicle-saves-v1";
 const AUTOSAVE_ID = "autosave";
@@ -20,6 +22,7 @@ function cleanGame(game) {
   const cloned = structuredClone(game);
   delete cloned.apiKey;
   delete cloned.apiSettings;
+  syncKnownPeople(cloned);
   return cloned;
 }
 
@@ -143,15 +146,9 @@ export function migrateSave(raw) {
   return result;
 }
 
-export function exportSave(game) {
+export async function exportSave(game) {
   const payload = JSON.stringify({ format: "backlund-chronicle-save", version: SAVE_VERSION, exportedAt: new Date().toISOString(), game: cleanGame(game) }, null, 2);
-  const blob = new Blob([payload], { type: "application/json" });
-  const url = URL.createObjectURL(blob);
-  const anchor = document.createElement("a");
-  anchor.href = url;
-  anchor.download = `贝克兰德纪事-${game.character.name}-第${game.turn}轮.json`;
-  anchor.click();
-  URL.revokeObjectURL(url);
+  return writeSaveExport(payload, saveExportFileName(game));
 }
 
 export async function importSave(file) {

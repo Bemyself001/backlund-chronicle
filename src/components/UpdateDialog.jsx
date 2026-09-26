@@ -44,7 +44,7 @@ export default function UpdateDialog({ onClose, automatic = false }) {
           setStatus("网页版会随每次发布自动更新；当前页面已是最新部署版本。若页面一直开着，刷新即可载入新版本。");
         } else {
           const channel = next.source === "pages" ? "（经备用通道获取）" : "";
-          setStatus(next.hasUpdate ? `发现新版本 ${next.latestVersion}${channel}` : `当前 ${next.currentVersion} 已是最新版。${channel}`);
+          setStatus(next.nativeUpgradeRequired ? "存档导出需要新版 APK 的文件保存功能，请下载完整安装包覆盖安装。" : next.hasUpdate ? `发现新版本 ${next.latestVersion}${channel}` : `当前 ${next.currentVersion} 已是最新版。${channel}`);
         }
       })
       .catch((error) => active && setStatus(error.message || "暂时无法检查更新。"));
@@ -65,7 +65,7 @@ export default function UpdateDialog({ onClose, automatic = false }) {
           <div className={styles.notes}><strong>更新说明</strong><p>{result.notes}</p></div>
           {hotUpdate
             ? <p className={styles.hint}>下载完成后可重新载入；如果新版无法正常启动，将自动恢复可用版本，存档保持不变。</p>
-            : <p className={styles.hint}>此版本请下载完整 APK 覆盖安装。修复热更新需要升级 APK；请保留原应用和存档，不要先卸载。</p>}
+            : <p className={styles.hint}>此版本需要下载完整 APK 覆盖安装，才能启用所需的原生功能。请保留原应用和存档，不要先卸载。</p>}
         </>}
         <div className={styles.actions}>
           <button className="button button--ghost" type="button" onClick={onClose}>稍后</button>

@@ -61,6 +61,8 @@ npm run preview
 
 游戏存档保存在 LocalStorage。API Key 默认只保存在 sessionStorage；只有用户明确开启“跨会话保存”时才会写入单独的本地 API 设置。剧情状态与导出的 JSON 存档均会剔除 API Key。
 
+点击「存档柜 → 导出当前」后会显示文件名与保存位置。Android 10 及以上的正式 APK 将存档保存到「文件管理 → 内部存储 → Download（下载）→ 贝克兰德纪事」，Android 7–9 使用系统保存窗口选择位置。网页版优先使用浏览器的另存为窗口，不支持时发起浏览器下载并显示查找说明；网页无法获取浏览器最终保存的完整磁盘路径。Android 文件保存功能需要安装 1.6.12 或更新的 APK，仅热更新页面不能新增原生功能。
+
 API Key 输入框使用本地圆点遮罩而非系统密码字段，并请求浏览器关闭自动填充；Android APK 还会将 Activity 根视图和游戏 WebView 排除出系统自动填充，以避免部分 ColorOS 设备反复弹出密码建议。手动输入、粘贴和用户主动选择的本地密钥保存不受影响。
 
 游戏需配置可用的 AI 接口与模型；使用本地 Ollama 等无需密钥的服务时可留空 API Key。接口默认按 OpenAI Chat Completions 协议调用，兼容流式输出、原生 tool calling 与 JSON 回退。

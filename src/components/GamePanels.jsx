@@ -1,4 +1,4 @@
-import { memo, useRef, useState } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 import { medicineRecipe } from "../engine/recovery.js";
 import { getAdvancement } from "../system/character.js";
 import { getTalent } from "../content/index.js";
@@ -9,6 +9,7 @@ import { getAuditRows } from "./gameUi.js";
 import { triggerGuidance } from "../engine/triggerGuidance.js";
 import { visibleQuestJournal, questAssistance } from "../engine/questRuntime.js";
 import styles from "./GamePanels.module.css";
+import PeoplePanel from "./PeoplePanel.jsx";
 
 export const CharacterPanel = memo(function CharacterPanel({ game }) {
   const { character } = game;
@@ -86,6 +87,14 @@ export function AuditPanel({ game }) {
 
 export const JournalPanel = memo(function JournalPanel({ game }) {
   const [tab, setTab] = useState("changes");
+  const [selectedQuest, setSelectedQuest] = useState(null);
+  const selectedQuestRef = useRef(null);
+  useEffect(() => {
+    if (tab === "quests" && selectedQuest) {
+      selectedQuestRef.current?.focus({ preventScroll: true });
+      selectedQuestRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    }
+  }, [tab, selectedQuest]);
   const tasks = visibleQuestJournal(game);
   return <div className={styles.content}>
     <nav className={styles.filtersNav} aria-label="手记类别">{[["changes", "记录"], ["quests", "任务"], ["clues", "线索"], ["people", "人物"]].map(([id, label]) => <button type="button" key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>{label}</button>)}</nav>
@@ -94,10 +103,10 @@ export const JournalPanel = memo(function JournalPanel({ game }) {
       const instance = [...(game.triggerState?.active || []), ...(game.triggerState?.history || [])].find(event => event.instanceId === task.id);
       const guidance = instance ? triggerGuidance(game, instance) : { timers: [] };
       const assistance = questAssistance(game, task);
-      return <article className={styles.record} key={task.id}><small>{{ available: "可选线索 · 尚未追查", engaged: "正在追查", completed: "已告一段落", failed: "调查中断", abandoned: "已放下", expired: "线索已失效" }[task.status] || task.status}{task.policy.finale ? " · 终章" : ""}</small><h4>{task.title}</h4><p>{task.summary}</p><p><strong>当前目标：</strong>{task.objective}</p>{task.treatmentReady != null && task.status === "engaged" && <p><strong>治疗准备：</strong>{task.treatmentReady}/1 · {task.treatmentReady ? "返回雷纳德宅邸即可完成救治" : "取得拍卖会重伤治疗药剂，或找到药师埃德蒙"}</p>}{assistance?.text && <p role="status">{assistance.text}</p>}{guidance.timers.map(timer => <p key={timer.id} role="status"><strong>剩余 {timer.remaining} 次行动</strong>{timer.remaining <= 1 ? " · 请立即脱离危险" : timer.remaining <= 3 ? " · 请准备撤离" : ""}</p>)}</article>;
+      return <article className={styles.record} key={task.id} tabIndex={-1} ref={task.id === selectedQuest ? selectedQuestRef : null}><small>{{ available: "可选线索 · 尚未追查", engaged: "正在追查", completed: "已告一段落", failed: "调查中断", abandoned: "已放下", expired: "线索已失效" }[task.status] || task.status}{task.policy.finale ? " · 终章" : ""}</small><h4>{task.title}</h4><p>{task.summary}</p><p><strong>当前目标：</strong>{task.objective}</p>{task.treatmentReady != null && task.status === "engaged" && <p><strong>治疗准备：</strong>{task.treatmentReady}/1 · {task.treatmentReady ? "返回雷纳德宅邸即可完成救治" : "取得拍卖会重伤治疗药剂，或找到药师埃德蒙"}</p>}{assistance?.text && <p role="status">{assistance.text}</p>}{guidance.timers.map(timer => <p key={timer.id} role="status"><strong>剩余 {timer.remaining} 次行动</strong>{timer.remaining <= 1 ? " · 请立即脱离危险" : timer.remaining <= 3 ? " · 请准备撤离" : ""}</p>)}</article>;
     })}{!tasks.length && <p className={styles.empty}>尚未接受委托。你可以按自己的意愿探索。</p>}</section>}
     {tab === "clues" && <section><h3>已确认线索 <small>{game.clues.length}</small></h3>{game.clues.length ? game.clues.map(clue => <article className={styles.record} key={clue.id}><h4>{clue.title}</h4><p>{clue.detail}</p><small>{clue.discoveredAt}</small></article>) : <p className={styles.empty}>尚未确认任何线索。</p>}</section>}
-    {tab === "people" && <section><h3>人物关系 <small>{game.relationships.length}</small></h3>{game.relationships.length ? game.relationships.map(npc => <article className={styles.record} key={npc.id}><h4>{npc.name}<span>{npc.value >= 0 ? "+" : ""}{npc.value}</span></h4><small>{npc.role}</small><p>{npc.note}</p></article>) : <p className={styles.empty}>尚未建立人物关系。</p>}</section>}
+    {tab === "people" && <PeoplePanel game={game} tasks={tasks} onSelectQuest={id => { setSelectedQuest(id); setTab("quests"); }} />}
   </div>;
 });
 

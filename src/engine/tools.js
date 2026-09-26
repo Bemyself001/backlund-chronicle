@@ -126,7 +126,7 @@ function parseRelationshipDelta(value) {
 function resolveRelationshipReference(game, args = {}) {
   const candidates = relationshipCandidates(args);
   if (!candidates.length) return { npc: null, resolutionError: "缺少 NPC 标识：请提供 npcId，或唯一的 npcName/name" };
-  const matches = (game.relationships || []).filter((npc) => candidates.some((candidate) => [npc.id, npc.name].map(String).includes(candidate)));
+  const matches = (game.relationships || []).filter((npc) => candidates.some((candidate) => [npc.id, npc.name, npc.alias, ...(npc.referenceIds || [])].filter(Boolean).map(String).includes(candidate)));
   const unique = [...new Map(matches.map((npc) => [npc.id, npc])).values()];
   if (unique.length === 1) return { npc: unique[0] };
   if (unique.length > 1) return { npc: null, resolutionError: `NPC 标识「${candidates[0]}」对应多个对象，请改用 npcId` };
@@ -263,7 +263,7 @@ function repairToolArgs(name, rawArgs = {}, game = null) {
       const parsedDelta = parseRelationshipDelta(args.delta);
       if (parsedDelta !== null && parsedDelta !== args.delta) args.delta = parsedDelta;
     }
-    if (!args.npcId && game) {
+    if (game && !game.relationships?.some(npc => npc.id === args.npcId)) {
       const resolved = resolveRelationshipReference(game, args);
       if (resolved.npc) {
         args.npcId = resolved.npc.id;

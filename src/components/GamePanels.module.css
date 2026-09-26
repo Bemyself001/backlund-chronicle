@@ -70,7 +70,7 @@
 .empty { margin: 1rem 0; padding: 1rem; border: 1px dashed #728265; color: #bfc4ad; font-size: .875rem; }
 .filtersNav { display: flex; gap: .4rem; margin-bottom: .8rem; }
 .filtersNav button { flex: 1; min-width: 0; padding: .5rem .3rem; font-size: .85rem; }
-.filtersNav button[aria-pressed="true"] { background: #d0b982; border-color: #d0b982; color: #222b1e; }
+.content .filtersNav button[aria-pressed="true"] { background: #d0b982; border-color: #d0b982; color: #222b1e; }
 .auditList { display: grid; gap: .55rem; padding: 0; margin: 1rem 0; list-style: none; }
 .auditList li { display: flex; align-items: baseline; gap: .65rem; font-size: .85rem; }
 .auditList li > span { flex: 0 0 1rem; color: #bdd6ad; }

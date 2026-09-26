@@ -4,7 +4,7 @@ import { createHash } from "node:crypto";
 import { Capacitor } from "@capacitor/core";
 import { createUpdateManifest } from "../scripts/write-update-manifests.mjs";
 
-import { compareVersions, getDownloadOptions, shapeGitHubRelease, shapePagesManifest } from "../src/services/updates.js";
+import { compareVersions, getDownloadOptions, shapeGitHubRelease, shapePagesManifest, checkForUpdate, needsNativeExportUpgrade } from "../src/services/updates.js";
 import { RELEASE_VERSION } from "../src/data/release.js";
 
 test("compareVersions orders semantic versions", () => {
@@ -106,4 +106,27 @@ test("canHotUpdate requires native android, an update and a bundle url", () => {
   // 测试环境是非原生（web），因此一律为 false
   assert.equal(canHotUpdate({ hasUpdate: true, bundleUrl: "https://x/web-bundle.zip" }), false);
   assert.equal(canHotUpdate(null), false);
+});
+
+test("an OTA client missing native export still offers the full APK at the same version", async (t) => {
+  t.mock.method(Capacitor, "isNativePlatform", () => true);
+  t.mock.method(Capacitor, "getPlatform", () => "android");
+  t.mock.method(Capacitor, "isPluginAvailable", () => false);
+  const oldStorage = globalThis.localStorage;
+  globalThis.localStorage = { getItem: () => String(Date.now()), setItem: () => assert.fail("must not cache a required upgrade") };
+  t.after(() => { if (oldStorage === undefined) delete globalThis.localStorage; else globalThis.localStorage = oldStorage; });
+  t.mock.method(globalThis, "fetch", async () => ({ ok: true, json: async () => ({
+    tag_name: `v${RELEASE_VERSION}`, html_url: "https://example.com/release",
+    assets: [{ name: "backlund-chronicle.apk", browser_download_url: "https://example.com/app.apk" }],
+  }) }));
+  assert.equal(needsNativeExportUpgrade("1.6.11"), false);
+  const update = await checkForUpdate();
+  assert.equal(update.currentVersion, RELEASE_VERSION);
+  assert.equal(update.hasUpdate, true);
+  assert.equal(update.nativeUpgradeRequired, true);
+  const ota = { ...update, updaterProtocol: 2, minUpdaterProtocol: 2, bundleUrl: "https://example.com/bundle.zip", bundleSha256: "a".repeat(64) };
+  assert.equal(canHotUpdate(ota), false);
+  t.mock.method(Capacitor, "isPluginAvailable", () => true);
+  assert.equal(needsNativeExportUpgrade(RELEASE_VERSION), false);
+  assert.equal(canHotUpdate(ota), true);
 });

@@ -38,6 +38,10 @@ export function isNativeAndroid() {
   return Capacitor.isNativePlatform() && Capacitor.getPlatform() === "android";
 }
 
+export function needsNativeExportUpgrade(version) {
+  return isNativeAndroid() && compareVersions(version, "1.6.12") >= 0 && !Capacitor.isPluginAvailable("SaveExport");
+}
+
 async function fetchJsonWithTimeout(url, timeoutMs = CHECK_TIMEOUT) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
@@ -125,7 +129,7 @@ export async function checkForUpdate({ force = false } = {}) {
   }
   const native = await Updater.getStatus().catch(() => ({ updaterProtocol: 0 }));
   const lastCheckedAt = Number(localStorage.getItem(CHECKED_AT_KEY) || 0);
-  if (!force && Date.now() - lastCheckedAt < CHECK_INTERVAL) return { skipped: true, reason: "recent" };
+  if (!force && !needsNativeExportUpgrade(APP_VERSION) && Date.now() - lastCheckedAt < CHECK_INTERVAL) return { skipped: true, reason: "recent" };
 
   let release;
   let source;
@@ -141,13 +145,15 @@ export async function checkForUpdate({ force = false } = {}) {
     }
   }
   const currentVersion = native.currentVersion || APP_VERSION;
-  const hasUpdate = Boolean(release.downloadUrl) && compareVersions(release.latestVersion, currentVersion) > 0;
+  const nativeUpgradeRequired = needsNativeExportUpgrade(release.latestVersion);
+  const hasUpdate = Boolean(release.downloadUrl) && (compareVersions(release.latestVersion, currentVersion) > 0 || nativeUpgradeRequired);
   if (!hasUpdate) localStorage.setItem(CHECKED_AT_KEY, String(Date.now()));
   return {
     ...native,
     currentVersion,
     latestVersion: release.latestVersion,
     hasUpdate,
+    nativeUpgradeRequired,
     downloadUrl: release.downloadUrl,
     bundleUrl: release.bundleUrl,
     bundleSha256: release.bundleSha256,
@@ -160,6 +166,7 @@ export async function checkForUpdate({ force = false } = {}) {
 
 export function canHotUpdate(result) {
   return isNativeAndroid() && Boolean(result?.hasUpdate && result?.bundleUrl
+    && !needsNativeExportUpgrade(result.latestVersion)
     && result.updaterProtocol >= result.minUpdaterProtocol
     && /^[a-f0-9]{64}$/i.test(result.bundleSha256 || "")
     && result.failedVersion !== result.latestVersion);

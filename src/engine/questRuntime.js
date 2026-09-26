@@ -1,6 +1,7 @@
 import { getInstanceTriggerDefinition, getTriggerDefinition } from "./triggerDefinitions.js";
 import { inspectQuestRoutes } from "./questRoutes.js";
 import { triggerGuidance } from "./triggerGuidance.js";
+import { syncKnownPeople } from "./people.js";
 
 export const QUEST_ENGINE_RULE = "【最高优先级：任务引擎契约】任何已开始任务必须通过工具登记名称、简要信息、当前目标；禁止只在正文宣称接受、推进、完成任务。已有特殊任务使用quest.resolve，新产生的普通任务使用quest.add并提供summary和objective。每次与任务相关的行动都调用quest.resolve：引用玩家原话actionQuote，说明实际结果evidence；steps仅包含本轮真实完成的目标，普通阶段可连续至多三个，重大选择、危险、倒计时、终章必须单独行动。自然语言等价行动不必匹配固定关键词，但不得把否定、假设、意图当作完成。失败或受阻也要登记outcome=failed或blocked；休息、闲逛和无关行动不登记。连续两次无进展明确提示，第三次提供可执行的替代调查途径；普通失败可花时间整理证据并寻求帮助，恢复路线必须经过本地条件验证，玩家明确选择后才结算。普通任务推进必须提供新登记线索的evidenceIds，不能靠改写summary或objective伪造进展。连续碰壁不得增加无依据的新障碍，不得重复推荐已被本地拒绝的行动；先说明实际缺少的条件。恢复失败不能清空停滞次数。终章和危险阶段没有保成功、免代价或自动解围兜底。叙事、手记和行动选项必须服从本地确认的任务状态及当前目标；不得提前透露后续真相。";
 
@@ -50,6 +51,7 @@ export function syncQuestJournal(game) {
       policy: quest.source === "特殊行动" ? { finale: false, isolated: true, canChain: false, canRecover: false } : questStagePolicy(quest, quest), startedTurn: entries[id]?.startedTurn ?? game.turn, updatedTurn: game.turn };
   }
   game.questJournal = { version: 1, entries, attempts: { ...(previous.attempts || {}) } };
+  syncKnownPeople(game);
   return game.questJournal;
 }
 

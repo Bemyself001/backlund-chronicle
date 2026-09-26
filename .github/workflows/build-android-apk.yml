@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  PRODUCT_VERSION: "1.6.11"
+  PRODUCT_VERSION: "1.6.12"
 
 jobs:
   build-release-apk:
@@ -111,5 +111,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "贝克兰德纪事 ${PRODUCT_VERSION}" \
-            --notes "1.6.11 · 移除 MOCK 模式：移除离线演示开关、本地模拟剧情与模拟接口；剧情、行装整理和祷告统一使用配置的 AI。旧设置中的 MOCK 标记自动忽略，存档继续保留。沿用原包名与正式签名，请覆盖安装，不要先卸载。" \
+            --notes "1.6.12 · 人物档案与存档导出位置：主支线重要人物随已确认线索与任务进度自动收录，隐藏尚未揭晓的身份。旧存档自动补齐有依据的记录，保留原有关系。导出存档后显示文件名和保存位置；Android 10 及以上保存到下载目录的贝克兰德纪事文件夹，较旧系统可自行选择位置。本次手机导出功能需要安装完整新版 APK，请覆盖安装，不要先卸载。" \
             --latest

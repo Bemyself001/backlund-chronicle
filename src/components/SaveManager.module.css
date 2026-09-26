@@ -13,5 +13,13 @@
 .empty { padding: 2rem; border: 1px dashed #8b7a5a88; color: var(--ink-soft); text-align: center; }
 .error { padding: .7rem; background: #7d282217; color: #72241e; }
 .notice { padding: .7rem; border-left: 3px solid var(--verdigris); background: #275f4d14; color: #285548; font: .78rem var(--font-sans); }
+.exportNotice { margin-top: 1rem; padding: 1rem; border: 1px solid #527866; border-left: 3px solid var(--verdigris); background: #275f4d14; color: #285548; font: .82rem/1.65 var(--font-sans); }
+.exportNotice > strong { font-size: .95rem; }
+.exportNotice dl { margin: .7rem 0; }
+.exportNotice dl > div { margin: .6rem 0; }
+.exportNotice dt { color: var(--ink-soft); font-size: .72rem; }
+.exportNotice dd { margin: .15rem 0 0; color: var(--ink); overflow-wrap: anywhere; white-space: pre-wrap; user-select: text; }
+.exportNotice p { margin: .7rem 0 .4rem; }
+.exportNotice small { color: var(--ink-soft); font-size: .72rem; }
 .footnote { margin-top: 1rem; text-align: right; }
 @media (max-width: 700px) { .toolbar { align-items: stretch; flex-wrap: wrap; } .toolbar label { flex-basis: 100%; } .toolbar button { flex: 1; } .slot { align-items: stretch; flex-direction: column; } .slotActions button { flex: 1; } }
