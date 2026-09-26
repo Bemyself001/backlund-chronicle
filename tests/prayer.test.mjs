@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { createInitialGame, EMPTY_CHARACTER } from "../src/data/defaults.js";
+import { createInitialGame, DEFAULT_API_SETTINGS, EMPTY_CHARACTER } from "../src/data/defaults.js";
 import { CHURCH_PRAYERS } from "../src/content/backlund/prayers.js";
 import { prayerAvailability, settlePrayer } from "../src/engine/prayer.js";
 import { generatePrayer, validatePrayer } from "../src/services/prayer.js";
@@ -72,15 +72,24 @@ test("prayer settles status ticks and clears spirituality collapse after recover
   assert.ok(!next.statusEffects.some((status) => status.id === "collapse-spirituality"));
 });
 
-test("each church has distinct prayer content; text limit and abort are enforced", async () => {
+test("each church requests AI prayer content; text limit and abort are enforced", async (t) => {
+  const requests = [];
+  t.mock.method(globalThis, "fetch", async (_url, options) => {
+    const body = JSON.parse(options.body);
+    const church = JSON.parse(body.messages.at(-1).content);
+    requests.push(church);
+    return new Response(JSON.stringify({ choices: [{ message: { content: church.deity + "啊，愿我以清醒的心面对未知。" } }] }));
+  });
   assert.equal(new Set(Object.values(CHURCH_PRAYERS).map((church) => church.environment)).size, 4);
   for (const church of Object.values(CHURCH_PRAYERS)) {
-    const text = await generatePrayer(church, { mockMode: true });
+    const text = await generatePrayer(church, { ...DEFAULT_API_SETTINGS, mockMode: true });
     assert.ok(text.includes(church.deity));
     assert.ok(validatePrayer(text).length <= 200);
   }
   assert.throws(() => validatePrayer(" "));
   assert.throws(() => validatePrayer("祈".repeat(201)));
   assert.equal(validatePrayer("祈".repeat(200)).length, 200);
-  await assert.rejects(generatePrayer(CHURCH_PRAYERS["st-samuel"], { mockMode: true }, AbortSignal.abort()), { name: "AbortError" });
+  assert.equal(requests.length, Object.keys(CHURCH_PRAYERS).length);
+  await assert.rejects(generatePrayer(CHURCH_PRAYERS["st-samuel"], DEFAULT_API_SETTINGS, AbortSignal.abort()), { name: "AbortError" });
+  assert.equal(requests.length, Object.keys(CHURCH_PRAYERS).length);
 });

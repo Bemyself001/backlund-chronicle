@@ -14,7 +14,7 @@
 .apiStatus, .updateStatus { display: flex; align-items: center; gap: .65rem; flex-shrink: 0; min-height: 2.75rem; padding: .5rem .75rem; border: 1px solid #c2a46d40; background: #080f10b3; color: #d3c8af; font: .7rem var(--font-sans); }
 .updateStatus { border-color: #c7a46288; color: #e1c78f; background: linear-gradient(115deg, #181b17d9, #101818d9); }
 .updateStatus > span:first-child { color: #c7a462; font-size: .45rem; }
-.ready, .live { width: .35rem; height: .35rem; border-radius: 50%; background: #d3ae68; box-shadow: 0 0 8px #d3ae6860; }
+.live { width: .35rem; height: .35rem; border-radius: 50%; background: #d3ae68; box-shadow: 0 0 8px #d3ae6860; }
 .live { background: #82b7a6; }
 .desk { flex: 1; display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(18rem, .8fr); align-items: center; gap: 4rem; width: min(88%, 79rem); margin: 0 auto; padding: clamp(2.8rem, 6vh, 5rem) 0 3.5rem; }
 .hero { min-width: 0; }

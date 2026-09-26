@@ -6,7 +6,6 @@ import { resolveTurnProgress, minutesForTurn } from "../src/engine/turn.js";
 import { createInitialGame, EMPTY_CHARACTER } from "../src/data/defaults.js";
 import { buildPlanningContext, buildRenderingContext, buildFastPresentationContext } from "../src/services/memory.js";
 import { createTurnResolution } from "../src/services/turnResolution.js";
-import { mockResponse } from "../src/services/mock.js";
 
 const late = "1349年 12月31日 · 周日 · 23:20";
 test("rest defaults and explicit Chinese or numeric durations", () => {
@@ -62,9 +61,6 @@ test("planning and final narration share local timing and rest skips speculative
   for (const messages of [planning, buildRenderingContext(game, after, "休息两小时", "", resolution), buildFastPresentationContext(game, "休息", "")]) {
     assert.ok(messages.some((message) => message.content.includes("【时间一致性】")));
   }
-  const mock = await mockResponse(game, "休息两小时");
-  assert.match(mock.narrative, /120分钟/);
-  assert.ok(mock.narrative.includes(progress.worldTime));
   const app = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
   assert.match(app, /const fastMode = .*restMinutes\(action, game.worldTime\) === null/);
 });

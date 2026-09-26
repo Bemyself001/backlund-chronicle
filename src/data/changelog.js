@@ -149,6 +149,18 @@ const RELEASE_149_UPDATE = {
 };
 
 export const LATEST_UPDATE = {
+  date: "2026-09-26", dateLabel: "2026.09.26",
+  title: "1.6.11 · 移除 MOCK 模式",
+  summary: "移除离线演示模式，剧情、行装整理与祷告统一使用配置的 AI 接口；保留原有存档与正式签名升级能力。",
+  changes: [
+    "删除 MOCK 设置开关、离线演示提示和本地模拟剧情服务，标准与快速模式均使用真实 AI 请求。",
+    "模型列表与连接测试不再返回模拟成功；行装整理、祷告、物品剧情及行动建议统一使用所选模型。",
+    "旧版 API 设置中的 MOCK 标记自动忽略并在保存时清除，保留服务商配置与密钥保存偏好。",
+    "发布 1.6.11 正式签名 APK 与配套热更新包，沿用原包名与签名，支持覆盖安装保留存档。",
+  ],
+};
+
+const RELEASE_1610_UPDATE = {
   date: "2026-09-23", dateLabel: "2026.09.23",
   title: "1.6.10 · 高窗之下治疗药剂交付修复",
   summary: "高窗之下拍卖会只产出同一ID的重伤治疗药剂；取得药剂或找到药师后，回宅邸自动完成救治与酬金结算。",
@@ -517,6 +529,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_1610_UPDATE,
   RELEASE_169_UPDATE,
   RELEASE_165_UPDATE,
   RELEASE_164_UPDATE,

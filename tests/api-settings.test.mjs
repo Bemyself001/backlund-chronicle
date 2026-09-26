@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DEFAULT_API_SETTINGS } from "../src/data/defaults.js";
-import { loadApiSettings, saveApiSettings } from "../src/services/api.js";
+import { listApiModels, loadApiSettings, saveApiSettings, testApiConnection } from "../src/services/api.js";
 
 class MemoryStorage {
   #entries = new Map();
@@ -27,6 +27,36 @@ test("uses the OpenAI preset for a fresh browser", () => {
   assert.equal(settings.model, "gpt-4.1-mini");
   assert.equal(settings.reasoningMode, "auto");
   assert.equal(settings.autoRetryReasoning, true);
+  assert.equal(Object.hasOwn(settings, "mockMode"), false);
+});
+
+test("legacy mock settings are removed while provider and key preferences survive", () => {
+  localStorage.setItem("mist-api-settings-v1", JSON.stringify({
+    ...DEFAULT_API_SETTINGS, mockMode: true, model: "existing-model",
+    persistKey: true, apiKey: "test-persisted-key",
+  }));
+  const settings = loadApiSettings();
+  assert.equal(Object.hasOwn(settings, "mockMode"), false);
+  assert.equal(settings.model, "existing-model");
+  assert.equal(settings.apiKey, "test-persisted-key");
+  const saved = saveApiSettings({ ...settings, mockMode: true });
+  assert.equal(Object.hasOwn(saved, "mockMode"), false);
+  assert.equal(Object.hasOwn(JSON.parse(localStorage.getItem("mist-api-settings-v1")), "mockMode"), false);
+  assert.equal(loadApiSettings().apiKey, "test-persisted-key");
+});
+
+test("legacy mock flag cannot fake model discovery or a successful connection", async (t) => {
+  const settings = { ...DEFAULT_API_SETTINGS, mockMode: true };
+  let calls = 0;
+  t.mock.method(globalThis, "fetch", async () => {
+    calls += 1;
+    return new Response(JSON.stringify({ data: [{ id: settings.model }] }));
+  });
+  assert.deepEqual(await listApiModels(settings), [settings.model]);
+  assert.match(await testApiConnection(settings), /连接成功/);
+  assert.equal(calls, 2);
+  t.mock.method(globalThis, "fetch", async () => new Response("{}", { status: 401 }));
+  await assert.rejects(testApiConnection(settings), /HTTP 401/);
 });
 
 test("keeps a session-only key out of persistent settings", () => {

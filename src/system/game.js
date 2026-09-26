@@ -86,7 +86,6 @@ export const DEFAULT_API_SETTINGS = {
   stream: true,
   nativeTools: true,
   jsonMode: true,
-  mockMode: true,
   fastMode: false,
   persistKey: false,
   profiles: {},

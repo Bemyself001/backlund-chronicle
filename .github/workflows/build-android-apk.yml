@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  PRODUCT_VERSION: "1.6.10"
+  PRODUCT_VERSION: "1.6.11"
 
 jobs:
   build-release-apk:
@@ -111,5 +111,5 @@ jobs:
             --repo "$GITHUB_REPOSITORY" \
             --target "$GITHUB_SHA" \
             --title "贝克兰德纪事 ${PRODUCT_VERSION}" \
-            --notes "1.6.10 · 高窗之下治疗药剂交付修复：拍卖会治疗药剂统一为重伤治疗药剂（固定物品ID）；取得药剂或找到序列9药师后，返回雷纳德宅邸会自动完成救治。独立取得药剂获得二十镑，与药师合作获得十镑，奖励只结算一次。旧存档中的进行中任务会按新规则迁移。请覆盖安装，不要先卸载。" \
+            --notes "1.6.11 · 移除 MOCK 模式：移除离线演示开关、本地模拟剧情与模拟接口；剧情、行装整理和祷告统一使用配置的 AI。旧设置中的 MOCK 标记自动忽略，存档继续保留。沿用原包名与正式签名，请覆盖安装，不要先卸载。" \
             --latest

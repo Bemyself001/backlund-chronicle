@@ -54,9 +54,9 @@ export default function Welcome({ hasSave, saves = [], loading = false, apiSetti
           <button className={styles.updateStatus} type="button" onClick={onUpdate}>
             <span aria-hidden="true">◆</span><span>检查更新</span><span aria-hidden="true">↗</span>
           </button>
-          <button className={styles.apiStatus} type="button" onClick={onApi} title={apiSettings.mockMode ? "离线演示，无需连接 AI" : apiSettings.model || "未配置模型"}>
-            <span className={apiSettings.mockMode ? styles.ready : styles.live} aria-hidden="true" />
-            {apiSettings.mockMode ? "离线演示" : "AI 对话设置"}<span aria-hidden="true">↗</span>
+          <button className={styles.apiStatus} type="button" onClick={onApi} title={apiSettings.model || "未配置模型"}>
+            <span className={styles.live} aria-hidden="true" />
+            AI 对话设置<span aria-hidden="true">↗</span>
           </button>
         </div>
       </header>

@@ -67,8 +67,6 @@
 .manuscript { max-width: 53rem; margin: 0 auto; padding: 2.3rem 2.8rem 4.5rem; }
 .sceneHeading { display: flex; justify-content: space-between; gap: .5rem; margin-bottom: 1.9rem; color: var(--game-muted); font-size: .75rem; }
 .sceneHeading > span:first-child { letter-spacing: .16em; font-family: var(--font-mono); }
-.mockTip { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: .4rem; margin: -1rem 0 1.5rem; padding: .6rem 0; border-block: 1px solid var(--game-line); color: var(--game-muted); font-size: .8rem; }
-.mockTip button { min-height: 2rem; padding: .2rem .4rem; border: 0; background: transparent; color: var(--game-green); }
 .historyEntry { scroll-margin-block: 1.5rem; }
 .turnDivider { display: flex; align-items: center; gap: .8rem; margin: 1.65rem 0 1.3rem; font: .8rem var(--font-serif); color: var(--game-muted); }
 .turnDivider i { flex: 1; height: 1px; background: var(--game-line); }
@@ -154,7 +152,6 @@
   .manuscript { padding: 1.4rem 1.15rem 4rem; }
   .sceneHeading { margin-bottom: 1.25rem; font-size: .7rem; }
   .sceneHeading > span:first-child { letter-spacing: .08em; }
-  .mockTip { margin-top: -.25rem; font-size: .75rem; }
   .narrative { line-height: 1.9; }
   .playerLine { padding: .75rem; font-size: .875rem; }
   .choiceHeading h2 { font-size: .95rem; }

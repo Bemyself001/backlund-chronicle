@@ -57,7 +57,7 @@ export default function ApiSettings({ settings, onSave, onClose }) {
 
   const cancelModels = () => { modelRequestRef.current?.abort(); modelRequestRef.current = null; setLoadingModels(false); };
   const update = (key, value) => {
-    if (["baseUrl", "apiKey", "customHeaders", "mockMode"].includes(key)) { cancelModels(); setStatus(""); }
+    if (["baseUrl", "apiKey", "customHeaders"].includes(key)) { cancelModels(); setStatus(""); }
     setDraft((current) => ({ ...current, [key]: value }));
   };
 
@@ -67,7 +67,7 @@ export default function ApiSettings({ settings, onSave, onClose }) {
     setDraft((current) => {
       const profiles = { ...(current.profiles || {}), [current.provider]: captureProfile(current) };
       const nextProfile = { ...createProviderProfile(providerId), ...(profiles[providerId] || {}) };
-      return { ...current, ...nextProfile, provider: providerId, profiles, mockMode: false };
+      return { ...current, ...nextProfile, provider: providerId, profiles };
     });
     setModelQuery("");
     setStatus("");
@@ -145,7 +145,7 @@ export default function ApiSettings({ settings, onSave, onClose }) {
 
         <label className={styles.field}>
           <span>Base URL</span>
-          <input value={draft.baseUrl} onChange={(event) => update("baseUrl", event.target.value)} placeholder="https://api.example.com/v1" disabled={draft.mockMode} inputMode="url" />
+          <input value={draft.baseUrl} onChange={(event) => update("baseUrl", event.target.value)} placeholder="https://api.example.com/v1" inputMode="url" />
         </label>
 
         <div className={styles.twoCol}>
@@ -162,7 +162,6 @@ export default function ApiSettings({ settings, onSave, onClose }) {
               value={draft.apiKey}
               onChange={(event) => update("apiKey", event.target.value)}
               placeholder="输入服务商密钥"
-              disabled={draft.mockMode}
               spellCheck="false"
               aria-describedby="api-key-autofill-hint"
             />
@@ -170,12 +169,12 @@ export default function ApiSettings({ settings, onSave, onClose }) {
           </label>
           <label className={styles.field}>
             <span>当前模型</span>
-            <input value={draft.model} onChange={(event) => update("model", event.target.value)} placeholder={provider.defaultModel || "输入模型 ID"} disabled={draft.mockMode} spellCheck="false" />
+            <input value={draft.model} onChange={(event) => update("model", event.target.value)} placeholder={provider.defaultModel || "输入模型 ID"} spellCheck="false" />
           </label>
         </div>
 
         <label className={`${styles.switch} ${styles.dangerSwitch}`}>
-          <input type="checkbox" checked={draft.persistKey} onChange={(event) => update("persistKey", event.target.checked)} disabled={draft.mockMode} />
+          <input type="checkbox" checked={draft.persistKey} onChange={(event) => update("persistKey", event.target.checked)} />
           <span>
             <strong>在此设备保存密钥</strong>
             <small>关闭浏览器后仍可使用；仅建议在个人设备上启用，清理站点数据会删除密钥。</small>
@@ -187,15 +186,15 @@ export default function ApiSettings({ settings, onSave, onClose }) {
           <div className={styles.modelPanelHeading}>
             <div><span>MODEL CATALOG</span><h3 id="model-panel-title">模型搜索与快捷保存</h3></div>
             <div className={styles.inlineActions}>
-              <button className="button button--ghost" type="button" onClick={loadModels} disabled={draft.mockMode || loadingModels}>
+              <button className="button button--ghost" type="button" onClick={loadModels} disabled={loadingModels}>
                 {loadingModels ? "正在读取…" : "读取模型"}
               </button>
-              <button className="button button--ghost" type="button" onClick={rememberModel} disabled={draft.mockMode || !draft.model.trim()}>保存当前模型</button>
+              <button className="button button--ghost" type="button" onClick={rememberModel} disabled={!draft.model.trim()}>保存当前模型</button>
             </div>
           </div>
           <label className={styles.field}>
             <span>筛选模型</span>
-            <input value={modelQuery} onChange={(event) => setModelQuery(event.target.value)} placeholder={models.length ? `在 ${models.length} 个模型中搜索` : "先点击“读取模型”"} disabled={!models.length || draft.mockMode} type="search" />
+            <input value={modelQuery} onChange={(event) => setModelQuery(event.target.value)} placeholder={models.length ? `在 ${models.length} 个模型中搜索` : "先点击“读取模型”"} disabled={!models.length} type="search" />
           </label>
           {savedModels.length > 0 && (
             <div className={styles.savedModels} aria-label="已保存模型">
@@ -228,7 +227,7 @@ export default function ApiSettings({ settings, onSave, onClose }) {
         </div>
         <label className={styles.field}>
           <span>推理模式</span>
-          <select value={draft.reasoningMode || "auto"} onChange={(event) => update("reasoningMode", event.target.value)} disabled={draft.mockMode}>
+          <select value={draft.reasoningMode || "auto"} onChange={(event) => update("reasoningMode", event.target.value)}>
             <option value="auto">自动 · 使用服务商默认值</option>
             <option value="off">关闭 / 最低 · 优先保留正文预算</option>
             <option value="low">低 · 更快、更省输出</option>
@@ -240,7 +239,7 @@ export default function ApiSettings({ settings, onSave, onClose }) {
         <label className={styles.field}><span>自定义请求头 · JSON</span><textarea rows="3" value={draft.customHeaders} onChange={(event) => update("customHeaders", event.target.value)} spellCheck="false" /></label>
         <fieldset className={styles.switches}><legend>协议能力</legend>
           {[
-            ["mockMode", "Mock 模式", "无需 API 也能完整体验"], ["stream", "流式输出", "逐步呈现模型回复"],
+            ["stream", "流式输出", "逐步呈现模型回复"],
             ["nativeTools", "原生 Tool Calling", "优先接收函数调用提议"], ["jsonMode", "JSON 兼容模式", "使用结构化回退协议"],
             ["fastMode", "快速模式", "并发生成状态规划与剧情；需要结算时再并发补写结果和选项，以更短等待换取更多请求"],
             ["autoRetryReasoning", "推理耗尽自动恢复", "先保留推理并增加输出预算；仍失败时才降低推理并使用兼容模式"],

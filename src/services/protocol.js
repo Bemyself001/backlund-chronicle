@@ -50,7 +50,7 @@ export function extractJson(text = "") {
   try { return JSON.parse(cleaned); } catch { /* scan for an embedded object */ }
   const parsed = firstBalancedObject(cleaned);
   if (parsed) return parsed;
-  throw new Error("AI 返回中没有可解析的 JSON 对象。可重试本轮或切换 Mock 模式。");
+  throw new Error("AI 返回中没有可解析的 JSON 对象。请重试本轮或检查 API 与模型设置。");
 }
 
 function responseObject(raw) {

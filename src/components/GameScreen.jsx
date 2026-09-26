@@ -60,7 +60,7 @@ export default function GameScreen(props) {
   return <GameSession key={props.game.id} {...props} />;
 }
 
-function GameSession({ game, loading, turnPhase, streamText, error, mockMode, onAction, onAbort, onRetry, onRegenerateChoices, onLocalTool, onOpenMap, onOpenApi, onOpenPrompt, onOpenSaves, onHome, onSpecialAction }) {
+function GameSession({ game, loading, turnPhase, streamText, error, onAction, onAbort, onRetry, onRegenerateChoices, onLocalTool, onOpenMap, onOpenApi, onOpenPrompt, onOpenSaves, onHome, onSpecialAction }) {
   const [input, setInput] = useState("");
   const [panel, setPanel] = useState(null);
   const [journalRequest, setJournalRequest] = useState(0);
@@ -197,7 +197,7 @@ function GameSession({ game, loading, turnPhase, streamText, error, mockMode, on
     <header className={styles.topbar}>
       <div className={styles.wordmark}><span className={styles.brandSeal} aria-hidden="true">纪</span><h1>贝克兰德纪事 <small>{RELEASE_NAME}</small></h1></div>
       <div className={styles.chapter}>第 {String(game.chapter.number).padStart(2, "0")} 章 <span>·</span> {game.chapter.title}</div>
-      <div className={styles.topActions}><button type="button" className={styles.modeButton} onClick={onOpenApi}>{mockMode ? "离线演示" : "AI 模式"}</button><button type="button" onClick={onOpenSaves} className={styles.quickSave}>存档</button><button type="button" className={styles.menuButton} onClick={event => changePanel("menu", event)} aria-expanded={panel === "menu"} aria-controls="game-dossier"><GameIcon name="menu" /><span>菜单</span></button></div>
+      <div className={styles.topActions}><button type="button" className={styles.modeButton} onClick={onOpenApi}>AI 模式</button><button type="button" onClick={onOpenSaves} className={styles.quickSave}>存档</button><button type="button" className={styles.menuButton} onClick={event => changePanel("menu", event)} aria-expanded={panel === "menu"} aria-controls="game-dossier"><GameIcon name="menu" /><span>菜单</span></button></div>
     </header>
     <div className={styles.statusbar}>
       <div className={styles.whereabouts}><button type="button" onClick={onOpenMap}>{game.location.name}<span aria-hidden="true">↗</span></button><span className={styles.worldTime}>{game.worldTime}</span></div>
@@ -218,7 +218,6 @@ function GameSession({ game, loading, turnPhase, streamText, error, mockMode, on
           <div className={styles.storyScroll} ref={storyRef} onScroll={handleScroll}>
             <div className={styles.manuscript}>
               <div className={styles.sceneHeading}><span>BACKLUND CHRONICLE</span><span>{game.turn === 0 ? "故事从这里开始" : `已完成 ${game.turn} 轮`}</span></div>
-              {mockMode && game.turn === 0 && <p className={styles.mockTip}>离线演示 · 剧情由本地生成 <button type="button" onClick={onOpenApi}>配置 AI ↗</button></p>}
               <StoryHistory messages={game.storyHistory?.length ? game.storyHistory : game.recentDialogues} />
               {loading && <div data-reader-entry="stream" className={styles.pending}><div className={styles.turnDivider}><span>{turnPhase === "choiceRetry" ? "行动建议" : `第 ${game.turn + 1} 轮`}</span><i /></div>{pendingAction && busyRef.current && turnPhase !== "choiceRetry" && <blockquote className={styles.playerLine}><span>你的行动</span>{pendingAction}</blockquote>}<TurnProgress phase={turnPhase} />{streamText && <article className={styles.narrative} aria-busy="true">{streamText.split("\n").filter(Boolean).map((paragraph, i) => <p key={i}>{paragraph}</p>)}<small className={styles.aiTag}>含 AI 生成内容 · 结果待确认</small></article>}</div>}
               {error && <div className={styles.error} role="alert"><strong>本轮未能完成</strong><p>{error}</p><button type="button" disabled={loading} onClick={retry}>重试本轮</button></div>}
@@ -227,7 +226,7 @@ function GameSession({ game, loading, turnPhase, streamText, error, mockMode, on
                 {(game.choices?.length || 0) < 3 && <p className={styles.choiceNote} role="status">{choiceStatusMessage(game.choiceMeta)}</p>}
                 <div id="action-choices" className={styles.choices} hidden={choicesFolded}>
                   {game.choices?.map((choice, i) => <button type="button" key={`${choice.intent}-${i}`} disabled={loading} onClick={() => performAction(choice.label)}><span>{String(i + 1).padStart(2, "0")}</span><strong>{choice.label}</strong><small data-risk={choice.risk}>{RISK_LABELS[choice.risk] || "风险未标注"}</small></button>)}
-                  {(game.choices?.length || 0) < 3 && <button type="button" onClick={onRegenerateChoices} disabled={loading || mockMode}><span>↻</span><strong>{mockMode ? "请在下方自由输入行动" : game.choices?.length ? "补全行动建议" : "重新生成行动建议"}</strong></button>}
+                  {(game.choices?.length || 0) < 3 && <button type="button" onClick={onRegenerateChoices} disabled={loading}><span>↻</span><strong>{game.choices?.length ? "补全行动建议" : "重新生成行动建议"}</strong></button>}
                 </div>
               </section>}
             </div>

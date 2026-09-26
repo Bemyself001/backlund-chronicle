@@ -16,7 +16,7 @@ import { medicineRecipe } from "./engine/recovery.js";
 import { specialState } from "./engine/specialActions.js";
 import ImportantItemConfirmation from "./components/ImportantItemConfirmation.jsx";
 import { createInitialGame, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from "./system/game.js";
-import { buildRejectedToolNarrative, dedupeToolCalls, executeToolCalls, normalizeToolCalls } from "./engine/tools.js";
+import { dedupeToolCalls, executeToolCalls, normalizeToolCalls } from "./engine/tools.js";
 import { auditTurnChanges, collectImportantItemConfirmations, createAuditBaseline } from "./engine/audit.js";
 import { resolveTurnProgress } from "./engine/turn.js";
 import { restMinutes } from "./engine/restTime.js";
@@ -24,7 +24,6 @@ import { processTriggers } from "./engine/triggerEngine.js";
 import { loadApiSettings, requestAIWithReasoningFallback, saveApiSettings } from "./services/api.js";
 import { buildFastNarrativeContinuationContext, buildFastPresentationContext, buildItemInspectionContext, buildPlanningContext, buildRenderingContext, buildSummaryContext, buildToolRepairContext, computeMemoryUpdate } from "./services/memory.js";
 import { applyMemorySummary, createMemorySummaryJob, parseMemoryDigestPayload } from "./services/memoryState.js";
-import { mockResponse } from "./services/mock.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
 import { extractNarrativePreview } from "./services/streamPreview.js";
 import { ensureMapMoveToolCall, ensureMapDiscoveryToolCall } from "./services/mapTravel.js";
@@ -161,7 +160,7 @@ export default function App() {
 
   // 每满十个未总结回合，后台整理一批；失败时原摘要和待总结事件保持不变。
   useEffect(() => {
-    if (!game || settings.mockMode || summaryJobRef.current) return undefined;
+    if (!game || summaryJobRef.current) return undefined;
     const job = createMemorySummaryJob(game);
     if (!job) return undefined;
     const jobKey = `${job.gameId}:${job.baseRevision}:${job.throughTurn}`;
@@ -225,12 +224,10 @@ export default function App() {
 
       const advancementIntent = isExplicitAdvancementIntent(action) && game.inventory.some((item) => item.potion);
       // Rest narration must wait for the authoritative end time instead of streaming a speculative time jump.
-      const fastMode = Boolean(settings.fastMode) && !settings.mockMode && !advancementIntent && restMinutes(action, game.worldTime) === null;
+      const fastMode = Boolean(settings.fastMode) && !advancementIntent && restMinutes(action, game.worldTime) === null;
       let planningResponse;
       let fastPresentationTask = null;
-      if (settings.mockMode) {
-        planningResponse = await mockResponse(game, action, controller.signal, handleTurnPreview, options);
-      } else if (fastMode) {
+      if (fastMode) {
         // 状态规划与剧情呈现同时启动；规划一完成即可继续校验、修复和结算，
         // 不必等待仍在流式输出的剧情草稿。
         const fastTasks = launchFastModeTasks({
@@ -249,7 +246,7 @@ export default function App() {
         throwIfFastTaskAborted(planningOutcome);
         planningResponse = planningOutcome.value || { toolCalls: [], narrative: "", hasNarrative: false };
       }
-      if (!settings.mockMode && !fastMode) {
+      if (!fastMode) {
         planningResponse = await requestModel(
           buildPlanningContext(game, action, prompt, { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation }),
           { toolSet: "state", disableJsonMode: Boolean(settings.nativeTools) },
@@ -259,25 +256,23 @@ export default function App() {
       const advancementAdjustedCalls = ensureRequestedAdvancementToolCall(discoveryAdjustedCalls, options.advancementRequest, game.turn + 1, game);
       let proposedToolCalls = dedupeToolCalls(normalizeToolCalls(ensureMapMoveToolCall(advancementAdjustedCalls, options.mapDestination, game.turn + 1), game));
 
-      if (!settings.mockMode) {
-        // 两种模式都并发修复最多三条独立参数错误；修复完成后仍按原顺序进入串行状态执行。
-        const repairPlan = await repairToolCallsConcurrently(game, proposedToolCalls, async ({ call, error }) => {
-          const repairMessages = buildToolRepairContext(game, action, call, error, prompt, { nativeTools: settings.nativeTools });
-          const repairResponse = await requestModel(repairMessages, {
-            toolSet: "state",
-            allowedToolNames: [call.name],
-            disableJsonMode: Boolean(settings.nativeTools),
-            forceDisableReasoning: true,
-            maxTokensModeOverride: "manual",
-            maxTokensOverride: 1600,
-          });
-          return repairResponse.toolCalls;
-        }, {
-          maxRepairs: 3,
-          onRepairsStarted: () => setTurnPhase("toolRetry"),
+      // 两种模式都并发修复最多三条独立参数错误；修复完成后仍按原顺序进入串行状态执行。
+      const repairPlan = await repairToolCallsConcurrently(game, proposedToolCalls, async ({ call, error }) => {
+        const repairMessages = buildToolRepairContext(game, action, call, error, prompt, { nativeTools: settings.nativeTools });
+        const repairResponse = await requestModel(repairMessages, {
+          toolSet: "state",
+          allowedToolNames: [call.name],
+          disableJsonMode: Boolean(settings.nativeTools),
+          forceDisableReasoning: true,
+          maxTokensModeOverride: "manual",
+          maxTokensOverride: 1600,
         });
-        proposedToolCalls = repairPlan.calls;
-      }
+        return repairResponse.toolCalls;
+      }, {
+        maxRepairs: 3,
+        onRepairsStarted: () => setTurnPhase("toolRetry"),
+      });
+      proposedToolCalls = repairPlan.calls;
       const advancementProposed = proposedToolCalls.some((call) => call.name === "advancement.promote");
       if (advancementProposed) resetStreamPreview();
       markTurnMetric(metrics, "planningCompletedAt");
@@ -342,13 +337,9 @@ export default function App() {
       }
 
       let response = fastPresentationResponse || planningResponse;
-      const rejectedNarrativeSuffix = () => {
-        const rejectionNarrative = buildRejectedToolNarrative(action, execution.results);
-        return execution.results.some((result) => result.ok) ? `${response.narrative}\n\n${rejectionNarrative}` : rejectionNarrative;
-      };
-      let needsFullRendering = !settings.mockMode && (!fastMode || !fastPresentationResponse?.hasNarrative || advancementProposed);
+      let needsFullRendering = !fastMode || !fastPresentationResponse?.hasNarrative || advancementProposed;
 
-      if (!settings.mockMode && fastMode && fastPresentationResponse?.hasNarrative && (proposedToolCalls.length || resolution.derivedEffects.narrativeEvents.length) && !advancementProposed) {
+      if (fastMode && fastPresentationResponse?.hasNarrative && (proposedToolCalls.length || resolution.derivedEffects.narrativeEvents.length) && !advancementProposed) {
         setTurnPhase("finalizing");
         const finalTasks = launchFastModeTasks({
           continuation: () => requestModel(
@@ -386,14 +377,8 @@ export default function App() {
           response = { ...narrativeResponse, ...originalChoices };
         }
         if (!response.hasNarrative) throw new Error("模型没有返回最终剧情正文，请重试本轮。");
-      } else if (settings.mockMode && execution.results.some((result) => !result.ok)) {
-        response = { ...response, narrative: rejectedNarrativeSuffix(), hasNarrative: true };
-      } else if (settings.mockMode && advancementProposed) {
-        const confirmedAdvancement = execution.results.find((result) => result.ok && result.data?.advancement)?.data.advancement.after;
-        if (confirmedAdvancement) response = { ...response, narrative: `${response.narrative}\n\n你作出最终确认后服下魔药。本地档案同步记录了灵性的变化：你已经不再是普通人，而是${confirmedAdvancement.pathwayName}途径的${confirmedAdvancement.sequenceLabel}非凡者。`, hasNarrative: true };
       }
 
-      if (settings.mockMode && resolution.derivedEffects.narrativeEvents.length) response = { ...response, narrative: `${response.narrative}\n\n${eventDirections(resolution.derivedEffects.narrativeEvents)}` };
       response = { ...response, narrative: appendFixedRenardTreatmentScene(response.narrative, progress) };
       const { choices, choiceMeta } = choiceResult(modelChoices(response), choiceValidationError(response));
 
@@ -423,7 +408,7 @@ export default function App() {
       resetStreamPreview(); commitGame(next);
       // Narrative and settlement are durable before any optional suggestion request.
       clearTimeout(watchdogTimer);
-      if (!settings.mockMode && !hasValidModelChoices(next)) {
+      if (!hasValidModelChoices(next)) {
         setTurnPhase("choiceRetry");
         try {
           const recovered = await requestChoicesFromAI(next, action, occultNarrative, next, controller.signal,
@@ -481,7 +466,7 @@ export default function App() {
   };
 
   const regenerateChoices = async () => {
-    if (!game || busyRef.current || settings.mockMode) return false;
+    if (!game || busyRef.current) return false;
     const narrative = [...game.recentDialogues].reverse().find((message) => message.role === "assistant")?.content || "";
     const action = [...game.recentDialogues].reverse().find((message) => message.role === "user")?.content || "继续当前场景";
     if (!narrative) return false;
@@ -537,9 +522,7 @@ export default function App() {
     const timer = setTimeout(() => controller.abort(), 150000);
     try {
       resolution.derivedEffects.narrativeEvents = events;
-      const response = settings.mockMode
-        ? { hasNarrative: true, narrative: [inspection.observation, eventDirections(events)].filter(Boolean).join("\n\n") }
-        : await requestAIWithReasoningFallback(settings, buildItemInspectionContext(game, next, reason, prompt, resolution, inspection), controller.signal, queueStreamPreview, { disableTools: true, disableJsonMode: true });
+      const response = await requestAIWithReasoningFallback(settings, buildItemInspectionContext(game, next, reason, prompt, resolution, inspection), controller.signal, queueStreamPreview, { disableTools: true, disableJsonMode: true });
       if (controller.signal.aborted) throw new DOMException("已取消", "AbortError");
       if (!response.hasNarrative) throw new Error("模型没有返回剧情正文");
       const memory = computeMemoryUpdate({ ...settled, turn: settled.turn - 1 }, reason, response.narrative, resolution, { settledGame: settled });
@@ -584,7 +567,7 @@ export default function App() {
     {screen === "splash" && <Splash onEnter={() => setScreen("welcome")} />}
     {screen === "welcome" && <Welcome loading={loading} hasSave={saves.some((slot) => slot.slotId === "autosave")} saves={saves} apiSettings={settings} onNew={() => { if (!busyRef.current) setScreen("create"); }} onContinue={handleContinue} onLoadSlot={loadSlot} onImport={handleImport} onApi={() => setModal("api")} onUpdate={() => setModal("update")} onChangelog={() => setModal("changelog")} />}
     {screen === "create" && <CharacterCreation onBack={() => setScreen("welcome")} onCreate={handleCreate} settings={settings} onApi={() => setModal("api")} />}
-    {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} mockMode={Boolean(settings.mockMode)} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onRegenerateChoices={regenerateChoices} onLocalTool={runLocalTool} onOpenMap={openMap} onSpecialAction={handleSpecialAction} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => { if (!busyRef.current) { resetAction(); setScreen("welcome"); } }} />}
+    {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onRegenerateChoices={regenerateChoices} onLocalTool={runLocalTool} onOpenMap={openMap} onSpecialAction={handleSpecialAction} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => { if (!busyRef.current) { resetAction(); setScreen("welcome"); } }} />}
     {itemConfirmation && <ImportantItemConfirmation changes={itemConfirmation.changes} onConfirm={(approvedKeys) => settleImportantItemConfirmation({ approvedKeys })} onCancel={() => settleImportantItemConfirmation({ cancelled: true })} />}
     {modal === "map" && game && <WorldMap game={game} loading={loading} initialLocationId={mapFocus} onSpecial={() => setModal("special")} onClose={() => setModal(null)} onTravel={(location) => { setModal(null); return runTurn(`前往${location.name}`, { mapDestination: location }); }} onInvestigate={(location, knowledge) => { setModal(null); return runTurn(`根据地图上的传闻，调查${knowledge.note || location.district}。`, { mapInvestigation: { locationId: location.id, currentStatus: knowledge.status, rumor: knowledge.note || location.rumor } }); }} onExplore={handleExplore} onPray={handlePray} />}
     {modal === "special" && game && <Modal title="特殊行动" onClose={() => setModal(null)}><SpecialActions game={game} loading={loading} onExecute={handleSpecialAction} onOpenMap={openMap} /></Modal>}

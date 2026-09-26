@@ -71,7 +71,7 @@ test("AI loadout uses configured transport and only submits clothing and persona
     request = JSON.parse(options.body);
     return new Response(JSON.stringify({ choices: [{ message: { content: JSON.stringify(raw) } }] }), { headers: { "content-type": "application/json" } });
   });
-  const result = await generateLoadout({ ...profile, avatar: "private-portrait", secret: "private-secret" }, { ...DEFAULT_API_SETTINGS, mockMode: false });
+  const result = await generateLoadout({ ...profile, avatar: "private-portrait", secret: "private-secret" }, { ...DEFAULT_API_SETTINGS, mockMode: true });
   assert.equal(result.mode, "ai");
   assert.equal(result.clothes.length, 4);
   assert.equal(request.stream, false);
@@ -81,9 +81,8 @@ test("AI loadout uses configured transport and only submits clothing and persona
 
 test("generation failures and cancellation do not silently create fallback items", async (t) => {
   t.mock.method(globalThis, "fetch", async () => new Response(JSON.stringify({ choices: [{ message: { content: "没有清单" } }] }), { headers: { "content-type": "application/json" } }));
-  await assert.rejects(generateLoadout(profile, { ...DEFAULT_API_SETTINGS, mockMode: false }), /JSON/);
+  await assert.rejects(generateLoadout(profile, { ...DEFAULT_API_SETTINGS }), /JSON/);
   const controller = new AbortController(); controller.abort();
   await assert.rejects(generateLoadout(profile, DEFAULT_API_SETTINGS, controller.signal), { name: "AbortError" });
-  const result = await generateLoadout(profile, DEFAULT_API_SETTINGS);
-  assert.equal(result.mode, "local");
+  await assert.rejects(generateLoadout(profile, { ...DEFAULT_API_SETTINGS, mockMode: true }), /JSON/);
 });

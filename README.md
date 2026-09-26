@@ -63,7 +63,7 @@ npm run preview
 
 API Key 输入框使用本地圆点遮罩而非系统密码字段，并请求浏览器关闭自动填充；Android APK 还会将 Activity 根视图和游戏 WebView 排除出系统自动填充，以避免部分 ColorOS 设备反复弹出密码建议。手动输入、粘贴和用户主动选择的本地密钥保存不受影响。
 
-没有 API Key 时保持 Mock 模式即可完成全部核心流程。真实接口默认按 OpenAI Chat Completions 协议调用，兼容流式输出、原生 tool calling 与 JSON 回退。
+游戏需配置可用的 AI 接口与模型；使用本地 Ollama 等无需密钥的服务时可留空 API Key。接口默认按 OpenAI Chat Completions 协议调用，兼容流式输出、原生 tool calling 与 JSON 回退。
 
 ## GitHub 云端构建 APK
 

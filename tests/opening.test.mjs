@@ -2,11 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createInitialGame, DEFAULT_SYSTEM_PROMPT, EMPTY_CHARACTER, LOW_SEQUENCE_PATHWAYS } from "../src/data/defaults.js";
 import { buildContext } from "../src/services/memory.js";
-import { mockResponse } from "../src/services/mock.js";
 import { OPENINGS } from "../src/data/openings.js";
 import { getMapLocation, hexForLocation, MAP_DISTRICTS } from "../src/data/map.js";
 import { migrateSave } from "../src/services/storage.js";
-import { executeToolCalls } from "../src/engine/tools.js";
 
 test("new characters begin freely at the East Borough railway station", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "测试旅客" });
@@ -83,25 +81,6 @@ test("new openings do not share mutable clues, choices or map knowledge", () => 
   assert.equal(second.locationKnowledge["north-flats"].status, "visited");
 });
 
-test("Mock follows all non-East opening actions and permits travel to known places", async () => {
-  await Promise.all(OPENINGS.filter((opening) => opening.district !== "东区").map(async (opening) => {
-    const game = createInitialGame({ ...EMPTY_CHARACTER, name: "地区测试员", startingDistrict: opening.district });
-    for (const [index, action] of opening.actions.entries()) {
-      const response = await mockResponse(game, action);
-      assert.doesNotMatch(response.narrative, /第七码头|站内公告|离开车站/);
-      assert.equal(response.toolCalls.some((call) => call.name === "quest.add" || call.name === "location.move"), false);
-      if (index === 2) {
-        const result = executeToolCalls(game, response.toolCalls);
-        assert.ok(result.game.clues.some((clue) => clue.id === opening.clues[0].id));
-      }
-    }
-    const destination = game.discoveredLocations.find((place) => place.id !== game.location.id);
-    const response = await mockResponse(game, `前往${destination.name}`);
-    const result = executeToolCalls(game, response.toolCalls);
-    assert.equal(result.game.location.id, destination.id);
-    assert.deepEqual(result.game.world.player, hexForLocation(getMapLocation(destination.id)));
-  }));
-});
 
 test("character creation exposes all 22 distinct sequence 9 pathways", () => {
   assert.equal(LOW_SEQUENCE_PATHWAYS.length, 22);
@@ -130,14 +109,4 @@ test("AI context treats mysteries as optional world threads", () => {
   assert.match(scenario.content, /开放世界沙盒/);
   assert.match(scenario.content, /不是必须完成的主线/);
   assert.match(scenario.content, /不得自动添加任务/);
-});
-
-test("Mock mode supports leaving the station without attaching a main quest", async () => {
-  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "测试旅客" });
-  const response = await mockResponse(game, "先去铁门街找住处", new AbortController().signal);
-
-  assert.match(response.narrative, /落脚处/);
-  assert.equal(response.toolCalls[0].name, "location.move");
-  assert.equal(response.toolCalls[0].args.locationId, "iron-gate");
-  assert.equal(response.toolCalls.some((call) => call.name === "quest.add"), false);
 });

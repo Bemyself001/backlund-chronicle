@@ -24,6 +24,7 @@ function captureProfile(settings) {
 export function loadApiSettings() {
   let saved = {};
   try { saved = JSON.parse(localStorage.getItem(SETTINGS_KEY) || "{}"); } catch { saved = {}; }
+  delete saved.mockMode;
   const provider = saved.provider || (saved.baseUrl ? inferApiProvider(saved.baseUrl) : DEFAULT_API_SETTINGS.provider);
   const legacyProfile = Object.fromEntries(Object.entries({
     baseUrl: saved.baseUrl,
@@ -43,6 +44,8 @@ export function loadApiSettings() {
 }
 
 export function saveApiSettings(settings) {
+  settings = { ...settings };
+  delete settings.mockMode;
   const provider = settings.provider || inferApiProvider(settings.baseUrl);
   const profiles = { ...(settings.profiles || {}), [provider]: captureProfile(settings) };
   const storedProfiles = {};
@@ -88,7 +91,6 @@ async function apiError(response, prefix) {
 }
 
 export async function listApiModels(settings, signal) {
-  if (settings.mockMode) return ["mock-narrator"];
   if (!settings.baseUrl) throw new Error("请先选择服务商或填写 Base URL。");
   let response;
   try {
@@ -108,7 +110,6 @@ export async function listApiModels(settings, signal) {
 }
 
 export async function testApiConnection(settings, signal) {
-  if (settings.mockMode) return "Mock 模式就绪：无需网络连接。";
   if (!settings.baseUrl || !settings.model) throw new Error("请填写 Base URL 和 Model。");
   const models = await listApiModels(settings, signal);
   const selected = models.includes(settings.model) ? "当前模型可用" : "当前模型未出现在列表中，请确认名称";

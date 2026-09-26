@@ -22,7 +22,7 @@ try {
   console.error("缺少 scripts/bench-settings.json，请先按 scripts/bench-settings.example.json 创建。");
   process.exit(1);
 }
-settings = { stream: true, nativeTools: true, jsonMode: true, mockMode: false, temperature: 0.8, maxTokensMode: "auto", contextLength: 12000, reasoningMode: "auto", customHeaders: "{}", ...settings, mockMode: false };
+settings = { stream: true, nativeTools: true, jsonMode: true, temperature: 0.8, maxTokensMode: "auto", contextLength: 12000, reasoningMode: "auto", customHeaders: "{}", ...settings };
 
 const TURNS = Math.max(1, Number(process.argv[2]) || 5);
 const ACTIONS = [

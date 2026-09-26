@@ -6,7 +6,6 @@ import { executeToolCalls } from "../src/engine/tools.js";
 import { minutesForTurn } from "../src/engine/turn.js";
 import { ensureMapMoveToolCall, ensureMapDiscoveryToolCall } from "../src/services/mapTravel.js";
 import { ensureWorld } from "../src/system/hexworld.js";
-import { mockResponse } from "../src/services/mock.js";
 import { buildPlanningContext, buildFastPresentationContext, buildRenderingContext } from "../src/services/memory.js";
 
 const known = ["east-station", "iron-gate", "soot-lamp", "queen-library"];
@@ -222,9 +221,6 @@ test("dynamic rumored locations also reveal after one map investigation", () => 
 test("church investigation narration distinguishes public knowledge from hidden interiors", async () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "教堂调查" });
   const options = { mapInvestigation: { locationId: "st-samuel" } };
-  const response = await mockResponse(game, "调查该区域", undefined, undefined, options);
-  assert.match(response.narrative, /圣赛缪尔教堂/);
-  assert.match(response.narrative, /公开宗教地标/);
   for (const messages of [buildPlanningContext(game, "调查", "", options), buildFastPresentationContext(game, "调查", ""), buildRenderingContext(game, game, "调查", "", {})]) {
     assert.ok(messages.some((message) => message.content.includes("不表示当地居民不知道该地点")));
   }
