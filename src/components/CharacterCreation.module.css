@@ -73,6 +73,7 @@
 .identity strong { font: .9rem var(--font-serif); }
 .identity small { color: var(--ink-soft); font: .72rem/1.4 var(--font-sans); }
 .error { padding: .65rem .8rem; border-left: 3px solid var(--danger); background: #812b2212; color: #6c211c; font: .8rem var(--font-sans); }
+.easterEggMessage { margin: 0 0 1.5rem; color: var(--ink); font: 500 1.15rem/2 var(--font-serif); }
 .formFooter { display: flex; align-items: center; justify-content: space-between; gap: 1rem; margin-top: 1.5rem; padding-top: 1.2rem; border-top: 1px solid #8e7b594d; }
 .formFooter p { max-width: 20rem; }
 @media (max-width: 850px) { .layout { grid-template-columns: 1fr; } .intro { position: static; } .intro > p { display: none; } .avatarFrame { width: 7.5rem; height: 9rem; margin-bottom: 3.5rem; } }

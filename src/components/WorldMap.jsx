@@ -4,7 +4,7 @@ import { findLocationRelations, findTravelRoute, getChildLocations, getMapLocati
 import { cityTerrainLabel, canExploreHex, hexPolygonPoints, hexToPixel, visibleHexes } from "../system/hexworld.js";
 import styles from "./WorldMap.module.css";
 import { prayerAvailability } from "../engine/prayer.js";
-import { SPECIAL_ACTIONS, SPECIAL_CONTACTS } from "../content/index.js";
+import { SPECIAL_ACTIONS, ORGANIZATIONS } from "../content/index.js";
 
 const KIND_LABELS = {
   street: "街道", residence: "住所", shop: "店铺", tavern: "酒馆", office: "事务所", church: "教会", warehouse: "仓库",
@@ -119,6 +119,7 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
         <h3>{discovered ? selected.name : rumored ? "地图上的地点传闻" : "雾中区域"}</h3>
         {discovered && <div className={styles.locationBadges}><span>{KIND_LABELS[selected.kind] || "地点"}</span><span>{selected.source === "dynamic" ? "剧情生长" : "城市档案"}</span>{selectedKnowledge.status === "visited" && <span>已到访</span>}</div>}
         <span>{discovered ? selected.description : rumored ? selectedKnowledge.note || selected.rumor : "这里还没有可供追查的传闻。继续探索、交谈或取得相关线索后，地图会补充记录。"}</span>
+        {discovered && ORGANIZATIONS.filter((entry) => entry.headquarters === selected.id).map((organization) => <p key={organization.id}>{organization.church} · {organization.name}驻地，可在此申请正式加入并办理组织事务。</p>)}
         {discovered && <dl>
           <div><dt>Location ID</dt><dd><code>{selected.id}</code></dd></div>
           <div><dt>档案状态</dt><dd>{current ? "当前位置" : selectedKnowledge.status === "visited" ? "已到访" : "已发现"}</dd></div>
@@ -145,7 +146,7 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
           <button className="button button--primary" type="button" disabled={loading || !prayer.ok} onClick={() => onPray(selected.id)}>{loading ? "本轮处理中" : prayer.reason || "祷告 · 理智与灵性各恢复 2 点"}</button>
           <small>向{prayer.church.deity}祷告，消耗一回合。每 5 回合可用一次，所有教堂共享冷却；恢复不超过各自上限。</small>
         </>}
-        {discovered && (SPECIAL_ACTIONS.some((entry) => entry.locationId === selected.id) || selected.id === SPECIAL_CONTACTS.organizationLocation) && <button type="button" className="button button--primary" disabled={loading} onClick={onSpecial}>特殊行动 · 工作与登记</button>}
+        {discovered && (SPECIAL_ACTIONS.some((entry) => entry.locationId === selected.id) || ORGANIZATIONS.some((entry) => entry.headquarters === selected.id)) && <button type="button" className="button button--primary" disabled={loading} onClick={onSpecial}>特殊行动 · 工作与登记</button>}
         <small>{discovered ? "新地点会连接已知锚点并由本地计算路线；到访后状态会永久记录。" : rumored ? "调查会进入正常回合；只有本地确认成功后，地点才会正式解锁。" : "未知区域不会提前泄露名称与详情。"}</small>
         </>}
       </aside>

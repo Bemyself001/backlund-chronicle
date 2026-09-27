@@ -7,7 +7,8 @@ import { amountToPence, formatMoney, moneyFromPence, moneyToPence } from "../sys
 import { isImportantNonMoneyItem, normalizeInventoryItem, normalizeItemImportance } from "../system/items.js";
 import { equipmentSlot } from "../system/loadout.js";
 import { applyAdvancement, getAdvancement, isExplicitAdvancementIntent } from "../system/character.js";
-import { getOrganization, getPathway, RENARD_AUCTION_MEDICINE } from "../content/index.js";
+import { getOrganization, getPathway, RENARD_AUCTION_MEDICINE, SPECIAL_RECIPES } from "../content/index.js";
+import { medicinePurchaseGate } from "./medicineAccess.js";
 import { abandonTrigger, engageTrigger, progressTrigger } from "./triggerEngine.js";
 import { normalizeTriggerState } from "./triggerState.js";
 import { executeItemContentAction, hasItemContentAction } from "./itemActions.js";
@@ -392,6 +393,9 @@ function executeOne(game, call, options = {}) {
   switch (call.name) {
     case "inventory.add": {
       const source = args.item;
+      const purchasedMedicine = SPECIAL_RECIPES.some(recipe => recipe.stat && (source?.itemId === `special-${recipe.id}` || source?.name === recipe.name))
+        && /买|购|purchase|buy/i.test(`${options.playerAction || ""} ${call.reason || ""} ${source?.source || ""}`);
+      if (purchasedMedicine && medicinePurchaseGate(game)) return fail(call.name, medicinePurchaseGate(game));
       const renardAuction = game.triggerState?.active?.some(entry => entry.definitionId === "side.queens.renard-fall"
         && ["available", "engaged"].includes(entry.status)
         && (["auction-conversation", "auction-box"].includes(entry.stage) || /拍卖|竞拍|出价/.test(String(options.playerAction || call.reason || ""))));

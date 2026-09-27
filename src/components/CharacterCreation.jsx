@@ -7,6 +7,8 @@ import { loadoutInput } from "../system/loadout.js";
 import { MAX_STARTING_MONEY_PENCE, moneyFromPence, formatMoney } from "../system/money.js";
 import styles from "./CharacterCreation.module.css";
 import { getMapLocation } from "../system/map.js";
+import { SEFIRAH_CASTLE_EASTER_EGG } from "../content/backlund/easterEggs.js";
+import Modal from "./Modal.jsx";
 
 const AVATAR_SIZE = 192;
 
@@ -46,6 +48,7 @@ export default function CharacterCreation({ onBack, onCreate, settings, onApi })
   const [error, setError] = useState("");
   const [generating, setGenerating] = useState(false);
   const [review, setReview] = useState(null);
+  const [showEasterEgg, setShowEasterEgg] = useState(false);
   const controllerRef = useRef(null);
   const previewRef = useRef(null);
   const preview = review?.character === character && review?.settings === settings ? review.loadout : null;
@@ -74,6 +77,13 @@ export default function CharacterCreation({ onBack, onCreate, settings, onApi })
   const submit = async (event) => {
     event.preventDefault();
     if (controllerRef.current) return;
+    if (character.carriedItemName.trim() === SEFIRAH_CASTLE_EASTER_EGG.itemName
+      || character.name.trim() === SEFIRAH_CASTLE_EASTER_EGG.characterName) {
+      setError("");
+      setReview(null);
+      setShowEasterEgg(true);
+      return;
+    }
     if (!character.name.trim() || !character.background.trim()) { setError("请至少填写姓名与个人背景。"); return; }
     const age = Number(character.age);
     if (age < 16 || age > 80) { setError("年龄需在 16—80 岁之间。"); return; }
@@ -178,6 +188,10 @@ export default function CharacterCreation({ onBack, onCreate, settings, onApi })
           <footer className={styles.formFooter}><p>{preview ? "确认这份行装后，将建立档案并进入所选大区。" : "先整理并确认行装，再进入故事。修改角色资料后需重新整理。"}</p><button className="button button--primary button--large" type="submit" disabled={generating}>{generating ? "正在整理…" : preview ? "确认行装并进入贝克兰德" : "整理开局行装"}</button></footer>
         </form>
       </section>
+      {showEasterEgg && <Modal title={SEFIRAH_CASTLE_EASTER_EGG.title} onClose={() => setShowEasterEgg(false)}>
+        <p className={styles.easterEggMessage}>{SEFIRAH_CASTLE_EASTER_EGG.message}</p>
+        <button className="button button--primary" type="button" onClick={() => setShowEasterEgg(false)}>{SEFIRAH_CASTLE_EASTER_EGG.closeLabel}</button>
+      </Modal>}
     </main>
   );
 }

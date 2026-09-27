@@ -7,10 +7,27 @@ import { executeToolCalls } from "../src/engine/tools.js";
 import { settlePrayer } from "../src/engine/prayer.js";
 import { moneyFromPence, moneyToPence } from "../src/system/money.js";
 import { migrateSave } from "../src/services/storage.js";
+import { medicinePurchaseGate } from "../src/engine/medicineAccess.js";
+import { processTriggers, engageTrigger, abandonTrigger } from "../src/engine/triggerEngine.js";
+import { visibleGameState } from "../src/services/memory.js";
 
 function fresh() {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "恢复测试" });
   game.money = moneyFromPence(100);
+  return game;
+}
+function offeredTreatment() {
+  const game = fresh();
+  game.location.id = "bridge-docks";
+  game.triggerState.facts["watch.formal-quest-unlocked"] = { value: true, firstTurn: 0, evidenceIds: ["test"] };
+  processTriggers(game, { action: "抵达南岸货栈", turn: 1 });
+  return game;
+}
+function startedTreatment() {
+  const game = offeredTreatment();
+  const task = game.triggerState.active.find(entry => entry.definitionId === "side.queens.renard-fall");
+  assert.ok(task);
+  assert.equal(engageTrigger(game, task.instanceId, 1, "回应求医消息").ok, true);
   return game;
 }
 const run = (game, operation, id) => executeSpecialAction(game, { operation, id, revision: specialState(game).revision });
@@ -59,7 +76,7 @@ test("recovery caps and failed purchases preserve resources; legacy medicines re
   assert.equal(slept.progress.restRecovery[0].delta, 1);
   assert.equal(slept.next.character.stats.health, game.character.stats.maxHealth);
   for (const patch of [{ money: moneyFromPence(0) }, { capacity: { maxWeight: 0.01 } }]) {
-    const poor = { ...game, ...patch };
+    const poor = { ...startedTreatment(), ...patch };
     const copy = structuredClone(poor);
     assert.throws(() => run(poor, "buy-medicine", "wound-salve"));
     assert.deepEqual(poor, copy);
@@ -73,7 +90,7 @@ test("recovery caps and failed purchases preserve resources; legacy medicines re
 
 test("ordinary characters can buy all medicines and use saved stock in inventory without double consumption", () => {
   for (const [id, stat, amount, price] of [["wound-salve", "health", 2, 12], ["soothing-draught", "sanity", 1, 15], ["restorative-tonic", "spirituality", 1, 20]]) {
-    const original = fresh();
+    const original = startedTreatment();
     const bought = run(original, "buy-medicine", id).next;
     assert.equal(moneyToPence(bought.money), 100 - price);
     const game = migrateSave(bought);
@@ -89,5 +106,47 @@ test("ordinary characters can buy all medicines and use saved stock in inventory
     assert.equal(used.results[0].ok, true);
     assert.equal(used.game.character.stats[stat], amount);
     assert.equal(executeToolCalls(used.game, [call]).results[0].ok, false);
+  }
+});
+
+test("medicine purchases unlock on accepted treatment, persist after reload and never unlock from an unaccepted rumor", () => {
+  for (const game of [fresh(), offeredTreatment()]) {
+    const before = structuredClone(game);
+    for (const id of ["wound-salve", "soothing-draught", "restorative-tonic"]) {
+      assert.throws(() => run(game, "buy-medicine", id), /开始追查「高窗之下」/);
+      assert.deepEqual(game, before);
+    }
+    assert.equal(visibleGameState(game).medicineSales.unlocked, false);
+  }
+  const declined = offeredTreatment();
+  const offer = declined.triggerState.active.find(entry => entry.definitionId === "side.queens.renard-fall");
+  assert.equal(abandonTrigger(declined, offer.instanceId, 2).ok, true);
+  assert.match(medicinePurchaseGate(migrateSave(declined)), /开始追查/);
+  const expired = offeredTreatment();
+  processTriggers(expired, { action: "处理日常事务", turn: 30 });
+  assert.match(medicinePurchaseGate(migrateSave(expired)), /开始追查/);
+
+  const started = startedTreatment();
+  assert.equal(medicinePurchaseGate(migrateSave(started)), "");
+  assert.equal(visibleGameState(started).medicineSales.unlocked, true);
+  const accepted = started.triggerState.active.find(entry => entry.definitionId === "side.queens.renard-fall");
+  assert.equal(abandonTrigger(started, accepted.instanceId, 2).ok, true);
+  assert.doesNotThrow(() => run(migrateSave(started), "buy-medicine", "wound-salve"));
+
+  const legacy = fresh();
+  legacy.triggerState.facts["side.renard.completed"] = { value: true };
+  assert.doesNotThrow(() => run(migrateSave(legacy), "buy-medicine", "wound-salve"));
+});
+
+test("narrative inventory tools cannot purchase locked medicines with a different item ID", () => {
+  for (const itemId of ["special-wound-salve", "shop-wound-salve"]) {
+    const game = fresh();
+    const result = executeToolCalls(game, [{ id: "purchase", name: "inventory.add", args: {
+      item: { itemId, name: "外伤药膏", description: "从药师处购买的普通外伤药膏。", quantity: 1, weight: 0.1 },
+    }, reason: "购买药师的外伤药膏" }], { playerAction: "购买外伤药膏" });
+    assert.equal(result.results[0].ok, false);
+    assert.match(result.results[0].reason, /开始追查/);
+    assert.deepEqual(result.game.inventory, game.inventory);
+    assert.deepEqual(result.game.money, game.money);
   }
 });

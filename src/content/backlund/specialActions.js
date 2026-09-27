@@ -1,3 +1,5 @@
+import { ORGANIZATIONS } from "./organizations.js";
+
 // 固定委托正文与结局均属于内容包；金钱、物品和回合由本地引擎结算。
 const pools = {
   seer: [
@@ -138,6 +140,35 @@ SPECIAL_ACTIONS.push({
   })),
 });
 
+const officialWork = [
+  { organizationId: "machinery-hivemind", pathwayId: "generalist", scenes: [
+    ["封存仪器的交接", "机械之心驻地收到一批待查仪器，值班队员安排你核对编号与封条，不得自行启动。", "逐件核对编号并登记差异", "你发现一张编号抄错的标签，交由值班队员复核，仪器按规程完成封存。", "协助登记外观和交接时间", "你如实完成交接记录，领取当班津贴。"],
+    ["工厂的异常汽笛", "工厂报告停机后仍有汽笛声，机械之心安排你随队走访工人与门卫。", "比对停机记录与证言", "你找出备用管路仍在运行的时段，队员据此排除误报，完成现场交接。", "整理工人的口述记录", "你把未经确认的细节逐一标注，交给负责调查的队员。"],
+    ["档案室的零件清单", "机械之心档案员需要复核旧案中的零件清单，避免把普通维修材料混入封存物记录。", "比对采购单和封存登记", "你厘清了两批零件的来源，档案员修正目录并支付工作津贴。", "先归档能够核实的条目", "你保留疑项供资深队员处理，完成本次文书工作。"],
+  ] },
+  { organizationId: "mandated-punishers", pathwayId: "sailor", scenes: [
+    ["码头的夜间巡查", "代罚者驻地安排一次例行巡查，你负责随队记录码头的异常报告。", "核对巡逻路线与值班记录", "你补齐了一处交接遗漏，巡查按时结束，队长签发当班津贴。", "按分工记录沿途情况", "你将见闻如实交回驻地，完成基础巡查工作。"],
+    ["船员的惊梦报告", "几名船员向代罚者报告相似的惊梦，值班队员让你分别记录他们的经历。", "分开询问并核对共同经历", "你发现他们都曾在同一货舱值班，将线索交给资深队员继续调查。", "记录原话并标注不确定之处", "你没有把传言当作事实，整理好的记录帮助队员安排后续走访。"],
+    ["风雨后的警戒线", "一处码头仓库在风雨后墙体受损，代罚者请你协助巡警维持现场秩序。", "核对名单并引导人员撤离", "仓库人员安全离开警戒区域，现场交给专业人员处理，你领取协助津贴。", "守住分配的警戒入口", "你阻止无关人员误入危险区域，按交班要求完成值守。"],
+  ] },
+];
+
+for (const work of officialWork) {
+  const organization = ORGANIZATIONS.find((entry) => entry.id === work.organizationId);
+  SPECIAL_ACTIONS.push({
+    id: `work-${organization.id}`, name: `${organization.name}基础委托`, pathwayId: work.pathwayId,
+    organizationId: organization.id, locationId: organization.headquarters, sharedOrganization: true,
+    kind: "commission", maxSequence: 9, minutes: 30, cost: 0,
+    pool: work.scenes.map(([title, scene, labelA, endingA, labelB, endingB], index) => ({
+      id: `${organization.id}-${index}`, title, scene,
+      options: [
+        { id: "careful", label: labelA, ending: endingA, reward: 120 + index * 30, reputation: 1 },
+        { id: "limited", label: labelB, ending: endingB, reward: 60 + index * 15 },
+      ],
+    })),
+  });
+}
+
 export const SPECIAL_RECIPES = [
   { id: "wound-salve", pathwayId: "apothecary", name: "外伤药膏", maxSequence: 9, material: "草药材料包", cost: 6, sale: 12, stat: "health", delta: 2, weight: 0.1, description: "普通外伤护理药剂，使用恢复2点生命；不含晋升魔药成分。" },
   { id: "soothing-draught", pathwayId: "apothecary", name: "安神药剂", maxSequence: 9, material: "安神草药包", cost: 8, sale: 15, stat: "sanity", delta: 1, weight: 0.1, description: "帮助安定思绪的普通药剂，使用恢复1点理智；不能解除非凡污染。" },
@@ -147,6 +178,7 @@ export const SPECIAL_RECIPES = [
 
 export const SPECIAL_CONTACTS = {
   registrationLocation: "city-cemetery", organizationLocation: "st-samuel", organizationId: "nighthawks",
+  medicinePurchaseUnlock: { triggerId: "side.queens.renard-fall", completedFact: "side.renard.completed", title: "高窗之下" },
   watchOutcomeFact: "watch.white-iris-outcome",
   watchContacts: {
     "escaped-with-official-escort": "你曾在南岸得到官方接应；联络人谨慎地把工作限制在外围文书范围。",

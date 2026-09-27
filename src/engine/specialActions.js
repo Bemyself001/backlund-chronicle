@@ -1,10 +1,12 @@
 import { SPECIAL_ACTIONS, SPECIAL_RECIPES, SPECIAL_CONTACTS, getOrganization } from "../content/index.js";
+import { getMapLocation } from "../system/map.js";
 import { getAdvancement } from "../system/character.js";
 import { moneyFromPence, moneyToPence } from "../system/money.js";
 import { applyStatDelta } from "./statChanges.js";
 import { resolveTurnProgress } from "./turn.js";
 import { makeId } from "../utils/id.js";
 import { medicineRecipe, consumeMedicine } from "./recovery.js";
+import { medicinePurchaseGate } from "./medicineAccess.js";
 
 export function specialState(game) {
   const raw = game.specialActions || {};
@@ -49,18 +51,24 @@ export function watchContactText(game) {
   return SPECIAL_CONTACTS.watchContacts[fact?.value ?? fact] || "联络人只把你当作外围合作者，不要求你正式加入魔女会。";
 }
 
+export function registrationOrganization(kind) {
+  const organization = getOrganization(kind === "organization" ? SPECIAL_CONTACTS.organizationId : kind);
+  return organization?.headquarters && organization.tags.includes("official") ? organization : null;
+}
+
 export function registrationGate(game, kind) {
   const state = specialState(game);
   const advancement = getAdvancement(game.character);
+  const organization = registrationOrganization(kind);
   if (kind === "gravekeeper") {
     const work = SPECIAL_ACTIONS.find((entry) => entry.license === "gravekeeper");
     if (advancement.pathwayId !== work.pathwayId) return "收尸人途径可登记守墓工作";
     if (state.gravekeeper) return "已登记为守墓人";
     if (game.location.id !== SPECIAL_CONTACTS.registrationLocation) return "需到达墓地管理处";
-  } else if (kind === "organization") {
+  } else if (organization) {
     if (advancement.type !== "extraordinary") return "成为非凡者后可申请";
     if (game.organizationState?.membership?.status === "active") return "已有正式组织身份";
-    if (game.location.id !== SPECIAL_CONTACTS.organizationLocation) return "需到达圣赛缪尔教堂登记";
+    if (game.location.id !== organization.headquarters) return `需到达${getMapLocation(organization.headquarters)?.name || "组织驻地"}登记`;
   } else return "未知登记项目";
   return "";
 }
@@ -172,15 +180,16 @@ export function executeSpecialAction(game, request) {
       action = "登记为守墓人";
       narrative = "墓地管理人核对了你的身份，讲解墓册与遗体交接要求，将你登记为守墓人。之后可以在这里接取有薪工作。";
     } else {
-      const organization = getOrganization(SPECIAL_CONTACTS.organizationId);
-      next.organizationState = { membership: { organizationId: organization.id, name: organization.name, kind: "official", tags: [...organization.tags], status: "active", joinedTurn: next.turn + 1, evidence: "本人到场，明确接受值夜者纪律并完成正式登记。" } };
-      action = "正式加入值夜者";
-      narrative = "你确认愿意接受值夜者的纪律与任务安排，完成身份说明和正式登记。值班人员将基础委托册交给你，提醒你遇到超出能力的异常必须报告。";
+      const organization = registrationOrganization(request.id);
+      const headquarters = getMapLocation(organization.headquarters).name;
+      next.organizationState = { membership: { organizationId: organization.id, name: organization.name, kind: "official", tags: [...organization.tags], status: "active", joinedTurn: next.turn + 1, evidence: `本人到达${headquarters}，明确接受${organization.name}纪律并完成正式登记。` } };
+      action = `正式加入${organization.name}`;
+      narrative = `你在${headquarters}确认愿意接受${organization.church}所属${organization.name}的纪律与任务安排，完成身份说明和正式登记。值班人员将基础委托册交给你，提醒你遇到超出能力的异常必须报告。`;
     }
     minutes = 30;
   } else if (operation === "buy" || operation === "craft" || operation === "buy-medicine") {
     const recipe = SPECIAL_RECIPES.find((entry) => entry.id === request.id);
-    const reason = operation === "buy-medicine" && recipe?.stat ? "" : actionGate(next, recipe);
+    const reason = operation === "buy-medicine" && recipe?.stat ? medicinePurchaseGate(next) : actionGate(next, recipe);
     requireCondition(!reason, reason);
     if (operation === "buy") {
       pay(next, recipe.cost);

@@ -208,6 +208,9 @@ export function validateContentPack(pack = ACTIVE_CONTENT) {
   const locations = new Set(asArray(pack?.map?.locations).map((entry) => entry?.id));
   const pathways = new Set(asArray(pack?.pathways).map((entry) => entry?.id));
   const organizations = new Set(asArray(pack?.organizations).map((entry) => entry?.id));
+  for (const organization of asArray(pack?.organizations)) {
+    if (organization?.headquarters && (!locations.has(organization.headquarters) || !organization.church || !organization.tags?.includes("official"))) errors.push(`组织 ${organization.id} 的教会驻地无效`);
+  }
   for (const [label, entries] of [["特殊行动", pack?.specialActions], ["制作配方", pack?.specialRecipes]]) {
     if (!Array.isArray(entries)) { errors.push(`${label}数据不是数组`); continue; }
     if (duplicateIds(entries, "id").length) errors.push(`${label}存在空或重复ID`);

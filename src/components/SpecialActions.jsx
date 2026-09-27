@@ -1,24 +1,26 @@
 import { useState } from "react";
-import { SPECIAL_RECIPES, SPECIAL_CONTACTS } from "../content/index.js";
+import { SPECIAL_RECIPES, SPECIAL_CONTACTS, ORGANIZATIONS, getOrganization } from "../content/index.js";
 import { availableSpecialActions, actionGate, commissionOffer, registrationGate, specialState } from "../engine/specialActions.js";
 import { getAdvancement } from "../system/character.js";
 import { getMapLocation } from "../system/map.js";
 import { moneyToPence } from "../system/money.js";
 import styles from "./SpecialActions.module.css";
+import { medicinePurchaseGate } from "../engine/medicineAccess.js";
 
 export default function SpecialActions({ game, loading, onExecute, onOpenMap }) {
   const [notice, setNotice] = useState("");
-  const [confirmJoin, setConfirmJoin] = useState(false);
+  const [confirmJoin, setConfirmJoin] = useState(null);
   const state = specialState(game);
   const advancement = getAdvancement(game.character);
   const definitions = availableSpecialActions(game);
   const recipes = SPECIAL_RECIPES.filter((entry) => entry.pathwayId === advancement.pathwayId);
   const remaining = Math.max(0, state.availableTurn - game.turn);
   const money = moneyToPence(game.money);
+  const medicineReason = medicinePurchaseGate(game);
   const execute = (operation, id, optionId) => {
     const result = onExecute({ operation, id, optionId, revision: state.revision });
     setNotice(result?.ok ? result.message : result?.error || "行动未完成，请重试。");
-    if (result?.ok) setConfirmJoin(false);
+    if (result?.ok) setConfirmJoin(null);
   };
   const go = (id) => onOpenMap(id);
   const locationLink = (id) => id && <button className={styles.link} type="button" onClick={() => go(id)}>在地图查看{getMapLocation(id, game)?.name || "地点"}</button>;
@@ -36,9 +38,9 @@ export default function SpecialActions({ game, loading, onExecute, onOpenMap }) 
         <button type="button" disabled={loading || game.location.id !== "soot-lamp"} onClick={() => execute("sleep", "soot-lamp")}>{game.location.id === "soot-lamp" ? "睡觉8小时 · 1回合" : "到达雾鸦旅店后可睡觉"}</button>
       </article>
       {SPECIAL_RECIPES.filter(recipe => recipe.stat).map(recipe => <article key={recipe.id} className={styles.card}><h4>{recipe.name}</h4><p>{recipe.description}</p>
-        <button type="button" disabled={loading || money < recipe.sale} onClick={() => execute("buy-medicine", recipe.id)}>购买成品 · {recipe.sale}便士 · 1回合</button>
+        <button type="button" disabled={loading || Boolean(medicineReason) || money < recipe.sale} onClick={() => execute("buy-medicine", recipe.id)}>{medicineReason || `购买成品 · ${recipe.sale}便士 · 1回合`}</button>
       </article>)}
-      <p className={styles.hint}>所有途径均可购买和使用成品；药师可自行制作。药剂每次消耗一份，对应属性已满时不会消耗。</p>
+      <p className={styles.hint}>开始追查「高窗之下」后，所有途径均可购买成品；仅听闻求医消息不会解锁。药师可自行制作，已有药剂仍可使用。药剂每次消耗一份，对应属性已满时不会消耗。</p>
     </section>
     {state.active && <section className={styles.active} aria-label="当前委托">
       <p className={styles.eyebrow}>正在进行 · 接单内容已保存</p><h3>{state.active.offer.title}</h3><p>{state.active.offer.scene}</p>
@@ -57,7 +59,7 @@ export default function SpecialActions({ game, loading, onExecute, onOpenMap }) 
         const disabledReason = reason || (state.active ? "已有进行中的委托" : remaining ? `还需 ${remaining} 回合接新单` : money < (definition.stake || 0) ? "赌注不足" : "");
         return <article key={definition.id} className={styles.card}><div className={styles.meta}><span>{definition.name}</span><span>{definition.pool.length}则固定剧情</span></div><h4>{offer.title}</h4><p>{offer.scene}</p>
           <p className={styles.hint}>{definition.stake ? "预留6便士，仅一局小赌；45%赢6便士、20%打平、35%输6便士。" : `基础报酬 ${Math.min(...offer.options.map((option) => option.reward))}—${Math.max(...offer.options.map((option) => option.reward))} 便士；每晋升一级额外1苏勒，最多6苏勒（1苏勒=12便士）。`}</p>
-          {locationLink(definition.locationId || (definition.organizationId ? SPECIAL_CONTACTS.organizationLocation : null))}
+          {locationLink(definition.locationId || getOrganization(definition.organizationId)?.headquarters)}
           <button type="button" className="button button--primary" disabled={loading || Boolean(disabledReason)} onClick={() => execute("accept", definition.id)}>{disabledReason || "接取委托"}</button>
         </article>;
       })}
@@ -84,12 +86,15 @@ export default function SpecialActions({ game, loading, onExecute, onOpenMap }) 
 
     <section aria-label="身份登记"><h3>身份与组织</h3>
       {advancement.pathwayId === "corpse_collector" && <article className={styles.card}><h4>墓地管理处</h4>{locationLink(SPECIAL_CONTACTS.registrationLocation)}<button type="button" disabled={loading || Boolean(state.active) || Boolean(registrationGate(game, "gravekeeper"))} onClick={() => execute("register", "gravekeeper")}>{registrationGate(game, "gravekeeper") || "登记为守墓人 · 1回合"}</button></article>}
-      <article className={styles.card}><h4>值夜者招募</h4><p>所有途径均可申请。到圣赛缪尔教堂正式登记后，开放官方基础委托。</p>
-        {game.organizationState?.membership?.status === "active" && <p>当前组织：{game.organizationState.membership.name}</p>}
-        {locationLink(SPECIAL_CONTACTS.organizationLocation)}
-        {confirmJoin ? <div><p>确认正式加入值夜者，接受组织纪律与任务安排？登记将消耗1回合。</p><div className={styles.buttons}><button type="button" disabled={loading} onClick={() => execute("register", "organization")}>确认加入</button><button type="button" onClick={() => setConfirmJoin(false)}>暂不加入</button></div></div>
-          : <button type="button" disabled={loading || Boolean(state.active) || Boolean(registrationGate(game, "organization"))} onClick={() => setConfirmJoin(true)}>{registrationGate(game, "organization") || "申请正式加入"}</button>}
-      </article>
+      {game.organizationState?.membership?.status === "active" && <p>当前组织：{game.organizationState.membership.name}</p>}
+      {ORGANIZATIONS.filter((organization) => organization.headquarters && organization.tags.includes("official")).map((organization) => {
+        const reason = registrationGate(game, organization.id);
+        return <article key={organization.id} className={styles.card}><h4>{organization.name}招募</h4><p>{organization.church}的官方非凡者组织。所有途径的非凡者均可申请，在驻地教堂正式登记后开放本组织基础委托。</p>
+          {locationLink(organization.headquarters)}
+          {confirmJoin === organization.id ? <div><p>确认正式加入{organization.name}，接受组织纪律与任务安排？登记将消耗1回合。</p><div className={styles.buttons}><button type="button" disabled={loading || Boolean(state.active) || Boolean(reason)} onClick={() => execute("register", organization.id)}>确认加入{organization.name}</button><button type="button" onClick={() => setConfirmJoin(null)}>暂不加入</button></div></div>
+            : <button type="button" disabled={loading || Boolean(state.active) || Boolean(reason)} onClick={() => setConfirmJoin(organization.id)}>{reason || `申请正式加入${organization.name}`}</button>}
+        </article>;
+      })}
     </section>
     {state.completed.length > 0 && <section aria-label="近期工作记录"><h3>近期结算</h3><ul className={styles.history}>{state.completed.slice(-5).reverse().map((entry) => <li key={entry.id}><span>{entry.title}</span><small>第{entry.turn}轮 · {entry.status === "abandon" ? "已放弃" : `入账${entry.reward}便士`}</small></li>)}</ul></section>}
   </div>;

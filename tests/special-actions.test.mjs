@@ -33,7 +33,7 @@ test("22 pathways have at least three authored scenes or recipes; definitions ar
     assert.equal(new Set(scenes.map((entry) => entry.title)).size, scenes.length);
     for (const scene of scenes) assert.equal(scene.options.length, 2);
   }
-  assert.equal(SPECIAL_ACTIONS.reduce((sum, entry) => sum + entry.pool.length, 0), 66);
+  assert.equal(SPECIAL_ACTIONS.reduce((sum, entry) => sum + entry.pool.length, 0), 72);
   assert.deepEqual(validateContentPack(), []);
 });
 
@@ -92,6 +92,38 @@ test("all 22 pathways may join nighthawks explicitly, never replacing an active 
     assert.ok(joined.organizationState.membership.tags.includes("official"));
     assert.doesNotThrow(() => run(joined, "accept", "work-sleepless"));
     assert.match(registrationGate(joined, "organization"), /已有/);
+  }
+});
+
+test("new official organizations require arrival, persist membership and authorize only their own commissions", () => {
+  for (const [id, church, headquarters] of [["mandated-punishers", "风暴之主教会", "saint-wind"], ["machinery-hivemind", "蒸汽与机械之神教会", "machinery-heart"]]) {
+    assert.equal(getOrganization(id).church, church);
+    assert.equal(getOrganization(id).headquarters, headquarters);
+    const wrongPlace = fresh();
+    const unchanged = structuredClone(wrongPlace);
+    assert.throws(() => run(wrongPlace, "register", id), /需到达/);
+    assert.deepEqual(wrongPlace, unchanged);
+    const ordinary = createInitialGame({ ...EMPTY_CHARACTER, name: "普通申请者" });
+    ordinary.location.id = headquarters;
+    assert.throws(() => run(ordinary, "register", id), /成为非凡者/);
+    for (const pathway of PATHWAYS) {
+      const game = fresh(pathway.id);
+      game.location.id = headquarters;
+      const joined = migrateSave(run(game, "register", id));
+      assert.equal(joined.organizationState.membership.organizationId, id);
+      assert.equal(joined.turn, game.turn + 1);
+      assert.ok(joined.organizationState.membership.tags.includes("combat-support"));
+      assert.match(joined.recentDialogues.at(-1).content, new RegExp(church));
+      assert.throws(() => run(joined, "register", "organization"), /已有正式/);
+      assert.throws(() => run(joined, "accept", "work-sleepless"), /需正式加入/);
+      const accepted = run(joined, "accept", `work-${id}`);
+      const settled = run(accepted, "resolve", accepted.specialActions.active.id, "careful");
+      assert.ok(moneyToPence(settled.money) > moneyToPence(joined.money));
+      assert.equal(settled.organizationState.membership.organizationId, id);
+      const away = structuredClone(joined);
+      away.location.id = "east-station";
+      assert.throws(() => run(away, "accept", `work-${id}`), /指定地点/);
+    }
   }
 });
 
