@@ -558,7 +558,7 @@ export default function App() {
     commitGame(next);
     setModal(null);
   };
-  const saveSlot = (slotId, label) => { if (game) saveGame(game, slotId, label); refreshSaves(); };
+  const saveSlot = (slotId, label, number) => { if (game) saveGame(game, slotId, label, number); refreshSaves(); };
   const loadSlot = (slotId) => { requireIdle(); const loaded = loadGame(slotId); if (loaded) { setGame(loaded); resetAction(); setScreen("game"); setModal(null); } };
   const removeSlot = (slotId) => { deleteSave(slotId); refreshSaves(); };
 

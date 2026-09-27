@@ -149,6 +149,18 @@ const RELEASE_149_UPDATE = {
 };
 
 export const LATEST_UPDATE = {
+  date: "2026-09-27", dateLabel: "2026.09.27",
+  title: "1.6.13 · 三格存档柜",
+  summary: "存档柜改为三个固定手动存档位，空位可直接保存，自动存档独立保留。",
+  changes: [
+    "固定显示存档位 1、2、3，展示角色、轮次、地点与保存时间；支持命名、读取、覆盖、单独导出和删除。",
+    "覆盖已有存档前确认，保存成功后明确提示存档位；删除后原位置留空，其余存档不换位。",
+    "旧版超过三个手动存档的部分保留为旧档案，可读取、导出和删除，不会因调整存档位而丢失。",
+    "自动存档独立展示，不占手动位置；手机以单列展示三格，导出位置提示继续保留。",
+  ],
+};
+
+const RELEASE_1612_UPDATE = {
   date: "2026-09-26", dateLabel: "2026.09.26",
   title: "1.6.12 · 人物档案与存档导出位置",
   summary: "人物栏随调查收录已获知的重要人物；存档导出新增保存位置提示，Android 将文件保存到公共下载目录。",
@@ -544,6 +556,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_1612_UPDATE,
   RELEASE_1611_UPDATE,
   RELEASE_1610_UPDATE,
   RELEASE_169_UPDATE,

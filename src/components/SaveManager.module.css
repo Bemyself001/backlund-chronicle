@@ -1,16 +1,36 @@
 .toolbar { display: flex; align-items: end; gap: .6rem; padding-bottom: 1rem; border-bottom: 1px solid #89765455; }
 .toolbar label { display: grid; flex: 1; gap: .35rem; color: var(--ink-soft); font: 700 .66rem var(--font-sans); letter-spacing: .1em; text-transform: uppercase; }
-.toolbar input { min-height: 2.65rem; padding: .6rem .7rem; border: 1px solid #76684f; border-radius: 0; background: #f2e7d1; color: var(--ink); }
+.toolbar input { min-width: 0; width: 100%; min-height: 2.65rem; padding: .6rem .7rem; border: 1px solid #76684f; border-radius: 0; background: #f2e7d1; color: var(--ink); }
 .list { display: grid; gap: .55rem; margin-top: 1rem; }
-.slot { display: flex; align-items: center; justify-content: space-between; gap: 1rem; padding: 1rem; border-left: 3px solid var(--brass); background: #c4ab7a18; }
+.slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; margin-top: 1rem; }
+.slot { display: flex; flex-direction: column; min-width: 0; gap: 1rem; padding: 1rem; border: 1px solid #89765466; border-top: 3px solid var(--brass); background: #c4ab7a18; }
+.slotHeading { display: flex; align-items: center; justify-content: space-between; gap: .5rem; }
+.slotHeading small { color: var(--ink-soft); font: .65rem var(--font-sans); }
+.slotDetails { min-width: 0; overflow-wrap: anywhere; }
+.slotDetails p + p { margin-top: .3rem; }
+.sectionIntro { margin: 1.2rem 0 0; color: var(--ink); font: 700 .85rem var(--font-sans); }
+.sectionIntro span { display: block; margin-top: .4rem; color: var(--ink-soft); font: .75rem/1.6 var(--font-sans); }
+.emptySlot { border-style: dashed; background: transparent; }
+.autoSection { display: grid; gap: .8rem; margin-top: 1rem; padding: 1rem; border-left: 3px solid var(--verdigris); background: #275f4d0c; }
+.autoSection h3 { margin: 0 0 .4rem; font: 600 .85rem var(--font-sans); }
+.autoSection p, .legacySection > p { margin: 0; color: var(--ink-soft); font: .75rem/1.6 var(--font-sans); }
+.legacySection { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #89765455; }
+.legacySection summary { cursor: pointer; margin-bottom: .7rem; color: var(--ink); font: 700 .8rem var(--font-sans); }
+.legacySlot { padding: 1rem; border: 1px solid #89765455; }
+.legacySlot h3 { font: 500 1rem var(--font-serif); margin: 0 0 .4rem; }
+.legacySlot p { color: var(--ink-soft); font: .72rem/1.5 var(--font-sans); }
 .slot span { color: var(--verdigris); font: 700 .62rem var(--font-mono); letter-spacing: .14em; }
 .slot h3 { margin: .2rem 0; font: 500 1rem var(--font-serif); }
 .slot p, .footnote { margin: 0; color: var(--ink-soft); font: .72rem/1.5 var(--font-sans); }
-.slotActions { display: flex; gap: .3rem; }
+.slotActions { display: flex; flex-wrap: wrap; gap: .4rem; }
+.slot > .slotActions { margin-top: auto; }
+.slot .saveButton { flex-basis: 100%; background: #b59a6033; font-weight: 700; }
+.slotActions button { flex: 1; }
 .slotActions button { min-height: 2.4rem; padding: .45rem .7rem; border: 1px solid #76684f; background: transparent; color: var(--ink); font: 700 .7rem var(--font-sans); }
-.slotActions button:hover { background: #241f19; color: var(--paper-pale); }
+.slotActions button:hover:not(:disabled) { background: #241f19; color: var(--paper-pale); }
+.slotActions button:disabled { opacity: .45; cursor: not-allowed; }
 .slotActions .delete { color: #7d2822; }
-.empty { padding: 2rem; border: 1px dashed #8b7a5a88; color: var(--ink-soft); text-align: center; }
+.empty { padding: 1rem 0; color: var(--ink-soft); }
 .error { padding: .7rem; background: #7d282217; color: #72241e; }
 .notice { padding: .7rem; border-left: 3px solid var(--verdigris); background: #275f4d14; color: #285548; font: .78rem var(--font-sans); }
 .exportNotice { margin-top: 1rem; padding: 1rem; border: 1px solid #527866; border-left: 3px solid var(--verdigris); background: #275f4d14; color: #285548; font: .82rem/1.65 var(--font-sans); }
@@ -22,4 +42,4 @@
 .exportNotice p { margin: .7rem 0 .4rem; }
 .exportNotice small { color: var(--ink-soft); font-size: .72rem; }
 .footnote { margin-top: 1rem; text-align: right; }
-@media (max-width: 700px) { .toolbar { align-items: stretch; flex-wrap: wrap; } .toolbar label { flex-basis: 100%; } .toolbar button { flex: 1; } .slot { align-items: stretch; flex-direction: column; } .slotActions button { flex: 1; } }
+@media (max-width: 700px) { .toolbar { align-items: stretch; flex-wrap: wrap; } .toolbar label { flex-basis: 100%; } .toolbar button { flex: 1; } .slots { grid-template-columns: 1fr; } }

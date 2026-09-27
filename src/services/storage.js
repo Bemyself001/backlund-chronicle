@@ -13,10 +13,11 @@ import { applyTalent } from "../system/talents.js";
 import { specialState } from "../engine/specialActions.js";
 import { syncKnownPeople } from "../engine/people.js";
 import { saveExportFileName, writeSaveExport } from "./saveExport.js";
+import { MAX_MANUAL_SAVES, normalizeSaveSlots } from "./saveSlots.js";
 
 const SAVES_KEY = "mist-chronicle-saves-v1";
 const AUTOSAVE_ID = "autosave";
-export const MAX_MANUAL_SAVES = 8;
+export { MAX_MANUAL_SAVES };
 
 function cleanGame(game) {
   const cloned = structuredClone(game);
@@ -29,18 +30,25 @@ function cleanGame(game) {
 export function listSaves() {
   try {
     const saves = JSON.parse(localStorage.getItem(SAVES_KEY) || "[]");
-    return Array.isArray(saves) ? saves.filter((slot) => slot && typeof slot.slotId === "string" && slot.game) : [];
+    return Array.isArray(saves) ? normalizeSaveSlots(saves.filter((slot) => slot && typeof slot.slotId === "string" && slot.game)) : [];
   }
   catch { return []; }
 }
 
-export function saveGame(game, slotId = AUTOSAVE_ID, label = "自动存档") {
-  const saves = listSaves().filter((slot) => slot.slotId !== slotId);
-  if (slotId !== AUTOSAVE_ID && saves.filter((slot) => slot.slotId !== AUTOSAVE_ID).length >= MAX_MANUAL_SAVES) {
-    throw new Error("手动存档已满，请选择覆盖已有档案，或先导出并删除不需要的档案。");
+export function saveGame(game, slotId = AUTOSAVE_ID, label = "自动存档", requestedSlot) {
+  const existing = listSaves();
+  const previous = existing.find((slot) => slot.slotId === slotId);
+  const saves = existing.filter((slot) => slot.slotId !== slotId);
+  let manualSlot;
+  if (slotId !== AUTOSAVE_ID) {
+    if (previous?.archivedManual) throw new Error("旧版保留档案不能覆盖，请将当前进度存入三个存档位之一。");
+    const occupied = new Set(saves.filter((slot) => slot.slotId !== AUTOSAVE_ID).map((slot) => slot.manualSlot));
+    manualSlot = previous?.manualSlot ?? requestedSlot ?? Array.from({ length: MAX_MANUAL_SAVES }, (_, i) => i + 1).find((number) => !occupied.has(number));
+    if (!manualSlot) throw new Error("手动存档已满，请选择覆盖已有档案，或先导出并删除不需要的档案。");
+    if (!Number.isInteger(manualSlot) || manualSlot < 1 || manualSlot > MAX_MANUAL_SAVES || occupied.has(manualSlot)) throw new Error("该存档位不可用，请重新打开存档柜后再试。");
   }
   const safeGame = cleanGame({ ...game, updatedAt: new Date().toISOString() });
-  saves.unshift({ slotId, label, updatedAt: safeGame.updatedAt, turn: safeGame.turn, characterName: safeGame.character?.name, game: safeGame });
+  saves.unshift({ slotId, label, ...(manualSlot ? { manualSlot, archivedManual: false } : {}), updatedAt: safeGame.updatedAt, turn: safeGame.turn, characterName: safeGame.character?.name, game: safeGame });
   localStorage.setItem(SAVES_KEY, JSON.stringify(saves));
   return safeGame;
 }
