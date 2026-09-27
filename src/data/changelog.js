@@ -150,6 +150,17 @@ const RELEASE_149_UPDATE = {
 
 export const LATEST_UPDATE = {
   date: "2026-09-27", dateLabel: "2026.09.27",
+  title: "1.6.14 · 开局衣物判定修复",
+  summary: "明确开局衣物判定，避免将丝绸长袍等贵重材质或少见款式误认作超凡物品。",
+  changes: [
+    "开局整理行装明确允许丝绸长袍、天鹅绒礼服、刺绣斗篷等普通衣物；保留材质与款式，不因价格、装饰或仪式用途推断超自然能力。",
+    "随身物品的接受判定仅针对随身物品本身，不再因衣着描述拒绝；保留对直接获取超凡能力、魔药、封印物和额外物资的限制。",
+    "产品版本更新为 1.6.14，继续沿用原包名与正式签名；代码检查排除本地预览目录。",
+  ],
+};
+
+const RELEASE_1613_UPDATE = {
+  date: "2026-09-27", dateLabel: "2026.09.27",
   title: "1.6.13 · 三格存档柜",
   summary: "存档柜改为三个固定手动存档位，空位可直接保存，自动存档独立保留。",
   changes: [
@@ -556,6 +567,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_1613_UPDATE,
   RELEASE_1612_UPDATE,
   RELEASE_1611_UPDATE,
   RELEASE_1610_UPDATE,
