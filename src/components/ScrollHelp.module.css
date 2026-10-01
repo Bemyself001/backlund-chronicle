@@ -1,0 +1,5 @@
+.content { display: grid; gap: .5rem; padding: .75rem; border: 1px solid #8b7a5a66; font-size: .8rem; }
+.content p { margin: 0; }
+.content button { justify-self: start; }
+.content label { display: grid; gap: .4rem; }
+.content textarea { width: 100%; min-width: 0; padding: .6rem; font: .75rem/1.5 var(--font-mono); background: #fff8e8; color: #302d25; border: 1px solid #8b7a5a; }

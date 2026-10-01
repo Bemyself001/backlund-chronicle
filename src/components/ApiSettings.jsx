@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import Modal from "./Modal.jsx";
+import ScrollHelp from "./ScrollHelp.jsx";
 import styles from "./Forms.module.css";
 import { listApiModels, testApiConnection } from "../services/api.js";
 import { API_PROVIDER_PRESETS, createProviderProfile, getApiProvider } from "../services/apiProviders.js";
@@ -115,6 +116,7 @@ export default function ApiSettings({ settings, onSave, onClose }) {
   return (
     <Modal title="AI 接口设置" eyebrow="Connection dossier" onClose={onClose} wide>
       <form className={styles.form} onSubmit={submit}>
+        <ScrollHelp />
         <div className={styles.notice}>
           <strong>密钥安全：</strong>默认只保存在当前会话。启用“在此设备保存密钥”后，密钥会以明文存入本浏览器；不会进入剧情、错误日志或导出的游戏存档。
         </div>

@@ -149,6 +149,19 @@ const RELEASE_149_UPDATE = {
 };
 
 export const LATEST_UPDATE = {
+  date: "2026-10-01", dateLabel: "2026.10.01",
+  title: "1.6.16 · Android API 设置滚动修复",
+  summary: "针对 OPPO A93 Android 12 的 API 设置弹窗无法下滑反馈，补齐弹窗高度兼容与内容滚动，并增加设置页诊断入口；仍需故障设备实测。",
+  changes: [
+    "共用弹窗不再依赖 svh 单位，使用实际可视高度并回退到窗口高度和 vh，兼容旧版 WebView。",
+    "弹窗标题保持可见，内容区按剩余高度收缩并独立滚动；不再通过固定扣减标题高度限制内容。窗口和键盘尺寸变化时同步高度。",
+    "APK 的 API 设置顶部新增复制滚动诊断，可检查弹窗尺寸、程序滚动和触摸事件计数；不读取密钥、存档或对话，不自动上传。",
+    "修复仅涉及前端弹窗，可通过网页资源更新生效；首页、剧情页和原生触摸处理保持原样。",
+    "产品版本更新为 1.6.16，沿用原包名与正式签名，支持热更新和覆盖安装。",
+  ],
+};
+
+const RELEASE_1615_UPDATE = {
   date: "2026-09-27", dateLabel: "2026.09.27",
   title: "1.6.15 · 官方组织、药剂解锁与愚者彩蛋",
   summary: "开放代罚者与机械之心的教堂登记和组织委托；成品药剂在开始追查「高窗之下」后开放购买，并加入愚者尊名彩蛋。",
@@ -580,6 +593,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_1615_UPDATE,
   RELEASE_1614_UPDATE,
   RELEASE_1613_UPDATE,
   RELEASE_1612_UPDATE,
