@@ -29,7 +29,7 @@ try {
     const url = `http://127.0.0.1:${server.address().port}/`;
     try {
       for (const scenario of ["fresh", "missing-script", "syntax-error", "render-error", "blocked-storage", "missing-style", "offline-html", ...(variant === "compat" ? ["missing-apis"] : ["timeout", "stalled-script"])]) {
-        const context = await browser.newContext({ viewport: { width: 393, height: 820 }, deviceScaleFactor: 1 });
+        const context = await browser.newContext({ viewport: { width: 393, height: 820 }, deviceScaleFactor: 1, hasTouch: true });
         const page = await context.newPage();
         const pageErrors = [];
         page.on("pageerror", error => pageErrors.push(error.name));
@@ -62,9 +62,68 @@ try {
               await page.screenshot({ path: resolve(output, `${variant}-first-screen.png`) });
               await page.locator("#startup-open").click();
               assert.equal(await page.locator("#startup-panel").isVisible(), true);
+              for (const id of ["input-probe-plain", "input-probe-controlled"]) {
+                const field = page.locator(`#${id}`);
+                await field.tap();
+                assert.equal(await field.evaluate(element => document.activeElement === element), true);
+                await field.pressSequentially("abc");
+                assert.equal(await field.inputValue(), "abc");
+                await field.press("ControlOrMeta+A");
+                await page.keyboard.insertText("中文输入"); // Committed text, not a real Android IME.
+                assert.equal(await field.inputValue(), "中文输入");
+                await field.press("Backspace");
+                assert.equal(await field.inputValue(), "中文输");
+              }
+              // Reproduce a click that reaches the field but fails to grant DOM focus.
+              await page.locator("#input-reset").click();
+              await page.locator("#input-probe-plain").evaluate(field => {
+                field.addEventListener("mousedown", event => event.preventDefault(), { once: true });
+              });
+              await page.locator("#input-probe-plain").click();
+              const events = await page.evaluate(() => JSON.parse(window.__startupDiagnostics.report()).inputEvents);
+              assert.equal(await page.locator("#input-probe-plain").evaluate(field => document.activeElement === field), variant === "compat", JSON.stringify(events));
+              assert.equal(events.some(event => event.type === "focus-recovered"), variant === "compat");
+              // App-cancelled clicks and read-only fields must never be forcibly focused.
+              await page.locator("#input-reset").click();
+              await page.locator("#input-probe-plain").evaluate(field => {
+                field.addEventListener("mousedown", event => event.preventDefault(), { once: true });
+                field.addEventListener("click", event => event.preventDefault(), { once: true });
+              });
+              await page.locator("#input-probe-plain").click();
+              assert.equal(await page.locator("#input-probe-plain").evaluate(field => document.activeElement === field), false);
+              await page.locator("#input-probe-plain").evaluate(field => {
+                field.readOnly = true;
+                field.addEventListener("mousedown", event => event.preventDefault(), { once: true });
+              });
+              await page.locator("#input-probe-plain").click();
+              assert.equal(await page.locator("#input-probe-plain").evaluate(field => document.activeElement === field), false);
+              await page.locator("#input-probe-plain").evaluate(field => { field.readOnly = false; });
+              // Diagnostics must never include values, composition data, labels or clipboard text.
+              await page.locator("#input-probe-controlled").fill("sk-private-input-test");
+              await page.locator("#input-probe-controlled").dispatchEvent("compositionend", { data: "secret-composition" });
+              assert.doesNotMatch(await page.evaluate(() => window.__startupDiagnostics.report()), /sk-private-input-test|secret-composition/);
+              await page.locator("#input-probe-controlled").evaluate(field => {
+                for (let i = 0; i < 100; i++) field.dispatchEvent(new InputEvent("input", { bubbles: true }));
+              });
+              assert.equal(await page.evaluate(() => JSON.parse(window.__startupDiagnostics.report()).inputEvents.length), 80);
+              await page.screenshot({ path: resolve(output, `${variant}-input-diagnostics.png`) });
               await page.locator("#startup-copy").click();
               await page.locator("#startup-close").click();
               assert.equal(await page.locator("#startup-panel").isVisible(), false);
+              await page.getByRole("button", { name: /签署档案并进入/ }).click();
+              await page.getByRole("button", { name: /建立新档案/ }).click();
+              const character = page.locator('#main input[type="text"]').first();
+              await character.fill("输入测试员");
+              assert.equal(await character.inputValue(), "输入测试员");
+              await page.getByRole("button", { name: "API 设置", exact: true }).click();
+              const baseUrl = page.getByLabel("Base URL", { exact: true });
+              await baseUrl.tap();
+              await baseUrl.press("ControlOrMeta+A");
+              await baseUrl.pressSequentially("https://example.invalid/v1");
+              assert.equal(await baseUrl.inputValue(), "https://example.invalid/v1");
+              await page.getByRole("button", { name: "关闭对话框", exact: true }).click();
+              assert.equal(await character.inputValue(), "输入测试员");
+              assert.deepEqual(pageErrors, []);
             }
           } else {
             await page.waitForFunction(() => JSON.parse(window.__startupDiagnostics.report()).failed, null, { timeout: 20000 });

@@ -6,6 +6,7 @@
   var failed = false;
   var bound = false;
   var nativeInfo = null;
+  var inputEvents = [];
   var variant = document.querySelector('meta[name="startup-variant"]').content;
   var version = document.querySelector('meta[name="startup-version"]').content;
   var capabilities = {
@@ -20,7 +21,7 @@
   function report() {
     return JSON.stringify({ version: version, variant: variant, userAgent: navigator.userAgent,
       viewport: [window.innerWidth, window.innerHeight], capabilitiesBeforePolyfills: capabilities,
-      native: nativeInfo, completed: completed, failed: failed, events: events }, null, 2);
+      native: nativeInfo, completed: completed, failed: failed, events: events, inputEvents: inputEvents }, null, 2);
   }
   function refresh() { if (element('startup-report')) element('startup-report').value = report(); }
   function mark(stage) {
@@ -62,6 +63,7 @@
   window.__startupDiagnostics = {
     mark: mark, fail: fail, report: report, bind: bind,
     native: function (info) { nativeInfo = info; refresh(); },
+    input: function (records) { inputEvents = records; },
     ready: function () {
       if (completed) return;
       completed = true;

@@ -49,6 +49,9 @@ final class StartupDiagnostics extends WebViewListener {
         result.put("sdk", Build.VERSION.SDK_INT);
         result.put("variant", BuildConfig.STARTUP_VARIANT);
         result.put("nativeVersion", BuildConfig.VERSION_NAME);
+        result.put("nativeCode", BuildConfig.VERSION_CODE);
+        InputFocusGuard inputFocus = ((MainActivity) activity).inputFocus;
+        if (inputFocus != null) result.put("inputFocus", inputFocus.info());
         result.put("nativeStages", stages.toString());
         try {
             PackageInfo provider = Build.VERSION.SDK_INT >= 26 ? WebView.getCurrentWebViewPackage() : null;

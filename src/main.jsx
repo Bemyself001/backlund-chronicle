@@ -4,6 +4,7 @@ import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
 import UpdateStartup from "./components/UpdateStartup.jsx";
 import StartupBoundary from "./startup/StartupBoundary.jsx";
+import InputDiagnostics from "./startup/InputDiagnostics.jsx";
 import { readNativeStartup } from "./services/startup.js";
 import "./styles/reset.css";
 import "./styles/tokens.css";
@@ -16,6 +17,7 @@ createRoot(document.getElementById("root")).render(
     <StartupBoundary>
     <App />
     <UpdateStartup />
+    <InputDiagnostics />
     </StartupBoundary>
   </StrictMode>,
 );

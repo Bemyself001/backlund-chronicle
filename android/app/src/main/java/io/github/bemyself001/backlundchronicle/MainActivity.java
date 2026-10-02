@@ -11,6 +11,7 @@ import android.view.View;
 
 public class MainActivity extends BridgeActivity {
     final StartupDiagnostics startupDiagnostics = new StartupDiagnostics(this);
+    InputFocusGuard inputFocus;
     private final Handler startupHandler = new Handler(Looper.getMainLooper());
     private String runningBundlePath;
     private String runningVersion;
@@ -86,5 +87,6 @@ public class MainActivity extends BridgeActivity {
                 View.IMPORTANT_FOR_AUTOFILL_NO_EXCLUDE_DESCENDANTS
             );
         }
+        inputFocus = new InputFocusGuard(this, getBridge().getWebView(), BuildConfig.STARTUP_VARIANT.equals("compat"));
     }
 }

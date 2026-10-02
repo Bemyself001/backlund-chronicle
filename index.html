@@ -12,18 +12,26 @@
     <!-- STARTUP_DIAGNOSTICS -->
   </head>
   <body>
-    <section id="startup-panel" role="status" aria-live="polite">
+    <section id="startup-panel" aria-labelledby="startup-title">
       <h1 id="startup-title">正在打开贝克兰德纪事</h1>
       <p id="startup-message">正在加载游戏，请稍候。若启动未完成，这里将显示诊断信息。</p>
       <details id="startup-details"><summary>启动诊断</summary>
-        <p>仅包含启动阶段、环境与错误类型，不包含密钥或存档，不会自动上传。</p>
+        <p>仅包含启动阶段、环境、错误类型及输入事件与字符数，不包含输入文字、密钥或存档，不会自动上传。</p>
         <textarea id="startup-report" readonly aria-label="启动诊断信息"></textarea>
         <button id="startup-copy" type="button">复制诊断信息</button>
       </details>
+      <section id="input-diagnostics" hidden>
+        <h2>输入检测</h2>
+        <p>请分别点击下方两个框，输入或粘贴 abc。检测文字不会保存；报告只记录事件、焦点和字符数，不记录输入内容。</p>
+        <label>普通输入框<input id="input-probe-plain" type="text" autocomplete="off" /></label>
+        <div id="input-probe-react"></div>
+        <p id="input-status">完成测试后，点击上方“复制诊断信息”。</p>
+        <button id="input-reset" type="button">清空检测记录</button>
+      </section>
       <button id="startup-retry" type="button" hidden>重新启动</button>
       <noscript>当前环境未启用 JavaScript，游戏无法启动。</noscript>
     </section>
-    <button id="startup-open" type="button" hidden>启动诊断</button>
+    <button id="startup-open" type="button" hidden>启动 / 输入诊断</button>
     <script>if (window.__startupDiagnostics) window.__startupDiagnostics.bind();</script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>

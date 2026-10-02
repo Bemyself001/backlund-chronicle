@@ -8,3 +8,7 @@
 #startup-panel button, #startup-open { min-height: 44px; padding: 10px 16px; border: 1px solid #c3a363; background: #17201f; color: #eee3cf; font: 15px/1.5 sans-serif; cursor: pointer; }
 #startup-open { position: fixed; bottom: 12px; right: 12px; z-index: 2147483645; }
 #startup-panel [hidden], #startup-panel[hidden], #startup-open[hidden] { display: none !important; }
+#input-diagnostics { max-width: 720px; margin: 24px 0; padding: 16px; border: 1px solid #a78750; }
+#input-diagnostics label { display: block; margin: 12px 0; }
+#input-diagnostics input { display: block; box-sizing: border-box; width: 100%; min-height: 46px; padding: 10px; border: 1px solid #a78750; background: #eee3cf; color: #17201f; font: 16px/1.5 sans-serif; }
+#input-status { overflow-wrap: anywhere; }
