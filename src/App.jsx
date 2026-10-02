@@ -19,7 +19,7 @@ import { createInitialGame, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from ".
 import { dedupeToolCalls, executeToolCalls, normalizeToolCalls } from "./engine/tools.js";
 import { auditTurnChanges, collectImportantItemConfirmations, createAuditBaseline } from "./engine/audit.js";
 import { resolveTurnProgress } from "./engine/turn.js";
-import { restMinutes } from "./engine/restTime.js";
+import { timedAction } from "./engine/restTime.js";
 import { processTriggers } from "./engine/triggerEngine.js";
 import { loadApiSettings, requestAIWithReasoningFallback, saveApiSettings } from "./services/api.js";
 import { buildFastNarrativeContinuationContext, buildFastPresentationContext, buildItemInspectionContext, buildPlanningContext, buildRenderingContext, buildSummaryContext, buildToolRepairContext, computeMemoryUpdate } from "./services/memory.js";
@@ -37,7 +37,7 @@ import { finishTurnMetrics, markTurnMetric, recordModelRequest, startTurnMetrics
 import { isExplicitAdvancementIntent } from "./system/character.js";
 import { exploreHex } from "./system/hexworld.js";
 import { ensureRequestedAdvancementToolCall } from "./services/advancement.js";
-import { launchFastModeTasks, throwIfFastTaskAborted } from "./services/fastMode.js";
+import { finalizeFastPresentation, launchFastModeTasks, throwIfFastTaskAborted } from "./services/fastMode.js";
 import { repairToolCallsConcurrently } from "./services/toolRepair.js";
 import { prayerAvailability, settlePrayer } from "./engine/prayer.js";
 import { generatePrayer } from "./services/prayer.js";
@@ -223,8 +223,8 @@ export default function App() {
       };
 
       const advancementIntent = isExplicitAdvancementIntent(action) && game.inventory.some((item) => item.potion);
-      // Rest narration must wait for the authoritative end time instead of streaming a speculative time jump.
-      const fastMode = Boolean(settings.fastMode) && !advancementIntent && restMinutes(action, game.worldTime) === null;
+      // All sleep, rest and waiting narration must use the settled clock.
+      const fastMode = Boolean(settings.fastMode) && !advancementIntent && timedAction(action, game.worldTime) === null;
       let planningResponse;
       let fastPresentationTask = null;
       if (fastMode) {
@@ -339,25 +339,22 @@ export default function App() {
       let response = fastPresentationResponse || planningResponse;
       let needsFullRendering = !fastMode || !fastPresentationResponse?.hasNarrative || advancementProposed;
 
-      if (fastMode && fastPresentationResponse?.hasNarrative && (proposedToolCalls.length || resolution.derivedEffects.narrativeEvents.length) && !advancementProposed) {
+      if (fastMode && fastPresentationResponse?.hasNarrative && !advancementProposed) {
         setTurnPhase("finalizing");
         const finalTasks = launchFastModeTasks({
-          continuation: () => requestModel(
-            buildFastNarrativeContinuationContext(game, resolvedGame, action, fastPresentationResponse.narrative, prompt, resolution),
-            { disableTools: true, disableJsonMode: true, forceDisableReasoning: true, maxTokensModeOverride: "manual", maxTokensOverride: 1400 },
+          continuation: () => finalizeFastPresentation(
+            fastPresentationResponse, resolution,
+            (draft, settled) => requestModel(
+              buildFastNarrativeContinuationContext(game, resolvedGame, action, draft, prompt, settled),
+              { disableTools: true, disableJsonMode: true, forceDisableReasoning: true, maxTokensModeOverride: "manual", maxTokensOverride: 5200 },
+            ),
           ),
         });
         const continuationOutcome = await finalTasks.continuation;
         throwIfFastTaskAborted(continuationOutcome);
 
         if (continuationOutcome.value?.hasNarrative) {
-          response = {
-            ...fastPresentationResponse,
-            narrative: `${fastPresentationResponse.narrative.trim()}\n\n${continuationOutcome.value.narrative.trim()}`,
-            hasNarrative: true,
-            // Draft choices predate settlement; regenerate against the completed scene after saving.
-            ...choiceResult([], "scene_changed"),
-          };
+          response = continuationOutcome.value;
         } else {
           needsFullRendering = true;
         }

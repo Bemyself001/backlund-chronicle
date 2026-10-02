@@ -32,6 +32,22 @@ function startedTreatment() {
 }
 const run = (game, operation, id) => executeSpecialAction(game, { operation, id, revision: specialState(game).revision });
 
+test("waiting advances time without inn healing, while complete sleep heals once", () => {
+  const game = fresh();
+  game.location.id = "soot-lamp";
+  game.character.stats.health = 2;
+  game.character.stats.sanity = 2;
+  const waiting = structuredClone(game);
+  const waitProgress = resolveTurnProgress(waiting, "等待八小时", "low");
+  assert.equal(waitProgress.elapsedMinutes, 480);
+  assert.deepEqual(waitProgress.restRecovery, []);
+  assert.equal(waiting.character.stats.health, 2);
+  const sleepProgress = resolveTurnProgress(game, "睡眠八小时", "low");
+  assert.equal(sleepProgress.timedAction.status, "completed");
+  assert.equal(game.character.stats.health, 6);
+  assert.equal(game.character.stats.sanity, 6);
+});
+
 test("inn sleep heals after ticks, caps recovery, and requires arrival", () => {
   const game = fresh();
   assert.throws(() => run(game, "sleep", "soot-lamp"));

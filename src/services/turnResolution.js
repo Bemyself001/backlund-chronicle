@@ -27,6 +27,7 @@ export function createTurnResolution(toolCalls = [], results = [], progress = {}
         ...(progress.triggerEvents?.expired || []), ...(progress.triggerEvents?.abandoned || []),
       ]) : narrativeEventsForTurn(progress.triggerSignals),
       elapsedMinutes: progress.elapsedMinutes || 0,
+      timedAction: progress.timedAction || null,
       restRecovery: progress.restRecovery || [],
       worldTime: progress.worldTime || "",
       dangerDelta: progress.dangerDelta || 0,

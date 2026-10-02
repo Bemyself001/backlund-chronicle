@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import { restMinutes } from "../src/engine/restTime.js";
+import { restMinutes, timedAction } from "../src/engine/restTime.js";
 import { resolveTurnProgress, minutesForTurn } from "../src/engine/turn.js";
 import { createInitialGame, EMPTY_CHARACTER } from "../src/data/defaults.js";
 import { buildPlanningContext, buildRenderingContext, buildFastPresentationContext } from "../src/services/memory.js";
@@ -62,5 +62,48 @@ test("planning and final narration share local timing and rest skips speculative
     assert.ok(messages.some((message) => message.content.includes("【时间一致性】")));
   }
   const app = readFileSync(new URL("../src/App.jsx", import.meta.url), "utf8");
-  assert.match(app, /const fastMode = .*restMinutes\(action, game.worldTime\) === null/);
+  assert.match(app, /const fastMode = .*timedAction\(action, game.worldTime\) === null/);
+});
+
+test("sleep, rest and waiting share complete duration and end-time parsing", () => {
+  for (const [action, kind, minutes] of [
+    ["睡眠", "sleep", 480], ["睡", "sleep", 480], ["整夜休息", "sleep", 480],
+    ["休息，直到明天早上", "rest", 400], ["休息，睡到明早", "sleep", 400],
+    ["等待3小时", "wait", 180], ["等两个半小时", "wait", 150],
+    ["等待，直到明早七点半", "wait", 490], ["睡到后天早上六点", "sleep", 1840],
+    ["休息2天", "rest", 2880], ["小睡二十分钟", "sleep", 20],
+    ["等待片刻", "wait", 5], ["等候", "wait", 5],
+    ["睡眠八小时", "sleep", 480], ["休息大概三个小时", "rest", 180],
+    ["睡到自然醒", "sleep", 480], ["等到明天", "wait", 400],
+    ["不是休息，而是等待三小时", "wait", 180],
+  ]) {
+    const timing = timedAction(action, late);
+    assert.equal(timing?.kind, kind, action);
+    assert.equal(timing?.elapsedMinutes, minutes, action);
+    assert.equal(minutesForTurn(action, [], [], late), minutes, action);
+    if (kind === "wait") assert.equal(restMinutes(action, late), null, action);
+  }
+  assert.equal(timedAction("等到中午十一点", "1349年 10月17日 · 周二 · 10:00").elapsedMinutes, 60);
+  for (const action of ["不要等待", "不打算休息", "不想再去休息", "询问老板能否睡觉", "如果睡到明早", "查看休息室", "询问睡眠不足的男人"]) {
+    assert.equal(timedAction(action, late), null, action);
+  }
+});
+
+test("timed action completion and local interruption are explicit in final settlement", () => {
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "完整休息" });
+  const completed = resolveTurnProgress(structuredClone(game), "睡眠八小时", "low");
+  assert.equal(completed.timedAction.status, "completed");
+  assert.equal(completed.elapsedMinutes, 480);
+  const interrupted = resolveTurnProgress(structuredClone(game), "等待3小时", "low", [], [{ ok: true, log: "交接人员已抵达", data: { taskMinutes: 60 } }]);
+  assert.equal(interrupted.elapsedMinutes, 60);
+  assert.equal(interrupted.timedAction.status, "interrupted");
+  assert.equal(interrupted.timedAction.interruptionReason, "交接人员已抵达");
+  assert.deepEqual(createTurnResolution([], [], interrupted).derivedEffects.timedAction, interrupted.timedAction);
+  const rejected = resolveTurnProgress(structuredClone(game), "等待3小时", "low", [], [{ ok: false, data: { taskMinutes: 60 } }]);
+  assert.equal(rejected.elapsedMinutes, 180);
+  const pending = resolveTurnProgress(structuredClone(game), "等待直到客人抵达", "low");
+  assert.equal(pending.timedAction.status, "pending");
+  const arrived = resolveTurnProgress(structuredClone(game), "等待直到客人抵达", "low", [], [{ ok: true, log: "客人抵达", data: { taskMinutes: 30 } }]);
+  assert.equal(arrived.timedAction.status, "completed");
+  assert.equal(resolveTurnProgress(structuredClone(game), "睡到自然醒", "low").timedAction.status, "completed");
 });

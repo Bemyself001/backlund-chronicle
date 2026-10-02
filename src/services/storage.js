@@ -9,6 +9,7 @@ import { normalizeMemoryState } from "./memoryState.js";
 import { normalizeTriggerState, syncLegacyOccult } from "../engine/triggerState.js";
 import { syncQuestJournal } from "../engine/questRuntime.js";
 import { migrateContentState } from "../engine/contentMigrations.js";
+import { normalizeWorldTime } from "../engine/worldTime.js";
 import { applyTalent } from "../system/talents.js";
 import { specialState } from "../engine/specialActions.js";
 import { syncKnownPeople } from "../engine/people.js";
@@ -108,6 +109,7 @@ export function migrateSave(raw) {
   } } : { membership: null };
   const result = {
     ...migrated,
+    worldTime: normalizeWorldTime(migrated.worldTime),
     version: SAVE_VERSION,
     systemVersion: Number(migrated.systemVersion) || GAME_SYSTEM_VERSION,
     content: migrated.content || { packId: ACTIVE_CONTENT.id, schemaVersion: CONTENT_SCHEMA_VERSION, contentVersion: "legacy" },

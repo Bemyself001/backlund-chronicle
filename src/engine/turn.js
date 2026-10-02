@@ -1,10 +1,11 @@
 import { applyStatDelta } from "./statChanges.js";
 import { processTriggers } from "./triggerEngine.js";
-import { restMinutes } from "./restTime.js";
+import { timedAction } from "./restTime.js";
+import { advanceWorldTime } from "./worldTime.js";
 import { settleInnRest } from "./recovery.js";
 import { resolveSelectedQuestRoute } from "./questActions.js";
 
-const WEEKDAYS = ["日", "一", "二", "三", "四", "五", "六"];
+export { advanceWorldTime } from "./worldTime.js";
 
 // 每轮结算：所有带 tick 的状态对角色数值生效（截断与归零联动由 applyStatDelta 统一处理）。
 export function settleStatusTicks(game) {
@@ -32,8 +33,8 @@ export function minutesForTurn(action, toolCalls = [], toolResults = [], worldTi
   const text = String(action || "");
   const taskMinutes = toolResults.filter(result => result?.ok).map(result => result.data?.taskMinutes).filter(value => Number.isInteger(value) && value > 0);
   if (taskMinutes.length) return Math.max(...taskMinutes);
-  const rest = restMinutes(text, worldTime);
-  if (rest !== null) return rest;
+  const timing = timedAction(text, worldTime);
+  if (timing) return timing.elapsedMinutes;
   if (TRAVEL_ACTION.test(text)) return 75;
   const movementIndex = toolCalls.findIndex((call, index) => call.name === "location.move" && toolResults[index]?.ok);
   if (movementIndex >= 0) return Math.max(1, Number(toolResults[movementIndex]?.data?.travelMinutes) || 35);
@@ -51,19 +52,6 @@ export function dangerDeltaForTurn({ action, selectedRisk, toolCalls = [], toolR
   return dangerousStatusAccepted ? 1 : 0;
 }
 
-export function advanceWorldTime(value, minutes) {
-  const match = String(value || "").match(/(\d{3,4})年\s*(\d{1,2})月(\d{1,2})日\s*·\s*周([一二三四五六日天])\s*·\s*(\d{1,2}):(\d{2})/);
-  if (!match) return value;
-  const [, yearText, monthText, dayText, weekdayText, hourText, minuteText] = match;
-  const date = new Date(Date.UTC(Number(yearText), Number(monthText) - 1, Number(dayText), Number(hourText), Number(minuteText)));
-  const beforeDay = date.getUTCDate();
-  date.setUTCMinutes(date.getUTCMinutes() + Math.max(0, Number(minutes) || 0));
-  const elapsedDays = Math.round((Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()) - Date.UTC(Number(yearText), Number(monthText) - 1, beforeDay)) / 86400000);
-  const weekdayIndex = WEEKDAYS.indexOf(weekdayText === "天" ? "日" : weekdayText);
-  const weekday = WEEKDAYS[(weekdayIndex + elapsedDays + 7) % 7];
-  return `${date.getUTCFullYear()}年 ${date.getUTCMonth() + 1}月${date.getUTCDate()}日 · 周${weekday} · ${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`;
-}
-
 export function occultEntryForTurn(game, nextTurn) {
   const clone = structuredClone(game);
   const result = processTriggers(clone, { action: "调查异常线索", turn: nextTurn });
@@ -72,11 +60,13 @@ export function occultEntryForTurn(game, nextTurn) {
 }
 
 export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], toolResults = [], options = {}) {
+  const timing = timedAction(action, game.worldTime);
   // Execute the player's exact local route even when the AI omitted quest.resolve.
   const recovery = resolveSelectedQuestRoute(game, action, Number(game.turn || 0) + 1);
   if (recovery) toolResults = [...toolResults, { ok: recovery.ok, data: recovery }];
   const elapsedMinutes = Number.isInteger(options.elapsedMinutes) && options.elapsedMinutes > 0
     ? options.elapsedMinutes : minutesForTurn(action, toolCalls, toolResults, game.worldTime);
+  const localTaskTiming = toolResults.find(result => result?.ok && Number.isInteger(result.data?.taskMinutes) && result.data.taskMinutes > 0);
   const dangerDelta = dangerDeltaForTurn({ action, selectedRisk, toolCalls, toolResults });
   const statusTicks = settleStatusTicks(game);
   const restRecovery = settleInnRest(game, action, elapsedMinutes);
@@ -89,6 +79,16 @@ export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], 
   const occultEntry = triggerProgress.occultEntry ? { id: triggerProgress.occultEntry.instanceId, turn: triggerProgress.occultEntry.createdTurn, ...triggerProgress.occultEntry.presentation } : null;
   return {
     elapsedMinutes,
+    timedAction: timing ? {
+      ...timing,
+      requestedMinutes: timing.elapsedMinutes,
+      elapsedMinutes,
+      status: elapsedMinutes < timing.elapsedMinutes ? "interrupted" : timing.source === "unresolvedEnd" && !localTaskTiming ? "pending" : "completed",
+      // Only accepted local task/fixed-action timing can shorten this action.
+      interruptionReason: elapsedMinutes < timing.elapsedMinutes
+        ? localTaskTiming?.log || "本地事件结算提前结束了本次行动"
+        : null,
+    } : null,
     restRecovery,
     dangerDelta,
     statusTicks,

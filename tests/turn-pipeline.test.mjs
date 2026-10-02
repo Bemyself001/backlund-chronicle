@@ -119,7 +119,7 @@ test("fast continuation receives only the draft and authoritative local resoluti
   const messages = buildFastNarrativeContinuationContext(before, after, "观察四周", "你压低帽檐，留意站台上的动静。", DEFAULT_SYSTEM_PROMPT, resolution);
   const serialized = messages.map((message) => message.content).join("\n");
 
-  assert.match(serialized, /快速模式：权威结果补写/);
+  assert.match(serialized, /快速模式：权威结果校正/);
   assert.match(serialized, /narrativeDraft/);
   assert.match(serialized, /turnResolution/);
   assert.match(serialized, /status\.add/);

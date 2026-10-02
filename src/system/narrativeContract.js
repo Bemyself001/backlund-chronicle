@@ -11,6 +11,6 @@ export function fixedNarrativeMessages() {
     { role: "system", content: QUEST_ENGINE_RULE },
     { role: "system", content: FIXED_NARRATIVE_CONTRACT },
     { role: "system", content: `${LOCAL_STATE_AUTHORITY_RULES}${FACT_DISCLOSURE_RULES}` },
-    { role: "system", content: "【时间一致性】本轮耗时与结束时刻只以本地结算 turnResolution.derivedEffects.elapsedMinutes 和 worldTime 为准。不得把几分钟写成几小时，不得擅自跳到天黑、天亮或次日；历史剧情中的错误时间不能覆盖系统时钟。休息的明确时长优先，默认休息60分钟、睡觉480分钟，睡到天亮按下一个早上6点计算。规划阶段可参考 plannedRestTime；最终叙事必须按实际结算写明休息耗时和结束时刻。尚未拿到结算的快速草稿只写行动过程，不宣称时间跳跃或休息结束。休息不自动授予未经本地确认的生命、理智或灵性恢复。" },
+    { role: "system", content: "【时间一致性】日期、星期、时刻以及本轮耗时只以本地结算 turnResolution.derivedEffects.elapsedMinutes 和 worldTime 为准。不得把几分钟写成几小时，不得擅自跳到天黑、天亮或次日；历史剧情中的错误时间不能覆盖系统时钟。睡眠、休息、等待是不同动作，明确时长和结束时间优先；默认休息60分钟、睡觉480分钟、等待5分钟，天亮按早上6点计算。规划阶段参考 plannedTimedAction；不得把这些动作一律当成休息一小时，不得虚构任务推进以覆盖其耗时。最终叙事必须按实际结算写明耗时和结束时刻。timedAction.status=completed 时，本轮直接写完休息、醒来或指定时长的等待，后续选项从结束时刻开始，不要求玩家再用多轮继续同一次动作。status=interrupted 时只按本地 interruptionReason 和实际耗时写中断；只有已确认的本地事件可以中断，不得为了悬念虚构敲门、袭击或惊醒。status=pending 表示目标事件或结束时刻尚未确定，只能叙述实际经过的时间，不可宣称等到了人或事件。尚未拿到结算的快速草稿只写行动过程，不宣称时间跳跃、结束时刻或休息结束。等待不产生休息恢复；睡眠与休息的恢复只以 restRecovery 及其他本地结果为准。" },
   ];
 }

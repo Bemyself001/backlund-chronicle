@@ -1,5 +1,7 @@
-// Parse the player's current rest instruction, never elapsed time invented in prose.
+import { parseWorldTime } from "./worldTime.js";
+
 const NUMBER = "(?:\\d+(?:\\.\\d+)?|[零〇一二两三四五六七八九十百]+)";
+const ACTION = /睡眠(?!不足|质量)|睡觉|入睡|小睡|睡(?=到|至|上|一|个|半|\d|[两三四五六七八九十]|\s*$)|过夜|就寝|歇息|休息(?!室)|小憩|打盹|等待|等候|守候|蹲守|等(?=到|至|上|一|半|\d|[两三四五六七八九十])/;
 
 function numberValue(text) {
   if (/^\d/.test(text)) return Number(text);
@@ -13,39 +15,67 @@ function numberValue(text) {
   return total + digit;
 }
 
-export function restMinutes(action, worldTime = "") {
-  const clauses = String(action || "").split(/[，。；！？,;!?\n]/);
-  const text = clauses.find((clause) => /休息|睡觉|入睡|睡到|睡上|睡一|睡\d|睡[两三四五六七八九十半]|过夜/.test(clause)
-    && !/(?:不|别|不要|不想|不再|暂不|没有|不能|无法)(?:再|去)?(?:休息|睡|入睡|过夜)/.test(clause)
-    && !/昨天|昨晚|已经|刚才|休息过|睡过|询问|问他|问她/.test(clause));
-  if (!text) return null;
-  const instruction = text.slice(text.search(/休息|睡|入睡|过夜/));
-  const clock = String(worldTime).match(/(\d{1,2}):(\d{2})$/);
-  const current = clock ? Number(clock[1]) * 60 + Number(clock[2]) : null;
-  const until = instruction.match(new RegExp(`(?:到|至)\\s*(明天|明早|明日|次日|今天|今晚)?\\s*(早上|早晨|清晨|上午|中午|下午|晚上|凌晨)?\\s*(${NUMBER})\\s*(?:点|时|[:：])\\s*(半|${NUMBER})?\\s*分?`));
+function endTime(text, current) {
+  const until = text.match(new RegExp(`(?:到|至)\\s*(明天|明早|明日|次日|后天|今天|今晚)?\\s*(早上|早晨|清晨|上午|中午|下午|晚上|凌晨)?\\s*(${NUMBER})\\s*(?:点|时|[:：])\\s*(半|${NUMBER})?\\s*分?`));
   let target = null;
-  let tomorrow = /明天|明早|明日|次日/.test(instruction);
+  const offset = /后天/.test(text) ? 2 : /明天|明早|明日|次日/.test(text) ? 1 : 0;
   if (until) {
     let hour = numberValue(until[3]);
     const minute = until[4] === "半" ? 30 : until[4] ? numberValue(until[4]) : 0;
-    if (/下午|晚上|中午/.test(until[2] || "") && hour < 12) hour += 12;
-    if (/凌晨/.test(until[2] || "") && hour === 12) hour = 0;
+    const period = until[2] || (until[1] === "今晚" ? "晚上" : "");
+    if (/下午|晚上/.test(period) && hour < 12) hour += 12;
+    if (period === "中午" && hour < 11) hour += 12;
+    if (period === "凌晨" && hour === 12) hour = 0;
     if (hour < 24 && minute < 60) target = hour * 60 + minute;
-    tomorrow = Boolean(until[1] && /明|次/.test(until[1]));
-  } else if (/(?:到|至)(?:明天|明早|次日)?天亮/.test(instruction)) target = 360;
-  if (target !== null && current !== null) {
-    const difference = target - current + (tomorrow ? 1440 : 0);
-    return difference > 0 ? difference : difference + 1440;
+  } else {
+    const part = text.match(/(?:到|至)\s*(?:明天|明日|次日|后天|今天)?\s*(天亮|早上|早晨|清晨|上午|中午|下午|晚上|天黑|明早|今晚)/)?.[1];
+    target = ({ 天亮: 360, 早上: 360, 早晨: 360, 清晨: 360, 上午: 540, 中午: 720, 下午: 840, 晚上: 1080, 天黑: 1080, 明早: 360, 今晚: 1080 })[part]
+      ?? (/(?:到|至)\s*(?:明天|明日|次日|后天)\s*$/.test(text) ? 360 : null);
   }
-  const halfHours = instruction.match(new RegExp(`(?:休息|睡觉|睡)(?:上|了)?\\s*(${NUMBER})个?半(?:个)?小时`));
-  if (halfHours) return Math.round((numberValue(halfHours[1]) + 0.5) * 60);
-  const duration = instruction.match(new RegExp(`(?:休息|睡觉|入睡|睡)(?:上|个|了|大约|约|大概|一下)?\\s*(${NUMBER})\\s*(?:个)?\\s*(小时|钟头|分钟|分)(半)?(?:\\s*(${NUMBER})\\s*分(?:钟)?)?`));
-  if (duration) {
-    const hours = /小时|钟头/.test(duration[2]);
-    const minutes = numberValue(duration[1]) * (hours ? 60 : 1) + (duration[3] ? (hours ? 30 : 0.5) : 0) + (duration[4] ? numberValue(duration[4]) : 0);
-    if (minutes > 0) return Math.max(1, Math.round(minutes));
+  if (target === null || current === null) return null;
+  const difference = target - current + offset * 1440;
+  return difference > 0 ? difference : difference + 1440;
+}
+
+// Shared by planning, settlement, recovery and fast-mode gating. Never parse AI prose.
+export function timedAction(action, worldTime = "") {
+  const clauses = String(action || "").split(/[，。；！？,;!?\n]/);
+  for (let index = 0; index < clauses.length; index += 1) {
+    const clause = clauses[index];
+    const match = clause.match(ACTION);
+    if (!match) continue;
+    const prefix = clause.slice(0, match.index);
+    if (/(?:不|别|不要|不想|不再|暂不|没有|不能|无法)(?:是|会|再|去|继续|打算|准备){0,3}$/.test(prefix)
+      || /昨天|昨晚|已经|刚才|询问|问他|问她|能否|是否|如果|假如/.test(prefix)
+      || /^(?:休息|睡觉|睡|等待|等候)(?:过|了)/.test(clause.slice(match.index))) continue;
+    let instruction = clause.slice(match.index);
+    // A comma before an end time does not end the instruction. Stop at a new action.
+    for (let next = index + 1; next < clauses.length && /^\s*(?:(?:然后)?睡到|一直|直到|到|至|大约|约|共|持续|时长|\d|[一二两三四五六七八九十半])/.test(clauses[next]); next += 1) {
+      instruction += clauses[next];
+    }
+    const kind = /^(?:等|守候|蹲守)/.test(instruction) ? "wait"
+      : /睡|入睡|过夜|就寝|休息一晚/.test(instruction) || /整夜$/.test(prefix) ? "sleep" : "rest";
+    const clock = parseWorldTime(worldTime);
+    const current = clock ? clock.getUTCHours() * 60 + clock.getUTCMinutes() : null;
+    const until = endTime(instruction, current);
+    if (until !== null) return { kind, elapsedMinutes: until, source: "endTime" };
+    const duration = instruction.match(new RegExp(`(${NUMBER})\\s*个?半(?:个)?小时|半(?:个)?小时|(${NUMBER})\\s*个?\\s*(小时|钟头|分钟|分|天)(半)?(?:\\s*(${NUMBER})\\s*分(?:钟)?)?`));
+    if (duration) {
+      const minutes = duration[1] ? (numberValue(duration[1]) + 0.5) * 60
+        : !duration[2] ? 30
+          : numberValue(duration[2]) * (duration[3] === "天" ? 1440 : /小时|钟头/.test(duration[3]) ? 60 : 1)
+            + (duration[4] ? (/小时|钟头/.test(duration[3]) ? 30 : 0.5) : 0)
+            + (duration[5] ? numberValue(duration[5]) : 0);
+      if (Number.isFinite(minutes) && minutes > 0) return { kind, elapsedMinutes: Math.max(1, Math.round(minutes)), source: "duration" };
+    }
+    const unresolvedEnd = /到|至/.test(instruction) && !/睡到自然醒/.test(instruction);
+    return { kind, elapsedMinutes: kind === "sleep" ? 480 : kind === "wait" ? 5 : 60, source: unresolvedEnd ? "unresolvedEnd" : "default" };
   }
-  if (/(?:休息|睡觉|睡)(?:个)?半(?:个)?小时/.test(instruction)) return 30;
-  if (/睡|入睡|过夜|整夜休息/.test(instruction)) return 480;
-  return 60;
+  return null;
+}
+
+// Recovery callers deliberately exclude waiting.
+export function restMinutes(action, worldTime = "") {
+  const timing = timedAction(action, worldTime);
+  return timing && timing.kind !== "wait" ? timing.elapsedMinutes : null;
 }
