@@ -43,22 +43,23 @@ import { prayerAvailability, settlePrayer } from "./engine/prayer.js";
 import { generatePrayer } from "./services/prayer.js";
 import { actionRequest, retryRequest } from "./services/actionRequest.js";
 import { appendStoryMessages } from "./services/storyHistory.js";
+import { IS_STARTUP_TEST, startupStage } from "./services/startup.js";
 
 export default function App() {
   const [screen, setScreen] = useState("splash");
   const [game, setGame] = useState(null);
-  const [settings, setSettings] = useState(loadApiSettings);
-  const [prompt, setPrompt] = useState(() => {
+  const [settings, setSettings] = useState(() => startupStage("读取 API 设置", loadApiSettings));
+  const [prompt, setPrompt] = useState(() => startupStage("读取叙事设置", () => {
     const saved = localStorage.getItem("mist-system-prompt");
     if (!saved) return DEFAULT_SYSTEM_PROMPT;
     const migrated = migrateSystemPrompt(saved);
     if (migrated !== saved) localStorage.setItem("mist-system-prompt", migrated);
     return migrated;
-  });
+  }));
   const [modal, setModal] = useState(null);
   const [mapFocus, setMapFocus] = useState(null);
   const openMap = (locationId = null) => { setMapFocus(typeof locationId === "string" ? locationId : null); setModal("map"); };
-  const [saves, setSaves] = useState(listSaves);
+  const [saves, setSaves] = useState(() => startupStage("读取存档列表", listSaves));
   const [loading, setLoading] = useState(false);
   const [streamText, setStreamText] = useState("");
   const [turnPhase, setTurnPhase] = useState("idle");
@@ -75,7 +76,7 @@ export default function App() {
   const refreshSaves = () => setSaves(listSaves());
 
   useEffect(() => {
-    if (!isNativeAndroid()) return undefined;
+    if (IS_STARTUP_TEST || !isNativeAndroid()) return undefined;
     let active = true;
     const timer = window.setTimeout(() => {
       checkForUpdate().then(async (result) => {

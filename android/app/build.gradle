@@ -4,16 +4,20 @@ def appVersionCode = (project.findProperty("APP_VERSION_CODE") ?: System.getenv(
 def appVersionName = project.findProperty("APP_VERSION_NAME") ?: System.getenv("APP_VERSION_NAME") ?: "1.6.17"
 def releaseStoreFile = System.getenv("ANDROID_KEYSTORE_PATH")
 def hasReleaseSigning = releaseStoreFile && System.getenv("ANDROID_KEYSTORE_PASSWORD") && System.getenv("ANDROID_KEY_ALIAS") && System.getenv("ANDROID_KEY_PASSWORD")
+def startupVariant = project.findProperty("STARTUP_VARIANT") ?: "standard"
+if (!(startupVariant in ["standard", "diagnostic", "compat"])) throw new GradleException("Invalid STARTUP_VARIANT")
 
 android {
     namespace = "io.github.bemyself001.backlundchronicle"
     compileSdk = rootProject.ext.compileSdkVersion
+    buildFeatures { buildConfig true }
     defaultConfig {
         applicationId "io.github.bemyself001.backlundchronicle"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode appVersionCode
         versionName appVersionName
+        buildConfigField "String", "STARTUP_VARIANT", "\"${startupVariant}\""
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         aaptOptions {
              // Files and dirs to omit from the packaged assets dir, modified to accommodate modern web apps.
@@ -62,6 +66,19 @@ dependencies {
 }
 
 apply from: 'capacitor.build.gradle'
+
+// Prevent a test APK from accidentally booting production assets or an OTA bundle.
+tasks.named("preBuild").configure {
+    doFirst {
+        def entry = file("src/main/assets/public/index.html")
+        if (!entry.isFile()) throw new GradleException("Web entry missing; run cap sync android first")
+        def marker = entry.getText("UTF-8") =~ /name="startup-variant" content="([a-z]+)"/
+        def webVariant = marker.find() ? marker.group(1) : "standard"
+        if (webVariant != startupVariant) {
+            throw new GradleException("Web/native startup variant mismatch: ${webVariant}/${startupVariant}")
+        }
+    }
+}
 
 try {
     def servicesJSON = file('google-services.json')
