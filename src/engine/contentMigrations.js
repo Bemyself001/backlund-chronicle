@@ -70,13 +70,21 @@ function patchStoryRecords(game, step) {
     if (!item || (update.requiredTags || []).some((tag) => !(item.tags || []).includes(tag))) continue;
     Object.assign(item, renderContentData(update.patch || {}, { game, item }));
   }
+  for (const rumor of step.locationRumors || []) {
+    const location = getMapLocation(rumor.locationId, game);
+    if (!location) continue;
+    game.locationKnowledge = normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location?.id, game);
+    if (game.locationKnowledge[location.id].status !== "unknown") continue;
+    game.locationKnowledge[location.id] = { ...game.locationKnowledge[location.id], status: "rumored", note: rumor.note || location.rumor, source: "内容迁移" };
+  }
   for (const discovery of step.locationDiscoveries || []) {
     if (!allConditionsMatch(discovery.when || [], { game, state: game.triggerState, signals: [], action: "", turn: Number(game.turn || 0) })) continue;
     const location = getMapLocation(discovery.locationId, game);
     if (!location) continue;
     game.discoveredLocations = Array.isArray(game.discoveredLocations) ? game.discoveredLocations : [];
     game.locationKnowledge = normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location?.id, game);
-    game.locationKnowledge[location.id] = { ...game.locationKnowledge[location.id], status: "discovered", note: discovery.note || location.description, source: "内容迁移" };
+    const known = game.locationKnowledge[location.id];
+    game.locationKnowledge[location.id] = { ...known, status: known.status === "visited" ? "visited" : "discovered", note: known.note || discovery.note || location.description, source: known.source || "内容迁移" };
     if (!game.discoveredLocations.some((entry) => entry.id === location.id)) game.discoveredLocations.push({ id: location.id, name: location.name, note: discovery.note || location.description });
   }
 }

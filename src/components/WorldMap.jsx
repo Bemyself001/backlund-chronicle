@@ -4,7 +4,7 @@ import { findLocationRelations, findTravelRoute, getChildLocations, getMapLocati
 import { cityTerrainLabel, canExploreHex, hexPolygonPoints, hexToPixel, visibleHexes } from "../system/hexworld.js";
 import styles from "./WorldMap.module.css";
 import { prayerAvailability } from "../engine/prayer.js";
-import { SPECIAL_ACTIONS, ORGANIZATIONS } from "../content/index.js";
+import { SPECIAL_ACTIONS, ORGANIZATIONS, VISITABLE_PEOPLE } from "../content/index.js";
 
 const KIND_LABELS = {
   street: "街道", residence: "住所", shop: "店铺", tavern: "酒馆", office: "事务所", church: "教会", warehouse: "仓库",
@@ -119,7 +119,7 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
         <h3>{discovered ? selected.name : rumored ? "地图上的地点传闻" : "雾中区域"}</h3>
         {discovered && <div className={styles.locationBadges}><span>{KIND_LABELS[selected.kind] || "地点"}</span><span>{selected.source === "dynamic" ? "剧情生长" : "城市档案"}</span>{selectedKnowledge.status === "visited" && <span>已到访</span>}</div>}
         <span>{discovered ? selected.description : rumored ? selectedKnowledge.note || selected.rumor : "这里还没有可供追查的传闻。继续探索、交谈或取得相关线索后，地图会补充记录。"}</span>
-        {discovered && ORGANIZATIONS.filter((entry) => entry.headquarters === selected.id).map((organization) => <p key={organization.id}>{organization.church} · {organization.name}驻地，可在此申请正式加入并办理组织事务。</p>)}
+        {discovered && ORGANIZATIONS.filter((entry) => entry.headquarters === selected.id).map((organization) => <p key={organization.id}>{organization.church || organization.agency || "官方机构"} · {organization.name}驻地，可在此申请正式加入并办理组织事务。</p>)}
         {discovered && <dl>
           <div><dt>Location ID</dt><dd><code>{selected.id}</code></dd></div>
           <div><dt>档案状态</dt><dd>{current ? "当前位置" : selectedKnowledge.status === "visited" ? "已到访" : "已发现"}</dd></div>
@@ -142,6 +142,7 @@ export default function WorldMap({ game, loading, onClose, onTravel, onInvestiga
             ? <button className="button button--primary" type="button" disabled={loading} onClick={() => onInvestigate(selected, selectedKnowledge)}>{loading ? "本轮处理中" : "调查该区域"}</button>
             : <button className="button button--primary" type="button" disabled>尚无线索</button>}
         {discovered && selected.id === "soot-lamp" && <button type="button" className="button button--primary" disabled={loading} onClick={onSpecial}>旅店休息 · 恢复生命与理智</button>}
+        {discovered && VISITABLE_PEOPLE.filter(person => person.locationId === selected.id).map(person => <button key={person.id} type="button" className="button button--primary" disabled={loading} onClick={onSpecial}>人物拜访 · {person.name}</button>)}
         {discovered && prayer.church && <>
           <button className="button button--primary" type="button" disabled={loading || !prayer.ok} onClick={() => onPray(selected.id)}>{loading ? "本轮处理中" : prayer.reason || "祷告 · 理智与灵性各恢复 2 点"}</button>
           <small>向{prayer.church.deity}祷告，消耗一回合。每 5 回合可用一次，所有教堂共享冷却；恢复不超过各自上限。</small>

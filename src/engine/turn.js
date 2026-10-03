@@ -1,4 +1,4 @@
-import { applyStatDelta } from "./statChanges.js";
+import { applyStatDelta, syncStatCollapseStatuses } from "./statChanges.js";
 import { processTriggers } from "./triggerEngine.js";
 import { timedAction } from "./restTime.js";
 import { advanceWorldTime } from "./worldTime.js";
@@ -76,6 +76,16 @@ export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], 
   const worldTime = advanceWorldTime(game.worldTime, elapsedMinutes);
   game.worldTime = worldTime;
   const triggerProgress = processTriggers(game, { action, toolCalls, toolResults, turn: nextTurn });
+  // Promotion recovery is the final stat settlement of this turn; ongoing effects remain.
+  const advancementRecovery = successfulTool(toolCalls, toolResults, call => call.name === "advancement.promote")
+    ? ["health", "sanity"].map(stat => {
+      const maxKey = `max${stat[0].toUpperCase()}${stat.slice(1)}`;
+      return applyStatDelta(game, stat, game.character.stats[maxKey] - game.character.stats[stat]);
+    }).filter(Boolean) : [];
+  if (advancementRecovery.length) {
+    syncStatCollapseStatuses(game);
+    statusTickLogs.push(...advancementRecovery.map(change => `晋升恢复：${change.label} ${change.before}→${change.after}`));
+  }
   const occultEntry = triggerProgress.occultEntry ? { id: triggerProgress.occultEntry.instanceId, turn: triggerProgress.occultEntry.createdTurn, ...triggerProgress.occultEntry.presentation } : null;
   return {
     elapsedMinutes,
@@ -90,6 +100,7 @@ export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], 
         : null,
     } : null,
     restRecovery,
+    advancementRecovery,
     dangerDelta,
     statusTicks,
     statusTickLogs,

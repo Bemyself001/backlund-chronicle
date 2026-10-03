@@ -420,7 +420,7 @@ test("map state tools expose strict growth, discovery, movement and archive para
   const definitions = Object.fromEntries(requestBody.tools.map((tool) => [tool.function.name, tool.function.parameters]));
   assert.deepEqual(definitions.location__grow.required, ["location", "reason"]);
   assert.equal(definitions.location__grow.properties.location.additionalProperties, false);
-  assert.deepEqual(definitions.location__grow.properties.location.properties.district.enum, ["北区", "皇后区", "希尔斯顿区", "东区", "桥区"]);
+  assert.deepEqual(definitions.location__grow.properties.location.properties.district.enum, ["北区", "皇后区", "希尔斯顿区", "东区", "桥区", "乔伍德区"]);
   assert.deepEqual(definitions.location__grow.properties.location.properties.scope.enum, ["landmark", "interior"]);
   assert.deepEqual(definitions.location__discover.required, ["locationId", "status", "note", "reason"]);
   assert.equal(definitions.location__discover.properties.status.additionalProperties, undefined);

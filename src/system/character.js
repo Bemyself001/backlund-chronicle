@@ -1,4 +1,5 @@
 import { getUnlockedAbilities, pathwayIdForName, pathwayNameForId } from "../content/index.js";
+import { spiritualGrowthForSequence } from "./characterStats.js";
 
 export function createAdvancement(character = {}) {
   if (character.extraordinary !== "low") {
@@ -63,11 +64,13 @@ export function applyAdvancement(character = {}, pathwayId, sequence, acquiredAt
   const pathwayName = pathwayNameForId(pathwayId);
   if (!pathwayName || !Number.isInteger(sequence) || sequence < 0 || sequence > 9) return null;
   const previous = getAdvancement(character);
-  const spiritualGrowth = { 9: 3, 8: 1, 7: 1, 6: 1, 5: 2, 4: 2, 3: 2, 2: 3, 1: 3, 0: 4 }[sequence];
+  const spiritualGrowth = spiritualGrowthForSequence(sequence);
   const stats = { ...(character.stats || {}) };
   const previousMax = Number(stats.maxSpirituality || 0);
   stats.maxSpirituality = previousMax + spiritualGrowth;
   stats.spirituality = Math.min(stats.maxSpirituality, Number(stats.spirituality || 0) + spiritualGrowth);
+  stats.health = Number(stats.maxHealth);
+  stats.sanity = Number(stats.maxSanity);
   return {
     ...character,
     extraordinary: "low",

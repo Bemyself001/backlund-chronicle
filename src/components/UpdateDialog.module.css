@@ -1,5 +1,9 @@
+/* Flex spacing fallbacks are activated only by the startup layout probe. */
 .content { display: grid; gap: 1rem; }
 .version { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding-bottom: .7rem; border-bottom: 1px solid #8b7a5a66; }
+
+:global(.no-flex-gap) .version { gap: 0; }
+:global(.no-flex-gap) .version > :not(:last-child) { margin-right: 1rem; margin-bottom: 0; }
 .version span { color: var(--ink-soft); font-size: .78rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .version strong { color: var(--verdigris); font-family: var(--font-display); font-size: 1.25rem; }
 .status { margin: 0; color: var(--ink); line-height: 1.6; }
@@ -7,4 +11,7 @@
 .notes p { max-height: 9rem; margin: 0; overflow: auto; color: var(--ink-soft); line-height: 1.65; white-space: pre-wrap; }
 .hint { margin: 0; color: var(--danger); font-size: .82rem; line-height: 1.55; }
 .actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: .65rem; }
+
+:global(.no-flex-gap) .actions { gap: 0; }
+:global(.no-flex-gap) .actions > :not(:last-child) { margin-right: .65rem; margin-bottom: .65rem; }
 .mirrorHint { margin: 0; color: var(--ink-soft); font-size: .82rem; line-height: 1.55; }

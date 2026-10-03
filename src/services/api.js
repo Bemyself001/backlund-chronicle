@@ -3,6 +3,7 @@ import { PATHWAYS, DYNAMIC_LOCATION_KINDS, DYNAMIC_LOCATION_SCOPES, MAP_DISTRICT
 import { createProviderProfile, inferApiProvider } from "./apiProviders.js";
 import { normalizeAIResponse, textFromContent } from "./protocol.js";
 import { CLOTHING_SLOTS } from "../system/loadout.js";
+import { MAX_ENEMY_HEALTH, MAX_ENEMY_ID_LENGTH, MAX_ENEMY_NAME_LENGTH, MAX_COMBAT_ENEMIES } from "../system/combat.js";
 
 const SETTINGS_KEY = "mist-api-settings-v1";
 const LEGACY_SESSION_KEY = "mist-api-key";
@@ -209,8 +210,41 @@ const TOOL_PARAMETER_SCHEMAS = {
       instanceId: { type: "string", description: "必须复制当前背包中的 instanceId" },
       itemId: { type: "string" },
       name: { type: "string" },
+      enemyId: { type: "string", description: "深红或风暴符咒的唯一目标，复制当前敌人 ID" },
+      clue: {
+        type: "object", additionalProperties: false, required: ["id", "title", "detail"],
+        description: "通识符咒必须提供一条新的当前场景线索，与消耗符咒同时入册，不另调 clue.add",
+        properties: { id: { type: "string", maxLength: 160 }, title: { type: "string", minLength: 2, maxLength: 120 }, detail: { type: "string", minLength: 8, maxLength: 2000 } },
+      },
       reason: { type: "string" },
     },
+  },
+  "enemy.encounter": {
+    type: "object", additionalProperties: false, required: ["enemies", "reason"],
+    properties: {
+      enemies: { type: "array", minItems: 1, maxItems: MAX_COMBAT_ENEMIES, items: {
+        type: "object", additionalProperties: false, required: ["id", "name", "maxHealth"],
+        properties: {
+          id: { type: "string", maxLength: MAX_ENEMY_ID_LENGTH, description: "同一敌人持续沿用的稳定 ID" },
+          name: { type: "string", maxLength: MAX_ENEMY_NAME_LENGTH, description: "玩家可见称呼" },
+          maxHealth: { type: "integer", minimum: 1, maximum: MAX_ENEMY_HEALTH, description: "按敌人实力生成的生命上限，一经登记不得重置" },
+          health: { type: "integer", minimum: 0, maximum: MAX_ENEMY_HEALTH, description: "首次遭遇的剩余生命，省略时为满生命" },
+        },
+      } },
+      reason: { type: "string" },
+    },
+  },
+  "enemy.damage": {
+    type: "object", additionalProperties: false, required: ["enemyId", "amount", "reason"],
+    properties: { enemyId: { type: "string" }, amount: { type: "integer", minimum: 1, maximum: MAX_ENEMY_HEALTH }, reason: { type: "string" } },
+  },
+  "enemy.act": {
+    type: "object", additionalProperties: false, required: ["enemyId", "damage", "action", "reason"],
+    properties: { enemyId: { type: "string" }, damage: { type: "integer", minimum: 0, maximum: MAX_ENEMY_HEALTH, description: "对玩家的生命伤害，非攻击行动为0" }, action: { type: "string", maxLength: 500 }, reason: { type: "string" } },
+  },
+  "enemy.leave": {
+    type: "object", additionalProperties: false, required: ["enemyId", "reason"],
+    properties: { enemyId: { type: "string" }, reason: { type: "string" } },
   },
   "item.equip": {
     type: "object",
@@ -452,6 +486,7 @@ const TOOL_PARAMETER_SCHEMAS = {
         },
       },
       requiresOccult: { type: "boolean", description: "仅非凡相关变化为 true，需已接触非凡世界" },
+      damageSource: { type: "string", enum: ["environment"], description: "仅独立环境伤害可用；敌人战斗伤害必须通过 enemy.act" },
       reason: { type: "string" },
     },
   },
@@ -563,7 +598,7 @@ const TOOL_PARAMETER_SCHEMAS = {
   },
 };
 
-const STATE_TOOL_NAMES = ["context.lookup", "inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "item.equip", "item.unequip", "occult.contact", "trigger.engage", "trigger.progress", "trigger.abandon", "organization.join", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.grow", "location.discover", "location.move", "location.archive", "clue.add", "quest.add", "quest.update", "quest.resolve", "dice.check"];
+const STATE_TOOL_NAMES = ["context.lookup", "inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "enemy.encounter", "enemy.damage", "enemy.act", "enemy.leave", "item.equip", "item.unequip", "occult.contact", "trigger.engage", "trigger.progress", "trigger.abandon", "organization.join", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.grow", "location.discover", "location.move", "location.archive", "clue.add", "quest.add", "quest.update", "quest.resolve", "dice.check"];
 
 const CHOICE_TOOL_SCHEMA = {
   type: "object",

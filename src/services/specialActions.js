@@ -5,6 +5,7 @@ import { injectOccultEntryChoice } from "./choices.js";
 import { makeId } from "../utils/id.js";
 import { createTurnResolution } from "./turnResolution.js";
 import { eventDirections, markNarrativeEventsDelivered } from "./narrativeEvents.js";
+import { visitablePerson } from "../engine/visitablePeople.js";
 
 export function resolveSpecialAction(game, request) {
   const result = executeSpecialAction(game, request);
@@ -17,8 +18,10 @@ export function resolveSpecialAction(game, request) {
   // 固定内容明确标注来源，既写入阅读历史，也保留给后续 AI 的场景上下文。
   for (const entry of memory.updates.storyHistory.slice(-2)) entry.source = "fixed";
   const trigger = progress.newTrigger?.presentation || next.triggerState?.active?.find((entry) => entry.status === "available")?.presentation;
+  const visitedPerson = request.operation === "visit-person" ? visitablePerson(request.id) : null;
+  const choices = visitedPerson ? visitedPerson.topics.map(topic => ({ label: topic.action, intent: "social", risk: "low" })) : game.choices;
   return markNarrativeEventsDelivered({ ...next, ...memory.updates,
-    choices: injectOccultEntryChoice(game.choices, trigger),
+    choices: injectOccultEntryChoice(choices, trigger),
     worldEvents: [...game.worldEvents, ...(progress.newTrigger ? [{ id: makeId("event"), turn: next.turn, text: `特殊事件出现：${progress.newTrigger.presentation.title}` }] : [])].slice(-40),
     changeLog: [...game.changeLog, { id: makeId("log"), turn: next.turn, text: action, tone: "success" },
       ...logs.map((text) => ({ id: makeId("log"), turn: next.turn, text, tone: "neutral" })), ...progress.statusTickLogs].slice(-100),

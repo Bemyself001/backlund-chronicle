@@ -25,6 +25,8 @@ export const LOCATION_KNOWLEDGE_STATUSES = ACTIVE_CONTENT.map.locationKnowledgeS
 export const DYNAMIC_LOCATION_SCOPES = ACTIVE_CONTENT.map.dynamicLocationScopes;
 export const DYNAMIC_LOCATION_KINDS = ACTIVE_CONTENT.map.dynamicLocationKinds;
 export const ORGANIZATIONS = ACTIVE_CONTENT.organizations;
+export const CHURCH_TALISMANS = ACTIVE_CONTENT.churchTalismans;
+export const VISITABLE_PEOPLE = ACTIVE_CONTENT.visitablePeople;
 export const ITEM_BEHAVIORS = ACTIVE_CONTENT.itemBehaviors;
 export const TRIGGER_DEFINITIONS = ACTIVE_CONTENT.triggers;
 export const LORE_ENTRIES = ACTIVE_CONTENT.lore;
@@ -208,8 +210,20 @@ export function validateContentPack(pack = ACTIVE_CONTENT) {
   const locations = new Set(asArray(pack?.map?.locations).map((entry) => entry?.id));
   const pathways = new Set(asArray(pack?.pathways).map((entry) => entry?.id));
   const organizations = new Set(asArray(pack?.organizations).map((entry) => entry?.id));
+  if (!Array.isArray(pack?.visitablePeople) || duplicateIds(pack.visitablePeople).length) errors.push("可拜访人物数据无效或ID重复");
+  for (const person of asArray(pack?.visitablePeople)) {
+    if (!locations.has(person.locationId) || !person.name || !person.role || !person.metFact || !person.description || !person.behavior || !person.introduction || !person.greeting) errors.push(`可拜访人物 ${person.id} 的地点或档案不完整`);
+    if (!person.topics?.length || duplicateIds(person.topics).length || person.topics.some(topic => !topic.label || !topic.action)) errors.push(`可拜访人物 ${person.id} 的话题无效`);
+  }
+  if (duplicateIds(pack?.churchTalismans, "itemId").length) errors.push("教会符咒存在空或重复物品 ID");
+  for (const charm of asArray(pack?.churchTalismans)) {
+    if (!organizations.has(charm.organizationId) || !["stun", "damage", "clue"].includes(charm.effect) || !charm.name || !charm.description) errors.push("教会符咒的组织、效果或说明无效");
+  }
   for (const organization of asArray(pack?.organizations)) {
-    if (organization?.headquarters && (!locations.has(organization.headquarters) || !organization.church || !organization.tags?.includes("official"))) errors.push(`组织 ${organization.id} 的教会驻地无效`);
+    if (organization?.headquarters && (!locations.has(organization.headquarters) || !asArray(organization.tags).includes("official"))) errors.push(`组织 ${organization.id} 的官方驻地无效`);
+    for (const field of ["church", "agency", "description"]) {
+      if (organization?.[field] != null && (typeof organization[field] !== "string" || !organization[field].trim())) errors.push(`组织 ${organization.id} 的 ${field} 说明无效`);
+    }
   }
   for (const [label, entries] of [["特殊行动", pack?.specialActions], ["制作配方", pack?.specialRecipes]]) {
     if (!Array.isArray(entries)) { errors.push(`${label}数据不是数组`); continue; }

@@ -1,0 +1,46 @@
+/* Flex spacing fallbacks are activated only by the startup layout probe. */
+.encounter { margin: 1.5rem 0; padding: 1rem; border: 1px solid var(--game-line); background: var(--game-raised); color: var(--game-ink); }
+.heading, .enemyHeading, .healthLabel, .talismanHeading { display: flex; flex-wrap: wrap; align-items: baseline; justify-content: space-between; gap: .3rem .8rem; }
+
+:global(.no-flex-gap) .heading { gap: 0; }
+:global(.no-flex-gap) .heading > :not(:last-child) { margin-right: .8rem; margin-bottom: .3rem; }
+:global(.no-flex-gap) .enemyHeading { gap: 0; }
+:global(.no-flex-gap) .enemyHeading > :not(:last-child) { margin-right: .8rem; margin-bottom: .3rem; }
+:global(.no-flex-gap) .healthLabel { gap: 0; }
+:global(.no-flex-gap) .healthLabel > :not(:last-child) { margin-right: .8rem; margin-bottom: .3rem; }
+:global(.no-flex-gap) .talismanHeading { gap: 0; }
+:global(.no-flex-gap) .talismanHeading > :not(:last-child) { margin-right: .8rem; margin-bottom: .3rem; }
+.heading { margin-bottom: .85rem; }
+.heading h2 { margin: 0; font: 500 1rem/1.5 var(--font-serif); }
+.heading > span { color: var(--game-muted); font-size: .75rem; }
+.enemies { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 14rem), 1fr)); gap: .65rem; }
+.enemy { min-width: 0; padding: .8rem; border: 1px solid var(--game-line); border-left: 3px solid var(--game-danger); background: var(--game-paper); }
+.enemyHeading h3 { margin: 0; font: 500 .95rem/1.5 var(--font-serif); overflow-wrap: anywhere; }
+.enemyHeading > span { color: var(--game-danger); font: .75rem/1.5 var(--font-sans); }
+.healthLabel { margin: .65rem 0 .35rem; font-size: .75rem; color: var(--game-muted); }
+.healthLabel strong { color: var(--game-ink); font: 500 .8rem var(--font-mono); }
+.healthLabel strong span { color: var(--game-muted); }
+.health { height: .4rem; overflow: hidden; background: var(--game-line); }
+.health > span { display: block; height: 100%; background: var(--game-danger); }
+.enemy[data-status="stunned"] { border-left-color: var(--game-green); }
+.enemy[data-status="stunned"] .enemyHeading > span { color: var(--game-green); }
+.enemy[data-status="defeated"] { border-left-color: var(--game-muted); }
+.enemy[data-status="defeated"] .enemyHeading > span { color: var(--game-muted); }
+.quickActions { margin-top: .8rem; border-top: 1px solid var(--game-line); }
+.quickActions summary { min-height: 2.75rem; padding: .75rem 0 .2rem; cursor: pointer; color: var(--game-green); font-size: .85rem; }
+.quickActions summary > span { margin-left: .5rem; color: var(--game-muted); font-size: .75rem; }
+.charms { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: .7rem; margin-top: .5rem; }
+.talisman { --charm-bg: var(--game-paper); --charm-ink: var(--game-ink); --charm-muted: var(--game-muted); --charm-line: var(--game-line); --charm-accent: var(--game-green); min-width: 0; padding: .8rem; border: 1px solid var(--charm-line); background: var(--charm-bg); color: var(--charm-ink); font: .85rem/1.65 var(--font-sans); }
+.talisman[data-tone="panel"] { --charm-bg: #253429; --charm-ink: #e5deca; --charm-muted: #bdbeaa; --charm-line: #748267; --charm-accent: #e2c994; margin-top: 1rem; }
+.talismanHeading strong { font: 500 .95rem/1.5 var(--font-serif); }
+.talismanHeading > span { color: var(--charm-muted); font-size: .75rem; }
+.talisman p { margin: .5rem 0; overflow-wrap: anywhere; }
+.talisman .source { color: var(--charm-muted); font-size: .75rem; }
+.target { display: grid; gap: .3rem; margin: .75rem 0; font-size: .8rem; }
+.target select { width: 100%; min-width: 0; min-height: 2.75rem; padding: .5rem; border: 1px solid var(--charm-line); background: var(--charm-bg); color: var(--charm-ink); font: inherit; }
+.talisman .targetNote { color: var(--charm-accent); font-size: .8rem; }
+.talisman > button { width: 100%; min-height: 2.75rem; padding: .5rem .7rem; border: 1px solid var(--charm-accent); background: transparent; color: var(--charm-accent); font: 500 .85rem/1.5 var(--font-sans); }
+.talisman > button:hover:not(:disabled) { background: var(--charm-accent); color: var(--charm-bg); }
+.talisman > button:disabled { opacity: .5; cursor: not-allowed; }
+.note { display: block; margin-top: .5rem; color: var(--charm-muted); font-size: .75rem; }
+@media (max-width: 767px) { .encounter { padding: .75rem; } .enemies, .charms { grid-template-columns: minmax(0, 1fr); } }

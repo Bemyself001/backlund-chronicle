@@ -10,6 +10,8 @@ import { triggerGuidance } from "../engine/triggerGuidance.js";
 import { visibleQuestJournal, questAssistance } from "../engine/questRuntime.js";
 import styles from "./GamePanels.module.css";
 import PeoplePanel from "./PeoplePanel.jsx";
+import { TalismanControl } from "./EnemyEncounter.jsx";
+import { getChurchTalisman } from "../system/talismans.js";
 
 export const CharacterPanel = memo(function CharacterPanel({ game }) {
   const { character } = game;
@@ -42,6 +44,7 @@ export const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, 
   const items = game.inventory.filter(item => (effectiveCategory === "全部" || item.category === effectiveCategory) && item.name.includes(search.trim()));
   const selected = game.inventory.find(item => item.instanceId === selectedId);
   const eligible = selected && getPotionAdvancementEligibility(game, selected.instanceId);
+  const talisman = selected && getChurchTalisman(selected);
   const weight = game.inventory.reduce((sum, item) => sum + item.weight * item.quantity, 0);
   const returnToList = () => {
     setSelectedId(null);
@@ -55,10 +58,11 @@ export const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, 
       <p className={styles.muted}>{selected.rarity} · {selected.category}</p><h3>{selected.name}</h3><p>{selected.discoveredInfo || selected.description}</p>
       {selected.potion && <div className={styles.record}><h4>{selected.potion.identified ? `${selected.potion.pathwayName}途径 · 序列${selected.potion.sequence}魔药` : "性质未明的魔药"}</h4><p>{selected.potion.identified ? eligible ? "配方与当前序列匹配，可以申请晋升。" : "服用前仍需匹配配方、途径与目标序列。" : "需要对应配方或同途径经验才能鉴定；不能直接服用。"}</p></div>}
       <dl className={styles.dataList}><div><dt>重量</dt><dd>{selected.weight} kg</dd></div><div><dt>状态</dt><dd>{selected.condition}</dd></div><div><dt>数量</dt><dd>{selected.quantity}</dd></div><div><dt>来源</dt><dd>{selected.source}</dd></div></dl>
+      {talisman && <TalismanControl key={selected.instanceId} game={game} item={selected} onAction={onAction} disabled={disabled} tone="panel" />}
       <div className={styles.itemActions}>
         {eligible && <button className={styles.primary} type="button" disabled={disabled} onClick={() => onAction(`服用${selected.name}并正式晋升至${selected.potion.pathwayName}序列${selected.potion.sequence}`, { advancementRequest: { potionInstanceId: selected.instanceId } })}>服用并晋升</button>}
         <button type="button" disabled={disabled} onClick={() => onLocalTool("item.inspect", { instanceId: selected.instanceId }, `检查${selected.name}`)}>检查</button>
-        {(selected.tags.includes("消耗品") || medicineRecipe(selected)) && !selected.potion && <button type="button" disabled={disabled} onClick={() => onLocalTool("item.use", { instanceId: selected.instanceId }, `主动使用${selected.name}`)}>使用</button>}
+        {(selected.tags.includes("消耗品") || medicineRecipe(selected)) && !selected.potion && !talisman && <button type="button" disabled={disabled} onClick={() => onLocalTool("item.use", { instanceId: selected.instanceId }, `主动使用${selected.name}`)}>使用</button>}
         {selected.tags.includes("装备") && <button type="button" disabled={disabled} onClick={() => onLocalTool(selected.equipped ? "item.unequip" : "item.equip", { instanceId: selected.instanceId }, `玩家${selected.equipped ? "卸下" : "装备"}${selected.name}`)}>{selected.equipped ? "卸下" : "装备"}</button>}
         <button type="button" className={styles.danger} disabled={disabled} onClick={() => { if (window.confirm(`丢弃一件“${selected.name}”？`)) { onLocalTool("inventory.remove", { instanceId: selected.instanceId, quantity: 1 }, `玩家主动丢弃${selected.name}`); returnToList(); } }}>丢弃</button>
       </div>

@@ -1,11 +1,17 @@
+/* Flex spacing fallbacks are activated only by the startup layout probe. */
 .page { position: relative; isolation: isolate; display: flex; flex-direction: column; min-height: 100vh; min-height: 100svh; background: #10100e; color: #f0e6d2; }
-.backgroundFrame { position: absolute; inset: 0; z-index: -3; overflow: hidden; background-color: #10100e; background-position: 65% center; background-size: cover; }
+.backgroundFrame { position: absolute; top: 0; right: 0; bottom: 0; left: 0; inset: 0; z-index: -3; overflow: hidden; background-color: #10100e; background-position: 65% center; background-size: cover; }
 .background { display: block; width: 100%; height: 100%; object-fit: cover; object-position: 65% center; }
-.page::before { content: ""; position: absolute; inset: 0; z-index: -2; background: linear-gradient(90deg, #080b0bea 0%, #080b0b88 42%, #080b0b0a 75%), linear-gradient(0deg, #080b0bd9, transparent 30%); }
+.page::before { content: ""; position: absolute; top: 0; right: 0; bottom: 0; left: 0; inset: 0; z-index: -2; background: linear-gradient(90deg, #080b0bea 0%, #080b0b88 42%, #080b0b0a 75%), linear-gradient(0deg, #080b0bd9, transparent 30%); }
 .header, .footer { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; padding: 2rem 5vw; color: #d0c2a6; font-size: .875rem; letter-spacing: .16em; }
+
+:global(.no-flex-gap) .header { gap: 0; }
+:global(.no-flex-gap) .header > :not(:last-child) { margin-right: 1rem; margin-bottom: 1rem; }
+:global(.no-flex-gap) .footer { gap: 0; }
+:global(.no-flex-gap) .footer > :not(:last-child) { margin-right: 1rem; margin-bottom: 1rem; }
 .header { border-bottom: 1px solid #dbb97928; }
 .header span:first-child { font-family: var(--font-serif); }
-.content { width: min(100%, 48rem); margin-block: auto; padding: 4rem 5vw; }
+.content { width: min(100%, 48rem); margin-top: auto; margin-bottom: auto; margin-block: auto; padding: 4rem 5vw; }
 .eyebrow { color: #c9a66b; font-size: .875rem; letter-spacing: .24em; margin: 0 0 1.8rem; }
 .content h1 { margin: 0; font-family: var(--font-display); font-size: 4.5rem; font-size: clamp(3rem, 6.8vw, 6.4rem); font-weight: 400; line-height: 1.16; letter-spacing: .08em; text-shadow: 0 4px 32px #000; }
 .content h1 span { display: block; color: #d4b478; }
@@ -13,6 +19,13 @@
 .actions { display: grid; gap: .8rem; max-width: 30rem; }
 .externalActions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .8rem; }
 .tapButton, .qqButton, .enterButton { display: flex; align-items: center; justify-content: space-between; gap: .75rem; min-height: 3.8rem; width: 100%; padding: .9rem 1.15rem; text-decoration: none; font-size: 1rem; cursor: pointer; }
+
+:global(.no-flex-gap) .tapButton { gap: 0; }
+:global(.no-flex-gap) .tapButton > :not(:last-child) { margin-right: .75rem; margin-bottom: 0; }
+:global(.no-flex-gap) .qqButton { gap: 0; }
+:global(.no-flex-gap) .qqButton > :not(:last-child) { margin-right: .75rem; margin-bottom: 0; }
+:global(.no-flex-gap) .enterButton { gap: 0; }
+:global(.no-flex-gap) .enterButton > :not(:last-child) { margin-right: .75rem; margin-bottom: 0; }
 .tapButton { color: #052c29; border: 1px solid #22d6bb; border-radius: .75rem; background: #22d6bb; font-family: var(--font-sans); font-weight: 600; }
 .tapWordmark { font-family: Arial, sans-serif; font-size: 1.45rem; font-weight: 800; letter-spacing: -.07em; }
 .tapButton:hover { background: #65eed7; }
@@ -41,17 +54,17 @@
   .subtitle { margin: 1rem 0 1.5rem; letter-spacing: .04em; }
   .actions { max-width: none; }
   .externalActions { grid-template-columns: 1fr; gap: .7rem; }
-  .enterButton { font-size: .95rem; padding-inline: 1rem; }
+  .enterButton { font-size: .95rem; padding-left: 1rem; padding-right: 1rem; padding-inline: 1rem; }
   .adNote { text-align: left; line-height: 1.5; }
-  .footer { padding-inline: 6vw; padding-bottom: max(1rem, env(safe-area-inset-bottom)); font-size: .875rem; letter-spacing: .03em; }
+  .footer { padding-left: 6vw; padding-right: 6vw; padding-inline: 6vw; padding-bottom: max(1rem, env(safe-area-inset-bottom)); font-size: .875rem; letter-spacing: .03em; }
 }
 @media (max-width: 600px) and (max-height: 720px) {
   .content { padding-top: 5rem; }
   .eyebrow { margin-bottom: 1rem; }
   .content h1 { font-size: 2.8rem; }
   .content h1 span { font-size: 2.2rem; }
-  .subtitle { margin-block: .75rem 1rem; }
-  .tapButton, .qqButton, .enterButton { min-height: 3.35rem; padding-block: .65rem; }
+  .subtitle { margin-top: .75rem; margin-bottom: 1rem; margin-block: .75rem 1rem; }
+  .tapButton, .qqButton, .enterButton { min-height: 3.35rem; padding-top: .65rem; padding-bottom: .65rem; padding-block: .65rem; }
   .actions, .externalActions { gap: .6rem; }
 }
 @media (max-width: 360px) { .content h1 { font-size: 2.8rem; } .content h1 span { font-size: 2rem; } }

@@ -1,4 +1,6 @@
+/* Flex spacing fallbacks are activated only by the startup layout probe. */
 .form { display: grid; gap: 1rem; }
+.setupActions { display: grid; gap: .7rem; padding: 1rem; border: 1px solid #8b7a5a66; background: #1f55470d; }
 .providerFieldset { display: grid; gap: .65rem; margin: 0; padding: 0; border: 0; }
 .providerFieldset legend { margin-bottom: .65rem; color: var(--ink-soft); font: 700 .72rem/1.2 var(--font-sans); letter-spacing: .12em; text-transform: uppercase; }
 .providerGrid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .55rem; }
@@ -9,14 +11,29 @@
 .providerButton small { color: var(--ink-soft); line-height: 1.35; }
 .providerButtonActive { border-color: var(--verdigris); background: #1f554717; box-shadow: inset 3px 0 var(--verdigris); }
 .providerMeta { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem .75rem; padding-bottom: .75rem; color: var(--ink-soft); border-bottom: 1px solid #8b7a5a42; font-size: .82rem; line-height: 1.55; }
+
+:global(.no-flex-gap) .providerMeta { gap: 0; }
+:global(.no-flex-gap) .providerMeta > :not(:last-child) { margin-right: .75rem; margin-bottom: .45rem; }
 .savedState { padding: .18rem .42rem; color: var(--verdigris); border: 1px solid #1f554773; font-size: .72rem; font-weight: 700; letter-spacing: .08em; }
 .modelPanel { display: grid; gap: .8rem; padding: .9rem; background: #f1e7d170; border: 1px solid #8b7a5a4d; }
-.modelPanelHeading { display: flex; align-items: end; justify-content: space-between; gap: .75rem; }
+.modelPanelHeading { display: flex; align-items: flex-end; align-items: end; justify-content: space-between; gap: .75rem; }
+
+:global(.no-flex-gap) .modelPanelHeading { gap: 0; }
+:global(.no-flex-gap) .modelPanelHeading > :not(:last-child) { margin-right: .75rem; margin-bottom: 0; }
 .modelPanelHeading h3 { margin: 0 0 .2rem; font-family: var(--font-display); font-size: 1rem; letter-spacing: .05em; }
 .modelPanelHeading span { color: var(--ink-soft); font-size: .76rem; }
 .inlineActions { display: flex; flex-wrap: wrap; gap: .5rem; }
+
+:global(.no-flex-gap) .inlineActions { gap: 0; }
+:global(.no-flex-gap) .inlineActions > :not(:last-child) { margin-right: .5rem; margin-bottom: .5rem; }
 .savedModels { display: flex; flex-wrap: wrap; align-items: center; gap: .45rem; }
+
+:global(.no-flex-gap) .savedModels { gap: 0; }
+:global(.no-flex-gap) .savedModels > :not(:last-child) { margin-right: .45rem; margin-bottom: .45rem; }
 .savedModels > div { display: flex; flex: 1 1 17rem; flex-wrap: wrap; gap: .4rem; min-width: 0; }
+
+:global(.no-flex-gap) .savedModels > div { gap: 0; }
+:global(.no-flex-gap) .savedModels > div > :not(:last-child) { margin-right: .4rem; margin-bottom: .4rem; }
 .savedModels > span { color: var(--ink-soft); font-size: .76rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
 .savedModels button, .modelResults button { min-width: 0; color: var(--ink); background: transparent; border: 1px solid #8b7a5a57; border-radius: 1px; overflow-wrap: anywhere; }
 .savedModels button { padding: .36rem .55rem; font-size: .76rem; }
@@ -36,6 +53,9 @@
 .switches { display: grid; grid-template-columns: 1fr 1fr; gap: .65rem; padding: 1rem; border: 1px solid #8b7a5a80; }
 .switches legend { padding: 0 .4rem; color: var(--ink-soft); font: 700 .68rem var(--font-sans); letter-spacing: .12em; text-transform: uppercase; }
 .switch { display: flex; align-items: flex-start; gap: .7rem; padding: .65rem; font-family: var(--font-sans); cursor: pointer; }
+
+:global(.no-flex-gap) .switch { gap: 0; }
+:global(.no-flex-gap) .switch > :not(:last-child) { margin-right: .7rem; margin-bottom: 0; }
 .switch input { width: 1.05rem; height: 1.05rem; margin-top: .2rem; accent-color: var(--verdigris); }
 .switch span { display: grid; gap: .12rem; }
 .switch strong { color: var(--ink); font-size: .88rem; }
@@ -43,7 +63,10 @@
 .dangerSwitch { border: 1px solid #7c2d2d66; background: #7c2d2d0d; }
 .status { margin: 0; padding: .7rem; background: #111817; color: #d8c69f; font: .82rem/1.5 var(--font-mono); }
 .releaseCard { display: grid; gap: .72rem; padding: 1rem; background: linear-gradient(135deg, #1f554711, #b8893b12 70%); border: 1px solid #8b7a5a66; border-left: 3px solid var(--brass); }
-.releaseHeading { display: flex; align-items: end; justify-content: space-between; gap: .8rem; padding-bottom: .68rem; border-bottom: 1px solid #8b7a5a42; }
+.releaseHeading { display: flex; align-items: flex-end; align-items: end; justify-content: space-between; gap: .8rem; padding-bottom: .68rem; border-bottom: 1px solid #8b7a5a42; }
+
+:global(.no-flex-gap) .releaseHeading { gap: 0; }
+:global(.no-flex-gap) .releaseHeading > :not(:last-child) { margin-right: .8rem; margin-bottom: 0; }
 .releaseHeading div { display: grid; gap: .18rem; min-width: 0; }
 .releaseHeading span { color: var(--ink-soft); font: 700 .68rem/1.2 var(--font-sans); letter-spacing: .12em; text-transform: uppercase; }
 .releaseHeading h3 { margin: 0; color: var(--ink); font-family: var(--font-display); font-size: 1.05rem; letter-spacing: .04em; }
@@ -53,5 +76,16 @@
 .releaseCard li { position: relative; padding-left: 1rem; }
 .releaseCard li::before { position: absolute; top: .62em; left: .08rem; width: .38rem; height: 1px; background: var(--brass); content: ""; }
 .actions { display: flex; justify-content: flex-end; gap: .7rem; padding-top: .25rem; }
+
+:global(.no-flex-gap) .actions { gap: 0; }
+:global(.no-flex-gap) .actions > :not(:last-child) { margin-right: .7rem; margin-bottom: 0; }
 .prompt { min-height: 25rem !important; font-family: var(--font-mono) !important; font-size: .82rem !important; line-height: 1.65 !important; }
-@media (max-width: 650px) { .providerGrid, .modelResults, .twoCol, .threeCol, .switches { grid-template-columns: minmax(0, 1fr); } .modelPanelHeading, .releaseHeading { align-items: stretch; flex-direction: column; } .inlineActions > button { flex: 1 1 9rem; } .actions { flex-wrap: wrap; } .actions > * { flex: 1; } .prompt { min-height: 19rem !important; } }
+@media (max-width: 650px) { .providerGrid, .modelResults, .twoCol, .threeCol, .switches { grid-template-columns: minmax(0, 1fr); } .modelPanelHeading, .releaseHeading { align-items: stretch; flex-direction: column; }
+:global(.no-flex-gap) .modelPanelHeading { gap: 0; }
+:global(.no-flex-gap) .modelPanelHeading > :not(:last-child) { margin-right: 0; margin-bottom: .75rem; }
+:global(.no-flex-gap) .releaseHeading { gap: 0; }
+:global(.no-flex-gap) .releaseHeading > :not(:last-child) { margin-right: 0; margin-bottom: .8rem; }
+.inlineActions > button { flex: 1 1 9rem; } .actions { flex-wrap: wrap; }
+:global(.no-flex-gap) .actions { gap: 0; }
+:global(.no-flex-gap) .actions > :not(:last-child) { margin-right: .7rem; margin-bottom: .7rem; }
+.actions > * { flex: 1; } .prompt { min-height: 19rem !important; } }

@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import Modal from "./Modal.jsx";
+import OnboardingGuide from "./OnboardingGuide.jsx";
 import styles from "./Welcome.module.css";
 import { APP_VERSION, WEB_BUILD, isNativeAndroid } from "../services/updates.js";
 import { recentArchives, archiveLocation } from "../data/titleArchive.js";
@@ -15,13 +16,25 @@ function formatSavedAt(iso) {
   return `${date.getMonth() + 1}月${date.getDate()}日 ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`;
 }
 
-export default function Welcome({ hasSave, saves = [], loading = false, apiSettings, onNew, onContinue, onLoadSlot, onImport, onApi, onUpdate, onChangelog }) {
+export default function Welcome({ hasSave, saves = [], loading = false, apiSettings, onNew, onContinue, onLoadSlot, onImport, onApi, onUpdate, onChangelog, onDiagnostics, onboardingStep, onOnboardingStep }) {
   const inputRef = useRef(null);
+  const startRef = useRef(null);
   const [importError, setImportError] = useState("");
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [stillScene, setStillScene] = useState(false);
   const archives = recentArchives(saves);
   const latest = archives[0];
+  const guideStep = !archiveOpen ? onboardingStep : null;
+  const guideTarget = guideStep === "setup" ? "api" : guideStep;
+  const tourProps = (id) => ({
+    "data-onboarding-target": id,
+    "aria-describedby": guideTarget === id ? "onboarding-description" : undefined,
+  });
+  const tourArrow = (id) => guideTarget === id ? <span className={styles.tourArrow} aria-hidden="true">↓</span> : null;
+  const finishGuide = () => {
+    onOnboardingStep("complete");
+    requestAnimationFrame(() => startRef.current?.focus());
+  };
   const canContinue = latest ? Boolean(onLoadSlot || (latest.slotId === "autosave" && onContinue)) : Boolean(hasSave && onContinue);
   const continueLatest = () => {
     try {
@@ -69,7 +82,7 @@ export default function Welcome({ hasSave, saves = [], loading = false, apiSetti
           <p className={styles.subtitle}>雾已入城。<br />{latest ? "灯还亮着，你的故事尚未写完。" : "你的名字，尚未写入档案。"}</p>
 
           <nav className={styles.actions} aria-label="开始调查">
-            <button className={styles.primaryAction} type="button" disabled={loading} onClick={canContinue ? continueLatest : onNew}>
+            <button ref={startRef} className={styles.primaryAction} type="button" disabled={loading} onClick={canContinue ? continueLatest : onNew}>
               <span className={styles.actionNo} aria-hidden="true">01</span>
               <span><strong>{canContinue ? "继续调查" : "建立新档案"}</strong><small>{canContinue ? "回到尚未结束的故事" : "以你的名字，开启一段非凡人生"}</small></span>
               <span className={styles.actionArrow} aria-hidden="true">→</span>
@@ -99,14 +112,16 @@ export default function Welcome({ hasSave, saves = [], loading = false, apiSetti
         </aside>
       </div>
 
-      <footer className={styles.footer}>
-        <div className={styles.minorActions} aria-label="辅助操作">
-          <button type="button" disabled={loading} onClick={() => inputRef.current?.click()}>导入存档</button>
-          <button type="button" onClick={onApi}>API 设置</button>
-          <button type="button" onClick={onChangelog}>更新日志</button>
-          <a href="https://bemyself001.github.io/backlund-chronicle/privacy.html" target="_blank" rel="noreferrer">隐私政策<span className="sr-only">（新窗口打开）</span></a>
+      <footer className={`${styles.footer} ${guideStep ? styles.guidedFooter : ""}`} data-onboarding-area>
+        {guideStep && <OnboardingGuide step={guideStep} onApi={onApi} onStep={onOnboardingStep} onFinish={finishGuide} />}
+        <nav className={styles.minorActions} aria-label="辅助操作">
+          <button {...tourProps("import")} type="button" disabled={loading} onClick={() => inputRef.current?.click()}>{tourArrow("import")}导入存档</button>
+          <button {...tourProps("api")} type="button" onClick={onApi}>{tourArrow("api")}API 设置</button>
+          <button {...tourProps("changelog")} type="button" onClick={onChangelog}>{tourArrow("changelog")}更新日志</button>
+          <button {...tourProps("diagnostics")} type="button" onClick={(event) => onDiagnostics(event.currentTarget)}>{tourArrow("diagnostics")}启动诊断</button>
+          <a {...tourProps("privacy")} href="https://bemyself001.github.io/backlund-chronicle/privacy.html" target="_blank" rel="noreferrer">{tourArrow("privacy")}隐私政策<span className="sr-only">（新窗口打开）</span></a>
           <button type="button" aria-pressed={stillScene} onClick={() => setStillScene((current) => !current)}>静态场景{stillScene ? " · 开" : " · 关"}</button>
-        </div>
+        </nav>
         <span className={styles.version}>{`VER ${APP_VERSION}`}{!isNativeAndroid() && ` · WEB ${WEB_BUILD}`}</span>
         <input ref={inputRef} className="sr-only" disabled={loading} tabIndex={-1} aria-label="选择存档文件" type="file" accept="application/json,.json" onChange={chooseFile} />
         {importError && <p className={styles.error} role="alert">{importError}</p>}

@@ -14,7 +14,10 @@ import { timedAction } from "../engine/restTime.js";
 import { advanceWorldTime } from "../engine/turn.js";
 import { visibleQuestJournal, questAssistance, questStagePolicy } from "../engine/questRuntime.js";
 import { visiblePeopleContext } from "../engine/people.js";
+import { nearbyPeopleContext } from "../engine/visitablePeople.js";
 import { medicinePurchaseGate } from "../engine/medicineAccess.js";
+import { normalizeCombatState } from "../system/combat.js";
+import { talismanCatalog } from "../system/talismans.js";
 
 const SHARED_AUTHORITY_RULES = LOCAL_STATE_AUTHORITY_RULES + "【地图调查与公共常识】玩家未揭开地图迷雾只表示其个人尚未确认地点，不表示当地居民不知道该地点。圣赛缪尔教堂是黑夜女神教会的公开教堂，永恒烈阳教堂也是公开宗教场所；正常描写居民指路、公开礼拜与日常活动，不因地图未发现就编造集体不知情、避讳或秘密据点。其他公共地点同理，按身份与当地知识差异自然回应。明确的地图调查在本轮正常完成后由本地规则确认所选地点，只揭开该地点，不自动到访、加入组织或解锁内部秘密；不要把本次调查写成仍无法确认地址。快速模式草稿先写核实过程，具体确认结果留给本地结算后的叙事。";
 
@@ -64,10 +67,13 @@ export function visibleGameState(game) {
     character: game.character,
     money: game.money,
     statusEffects: game.statusEffects,
+    combat: normalizeCombatState(game.combat),
+    churchTalismans: talismanCatalog(),
     relationships: visiblePeopleContext(game),
+    nearbyPeople: nearbyPeopleContext(game),
     peopleRule: "人物档案只包含玩家已经获知的信息。heard仅为听闻，known为旧识，met为实际见面；不得把听闻当作相识或交情，不得补写未确认真名、序列、去向。lastKnownLocation是历史线索，不是实时位置。固定剧情人物由本地任务节点登记，同一人物的代号与真名共用档案。",
     organization: game.organizationState?.membership || null,
-    officialOrganizations: ORGANIZATIONS.filter((entry) => entry.headquarters).map(({ id, name, church, headquarters }) => ({ id, name, church, headquarters, locationName: getMapLocations(game).find((location) => location.id === headquarters)?.name })),
+    officialOrganizations: ORGANIZATIONS.filter((entry) => entry.headquarters && entry.tags.includes("official")).map(({ id, name, church, agency, description, headquarters }) => ({ id, name, ...(church ? { church } : {}), ...(agency ? { agency } : {}), ...(description ? { description } : {}), headquarters, locationName: getMapLocations(game).find((location) => location.id === headquarters)?.name })),
     medicineSales: { unlocked: !medicinePurchaseGate(game), restriction: medicinePurchaseGate(game), rule: "成品药剂购买仅由特殊行动结算；未解锁时不能叙述购买成功或用 inventory.add 绕过限制。已有药剂的使用和药师自行制作不受购买门槛影响。" },
     specialWork: game.specialActions ? {
       active: game.specialActions.active ? { title: game.specialActions.active.offer.title, scene: game.specialActions.active.offer.scene } : null,
@@ -148,6 +154,7 @@ function privatePlanningState(game, options = {}) {
     triggerObjectives,
     mapDiscoveryCandidates: shouldExposeMapCandidates(game, options) ? privateMapCandidates(game) : undefined,
     requestedMapInvestigation: options.mapInvestigation || null,
+    requestedTalisman: options.talismanRequest || null,
     mapGrowthAnchors: shouldExposeMapCandidates(game, options) ? mapGrowthAnchors(game) : undefined,
     potionFacts: (game.inventory || []).filter((item) => item.potion).map((item) => ({
       instanceId: item.instanceId,

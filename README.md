@@ -6,7 +6,7 @@
 
 ## 玩法
 
-- **原创角色开局**：创建属于你自己的角色踏入贝克兰德——原作主线与重要人物只是遥远背景，这座城市的街巷、人物、案件与秘密围绕你展开。
+- **原创角色开局**：创建属于你自己的角色踏入贝克兰德，在原创支线中展开调查；也可前往明斯克街15号拜访私家侦探夏洛克·莫里亚蒂。
 - **自由行动**：用自然语言描述你想做的任何事——调查一桩离奇命案、经营一间不起眼的店铺、或是触碰不该触碰的神秘力量，AI 会推演后果并推动世界运转。
 - **状态驱动的真实世界**：金钱、物品、地点、人际关系都被世界模拟器持续追踪；买了一张车票就真的会少一便士，结仇的黑帮真的会记住你。
 - **动态地图**：探索过的街区与传闻中的地点会出现在地图上，城市随你的足迹逐渐清晰。
@@ -34,19 +34,20 @@
 
 ## 运行
 
-需要 Node.js 20.19+ 或 22.12+。
+需要 Node.js 22.13+，项目与发布流水线使用 pnpm。
 
 ```bash
-npm ci
-npm run dev
+pnpm install --frozen-lockfile
+pnpm run dev
 ```
 
 质量检查：
 
 ```bash
-npm run lint
-npm run build
-npm run preview
+pnpm test
+pnpm run lint
+pnpm run build
+pnpm exec vite preview --outDir dist/client
 ```
 
 ## 目录
@@ -69,11 +70,13 @@ API Key 输入框使用本地圆点遮罩而非系统密码字段，并请求浏
 
 ## GitHub 云端构建 APK
 
-项目包含 Capacitor Android 工程与 `.github/workflows/build-android-apk.yml`。代码推送到 GitHub 的 `main` 分支后会自动构建正式签名 APK，也可以在仓库的 **Actions → Build Android APK → Run workflow** 手动运行。产品版本由 `src/data/release.js` 维护；为兼容已经发布的 `v1.3.102` 等安装包，流水线继续以 `1.3.<完整提交数>` 生成 Android 与 OTA 兼容构建号，并以 `30000 + 完整提交数` 生成始终递增的 `versionCode`。例如产品版本 1.3.5 可对应兼容构建 `v1.3.105`。
+项目包含 Capacitor Android 工程与 `.github/workflows/build-android-apk.yml`。代码推送到 GitHub 的 `main` 分支后会自动构建正式签名 APK，也可以在仓库的 **Actions → Build Android APK → Run workflow** 手动运行。产品版本由 `src/data/release.js` 维护，并与工作流 `PRODUCT_VERSION`、`package.json` 和 Android 本地回退版本保持一致。发布标签使用 `v<产品版本>`，Android 内部 `versionCode` 采用 `30000 + 完整提交数`，发布前核验签名证书、包名和版本。
 
 正式构建依赖四个 GitHub Actions Secrets：`ANDROID_KEYSTORE_BASE64`、`ANDROID_KEYSTORE_PASSWORD`、`ANDROID_KEY_ALIAS` 和 `ANDROID_KEY_PASSWORD`。签名文件及其本地恢复信息保存在被 Git 忽略的 `.signing/`；必须离线备份，丢失后将无法覆盖更新现有安装。
 
-构建完成后，可直接从仓库的 **Releases** 页面下载 `backlund-chronicle.apk`，无需登录且不会像 Actions Artifact 一样在 14 天后过期。APK 会在启动约两秒后每天至多自动检查一次最新版；也可在 **API 设置 → 检查应用更新** 手动检查。支持热更新的正式版会下载包含页面资源与标题字体的更新包（约 3.3 MB）并在下次启动时生效；完整 APK 下载与安装仍由 Android 系统要求用户确认。
+构建完成后，可直接从仓库的 **Releases** 页面下载 `backlund-chronicle.apk`，无需登录且不会像 Actions Artifact 一样在 14 天后过期。APK 启动后会检查更新，也可在首页点击「检查更新」。支持热更新的正式版会下载包含页面资源与标题字体的更新包，并在下次启动时生效；完整 APK 下载与安装仍由 Android 系统要求用户确认。
+
+1.6.18 新增首次 API 配置与首页按钮教程，完成或跳过后在本机记住，已有存档自动略过。正式版以 Chromium 80 为语法目标，并补充旧布局和焦点样式回退；浏览器模拟验证覆盖缺失 API、旧 CSS、可见焦点、Tab 顺序和弹窗焦点恢复，仍需具体旧内核与厂商设备的实机验证。首页「启动诊断」可复制启动信息；完整的 Android 原生诊断需要安装 1.6.18 或更新 APK。
 
 旧的 `apk-8`、`apk-9` 等版本使用临时调试签名，无法直接覆盖升级为新的正式签名版。首次迁移前请先导出游戏存档，然后卸载旧版、安装新正式版并导入存档；API Key 不包含在存档中，需要重新填写。
 

@@ -1,8 +1,9 @@
-import { MAP_LOCATIONS, getOpening } from "../content/index.js";
+import { MAP_LOCATIONS, VISITABLE_PEOPLE, getOpening } from "../content/index.js";
 import { getMapLocation, normalizeLocationKnowledge } from "./map.js";
 
 export function openingMapState(opening) {
-  const discoveredLocations = opening.knownIds.map((id) => {
+  const publicAddresses = VISITABLE_PEOPLE.map(person => person.locationId);
+  const discoveredLocations = [...new Set([...opening.knownIds, ...publicAddresses])].map((id) => {
     const location = getMapLocation(id);
     return { id, name: location.name, note: location.description };
   });
@@ -17,7 +18,7 @@ export function openingMapState(opening) {
 
 export function openingChoices(opening) {
   return opening.actions.map((label, index) => ({ label,
-    intent: ["investigate", "social", "dangerous"][index], risk: ["low", "medium", "high"][index],
+    intent: opening.actionIntents?.[index] || ["investigate", "social", "dangerous"][index], risk: opening.actionRisks?.[index] || ["low", "medium", "high"][index],
   }));
 }
 

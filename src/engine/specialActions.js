@@ -7,6 +7,8 @@ import { resolveTurnProgress } from "./turn.js";
 import { makeId } from "../utils/id.js";
 import { medicineRecipe, consumeMedicine } from "./recovery.js";
 import { medicinePurchaseGate } from "./medicineAccess.js";
+import { grantOrganizationTalisman } from "./talismans.js";
+import { visitPerson } from "./visitablePeople.js";
 
 export function specialState(game) {
   const raw = game.specialActions || {};
@@ -107,7 +109,9 @@ export function executeSpecialAction(game, request) {
     requireHealthy(next);
     requireCondition(!state.active, "请先完成或放弃当前委托");
   }
-  if (operation === "sleep") {
+  if (operation === "visit-person") {
+    ({ action, narrative, minutes } = visitPerson(next, request.id));
+  } else if (operation === "sleep") {
     requireCondition(next.location.id === "soot-lamp", "需到达雾鸦旅店才能睡觉");
     action = "在雾鸦旅店睡觉8小时";
     narrative = "你在雾鸦旅店安静睡了八小时，起身时检查了自己的身体与精神状况。";
@@ -182,9 +186,12 @@ export function executeSpecialAction(game, request) {
     } else {
       const organization = registrationOrganization(request.id);
       const headquarters = getMapLocation(organization.headquarters).name;
-      next.organizationState = { membership: { organizationId: organization.id, name: organization.name, kind: "official", tags: [...organization.tags], status: "active", joinedTurn: next.turn + 1, evidence: `本人到达${headquarters}，明确接受${organization.name}纪律并完成正式登记。` } };
+      next.organizationState = { ...next.organizationState, membership: { organizationId: organization.id, name: organization.name, kind: "official", tags: [...organization.tags], status: "active", joinedTurn: next.turn + 1, evidence: `本人到达${headquarters}，明确接受${organization.name}纪律并完成正式登记。` } };
       action = `正式加入${organization.name}`;
-      narrative = `你在${headquarters}确认愿意接受${organization.church}所属${organization.name}的纪律与任务安排，完成身份说明和正式登记。值班人员将基础委托册交给你，提醒你遇到超出能力的异常必须报告。`;
+      const authority = organization.church || organization.agency;
+      narrative = `你在${headquarters}确认愿意接受${authority ? `${authority}所属` : ""}${organization.name}的纪律与任务安排，完成身份说明和正式登记。值班人员将基础委托册交给你，提醒你遇到超出能力的异常必须报告。`;
+      const provision = grantOrganizationTalisman(next, next.turn + 1);
+      if (provision) narrative += `\n\n${organization.name}为你首次配发一枚${provision.name}，已收入行囊。${provision.description}`;
     }
     minutes = 30;
   } else if (operation === "buy" || operation === "craft" || operation === "buy-medicine") {

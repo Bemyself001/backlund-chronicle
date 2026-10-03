@@ -1,13 +1,14 @@
 import { useState } from "react";
-import { SPECIAL_RECIPES, SPECIAL_CONTACTS, ORGANIZATIONS, getOrganization } from "../content/index.js";
+import { SPECIAL_RECIPES, SPECIAL_CONTACTS, ORGANIZATIONS, VISITABLE_PEOPLE, getOrganization } from "../content/index.js";
 import { availableSpecialActions, actionGate, commissionOffer, registrationGate, specialState } from "../engine/specialActions.js";
 import { getAdvancement } from "../system/character.js";
 import { getMapLocation } from "../system/map.js";
 import { moneyToPence } from "../system/money.js";
 import styles from "./SpecialActions.module.css";
 import { medicinePurchaseGate } from "../engine/medicineAccess.js";
+import { hasMetPerson, visitPersonGate } from "../engine/visitablePeople.js";
 
-export default function SpecialActions({ game, loading, onExecute, onOpenMap }) {
+export default function SpecialActions({ game, loading, onExecute, onOpenMap, onAction }) {
   const [notice, setNotice] = useState("");
   const [confirmJoin, setConfirmJoin] = useState(null);
   const state = specialState(game);
@@ -32,6 +33,22 @@ export default function SpecialActions({ game, loading, onExecute, onOpenMap }) 
       <div className={styles.meta}><span>工作声誉 {state.reputation}</span><span>持有 {money} 便士</span></div>
     </header>
     {notice && <p role="status" className={styles.notice}>{notice}</p>}
+    <section aria-label="人物拜访"><h3>人物拜访</h3>
+      {VISITABLE_PEOPLE.map(person => {
+        const reason = visitPersonGate(game, person.id);
+        const conversationReason = visitPersonGate(game, person.id, { conversation: true });
+        const met = hasMetPerson(game, person);
+        return <article key={person.id} className={styles.card} aria-label={`${person.name}的拜访与交谈`}>
+          <div className={styles.meta}><span>{person.role}</span><span>{met ? "已见面" : "听闻于侦探广告"}</span></div>
+          <h4>{person.name}</h4><p>{person.description}</p>
+          {locationLink(person.locationId)}
+          <button type="button" disabled={loading || Boolean(reason)} onClick={() => execute("visit-person", person.id)}>{reason || `${met ? "再次拜访" : "敲门拜访"}${person.name} · 1回合`}</button>
+          <div className={styles.options}>{person.topics.map(topic => <button type="button" key={topic.id} disabled={loading || Boolean(conversationReason) || !onAction}
+            onClick={() => onAction(topic.action, { personConversation: person.id })}>{topic.label}</button>)}</div>
+          <p className={styles.hint}>{conversationReason || "也可在剧情中自由输入交谈内容；正式委托与费用另行商定。"}</p>
+        </article>;
+      })}
+    </section>
     <section aria-label="休息与药剂"><h3>休息与药剂</h3>
       <article className={styles.card}><h4>雾鸦旅店 · 睡眠恢复</h4><p>休息每满2小时恢复1点生命和理智，单次最多各4点，不超过上限；持续状态照常结算。</p>
         {locationLink("soot-lamp")}
@@ -89,7 +106,7 @@ export default function SpecialActions({ game, loading, onExecute, onOpenMap }) 
       {game.organizationState?.membership?.status === "active" && <p>当前组织：{game.organizationState.membership.name}</p>}
       {ORGANIZATIONS.filter((organization) => organization.headquarters && organization.tags.includes("official")).map((organization) => {
         const reason = registrationGate(game, organization.id);
-        return <article key={organization.id} className={styles.card}><h4>{organization.name}招募</h4><p>{organization.church}的官方非凡者组织。所有途径的非凡者均可申请，在驻地教堂正式登记后开放本组织基础委托。</p>
+        return <article key={organization.id} className={styles.card}><h4>{organization.name}招募</h4><p>{organization.description || `${organization.church || organization.agency || "官方机构"}的非凡者组织。`}所有途径的非凡者均可申请，在组织驻地正式登记后开放本组织基础委托。</p>
           {locationLink(organization.headquarters)}
           {confirmJoin === organization.id ? <div><p>确认正式加入{organization.name}，接受组织纪律与任务安排？登记将消耗1回合。</p><div className={styles.buttons}><button type="button" disabled={loading || Boolean(state.active) || Boolean(reason)} onClick={() => execute("register", organization.id)}>确认加入{organization.name}</button><button type="button" onClick={() => setConfirmJoin(null)}>暂不加入</button></div></div>
             : <button type="button" disabled={loading || Boolean(state.active) || Boolean(reason)} onClick={() => setConfirmJoin(organization.id)}>{reason || `申请正式加入${organization.name}`}</button>}

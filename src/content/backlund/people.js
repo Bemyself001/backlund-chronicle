@@ -1,3 +1,5 @@
+import { VISITABLE_PEOPLE } from "./visitablePeople.js";
+
 // Only these explicit discoveries may disclose fixed-story character information.
 const WATCH = "watch.heirloom.late-hour";
 const NOTE = "watch.heirloom.hidden-note";
@@ -17,6 +19,14 @@ const renardKnown = any(quest(RENARD), fact("side.renard.completed"));
 const edmundMet = any(fact("side.renard.apothecary-met"), stage(RENARD, "auction-conversation", "auction-box", "shared-treatment"));
 
 export const STORY_PEOPLE = [
+  ...VISITABLE_PEOPLE.map(person => ({
+    id: person.id, name: person.name, role: person.role, questIds: [],
+    connection: person.description,
+    discoveries: [
+      event("advertisement", { location: person.locationId }, "公开侦探广告", "报纸广告留下了侦探的姓名、业务范围与拜访地址。知道地址还不代表与他见过面。", { lastKnownLocation: person.address }),
+      event("met", fact(person.metFact), "登门拜访", "你在广告所留的地址登门，与夏洛克·莫里亚蒂当面见过。", { contact: "met", lastKnownLocation: person.address }),
+    ],
+  })),
   {
     id: "reginald", name: "雷金纳德{characterSurnameSuffix}", role: "你的舅舅",
     connection: "家传怀表的上一位主人；你的家族旧事与他有关。",

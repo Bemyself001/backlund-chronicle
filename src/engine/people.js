@@ -26,6 +26,12 @@ function evidenceFor(game, condition) {
     const item = game.inventory?.find(entry => entry.itemId === condition.item);
     return item ? yes(recordedTurn(item.acquiredAt)) : null;
   }
+  if (condition.location) {
+    const knowledge = game.locationKnowledge?.[condition.location];
+    const known = ["discovered", "visited"].includes(knowledge?.status)
+      || game.discoveredLocations?.some(location => location.id === condition.location);
+    return known ? yes(recordedTurn(knowledge?.discoveredAt)) : null;
+  }
   if (condition.reward) return game.triggerState?.rewardsClaimed?.includes(condition.reward) ? yes(null) : null;
   const instances = [...(game.triggerState?.active || []), ...(game.triggerState?.history || [])]
     .filter(entry => entry.definitionId === condition.quest && entry.status !== "eligible");

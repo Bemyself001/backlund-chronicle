@@ -1,4 +1,5 @@
 import { PATHWAYS, getPathway, pathwayIdForName } from "../content/index.js";
+import { normalizeTalismanItem } from "./talismans.js";
 
 export const ITEM_IMPORTANCE = {
   NORMAL: "normal",
@@ -23,7 +24,7 @@ export function normalizeItemImportance(item = {}) {
 export function normalizeInventoryItem(item = {}) {
   const { potion: _discardedPotion, ...base } = item;
   const potion = normalizePotion(item) || parseLegacyPotion(item);
-  return { ...base, ...(potion ? { potion } : {}), importance: normalizeItemImportance({ ...item, potion }) };
+  return normalizeTalismanItem({ ...base, ...(potion ? { potion } : {}), importance: normalizeItemImportance({ ...item, potion }) });
 }
 
 export function isImportantNonMoneyItem(item = {}) {

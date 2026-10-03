@@ -1,3 +1,4 @@
+/* Flex spacing fallbacks are activated only by the startup layout probe. */
 .panel { display: grid; gap: 1.5rem; padding: 1rem; color: inherit; overflow-wrap: anywhere; }
 .panel header, .panel section { display: grid; gap: .7rem; }
 .panel h3, .panel h4, .panel p { margin: 0; }
@@ -6,10 +7,16 @@
 .panel p { line-height: 1.7; }
 .eyebrow { color: #9b783d; font-size: .75rem; letter-spacing: .12em; }
 .meta { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .4rem; font-size: .78rem; opacity: .8; }
+
+:global(.no-flex-gap) .meta { gap: 0; }
+:global(.no-flex-gap) .meta > :not(:last-child) { margin-right: .4rem; margin-bottom: .4rem; }
 .card, .active { display: grid; gap: .75rem; padding: 1rem; border: 1px solid #8f896e66; border-radius: .6rem; background: #8888770a; }
 .active { border-color: #b0955c; background: #b0955c10; }
 .hint { font-size: .8rem; opacity: .8; }
 .buttons { display: flex; flex-wrap: wrap; gap: .6rem; }
+
+:global(.no-flex-gap) .buttons { gap: 0; }
+:global(.no-flex-gap) .buttons > :not(:last-child) { margin-right: .6rem; margin-bottom: .6rem; }
 .panel button { min-height: 44px; padding: .65rem .8rem; border: 1px solid #85836b; border-radius: .35rem; background: #53614b22; color: inherit; text-align: left; font: inherit; cursor: pointer; }
 .panel button:disabled { opacity: .5; cursor: not-allowed; }
 .panel button:focus-visible { outline: 2px solid #b89552; outline-offset: 3px; }

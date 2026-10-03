@@ -40,7 +40,7 @@ test("UI summaries use actual confirmed audit deltas and ignore narrative claims
   const audit = auditTurnChanges(baseline, game);
   audit.narrative = "你获得了一百万镑。";
   const rows = getAuditRows(audit);
-  assert.ok(rows.some(row => row.tone === "loss" && row.text === "生命 10 → 8（-2）"));
+  assert.ok(rows.some(row => row.tone === "loss" && row.text === "生命 20 → 18（-2）"));
   assert.ok(rows.some(row => row.text === "资金 −£0 · 1苏勒 · 0便士"));
   assert.ok(rows.some(row => row.text === `获得「${game.inventory[0].name}」×1`));
   assert.equal(rows.length, 3);

@@ -71,4 +71,16 @@ export const OPENINGS = [
     actions: ["查看旅店房价与临时帮工招募", "向老板和船工打听住宿及河运消息", "征求查看信封的许可，核对邮戳与退房记录"],
     danger: { id: "bridge-returned-mail", name: "昨日的收信人" },
   },
+  {
+    district: "乔伍德区", locationId: "minsk-street-15", title: "报纸上的门牌", theme: "街坊 · 侦探 · 日常调查",
+    preview: "明斯克街的门牌在雨雾中清晰可见。报纸上的侦探广告给出了15号，你还没有敲响他的门。",
+    time: "15:20", knownIds: ["minsk-street-15", "queen-library", "hillston-market"],
+    narrative: "乔伍德区明斯克街的行道树还在滴雨。你停在15号门前的公共街道上，沿街有人提着面包赶回家，公共马车从路口缓缓驶过。\n\n报纸广告将这里列为私家侦探夏洛克·莫里亚蒂的联系地址，可以询问寻人、寻物与普通调查。门牌与广告相符，你尚未敲门，也没有见过这位侦探。附近的马车站牌指向公共图书馆和商会街。\n\n你可以敲门说明来意，先在街边了解这一带的生活，或乘车前往别处。此时没有已约好的会面，也没有必须接下的委托。",
+    summary: "故事从乔伍德区明斯克街15号门前的公共街道开始。玩家只知道报纸广告上的私家侦探姓名与公开地址，尚未敲门、见到侦探或接受委托。",
+    event: "明斯克街的居民照常出门采买，路口公共马车来往于城区之间。",
+    clues: [],
+    actions: ["查看门牌与报纸上的侦探广告", "敲门拜访夏洛克·莫里亚蒂，询问调查服务", "沿明斯克街走走，了解周边的日常生活"],
+    actionIntents: ["investigate", "social", "explore"], actionRisks: ["low", "low", "low"],
+    danger: { id: "cherwood-unheard-rumor", name: "尚未听闻的街区传闻" },
+  },
 ];

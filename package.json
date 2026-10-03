@@ -1,7 +1,7 @@
 {
   "name": "backlund-chronicle-ai-sandbox",
   "private": true,
-  "version": "1.6.17",
+  "version": "1.6.18",
   "license": "MIT",
   "type": "module",
   "engines": {
@@ -10,6 +10,8 @@
   "scripts": {
     "dev": "vite --configLoader runner",
     "build": "vite build --configLoader runner",
+    "build:diagnostic": "node scripts/build-startup-variant.mjs diagnostic",
+    "build:compat": "node scripts/build-startup-variant.mjs compat",
     "postbuild": "node scripts/prepare-sites-build.mjs",
     "android:sync": "pnpm run build && node scripts/prepare-ota-bundle.mjs && cap sync android",
     "android:open": "cap open android",
@@ -20,6 +22,7 @@
   "dependencies": {
     "@capacitor/android": "^8.5.0",
     "@capacitor/core": "^8.5.0",
+    "core-js": "^3.50.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1"
   },

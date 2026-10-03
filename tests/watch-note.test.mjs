@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { createInitialGame, EMPTY_CHARACTER } from '../src/system/game.js';
 import { progressiveContext, lookupContext } from '../src/engine/contextLookup.js';
 import { migrateSave } from '../src/services/storage.js';
+import { CONTENT_VERSION } from '../src/content/index.js';
 import { getContentTrigger } from '../src/content/index.js';
 import { WATCH_NOTE_TEXT, WATCH_NOTE_DETAIL } from '../src/content/backlund/watchNote.js';
 import { buildPlanningContext, buildFastPresentationContext, buildRenderingContext, buildFastNarrativeContinuationContext } from '../src/services/memory.js';
@@ -73,7 +74,7 @@ test('version 1.6.0 saves correct white rose to white iris across clues, journal
   });
   game.triggerState.rewardsClaimed = ['watch.hidden-note.formal-quest'];
   const migrated = migrateSave(game);
-  assert.equal(migrated.content.contentVersion, '2026.09.23.1');
+  assert.equal(migrated.content.contentVersion, CONTENT_VERSION);
   assert.doesNotMatch(JSON.stringify(migrated), /白蔷薇/);
   assert.doesNotMatch(JSON.stringify(migrated), /南岸货站/);
   assert.match(migrated.questJournal.entries['old-watch'].summary, /白鸢尾/);

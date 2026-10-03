@@ -1,7 +1,11 @@
+/* Flex spacing fallbacks are activated only by the startup layout probe. */
 .content { padding: 1.2rem; color: #e5deca; font: .9rem/1.65 var(--font-sans); overflow-wrap: anywhere; }
 .content section { padding: 1rem 0; border-bottom: 1px solid #536149; }
 .content section:first-child { padding-top: 0; }
 .content h3 { display: flex; align-items: baseline; justify-content: space-between; gap: .6rem; margin: 0 0 .85rem; color: #e5d8b9; font: 500 1.05rem/1.4 var(--font-serif); }
+
+:global(.no-flex-gap) .content h3 { gap: 0; }
+:global(.no-flex-gap) .content h3 > :not(:last-child) { margin-right: .6rem; margin-bottom: 0; }
 .content h3 small { color: #b9b89f; font: .75rem var(--font-sans); }
 .content h4 { margin: 0 0 .4rem; font: 500 .95rem/1.5 var(--font-serif); }
 .content p { margin: .5rem 0; }
@@ -18,6 +22,9 @@
 .muted { color: #bdbeaa; font-size: .8rem; }
 .highlight { padding: .8rem; border-left: 2px solid #c6ad74; background: #29382b; color: #ead7a9; }
 .profile { display: flex; align-items: center; gap: 1rem; padding-bottom: 1.3rem; border-bottom: 1px solid #536149; }
+
+:global(.no-flex-gap) .profile { gap: 0; }
+:global(.no-flex-gap) .profile > :not(:last-child) { margin-right: 1rem; margin-bottom: 0; }
 .profile h3 { display: block; font-size: 1.4rem; margin: .2rem 0; }
 .profile p { color: #d1b882; font-size: .8rem; }
 .profile span { color: #bfc2ab; font-size: .8rem; }
@@ -26,6 +33,9 @@
 .avatar > span { font: 1.8rem var(--font-serif); color: #d4bf8c; }
 .dataList { margin: .5rem 0; }
 .dataList > div { display: flex; align-items: baseline; justify-content: space-between; gap: 1rem; padding: .6rem 0; border-bottom: 1px solid #53614980; font-size: .85rem; }
+
+:global(.no-flex-gap) .dataList > div { gap: 0; }
+:global(.no-flex-gap) .dataList > div > :not(:last-child) { margin-right: 1rem; margin-bottom: 0; }
 .dataList dt { color: #bfc2ab; flex-shrink: 0; }
 .dataList dd { margin: 0; color: #e3dbc5; text-align: right; }
 .dataList [data-stat="health"] { --stat-color: var(--stat-health); }
@@ -34,6 +44,9 @@
 .dataList [data-stat] dt, .dataList [data-stat] dd { color: var(--stat-color); white-space: nowrap; }
 .record { padding: .8rem; margin: .6rem 0; border-left: 2px solid #8f9e70; background: #253429; }
 .record h4 { display: flex; align-items: baseline; justify-content: space-between; gap: .7rem; }
+
+:global(.no-flex-gap) .record h4 { gap: 0; }
+:global(.no-flex-gap) .record h4 > :not(:last-child) { margin-right: .7rem; margin-bottom: 0; }
 .record h4 span { font: .8rem var(--font-mono); color: #b8d4ac; }
 .record p { font-size: .85rem; color: #d1d1bd; }
 .record small { color: #babea4; font-size: .75rem; }
@@ -43,6 +56,9 @@
 .biography h4 { color: #c4af7a; font-size: .8rem; }
 .wallet { padding-top: 0 !important; }
 .wallet summary { display: flex; flex-wrap: wrap; align-items: center; gap: .3rem 1rem; justify-content: space-between; }
+
+:global(.no-flex-gap) .wallet summary { gap: 0; }
+:global(.no-flex-gap) .wallet summary > :not(:last-child) { margin-right: 1rem; margin-bottom: .3rem; }
 .wallet summary::after { content: "+"; color: #c6ad74; }
 .wallet[open] summary::after { content: "−"; }
 .wallet strong { color: #e2c994; font: 500 .85rem var(--font-mono); }
@@ -69,10 +85,16 @@
 .itemActions .danger { color: #f0b2a0; border-color: #a76e5a; background: #482d24; }
 .empty { margin: 1rem 0; padding: 1rem; border: 1px dashed #728265; color: #bfc4ad; font-size: .875rem; }
 .filtersNav { display: flex; gap: .4rem; margin-bottom: .8rem; }
+
+:global(.no-flex-gap) .filtersNav { gap: 0; }
+:global(.no-flex-gap) .filtersNav > :not(:last-child) { margin-right: .4rem; margin-bottom: 0; }
 .filtersNav button { flex: 1; min-width: 0; padding: .5rem .3rem; font-size: .85rem; }
 .content .filtersNav button[aria-pressed="true"] { background: #d0b982; border-color: #d0b982; color: #222b1e; }
 .auditList { display: grid; gap: .55rem; padding: 0; margin: 1rem 0; list-style: none; }
 .auditList li { display: flex; align-items: baseline; gap: .65rem; font-size: .85rem; }
+
+:global(.no-flex-gap) .auditList li { gap: 0; }
+:global(.no-flex-gap) .auditList li > :not(:last-child) { margin-right: .65rem; margin-bottom: 0; }
 .auditList li > span { flex: 0 0 1rem; color: #bdd6ad; }
 .auditList li[data-tone="loss"] { color: #f0b7a5; }
 .auditList li[data-tone="loss"] > span { color: #f0b7a5; }

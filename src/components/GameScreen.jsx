@@ -7,6 +7,7 @@ import { APP_VERSION } from "../services/updates.js";
 import { RELEASE_NAME } from "../data/release.js";
 import styles from "./GameScreen.module.css";
 import SpecialActions from "./SpecialActions.jsx";
+import EnemyEncounter from "./EnemyEncounter.jsx";
 
 const NAVIGATION = [["story", "剧情"], ["character", "角色"], ["inventory", "行囊"], ["journal", "手记"], ["map", "地图"], ["special", "特殊行动"]];
 const PANEL_NAMES = { character: "角色档案", inventory: "行囊", journal: "调查手记", menu: "游戏菜单", special: "特殊行动" };
@@ -222,6 +223,7 @@ function GameSession({ game, loading, turnPhase, streamText, error, onAction, on
               {loading && <div data-reader-entry="stream" className={styles.pending}><div className={styles.turnDivider}><span>{turnPhase === "choiceRetry" ? "行动建议" : `第 ${game.turn + 1} 轮`}</span><i /></div>{pendingAction && busyRef.current && turnPhase !== "choiceRetry" && <blockquote className={styles.playerLine}><span>你的行动</span>{pendingAction}</blockquote>}<TurnProgress phase={turnPhase} />{streamText && <article className={styles.narrative} aria-busy="true">{streamText.split("\n").filter(Boolean).map((paragraph, i) => <p key={i}>{paragraph}</p>)}<small className={styles.aiTag}>含 AI 生成内容 · 结果待确认</small></article>}</div>}
               {error && <div className={styles.error} role="alert"><strong>本轮未能完成</strong><p>{error}</p><button type="button" disabled={loading} onClick={retry}>重试本轮</button></div>}
               {!loading && game.lastTurnAudit && <button className={styles.turnResult} type="button" onClick={event => { setJournalRequest(value => value + 1); changePanel("journal", event, true); }}><span><small>{game.lastTurnAudit.importantItemConfirmation?.status === "player-action" ? "最近物品操作" : `第 ${game.lastTurnAudit.turn} 轮 · 已确认`}</small>{auditRows.length ? auditRows.slice(0, 2).map(row => row.text).join("；") : "物品、资金与属性没有变化"}{auditRows.length > 2 ? `，另有 ${auditRows.length - 2} 项` : ""}</span><span aria-hidden="true">↗</span></button>}
+              <EnemyEncounter game={game} onAction={performAction} disabled={loading} />
               {!loading && <section className={styles.interaction} aria-label="下一步行动"><div className={styles.choiceHeading}><h2>接下来，你打算……</h2><button type="button" aria-expanded={!choicesFolded} aria-controls="action-choices" onClick={() => setChoicesFolded(value => !value)}>{choicesFolded ? "展开建议" : "收起建议"}</button></div>
                 {(game.choices?.length || 0) < 3 && <p className={styles.choiceNote} role="status">{choiceStatusMessage(game.choiceMeta)}</p>}
                 <div id="action-choices" className={styles.choices} hidden={choicesFolded}>
@@ -242,7 +244,7 @@ function GameSession({ game, loading, turnPhase, streamText, error, onAction, on
         <div hidden={panel !== "character"}><CharacterPanel game={game} /></div>
         <div hidden={panel !== "inventory"}><InventoryPanel game={game} onLocalTool={(name, args, reason) => onLocalTool(name, args, reason, () => setPanel(null))} onAction={performAction} disabled={loading} /></div>
         <div hidden={panel !== "journal"}><JournalPanel key={journalRequest} game={game} /></div>
-        {panel === "special" && <SpecialActions game={game} loading={loading} onExecute={onSpecialAction} onOpenMap={onOpenMap} />}
+        {panel === "special" && <SpecialActions game={game} loading={loading} onExecute={onSpecialAction} onOpenMap={onOpenMap} onAction={performAction} />}
         <div hidden={panel !== "menu"}><MenuPanel loading={loading} reading={reading} onReadingChange={updateReading} onOpenApi={onOpenApi} onOpenPrompt={onOpenPrompt} onOpenSaves={onOpenSaves} onHome={onHome} version={`${RELEASE_NAME} · ${APP_VERSION}`} />{readingNotice && <p className={styles.readingNotice} role="status">{readingNotice}</p>}</div>
       </div></aside></>}
     </div>

@@ -57,7 +57,10 @@ test("relationship updates repair a numeric alias and uniquely resolve an NPC", 
 
   const execution = executeToolCalls(game, [{ id: "relationship-repair", name: "relationship.update", args: { name: "阿尔文", change: "关系提升 3" }, reason: "主动帮助对方" }]);
   assert.equal(execution.results[0].ok, true);
-  assert.equal(execution.game.relationships[0].value, 3);
+  assert.equal(execution.game.relationships.find(person => person.id === "npc-porter").value, 3);
+  const detective = execution.game.relationships.find(person => person.id === "sherlock-moriarty");
+  assert.equal(detective.contact, "heard");
+  assert.equal(detective.value, 0);
 });
 
 test("repaired clue proposals execute, while incomplete clues remain rejected", () => {
@@ -177,7 +180,7 @@ test("character.update applies deltas, clamps to bounds and logs before/after", 
   assert.equal(hurt.game.character.stats.sanity, 7);
   assert.equal(hurt.game.character.stats.health, 0); // 截断到 0
   assert.match(hurt.results[0].log, /理智 9→7（-2）/);
-  assert.match(hurt.results[0].log, /生命 10→0（-10）/);
+  assert.match(hurt.results[0].log, /生命 20→0（-20）/);
   const healed = executeToolCalls(hurt.game, [{ id: "heal", name: "character.update", args: { patch: { sanity: 50 } }, reason: "安稳睡了一觉" }]);
   assert.equal(healed.game.character.stats.sanity, 10); // 截断到上限
 });

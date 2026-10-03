@@ -1,8 +1,12 @@
+/* Flex spacing fallbacks are activated only by the startup layout probe. */
 .people { min-width: 0; }
 .people .intro { margin: -.25rem 0 1rem; color: #bdbeaa; font-size: .8rem; }
 .list { display: grid; gap: .9rem; }
 .card { min-width: 0; padding: 1rem; border: 1px solid #58664e; border-top: 2px solid #baaa77; background: #253429; }
 .heading { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; }
+
+:global(.no-flex-gap) .heading { gap: 0; }
+:global(.no-flex-gap) .heading > :not(:last-child) { margin-right: .75rem; margin-bottom: 0; }
 .heading > div { min-width: 0; }
 .heading h4 { color: #f0e2c3; font-size: 1.05rem; }
 .heading .alias { margin: 0; color: #cdb67f; font-size: .75rem; }
@@ -16,6 +20,9 @@
 .card .location { font-size: .78rem; }
 .quests { display: grid; gap: .35rem; margin-top: .8rem; }
 .quests button { display: flex; justify-content: space-between; align-items: center; gap: .5rem; width: 100%; text-align: left; font-size: .78rem; }
+
+:global(.no-flex-gap) .quests button { gap: 0; }
+:global(.no-flex-gap) .quests button > :not(:last-child) { margin-right: .5rem; margin-bottom: 0; }
 .quests span { flex-shrink: 0; color: #d9c28d; }
 .card .history { margin-top: .35rem; padding-bottom: 0; border-bottom: 0; }
 .history ol { margin: 0; padding-left: 1.1rem; }

@@ -5,6 +5,7 @@ import { buildContext } from "../src/services/memory.js";
 import { OPENINGS } from "../src/data/openings.js";
 import { getMapLocation, hexForLocation, MAP_DISTRICTS } from "../src/data/map.js";
 import { migrateSave } from "../src/services/storage.js";
+import { CONTENT_VERSION } from "../src/content/index.js";
 
 test("new characters begin freely at the East Borough railway station", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "测试旅客" });
@@ -21,13 +22,13 @@ test("new characters begin freely at the East Borough railway station", () => {
   assert.match(game.longTermSummary, /尚未接受任何委托/);
   assert.equal(game.choices.length, 3);
   assert.equal(game.systemVersion, 2);
-  assert.deepEqual(game.content, { packId: "backlund-core", schemaVersion: 2, contentVersion: "2026.09.23.1" });
+  assert.deepEqual(game.content, { packId: "backlund-core", schemaVersion: 2, contentVersion: CONTENT_VERSION });
 });
 
 test("every district initializes a coherent, independent opening and survives save reload", () => {
   assert.deepEqual(OPENINGS.map((entry) => entry.district).sort(), [...MAP_DISTRICTS].sort());
   const games = OPENINGS.map((opening) => createInitialGame({ ...EMPTY_CHARACTER, name: "本地调查员", origin: "间海郡", startingDistrict: opening.district }));
-  assert.equal(new Set(games.map((game) => game.recentDialogues[0].content)).size, 5);
+  assert.equal(new Set(games.map((game) => game.recentDialogues[0].content)).size, 6);
   for (const game of games) {
     assert.equal(game.character.origin, "间海郡");
     assert.equal(game.location.district, `贝克兰德${game.character.startingDistrict}`);

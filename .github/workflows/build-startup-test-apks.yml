@@ -1,0 +1,79 @@
+name: Build startup test APKs
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        variant: [diagnostic, compat]
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.19.0
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+          cache: pnpm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 21
+          cache: gradle
+      - run: pnpm install --frozen-lockfile
+      - name: Build web test variant
+        env:
+          VARIANT: ${{ matrix.variant }}
+          VITE_APP_BUILD: ${{ github.sha }}
+        run: |
+          pnpm run "build:$VARIANT"
+          pnpm exec cap sync android
+      - name: Build with existing release identity
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          test -n "$ANDROID_KEYSTORE_PASSWORD"
+          test -n "$ANDROID_KEY_ALIAS"
+          test -n "$ANDROID_KEY_PASSWORD"
+          export ANDROID_KEYSTORE_PATH="$RUNNER_TEMP/startup-release.jks"
+          printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
+          export APP_VERSION_NAME=$(node -p "require('./package.json').version")
+          export APP_VERSION_CODE=$((30000 + $(git rev-list --count HEAD)))
+          cd android
+          chmod +x gradlew
+          ./gradlew testDebugUnitTest assembleRelease "-PSTARTUP_VARIANT=$VARIANT"
+      - name: Name and checksum test artifact
+        env:
+          VARIANT: ${{ matrix.variant }}
+        run: |
+          cp android/app/build/outputs/apk/release/app-release.apk "backlund-startup-$VARIANT.apk"
+          sha256sum "backlund-startup-$VARIANT.apk" > "backlund-startup-$VARIANT.apk.sha256"
+          BUILD_TOOLS=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "backlund-startup-$VARIANT.apk" > "backlund-startup-$VARIANT-verification.txt"
+          "$BUILD_TOOLS/aapt" dump badging "backlund-startup-$VARIANT.apk" >> "backlund-startup-$VARIANT-verification.txt"
+          cat "backlund-startup-$VARIANT-verification.txt"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: backlund-startup-${{ matrix.variant }}
+          path: |
+            backlund-startup-*.apk
+            backlund-startup-*.apk.sha256
+            backlund-startup-*-verification.txt
+            dist/client
+          if-no-files-found: error
+          retention-days: 14

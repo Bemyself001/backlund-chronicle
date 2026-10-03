@@ -1,5 +1,9 @@
 // 贝克兰德内容包：固定地点、路线与城区画布。规则实现位于 system/map.js。
 export const MAP_LOCATIONS = [
+  // 原著第216章报纸广告给出乔伍德区明斯克街15号；画布坐标、格网与路程为游戏抽象布局。
+  { id: "minsk-street-15", name: "乔伍德区·明斯克街15号", district: "乔伍德区", x: 50, y: 52, q: 0, r: 0, code: "J1", kind: "residence", rumor: "报纸上刊有私家侦探夏洛克·莫里亚蒂的广告，联系地址是乔伍德区明斯克街15号。", description: "私家侦探夏洛克·莫里亚蒂对外公开的住处与会客地点，承接寻人、寻物及普通调查。街边门牌写着15号；访客可在门前敲门询问，是否接下委托与费用需当面商议。" },
+  // 游戏原创的公开联络驻地，不指定原著中的秘密总部地址。
+  { id: "mi9-headquarters", name: "皇后区·军情九处联络署", district: "皇后区", x: 30, y: 38, q: -3, r: -1, code: "Q5", kind: "institution", rumor: "市政档案馆与公共图书馆之间有军方对外联络署，接待希望向军情九处报到的非凡者；公开接待路线可向办事员核实。", description: "军情九处办理身份登记与基础公务的对外联络驻地。接待厅设有登记桌与委托交接室；所有途径的非凡者均可申请，正式加入后可承接情报调查、监视与护送工作。" },
   { id: "divination-association", name: "皇后区·占卜师协会", district: "皇后区", x: 57, y: 31, q: 1, r: -3, code: "Q3", kind: "institution", rumor: "公共图书馆附近的占卜师协会接待寻找失物、咨询运势的普通客人。", description: "一间公开营业的职业协会。占卜家可以在这里接单，偶尔听闻基础非凡知识；大多数客人只为日常困扰而来。" },
   { id: "city-cemetery", name: "北区·静眠墓地", district: "北区", x: 65, y: 10, q: 3, r: -6, code: "N3", kind: "institution", rumor: "圣赛缪尔教堂附近的墓地管理处正在招募可靠的守墓人。", description: "墓册、守灵室与整齐的墓道由管理处照看。收尸人可在此登记为守墓人，承接守墓、遗体看护与安葬工作。" },
   { id: "north-flats", name: "北区·灰墙公寓", district: "北区", x: 49, y: 13, q: 0, r: -5, code: "N1", rumor: "北区似乎有一片不查问来历的廉租公寓。", description: "租金低廉的连排公寓，住户大多不愿过问邻居的来历。" },
@@ -19,6 +23,11 @@ export const MAP_LOCATIONS = [
 ];
 
 export const MAP_ROUTES = [
+  // 游戏路线设计；实际旅行时间统一由六边形距离结算。
+  { from: "queen-library", to: "minsk-street-15", minutes: 20, transport: "步行" },
+  { from: "hillston-market", to: "minsk-street-15", minutes: 34, transport: "公共马车" },
+  { from: "queen-library", to: "mi9-headquarters", minutes: 14, transport: "步行" },
+  { from: "queen-archive", to: "mi9-headquarters", minutes: 10, transport: "步行" },
   { from: "queen-library", to: "divination-association", minutes: 10, transport: "步行" },
   { from: "st-samuel", to: "city-cemetery", minutes: 10, transport: "步行" },
   { from: "north-flats", to: "queen-library", minutes: 24, transport: "步行与公共马车" },
@@ -43,14 +52,15 @@ export const MAP_ROUTES = [
   { from: "hillston-market", to: "blazing-sun", minutes: 11, transport: "步行" },
 ];
 
-export const INITIAL_DISCOVERED_LOCATION_IDS = ["east-station", "iron-gate", "soot-lamp", "queen-library"];
-export const INITIAL_RUMORED_LOCATION_IDS = ["queen-archive", "bridge-docks", "st-samuel", "machinery-heart", "saint-wind", "blazing-sun", "divination-association", "city-cemetery"];
+export const INITIAL_DISCOVERED_LOCATION_IDS = ["east-station", "iron-gate", "soot-lamp", "queen-library", "minsk-street-15"];
+export const INITIAL_RUMORED_LOCATION_IDS = ["queen-archive", "bridge-docks", "st-samuel", "machinery-heart", "saint-wind", "blazing-sun", "divination-association", "city-cemetery", "mi9-headquarters"];
 export const LOCATION_KNOWLEDGE_STATUSES = ["unknown", "rumored", "discovered", "visited"];
 export const DYNAMIC_LOCATION_SCOPES = ["landmark", "interior"];
 export const DYNAMIC_LOCATION_KINDS = ["street", "residence", "shop", "tavern", "office", "church", "warehouse", "station", "institution", "hideout", "interior", "other"];
-export const MAP_DISTRICTS = ["北区", "皇后区", "希尔斯顿区", "东区", "桥区"];
+export const MAP_DISTRICTS = ["北区", "皇后区", "希尔斯顿区", "东区", "桥区", "乔伍德区"];
 
 export const DISTRICT_LAYOUT = {
+  "乔伍德区": { prefix: "J", minX: 41, maxX: 65, minY: 45, maxY: 61 },
   "北区": { prefix: "N", minX: 28, maxX: 68, minY: 6, maxY: 24 },
   "皇后区": { prefix: "Q", minX: 20, maxX: 66, minY: 18, maxY: 44 },
   "希尔斯顿区": { prefix: "H", minX: 7, maxX: 40, minY: 42, maxY: 68 },

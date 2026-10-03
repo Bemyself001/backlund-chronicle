@@ -9,6 +9,26 @@ const COLLAPSE_STATUSES = {
   spirituality: { id: "collapse-spirituality", name: "灵性枯竭", kind: "neutral", description: "灵性暂时见底，非凡能力难以成形。" },
 };
 
+function syncStatCollapseStatus(game, stat) {
+  const value = game.character?.stats?.[stat];
+  const collapse = COLLAPSE_STATUSES[stat];
+  if (!collapse || !Number.isFinite(value) || !Array.isArray(game.statusEffects)) return null;
+  const existing = game.statusEffects.some(entry => entry.id === collapse.id);
+  if (value === 0 && !existing) {
+    game.statusEffects = [...game.statusEffects, { ...collapse }];
+    return `自动附加状态「${collapse.name}」`;
+  }
+  if (value > 0 && existing) {
+    game.statusEffects = game.statusEffects.filter(entry => entry.id !== collapse.id);
+    return `自动解除状态「${collapse.name}」`;
+  }
+  return null;
+}
+
+export function syncStatCollapseStatuses(game) {
+  return STAT_KEYS.map(stat => syncStatCollapseStatus(game, stat)).filter(Boolean);
+}
+
 // 返回 { stat, label, before, after, delta, autoStatus } 或 null（无变化时）。
 export function applyStatDelta(game, stat, requestedDelta) {
   if (!STAT_KEYS.includes(stat) || !Number.isFinite(Number(requestedDelta))) return null;
@@ -20,15 +40,6 @@ export function applyStatDelta(game, stat, requestedDelta) {
   const after = Math.max(0, Math.min(max, before + requested));
   if (after === before) return null;
   game.character.stats[stat] = after;
-  const collapse = COLLAPSE_STATUSES[stat];
-  const existing = game.statusEffects.find((entry) => entry.id === collapse.id);
-  let autoStatus = null;
-  if (after === 0 && !existing) {
-    game.statusEffects.push({ ...collapse });
-    autoStatus = `自动附加状态「${collapse.name}」`;
-  } else if (after > 0 && existing) {
-    game.statusEffects = game.statusEffects.filter((entry) => entry.id !== collapse.id);
-    autoStatus = `自动解除状态「${collapse.name}」`;
-  }
+  const autoStatus = syncStatCollapseStatus(game, stat);
   return { stat, label: STAT_LABELS[stat], before, after, delta: after - before, requested, autoStatus };
 }

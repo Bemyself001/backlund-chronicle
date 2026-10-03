@@ -33,7 +33,7 @@ test("22 pathways have at least three authored scenes or recipes; definitions ar
     assert.equal(new Set(scenes.map((entry) => entry.title)).size, scenes.length);
     for (const scene of scenes) assert.equal(scene.options.length, 2);
   }
-  assert.equal(SPECIAL_ACTIONS.reduce((sum, entry) => sum + entry.pool.length, 0), 72);
+  assert.equal(SPECIAL_ACTIONS.reduce((sum, entry) => sum + entry.pool.length, 0), 75);
   assert.deepEqual(validateContentPack(), []);
 });
 

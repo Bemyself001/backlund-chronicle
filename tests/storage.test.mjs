@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { migrateSave } from "../src/services/storage.js";
+import { CONTENT_VERSION } from "../src/content/index.js";
 
 test("version 1 saves migrate from Grayharbor to Backlund without losing progress", () => {
   const migrated = migrateSave({
@@ -15,7 +16,7 @@ test("version 1 saves migrate from Grayharbor to Backlund without losing progres
   });
   assert.equal(migrated.version, 13);
   assert.equal(migrated.systemVersion, 2);
-  assert.deepEqual(migrated.content, { packId: "backlund-core", schemaVersion: 2, contentVersion: "2026.09.23.1" });
+  assert.deepEqual(migrated.content, { packId: "backlund-core", schemaVersion: 2, contentVersion: CONTENT_VERSION });
   assert.equal(migrated.turn, 8);
   assert.equal(migrated.title, "艾琳的贝克兰德档案");
   assert.equal(migrated.location.district, "贝克兰德桥区·旧钟街");
@@ -31,7 +32,12 @@ test("version 1 saves migrate from Grayharbor to Backlund without losing progres
   assert.equal(migrated.character.advancement.sequenceLabel, "普通人");
   assert.equal(migrated.occult.contact, 0);
   assert.equal(migrated.lastTurnAudit, null);
-  assert.deepEqual(migrated.discoveredLocations, []);
+  assert.deepEqual(migrated.discoveredLocations.map(location => location.id), ["minsk-street-15"]);
+  assert.equal(migrated.locationKnowledge["minsk-street-15"].status, "discovered");
+  assert.deepEqual(migrated.relationships.map(person => person.id), ["sherlock-moriarty"]);
+  assert.equal(migrated.relationships[0].contact, "heard");
+  assert.equal(migrated.relationships[0].value, 0);
+  assert.doesNotMatch(JSON.stringify(migrated.relationships), /克莱恩|愚者|序列|非凡/);
   assert.equal(migrated.locationKnowledge["queen-archive"].status, "rumored");
   assert.deepEqual(migrated.mapExtensions, { locations: [], routes: [] });
 });
@@ -148,7 +154,7 @@ test("watch story content migration inherits the player surname and defers prema
     },
   });
 
-  assert.equal(migrated.content.contentVersion, "2026.09.23.1");
+  assert.equal(migrated.content.contentVersion, CONTENT_VERSION);
   const discovery = migrated.triggerState.active.find((entry) => entry.instanceId === "watch-discovery-old");
   assert.equal(discovery.status, "eligible");
   assert.equal(discovery.stage, "eligible");

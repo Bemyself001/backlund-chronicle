@@ -1,5 +1,6 @@
 import { Capacitor, registerPlugin } from "@capacitor/core";
 import { RELEASE_VERSION } from "../data/release.js";
+import { IS_STARTUP_TEST } from "./startup.js";
 
 const REPOSITORY = "Bemyself001/backlund-chronicle";
 const RELEASE_API = `https://api.github.com/repos/${REPOSITORY}/releases/latest`;
@@ -118,6 +119,7 @@ export function getDownloadOptions(result) {
 }
 
 export async function checkForUpdate({ force = false } = {}) {
+  if (IS_STARTUP_TEST) return { skipped: true, reason: "startup-test", hasUpdate: false, currentVersion: APP_VERSION };
   if (!isNativeAndroid()) {
     return {
       platform: "web",
@@ -165,7 +167,7 @@ export async function checkForUpdate({ force = false } = {}) {
 }
 
 export function canHotUpdate(result) {
-  return isNativeAndroid() && Boolean(result?.hasUpdate && result?.bundleUrl
+  return !IS_STARTUP_TEST && isNativeAndroid() && Boolean(result?.hasUpdate && result?.bundleUrl
     && !needsNativeExportUpgrade(result.latestVersion)
     && result.updaterProtocol >= result.minUpdaterProtocol
     && /^[a-f0-9]{64}$/i.test(result.bundleSha256 || "")
@@ -174,7 +176,7 @@ export function canHotUpdate(result) {
 
 /** Called only after React has mounted the application's first screen. */
 export async function confirmAppReady() {
-  if (!isNativeAndroid()) return;
+  if (IS_STARTUP_TEST || !isNativeAndroid()) return;
   await Updater.notifyReady({ version: APP_VERSION });
 }
 
@@ -204,12 +206,14 @@ export async function downloadAndApplyOta(result, { reload = false } = {}) {
 }
 
 export async function resetOtaBundle({ reload = false } = {}) {
+  if (IS_STARTUP_TEST) throw new Error("启动测试版暂停热更新，请安装对应测试 APK 切换版本。");
   if (!isNativeAndroid()) return;
   await Updater.resetBundle({ reload });
 }
 
 /** 已就绪的热更新立即生效（重新载入界面）。 */
 export async function activateOtaNow(bundle) {
+  if (IS_STARTUP_TEST) throw new Error("启动测试版暂停热更新，请安装对应测试 APK 切换版本。");
   if (!isNativeAndroid() || !bundle?.path) return;
   await Updater.applyBundle({ path: bundle.path, version: bundle.version || "", reload: true });
 }

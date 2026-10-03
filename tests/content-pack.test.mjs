@@ -21,8 +21,8 @@ test("content registry resolves definitions without applying game rules", () => 
   assert.equal(getOpening("桥区").locationId, "soot-lamp");
   assert.equal(getTalent("heirloom-watch").effects.item.itemId, "heirloom-watch");
   assert.equal(getPathway("seer").name, "占卜家");
-  assert.equal(OPENINGS.length, 5);
-  assert.equal(MAP_LOCATIONS.length, 16);
+  assert.equal(OPENINGS.length, 6);
+  assert.equal(MAP_LOCATIONS.length, 18);
 });
 
 test("content validation catches cross-reference and executable-data errors", () => {

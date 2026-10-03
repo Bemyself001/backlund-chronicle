@@ -1,6 +1,6 @@
 import { makeId } from "../utils/id.js";
 import { medicineRecipe, consumeMedicine } from "./recovery.js";
-import { applyStatDelta } from "./statChanges.js";
+import { applyStatDelta, syncStatCollapseStatuses } from "./statChanges.js";
 import { findLocationRelations, getMapLocation, getMapLocations, isDiscoveredLocationStatus, normalizeLocationKnowledge, normalizeMapExtensions, planDynamicLocation } from "../system/map.js";
 import { ensureWorld, travelToLocation } from "../system/hexworld.js";
 import { amountToPence, formatMoney, moneyFromPence, moneyToPence } from "../system/money.js";
@@ -15,6 +15,10 @@ import { executeItemContentAction, hasItemContentAction } from "./itemActions.js
 import { lookupContext } from "./contextLookup.js";
 import { resolveQuestAction } from "./questActions.js";
 import { syncQuestJournal } from "./questRuntime.js";
+import { executeCombatTool } from "./combat.js";
+import { activeEnemies } from "../system/combat.js";
+import { getChurchTalisman } from "../system/talismans.js";
+import { grantOrganizationTalisman, executeTalismanUse, validateTalismanClue } from "./talismans.js";
 
 export const TOOL_SCHEMAS = {
   "inventory.add": { required: ["item"], description: "新增或合并一个结构化物品实例" },
@@ -26,6 +30,10 @@ export const TOOL_SCHEMAS = {
   "context.lookup": { required: ["query"], description: "按当前披露权限查询本地设定资料，不修改状态" },
   "item.inspect": { required: ["instanceId"], description: "检查物品并揭示已发现信息" },
   "item.use": { required: ["instanceId"], description: "使用消耗品或工具" },
+  "enemy.encounter": { required: ["enemies"], description: "登记当前实际遭遇的敌人与 AI 生成的生命值，同一敌人不重置血量" },
+  "enemy.damage": { required: ["enemyId", "amount"], description: "扣除指定敌人的生命值，归零后失去战斗能力" },
+  "enemy.act": { required: ["enemyId", "damage", "action"], description: "结算敌人本轮行动与对玩家的伤害，禁锢或已击败敌人不能行动" },
+  "enemy.leave": { required: ["enemyId"], description: "确认敌人离场或玩家成功脱离该敌人" },
   "item.equip": { required: ["instanceId"], description: "装备可装备物品" },
   "item.unequip": { required: ["instanceId"], description: "卸下已装备物品" },
   "occult.contact": { required: ["entryId"], description: "确认玩家主动接触当前非凡入口" },
@@ -370,6 +378,11 @@ function validateCall(game, call) {
   if (missing.length) return `缺少参数（模型未提供）：${missing.join("、")}`;
   if (!call.reason || String(call.reason).trim().length < 2) return "缺少与本轮叙事对应的变更理由";
   if (!game.character || !Array.isArray(game.inventory)) return "游戏状态结构不完整";
+  if (call.name === "item.use") {
+    const definition = getChurchTalisman(game.inventory.find(item => item.instanceId === call.args.instanceId));
+    if (definition?.effect === "clue") return validateTalismanClue(game, call.args.clue);
+    if (definition && (typeof call.args.enemyId !== "string" || !call.args.enemyId.trim())) return "缺少参数 enemyId：战斗符咒必须指定一名敌人";
+  }
   return "";
 }
 
@@ -390,9 +403,13 @@ function executeOne(game, call, options = {}) {
   const args = call.args;
   const turnLabel = `第 ${game.turn + 1} 轮`;
   const findItem = () => game.inventory.find((item) => item.instanceId === args.instanceId);
+  if (call.name.startsWith("enemy.")) {
+    const result = executeCombatTool(game, call.name, args);
+    return result.ok ? succeed(call.name, `${turnLabel}：${result.log}`, result.data) : fail(call.name, result.reason);
+  }
   switch (call.name) {
     case "inventory.add": {
-      const source = args.item;
+      const source = normalizeInventoryItem(args.item || {});
       const purchasedMedicine = SPECIAL_RECIPES.some(recipe => recipe.stat && (source?.itemId === `special-${recipe.id}` || source?.name === recipe.name))
         && /买|购|purchase|buy/i.test(`${options.playerAction || ""} ${call.reason || ""} ${source?.source || ""}`);
       if (purchasedMedicine && medicinePurchaseGate(game)) return fail(call.name, medicinePurchaseGate(game));
@@ -404,7 +421,7 @@ function executeOne(game, call, options = {}) {
       if (auctionMedicine) return fail(call.name, "高窗之下拍卖会只有一份任务专用重伤治疗药剂；请通过任务的购买目标结算，由本地内容登记唯一物品ID与四镑费用");
       const quantity = Number(source?.quantity ?? 1);
       if (!source?.itemId || !source?.name || !source?.description) return fail(call.name, "新物品必须包含 itemId、name 与 description");
-      if (source.potion && !normalizeInventoryItem(source).potion) return fail(call.name, "魔药必须使用本地登记的 pathwayId 与 0—9 序列");
+      if (args.item?.potion && !source.potion) return fail(call.name, "魔药必须使用本地登记的 pathwayId 与 0—9 序列");
       if (!Number.isInteger(quantity) || quantity < 1 || quantity > 10) return fail(call.name, "物品数量必须是 1—10 的整数");
       const projected = weightOf(game.inventory) + Number(source.weight || 0) * quantity;
       if (projected > game.capacity.maxWeight) return fail(call.name, `背包将超过 ${game.capacity.maxWeight}kg 容量`);
@@ -443,6 +460,7 @@ function executeOne(game, call, options = {}) {
       if (!target) return fail(call.name, "背包中不存在该物品实例");
       const allowed = ["description", "condition", "discoveredInfo", "properties", "tags"];
       Object.entries(args.patch || {}).forEach(([key, value]) => { if (allowed.includes(key)) target[key] = value; });
+      if (getChurchTalisman(target)) Object.assign(target, normalizeInventoryItem(target));
       return succeed(call.name, `${turnLabel}：更新「${target.name}」——${call.reason}。`);
     }
     case "money.add": {
@@ -501,6 +519,8 @@ function executeOne(game, call, options = {}) {
     case "item.use": {
       const target = findItem();
       if (!target) return fail(call.name, "找不到要使用的物品");
+      const talisman = executeTalismanUse(game, target, args, { reason: call.reason });
+      if (talisman) return talisman.ok ? succeed(call.name, `${turnLabel}：${talisman.log}`, talisman.data) : fail(call.name, talisman.reason);
       if (medicineRecipe(target)) {
         const inventoryChange = { ...target, delta: -1, reason: call.reason };
         try {
@@ -580,8 +600,9 @@ function executeOne(game, call, options = {}) {
       if (String(args.evidence || "").trim().length < 4) return fail(call.name, "必须记录宣誓、登记或正式接纳的剧情证据");
       if (game.organizationState?.membership?.status === "active") return fail(call.name, "角色已经拥有一个有效组织成员身份");
       const organizationName = organization?.name || String(args.name);
-      game.organizationState = { membership: { organizationId: String(args.organizationId), name: organizationName, kind: args.kind, tags: organization?.tags ? [...organization.tags] : [args.kind], status: "active", joinedTurn: game.turn + 1, evidence: String(args.evidence) } };
-      return succeed(call.name, `${turnLabel}：正式加入「${organizationName}」——${args.evidence}。`, { membership: structuredClone(game.organizationState.membership) });
+      game.organizationState = { ...game.organizationState, membership: { organizationId: String(args.organizationId), name: organizationName, kind: args.kind, tags: organization?.tags ? [...organization.tags] : [args.kind], status: "active", joinedTurn: game.turn + 1, evidence: String(args.evidence) } };
+      const provision = grantOrganizationTalisman(game, game.turn + 1);
+      return succeed(call.name, `${turnLabel}：正式加入「${organizationName}」——${args.evidence}。${provision ? `首次配发「${provision.name}」×1。` : ""}`, { membership: structuredClone(game.organizationState.membership), ...(provision ? { inventoryChange: provision } : {}) });
     }
     case "occult.reveal": {
       const occult = game.occult || { contact: 0, revealLevel: 0 };
@@ -609,23 +630,31 @@ function executeOne(game, call, options = {}) {
       const recipe = (game.clues || []).find((clue) => clue.id === args.recipeClueId && clue.kind === "potion_recipe");
       if (!recipe || recipe.pathwayId !== pathway.id || Number(recipe.sequence) !== sequence) return fail(call.name, "缺少与本次晋升完全匹配的已确认配方");
       if (String(args.evidence || "").trim().length < 4) return fail(call.name, "需要说明本轮剧情中实际完成的服用与晋升条件");
+      const beforeStats = { ...game.character.stats };
+      const nextCharacter = applyAdvancement(game.character, pathway.id, sequence, turnLabel);
+      if (!nextCharacter) return fail(call.name, "本地引擎无法建立晋升后的角色档案");
       const consumed = { ...potion, delta: -1, reason: call.reason, importance: normalizeItemImportance(potion) };
       potion.quantity -= 1;
       if (potion.quantity <= 0) game.inventory = game.inventory.filter((item) => item.instanceId !== potion.instanceId);
-      const beforeStats = { spirituality: Number(game.character.stats.spirituality), maxSpirituality: Number(game.character.stats.maxSpirituality) };
-      const nextCharacter = applyAdvancement(game.character, pathway.id, sequence, turnLabel);
-      if (!nextCharacter) return fail(call.name, "本地引擎无法建立晋升后的角色档案");
       game.character = nextCharacter;
+      const autoStatuses = syncStatCollapseStatuses(game);
       const after = getAdvancement(game.character);
       const previouslyUnlockedIds = new Set((before.unlockedAbilities || []).map((ability) => ability.id));
-      return succeed(call.name, `${turnLabel}：服用已鉴定的${pathway.name}途径序列${sequence}魔药，完成晋升——${call.reason}。`, {
+      const organizationProvision = grantOrganizationTalisman(game, game.turn + 1);
+      const spiritualGrowth = game.character.stats.maxSpirituality - beforeStats.maxSpirituality;
+      return succeed(call.name, `${turnLabel}：服用已鉴定的${pathway.name}途径序列${sequence}魔药，完成晋升；当前灵性与上限各增加${spiritualGrowth}点，生命与理智回满——${call.reason}。`, {
         inventoryChange: consumed,
+        autoStatuses,
+        ...(organizationProvision ? { organizationProvision } : {}),
         advancement: {
           before,
           after,
           newlyUnlockedAbilities: (after.unlockedAbilities || []).filter((ability) => !previouslyUnlockedIds.has(ability.id)),
           recipeClueId: recipe.id,
+          spiritualGrowth,
           statChanges: {
+            health: { before: beforeStats.health, after: Number(game.character.stats.health) },
+            sanity: { before: beforeStats.sanity, after: Number(game.character.stats.sanity) },
             spirituality: { before: beforeStats.spirituality, after: Number(game.character.stats.spirituality) },
             maxSpirituality: { before: beforeStats.maxSpirituality, after: Number(game.character.stats.maxSpirituality) },
           },
@@ -634,6 +663,8 @@ function executeOne(game, call, options = {}) {
     }
     case "character.update": {
       if (args.requiresOccult && Number(game.occult?.contact) !== 1) return fail(call.name, "尚未接触非凡世界，不能应用非凡相关角色变化");
+      const combatTurn = activeEnemies(game).length || game.combat?.enemies?.some(enemy => enemy.lastUpdatedTurn === game.turn + 1);
+      if (Number(args.patch?.health) < 0 && combatTurn && args.damageSource !== "environment") return fail(call.name, "遭遇中的敌人伤害必须使用 enemy.act 结算；独立的环境伤害才可标记 damageSource=environment");
       const changes = Object.entries(args.patch || {}).map(([key, value]) => applyStatDelta(game, key, value)).filter(Boolean);
       if (!changes.length) return fail(call.name, "没有有效的数值变化；patch 只接受生命、理智、灵性的非零增减量");
       const autoStatuses = changes.map((change) => change.autoStatus).filter(Boolean);

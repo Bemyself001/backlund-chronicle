@@ -29,6 +29,7 @@ export function createTurnResolution(toolCalls = [], results = [], progress = {}
       elapsedMinutes: progress.elapsedMinutes || 0,
       timedAction: progress.timedAction || null,
       restRecovery: progress.restRecovery || [],
+      advancementRecovery: progress.advancementRecovery || [],
       worldTime: progress.worldTime || "",
       dangerDelta: progress.dangerDelta || 0,
       occultEntry: progress.occultEntry || null,

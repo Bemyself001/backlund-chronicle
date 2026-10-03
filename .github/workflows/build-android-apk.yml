@@ -9,7 +9,7 @@ permissions:
   contents: write
 
 env:
-  PRODUCT_VERSION: "1.6.17"
+  PRODUCT_VERSION: "1.6.18"
 
 jobs:
   build-release-apk:
@@ -80,6 +80,14 @@ jobs:
 
       - name: Prepare public APK
         run: |
+          BUILD_TOOLS=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          APK=android/app/build/outputs/apk/release/app-release.apk
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs "$APK" | tee apk-verification.txt
+          keytool -exportcert -keystore "$ANDROID_KEYSTORE_PATH" -storetype PKCS12 -storepass:env ANDROID_KEYSTORE_PASSWORD -alias "$ANDROID_KEY_ALIAS" -file "$RUNNER_TEMP/release-cert.der"
+          EXPECTED_SIGNER=$(sha256sum "$RUNNER_TEMP/release-cert.der" | cut -d ' ' -f 1)
+          grep -F "Signer #1 certificate SHA-256 digest: $EXPECTED_SIGNER" apk-verification.txt
+          "$BUILD_TOOLS/aapt" dump badging "$APK" > apk-badging.txt
+          grep -F "package: name='io.github.bemyself001.backlundchronicle' versionCode='$APP_VERSION_CODE' versionName='$APP_VERSION_NAME'" apk-badging.txt
           cp android/app/build/outputs/apk/release/app-release.apk backlund-chronicle.apk
           sha256sum backlund-chronicle.apk > backlund-chronicle.apk.sha256
 

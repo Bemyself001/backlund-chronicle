@@ -22,6 +22,7 @@ test("only pristine legacy openings are restored, migration is idempotent", () =
   for (const origin of ["ordinary", "low"]) for (const talent of ["none", "steady-mind", "sensitive"]) {
     const game = fresh(origin, talent);
     delete game.initialStatsVersion;
+    delete game.advancementStatsVersion;
     const maxSpirituality = origin === "low" ? 8 : 5;
     game.character.stats = applyTalent({ health: 10, maxHealth: 10, sanity: 9, maxSanity: 10, spirituality: maxSpirituality - 1, maxSpirituality }, talent);
     const original = structuredClone(game);
@@ -31,7 +32,8 @@ test("only pristine legacy openings are restored, migration is idempotent", () =
     assert.deepEqual(game, original);
     assert.deepEqual(migrateSave(migrated).character.stats, migrated.character.stats);
     for (const changed of [{ turn: 1 }, { lastTurnAudit: {} }, { initialStatsVersion: 1 }]) {
-      assert.deepEqual(migrateSave({ ...game, ...changed }).character.stats, game.character.stats);
+      // 生命基线独立升级；有行动记录的旧档仍保留原有理智与灵性消耗。
+      assert.deepEqual(migrateSave({ ...game, ...changed }).character.stats, { ...game.character.stats, health: 20, maxHealth: 20 });
     }
   }
 });
@@ -67,7 +69,7 @@ test("prayer settles status ticks and clears spirituality collapse after recover
   game.character.stats.spirituality = 0;
   game.statusEffects = [{ id: "collapse-spirituality" }, { id: "bleed", name: "流血", tick: { health: -1 } }];
   const { next } = settlePrayer(game, game.location.id);
-  assert.equal(next.character.stats.health, 9);
+  assert.equal(next.character.stats.health, 19);
   assert.equal(next.character.stats.spirituality, 2);
   assert.ok(!next.statusEffects.some((status) => status.id === "collapse-spirituality"));
 });

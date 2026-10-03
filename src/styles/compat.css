@@ -1,0 +1,5 @@
+/* Global fallbacks must remain a plain CSS import so production keeps their side effects. */
+.skip-link { top: .7rem; left: .7rem; }
+.button.button--large { padding-left: 1.4rem; padding-right: 1.4rem; }
+/* Keep this rule distinct from :focus-visible, whose selector is unknown to old WebViews. */
+.legacy-focus :focus { outline: 2px solid #e6c587; outline-offset: 4px; }

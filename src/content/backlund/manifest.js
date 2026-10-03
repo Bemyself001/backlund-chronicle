@@ -9,6 +9,8 @@ import {
 } from "./map.js";
 import { ITEM_BEHAVIORS } from "./itemBehaviors.js";
 import { ORGANIZATIONS } from "./organizations.js";
+import { CHURCH_TALISMANS } from "./talismans.js";
+import { VISITABLE_PEOPLE } from "./visitablePeople.js";
 import { OCCULT_ENTRY_DEFINITIONS } from "./occultEntries.js";
 import { LORE_ENTRIES } from "./lore.js";
 import { CONTENT_MIGRATIONS } from "./migrations.js";
@@ -22,7 +24,7 @@ export const BACKLUND_CONTENT = {
   id: "backlund-core",
   name: "贝克兰德核心内容",
   schemaVersion: 2,
-  contentVersion: "2026.09.23.1",
+  contentVersion: "2026.10.03.3",
   specialActions: SPECIAL_ACTIONS,
   specialRecipes: SPECIAL_RECIPES,
   specialContacts: SPECIAL_CONTACTS,
@@ -33,6 +35,8 @@ export const BACKLUND_CONTENT = {
   pathways: PATHWAYS,
   characters: { default: DEFAULT_CHARACTER, random: RANDOM_CHARACTERS },
   organizations: ORGANIZATIONS,
+  churchTalismans: CHURCH_TALISMANS,
+  visitablePeople: VISITABLE_PEOPLE,
   itemBehaviors: ITEM_BEHAVIORS,
   triggers: [
     ...OCCULT_ENTRY_DEFINITIONS,

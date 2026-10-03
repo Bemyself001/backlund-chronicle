@@ -15,6 +15,9 @@ import { specialState } from "../engine/specialActions.js";
 import { syncKnownPeople } from "../engine/people.js";
 import { saveExportFileName, writeSaveExport } from "./saveExport.js";
 import { MAX_MANUAL_SAVES, normalizeSaveSlots } from "./saveSlots.js";
+import { normalizeCombatState } from "../system/combat.js";
+import { grantOrganizationTalisman } from "../engine/talismans.js";
+import { migrateCharacterStatRules } from "./statMigrations.js";
 
 const SAVES_KEY = "mist-chronicle-saves-v1";
 const AUTOSAVE_ID = "autosave";
@@ -101,7 +104,7 @@ export function migrateSave(raw) {
   };
   const previousMembership = migrated.organizationState?.membership;
   const registeredOrganization = getOrganization(previousMembership?.organizationId);
-  const organizationState = previousMembership ? { membership: {
+  const organizationState = previousMembership ? { ...migrated.organizationState, membership: {
     status: "active",
     ...previousMembership,
     name: registeredOrganization?.name || previousMembership.name,
@@ -121,6 +124,7 @@ export function migrateSave(raw) {
     locationKnowledge,
     occult,
     organizationState,
+    combat: normalizeCombatState(migrated.combat),
     processedToolCalls: migrated.processedToolCalls || [],
     memoryNotes: migrated.memoryNotes || [],
     storyHistory: Array.isArray(migrated.storyHistory) ? migrated.storyHistory : (migrated.recentDialogues || []),
@@ -140,7 +144,8 @@ export function migrateSave(raw) {
       result.character.stats = { ...raw.character.stats, sanity: legacy.maxSanity, spirituality: legacy.maxSpirituality };
     }
   }
-  result.initialStatsVersion = 1;
+  migrateCharacterStatRules(result);
+  grantOrganizationTalisman(result);
   result.specialActions = specialState(result);
   result.triggerState = normalizeTriggerState(result);
   migrateContentState(result);

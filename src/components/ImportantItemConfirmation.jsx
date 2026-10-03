@@ -22,7 +22,7 @@ export default function ImportantItemConfirmation({ changes, onConfirm, onCancel
     {promotion ? <>
       <div className={`${styles.intro} ${styles.advancementIntro}`}>
         <strong>魔药尚未消耗，晋升也尚未写入存档</strong>
-        <p>本地规则已经验证配方、魔药身份与目标序列。确认后，魔药消耗和角色晋升将作为同一项不可拆分的变更生效。</p>
+        <p>本地规则已经验证配方、魔药身份与目标序列。确认后消耗魔药并完成晋升，增加当前灵性和上限，同时回满生命与理智。</p>
       </div>
       <section className={styles.advancement} aria-label="晋升结果预览">
         <div className={styles.advancementRoute}>
@@ -32,6 +32,8 @@ export default function ImportantItemConfirmation({ changes, onConfirm, onCancel
         <dl className={styles.statPreview}>
           <div><dt>当前灵性</dt><dd>{promotion.advancement.statChanges.spirituality.before} → {promotion.advancement.statChanges.spirituality.after}</dd></div>
           <div><dt>灵性上限</dt><dd>{promotion.advancement.statChanges.maxSpirituality.before} → {promotion.advancement.statChanges.maxSpirituality.after}</dd></div>
+          {promotion.advancement.statChanges.health && <div><dt>生命回满</dt><dd>{promotion.advancement.statChanges.health.before} → {promotion.advancement.statChanges.health.after}</dd></div>}
+          {promotion.advancement.statChanges.sanity && <div><dt>理智回满</dt><dd>{promotion.advancement.statChanges.sanity.before} → {promotion.advancement.statChanges.sanity.after}</dd></div>}
         </dl>
         {promotion.advancement.newlyUnlockedAbilities.length > 0 && <div className={styles.abilities}><p>将解锁的非凡能力</p><ul>{promotion.advancement.newlyUnlockedAbilities.map((ability) => <li key={ability.id}><strong>{ability.name}</strong><span>{ability.description}</span></li>)}</ul></div>}
       </section>

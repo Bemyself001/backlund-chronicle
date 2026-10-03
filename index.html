@@ -9,8 +9,22 @@
     <link rel="preload" href="/assets/promo-16x9-1600.webp" as="image" type="image/webp" media="(min-width: 601px)" fetchpriority="high" />
     <link rel="preload" href="/fonts/ShanHaiXingYeGeTeW-2.woff2?v=20260909-mobile" as="font" type="font/woff2" crossorigin />
     <title>贝克兰德纪事 · AI 文字沙盒</title>
+    <!-- STARTUP_DIAGNOSTICS -->
   </head>
   <body>
+    <section id="startup-panel" role="status" aria-live="polite">
+      <h1 id="startup-title">正在打开贝克兰德纪事</h1>
+      <p id="startup-message">正在加载游戏，请稍候。若启动未完成，这里将显示诊断信息。</p>
+      <details id="startup-details"><summary>启动诊断</summary>
+        <p>仅包含启动阶段、环境与错误类型，不包含密钥或存档，不会自动上传。</p>
+        <textarea id="startup-report" readonly aria-label="启动诊断信息"></textarea>
+        <button id="startup-copy" type="button">复制诊断信息</button>
+      </details>
+      <button id="startup-retry" type="button" hidden>重新启动</button>
+      <noscript>当前环境未启用 JavaScript，游戏无法启动。</noscript>
+    </section>
+    <button id="startup-open" type="button" hidden>启动诊断</button>
+    <script>if (window.__startupDiagnostics) window.__startupDiagnostics.bind();</script>
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
   </body>

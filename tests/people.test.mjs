@@ -18,20 +18,31 @@ const addQuest = (game, definitionId, stage, status = "engaged", extra = {}) => 
   return instance;
 };
 const person = (game, id) => knownPeople(game).find(entry => entry.id === id);
+const assertPublicDetective = (game) => {
+  const detective = person(game, "sherlock-moriarty");
+  assert.equal(detective.name, "夏洛克·莫里亚蒂");
+  assert.equal(detective.contact, "heard");
+  assert.equal(detective.value, 0);
+  assert.deepEqual(detective.dossier.questIds, []);
+  assert.deepEqual(Object.keys(detective.dossier.discoveries), ["advertisement"]);
+  assert.doesNotMatch(JSON.stringify(detective), /克莱恩|愚者|序列|非凡/);
+};
 
-test("fresh games, eligibility and unconfirmed narrative names do not reveal people", () => {
+test("fresh games only reveal the advertised detective; eligibility and guesses reveal no secret people", () => {
   const game = fresh();
   addQuest(game, WATCH, "white-iris-confrontation", "eligible", { definitionSnapshot: { secret: "塞西莉亚·沃恩" } });
   game.recentDialogues.push({ role: "assistant", content: "你猜想红夫人会是塞西莉亚·沃恩吗？" });
   const before = structuredClone(game);
-  assert.deepEqual(knownPeople(game), []);
+  assert.deepEqual(knownPeople(game).map(entry => entry.id), ["sherlock-moriarty"]);
+  assertPublicDetective(game);
   assert.deepEqual(game, before);
 });
 
 test("the recovered note recalls a relative; only decoding discloses White Iris", () => {
   const game = fresh();
   fact(game, "watch.note-recovered", 4);
-  assert.deepEqual(knownPeople(game).map(entry => entry.id), ["reginald"]);
+  assert.deepEqual(knownPeople(game).map(entry => entry.id).sort(), ["reginald", "sherlock-moriarty"]);
+  assertPublicDetective(game);
   const uncle = person(game, "reginald");
   assert.equal(uncle.name, "雷金纳德·霍尔");
   assert.equal(uncle.contact, "known");
@@ -89,7 +100,8 @@ test("uncle's identity, control and death each need their own evidence", () => {
 test("Renard notice includes the injured daughter but neither a meeting nor Edmund", () => {
   const game = fresh();
   addQuest(game, RENARD, "message-seen", "available");
-  assert.deepEqual(knownPeople(game).map(entry => entry.id).sort(), ["renard-daughter", "viscount-renard"]);
+  assert.deepEqual(knownPeople(game).map(entry => entry.id).sort(), ["renard-daughter", "sherlock-moriarty", "viscount-renard"]);
+  assertPublicDetective(game);
   assert.equal(person(game, "viscount-renard").contact, "heard");
   assert.equal(person(game, "renard-daughter").contact, "heard");
   assert.equal(person(game, "viscount-renard").lastKnownLocation, "");
@@ -141,13 +153,14 @@ test("legacy aliases merge into one stable identity while relationship tools sti
   game.relationships = [{ id: "old-iris", name: "白鸢尾", value: -12, note: "曾阻挡去路" }];
   fact(game, "demoness.white-iris.true-name", 9, "塞西莉亚·沃恩");
   syncKnownPeople(game);
-  assert.equal(game.relationships.length, 1);
-  assert.equal(game.relationships[0].id, "white-iris");
-  assert.equal(game.relationships[0].value, -12);
+  assert.deepEqual(game.relationships.map(entry => entry.id).sort(), ["sherlock-moriarty", "white-iris"]);
+  assert.equal(person(game, "white-iris").value, -12);
+  assertPublicDetective(game);
   for (const npcId of ["old-iris", "白鸢尾", "塞西莉亚·沃恩", "white-iris"]) {
     const result = executeToolCalls(game, [{ id: "update:" + npcId, name: "relationship.update", args: { npcId, delta: -1 }, reason: "谈判失败" }]);
     assert.equal(result.results[0].ok, true, npcId);
-    assert.equal(result.game.relationships[0].value, -13);
+    assert.equal(person(result.game, "white-iris").value, -13);
+    assertPublicDetective(result.game);
   }
 });
 
@@ -193,8 +206,8 @@ test("saving immediately includes discoveries and load keeps them without mutati
   const before = structuredClone(game);
   const saved = saveGame(game);
   assert.deepEqual(game, before);
-  assert.equal(saved.relationships[0].name, "雷金纳德·霍尔");
-  assert.equal(loadGame().relationships[0].name, "雷金纳德·霍尔");
+  assert.equal(person(saved, "reginald").name, "雷金纳德·霍尔");
+  assert.equal(person(loadGame(), "reginald").name, "雷金纳德·霍尔");
 });
 
 test("real quest transitions register people without awarding relationship points early", () => {

@@ -13,9 +13,11 @@
 .potionCost strong, .potionCost small { display: block; }
 .potionCost strong { color: #3e3228; font: 600 .82rem var(--font-serif); }
 .potionCost small { margin-top: .2rem; color: #776b5d; font: .67rem/1.45 var(--font-sans); }
-.statPreview { display: grid; grid-template-columns: 1fr 1fr; margin: 0; border-block: 1px solid #8c795747; }
+.statPreview { display: grid; grid-template-columns: 1fr 1fr; margin: 0; border-top: 1px solid #8c795747; border-bottom: 1px solid #8c795747; border-block: 1px solid #8c795747; }
 .statPreview div { display: flex; justify-content: space-between; padding: .65rem 0; }
-.statPreview div + div { padding-left: .8rem; border-left: 1px solid #8c795747; }
+.statPreview div:nth-child(odd) { padding-right: .8rem; }
+.statPreview div:nth-child(even) { padding-left: .8rem; border-left: 1px solid #8c795747; }
+.statPreview div:nth-child(n+3) { border-top: 1px solid #8c795747; }
 .statPreview dt, .statPreview dd { margin: 0; font: 700 .67rem var(--font-sans); }
 .statPreview dt { color: #716552; }
 .statPreview dd { color: #4c6c5f; font-family: var(--font-mono); }
@@ -47,10 +49,14 @@
   .advancementRoute { grid-template-columns: 1fr auto; }
   .advancementRoute strong { grid-column: 1 / -1; text-align: left; }
   .statPreview { grid-template-columns: 1fr; }
+  .statPreview div:nth-child(odd) { padding-right: 0; }
+  .statPreview div:nth-child(even) { padding-left: 0; border-left: 0; }
   .statPreview div + div { padding-left: 0; border-left: 0; border-top: 1px solid #8c795747; }
   .abilities li { grid-template-columns: 1fr; gap: .2rem; }
-  .change { grid-template-columns: auto 1.8rem minmax(0, 1fr); align-items: start; padding: .75rem; }
+  .change { grid-template-columns: auto 1.8rem minmax(0, 1fr); align-items: flex-start; align-items: start; padding: .75rem; }
   .change em { grid-column: 3; justify-self: start; }
   .actions { grid-template-columns: 1fr; }
   .confirm { grid-row: 1; }
 }
+
+.change input:checked ~ .copy strong { text-decoration: underline; text-underline-offset: .2em; }

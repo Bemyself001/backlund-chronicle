@@ -10,6 +10,7 @@ import { buildWorld } from "./hexworld.js";
 import { ITEM_IMPORTANCE } from "./items.js";
 import { equipmentSlot, loadoutInventory, localLoadout, validateLoadout } from "./loadout.js";
 import { createTriggerState } from "../engine/triggerState.js";
+import { initialCharacterStats, INITIAL_STATS_VERSION, ADVANCEMENT_STATS_VERSION } from "./characterStats.js";
 
 export { SAVE_VERSION, GAME_SYSTEM_VERSION };
 export const AI_SETTINGS_VERSION = "1.6";
@@ -21,7 +22,7 @@ const PREVIOUS_NARRATIVE_RULE = "narrative 使用成熟、富有吸引力的中�
 const CHOICE_RULE = "【行动选项】每轮提供恰好三个符合当前情境、具体可执行、目的明显不同的行动选项，同时允许玩家自由输入。选项必须根据当前人物、地点、线索和局势即时生成，不得固定套用调查、交涉、冒险三种模板，也不得用不同措辞表达同一个目标。risk 只表示行动后果的不确定性和代价，可以重复；只有当前情境确实存在合理危险时才能使用 high，不得为了凑齐风险等级凭空制造敌意、异常或灾难。";
 const NARRATIVE_RULE = "【叙事目标】narrative 以白金级商业小说作家的完成度写作。文字应当成熟、有吸引力，场景有画面，人物有辨识度，对话有目的，情节持续推进，信息能够形成伏笔与回收。文风可以细腻、浓郁、冷峻或凌厉，但不要为显得华丽而堆砌比喻、形容词和无关环境描写。每轮必须先回应玩家刚刚采取的行动，再描写具体过程、遇到的阻力和可以感知的反馈，并至少推进一项行动结果、人物关系、有效信息、局势变化、现实阻力或新的行动方向。NPC 应拥有符合身份、利益和经历的语言习惯与行为逻辑，可以隐瞒、误解、拒绝、试探、讨价还价或改变主意，但不得为了推动剧情突然失去判断力。【篇幅控制】简单观察、购物、移动或简短交谈约 120—250 字；交涉、调查、冲突或重要发现约 250—500 字；重大转折、仪式、战斗、晋升或章节高潮约 500—800 字。内容完整后立即结束，不为达到字数重复环境、心理活动、人物表情或已经确认的信息。【避免重复】环境描写必须服务于玩家行动、人物状态、信息揭示或气氛变化。已经建立过的煤烟、雾气、钟声、蒸汽、雨水、煤气灯等城市印象，只有发生变化、影响行动或承载新线索时才能再次描写。悬念应来自信息差、因果关系和人物动机；允许生活化、温暖、幽默、平静、尴尬、疲惫以及失败后的余韵，不要求每轮都阴森、紧张或出现异常。不要反复使用“选择权仍在你手中”“贝克兰德等待你的决定”“这一切也许只是巧合”“没有人要求你负责”等总结式套话，不要每轮都制造异常、敌意、追踪者或突发灾难，也不要总以“就在这时”式悬念收尾。不复述原著段落，不让原作角色抢占玩家中心位置，最后停在适合玩家继续作出决定的位置。";
 
-export const DEFAULT_SYSTEM_PROMPT = `你是《贝克兰德纪事》的叙事者与世界模拟器。故事发生在鲁恩王国首都贝克兰德，以原创街巷、人物、案件与剧情为中心；原作主线和重要人物仅作为遥远背景，不得取代玩家成为故事中心。
+export const DEFAULT_SYSTEM_PROMPT = `你是《贝克兰德纪事》的叙事者与世界模拟器。故事发生在鲁恩王国首都贝克兰德，以原创街巷、人物、案件与剧情为中心；原作主线保持为背景，本地登记的原作人物可以按拜访与披露规则参与原创支线，不得取代玩家成为故事中心。
 
 核心规则：
 1. 维持维多利亚时代工业社会、教会秩序、隐秘组织、非凡途径、失控风险与信息差。神秘知识必须经调查、仪式、晋升、线索或代价获得。
@@ -39,7 +40,8 @@ export const DEFAULT_SYSTEM_PROMPT = `你是《贝克兰德纪事》的叙事者
 
 export function migrateSystemPrompt(prompt = "") {
   const legacyIntro = "你是《雾中纪事》的叙事者与世界模拟器。故事运行在一个受《诡秘之主》启发、但城市、人物、案件与主线均为原创的蒸汽时代神秘世界。";
-  const nextIntro = "你是《贝克兰德纪事》的叙事者与世界模拟器。故事发生在鲁恩王国首都贝克兰德，以原创街巷、人物、案件与剧情为中心；原作主线和重要人物仅作为遥远背景，不得取代玩家成为故事中心。";
+  const previousIntro = "你是《贝克兰德纪事》的叙事者与世界模拟器。故事发生在鲁恩王国首都贝克兰德，以原创街巷、人物、案件与剧情为中心；原作主线和重要人物仅作为遥远背景，不得取代玩家成为故事中心。";
+  const nextIntro = DEFAULT_SYSTEM_PROMPT.split("\n")[0];
   const legacyProtocol = "11. 优先使用原生 tool calling；若使用 JSON 协议，返回 narrative、choices、toolCalls、memoryNotes、worldEvents。";
   const nextProtocol = "11. 支持原生工具时，状态变化只使用原生 tool calling，最终剧情放在 assistant.content，行动选项使用 ui.present_choices；只有不支持原生工具时才使用当前阶段指定的精简 JSON 兼容协议。";
   const legacyAdvancement = "8. 只有 occult.contact=1 后，才允许通过 occult.reveal 揭示神秘知识，或提出带有非凡依据的 character.update；普通人可以拒绝、推迟或离开入口。任何晋升仍必须经过知识、材料、引导、地点和代价的本地验证。";
@@ -58,7 +60,7 @@ export function migrateSystemPrompt(prompt = "") {
   const nextNarrativeRule = `12. ${NARRATIVE_RULE}`;
   const previousOccultRule = "7. 普通人的 occult.contact 初始为 0；在第 5、10、15 轮等每五轮节点，可出现一次非强制的非凡入口，直到玩家主动接触后变为 1。开局选择低序列非凡者的角色 occult.contact 初始为 1。contact=1 只代表接触过非凡世界，不代表获得力量。";
   const nextOccultRule = "7. 特殊事件的资格、出现、追查、阶段、过期与奖励完全由本地 triggerState 决定。看到线索不等于接受任务；只有玩家明确表示追查时才可调用 occult.contact 或 trigger.engage，完成当前阶段目标时必须调用 trigger.progress 并提供本轮可靠证据，明确放弃时才可调用 trigger.abandon。不得用 clue.add、quest.update 或正文叙述跳过特殊任务阶段。普通人和序列9可以获得新的非凡入口，序列8及以上不能新生成入口，但已经出现或正在追查的入口继续有效。occult.contact=1 只代表接触过非凡世界，不代表获得力量。";
-  let migrated = String(prompt).replace(legacyIntro, nextIntro).replace(legacyProtocol, nextProtocol).replace(legacyMoney, nextMoney).replaceAll("《雾中纪事》", "《贝克兰德纪事》").replaceAll("灰檐港", "贝克兰德");
+  let migrated = String(prompt).replace(legacyIntro, nextIntro).replace(previousIntro, nextIntro).replace(legacyProtocol, nextProtocol).replace(legacyMoney, nextMoney).replaceAll("《雾中纪事》", "《贝克兰德纪事》").replaceAll("灰檐港", "贝克兰德");
   if (!migrated.includes("本轮明确决定服用魔药")) migrated = migrated.includes(previousAdvancement) ? migrated.replace(previousAdvancement, nextAdvancement) : migrated.replace(legacyAdvancement, nextAdvancement);
   if (!migrated.includes("location.archive")) migrated = migrated.includes(previousMap) ? migrated.replace(previousMap, nextMap) : migrated.replace(legacyMap, nextMap);
   if (!migrated.includes("importance 设为 important")) migrated = migrated.replace("资金使用 money.add、money.remove", "新增物品只有在会影响任务、案件证据、身份、非凡能力或后续剧情入口时，才将 importance 设为 important；普通消耗品、生活用品、材料和货币必须使用 normal。资金使用 money.add、money.remove");
@@ -115,14 +117,15 @@ export function createInitialGame(character, confirmedLoadout) {
   const startingInventory = loadoutInventory(loadout);
   const { startingMoneyPence = 240, ...characterProfile } = normalizedCharacter;
   const initialMoneyPence = Math.max(0, Math.min(MAX_STARTING_MONEY_PENCE, Number(startingMoneyPence) || 0)) + talentMoneyBonus(normalizedCharacter.talent);
-  const baseStats = { health: 10, maxHealth: 10, sanity: 10, maxSanity: 10, spirituality: normalizedCharacter.extraordinary === "low" ? 8 : 5, maxSpirituality: normalizedCharacter.extraordinary === "low" ? 8 : 5 };
+  const baseStats = initialCharacterStats(normalizedCharacter.advancement);
   const talentSpec = talentItemSpec(normalizedCharacter.talent);
   const talentItem = talentSpec ? { ...item(talentSpec.itemId, talentSpec.name, talentSpec.category, talentSpec.description, 1, talentSpec.weight, talentSpec.rarity, talentSpec.tags), hiddenInfo: talentSpec.hiddenInfo || "" } : null;
   const openingMessage = { id: makeId("msg"), role: "assistant", turn: 0, content: opening.narrative };
   const gameId = makeId("game");
   const game = {
     version: SAVE_VERSION,
-    initialStatsVersion: 1,
+    initialStatsVersion: INITIAL_STATS_VERSION,
+    advancementStatsVersion: ADVANCEMENT_STATS_VERSION,
     specialActions: { version: 1, revision: 0 },
     systemVersion: GAME_SYSTEM_VERSION,
     content: { packId: ACTIVE_CONTENT.id, schemaVersion: CONTENT_SCHEMA_VERSION, contentVersion: CONTENT_VERSION },
@@ -151,6 +154,7 @@ export function createInitialGame(character, confirmedLoadout) {
     },
     triggerState: createTriggerState({ id: gameId }),
     organizationState: { membership: null },
+    combat: { enemies: [] },
     inventory: [
       ...startingInventory,
       ...(talentItem ? [talentItem] : []),

@@ -7,6 +7,9 @@ import { API_PROVIDER_PRESETS, createProviderProfile, getApiProvider } from "../
 import { isNativeAndroid } from "../services/updates.js";
 import { LATEST_UPDATE } from "../data/changelog.js";
 import { applyModelCatalog } from "../services/modelCatalog.js";
+import { onboardingConfigError } from "../services/onboarding.js";
+import { ApiSetupSteps } from "./OnboardingGuide.jsx";
+import guideStyles from "./OnboardingGuide.module.css";
 
 function captureProfile(settings) {
   return {
@@ -31,8 +34,10 @@ function withSavedModel(settings) {
   };
 }
 
-export default function ApiSettings({ settings, onSave, onClose }) {
+export default function ApiSettings({ settings, onSave, onClose, onSetupComplete }) {
   const [draft, setDraft] = useState(settings);
+  const [formError, setFormError] = useState("");
+  const formErrorRef = useRef(null);
   const [status, setStatus] = useState("");
   const [testing, setTesting] = useState(false);
   const [loadingModels, setLoadingModels] = useState(false);
@@ -58,6 +63,7 @@ export default function ApiSettings({ settings, onSave, onClose }) {
 
   const cancelModels = () => { modelRequestRef.current?.abort(); modelRequestRef.current = null; setLoadingModels(false); };
   const update = (key, value) => {
+    setFormError("");
     if (["baseUrl", "apiKey", "customHeaders"].includes(key)) { cancelModels(); setStatus(""); }
     setDraft((current) => ({ ...current, [key]: value }));
   };
@@ -65,6 +71,7 @@ export default function ApiSettings({ settings, onSave, onClose }) {
   const chooseProvider = (providerId) => {
     if (providerId === draft.provider) return;
     cancelModels();
+    setFormError("");
     setDraft((current) => {
       const profiles = { ...(current.profiles || {}), [current.provider]: captureProfile(current) };
       const nextProfile = { ...createProviderProfile(providerId), ...(profiles[providerId] || {}) };
@@ -109,13 +116,22 @@ export default function ApiSettings({ settings, onSave, onClose }) {
 
   const submit = (event) => {
     event.preventDefault();
-    onSave(withSavedModel(draft));
-    onClose();
+    const showError = (message) => {
+      setFormError(message);
+      requestAnimationFrame(() => { formErrorRef.current?.focus(); formErrorRef.current?.scrollIntoView({ block: "nearest" }); });
+    };
+    const problem = onSetupComplete ? onboardingConfigError(draft) : "";
+    if (problem) { showError(problem); return; }
+    try { onSave(withSavedModel({ ...draft, apiKey: draft.apiKey.trim(), baseUrl: draft.baseUrl.trim() })); }
+    catch { showError("设置未能保存，请检查浏览器的存储权限后重试。"); return; }
+    if (onSetupComplete) onSetupComplete();
+    else onClose();
   };
 
   return (
     <Modal title="AI 接口设置" eyebrow="Connection dossier" onClose={onClose} wide>
       <form className={styles.form} onSubmit={submit}>
+        {onSetupComplete && <section className={guideStyles.setupCard} aria-label="API 配置教程"><h3>三步完成 API 配置</h3><ApiSetupSteps inSettings /></section>}
         <ScrollHelp />
         <div className={styles.notice}>
           <strong>密钥安全：</strong>默认只保存在当前会话。启用“在此设备保存密钥”后，密钥会以明文存入本浏览器；不会进入剧情、错误日志或导出的游戏存档。
@@ -183,6 +199,16 @@ export default function ApiSettings({ settings, onSave, onClose }) {
           </span>
         </label>
         {draft.persistKey && draft.apiKey && <p className={styles.savedState}>保存设置后，{provider.shortName} 密钥会留在这台设备上。</p>}
+
+        {formError && <p ref={formErrorRef} className={styles.status} role="alert" tabIndex={-1}>{formError}</p>}
+        {onSetupComplete && <div className={styles.setupActions}>
+          <p className={styles.helper}>保存后继续了解首页按钮。此处仅检查填写是否完整，也可按需测试连接。</p>
+          <div className={styles.actions}>
+            <button className="button button--ghost" type="button" onClick={test} disabled={testing || loadingModels}>{testing ? "正在测试…" : "测试连接"}</button>
+            <button className="button button--primary" type="submit">下一步 · 保存并返回首页</button>
+          </div>
+          {status && <p className={styles.status} role="status">{status}</p>}
+        </div>}
 
         <section className={styles.modelPanel} aria-labelledby="model-panel-title">
           <div className={styles.modelPanelHeading}>
@@ -262,10 +288,10 @@ export default function ApiSettings({ settings, onSave, onClose }) {
           </ul>
         </section>
 
-        {status && <p className={styles.status} role="status">{status}</p>}
+        {!onSetupComplete && status && <p className={styles.status} role="status">{status}</p>}
         <div className={styles.actions}>
-          <button className="button button--ghost" type="button" onClick={test} disabled={testing || loadingModels}>{testing ? "正在测试…" : "测试连接"}</button>
-          <button className="button button--primary" type="submit">保存全部设置</button>
+          {!onSetupComplete && <button className="button button--ghost" type="button" onClick={test} disabled={testing || loadingModels}>{testing ? "正在测试…" : "测试连接"}</button>}
+          <button className="button button--primary" type="submit">{onSetupComplete ? "保存并继续教程" : "保存全部设置"}</button>
         </div>
       </form>
     </Modal>

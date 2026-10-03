@@ -9,12 +9,12 @@ import { resolveTurnProgress } from "../src/engine/turn.js";
 
 test("talents apply max-stat bonuses at character creation", () => {
   const hardy = createInitialGame({ ...EMPTY_CHARACTER, name: "体格测试员", talent: "hardy" });
-  assert.equal(hardy.character.stats.maxHealth, 12);
-  assert.equal(hardy.character.stats.health, 12);
+  assert.equal(hardy.character.stats.maxHealth, 22);
+  assert.equal(hardy.character.stats.health, 22);
   const sensitive = createInitialGame({ ...EMPTY_CHARACTER, name: "灵性测试员", talent: "sensitive" });
   assert.equal(sensitive.character.stats.maxSpirituality, 7);
   const none = createInitialGame({ ...EMPTY_CHARACTER, name: "普通测试员" });
-  assert.equal(none.character.stats.maxHealth, 10);
+  assert.equal(none.character.stats.maxHealth, 20);
   assert.equal(getTalent("不存在的天赋").id, "none");
   assert.ok(TALENTS.length >= 5);
 });
@@ -45,10 +45,10 @@ test("status ticks settle every turn through resolveTurnProgress and respect bou
   game.statusEffects.push({ id: "bleeding", name: "失血", kind: "danger", description: "", tick: { health: -2 } });
   game.statusEffects.push({ id: "warm-soup", name: "热汤余温", kind: "positive", description: "", tick: { sanity: 1 } });
   const progress = resolveTurnProgress(game, "等待片刻", "low", [], []);
-  assert.equal(game.character.stats.health, 8);
+  assert.equal(game.character.stats.health, 18);
   assert.equal(game.character.stats.sanity, 10); // 上限截断
   assert.equal(progress.statusTicks.length, 2);
-  assert.match(progress.statusTickLogs[0], /状态「失血」结算：生命 10→8（-2）/);
+  assert.match(progress.statusTickLogs[0], /状态「失血」结算：生命 20→18（-2）/);
   // 再结算两轮直至归零，触发自动状态
   game.character.stats.health = 2;
   const finalProgress = resolveTurnProgress(game, "等待片刻", "low", [], []);
@@ -63,5 +63,5 @@ test("heirloom-watch talent grants a checkable watch with hidden info", () => {
   assert.ok(watch, "inventory should contain the heirloom watch");
   assert.ok(watch.tags.includes("可检查"));
   assert.match(watch.hiddenInfo, /纸条/);
-  assert.equal(game.character.stats.maxHealth, 10); // 不影响数值
+  assert.equal(game.character.stats.maxHealth, 20); // 不影响数值
 });

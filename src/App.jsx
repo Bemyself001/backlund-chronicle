@@ -43,22 +43,29 @@ import { prayerAvailability, settlePrayer } from "./engine/prayer.js";
 import { generatePrayer } from "./services/prayer.js";
 import { actionRequest, retryRequest } from "./services/actionRequest.js";
 import { appendStoryMessages } from "./services/storyHistory.js";
+import { IS_STARTUP_TEST, openStartupDiagnostics, startupStage } from "./services/startup.js";
+import { loadOnboarding, saveOnboarding } from "./services/onboarding.js";
+import { ensureTalismanToolCall, validateTalismanRequest } from "./services/talismans.js";
+import { getChurchTalisman } from "./system/talismans.js";
+import { activeEnemies } from "./system/combat.js";
+import { requestedPersonVisit, visitPersonGate } from "./engine/visitablePeople.js";
 
 export default function App() {
   const [screen, setScreen] = useState("splash");
   const [game, setGame] = useState(null);
-  const [settings, setSettings] = useState(loadApiSettings);
-  const [prompt, setPrompt] = useState(() => {
+  const [settings, setSettings] = useState(() => startupStage("读取 API 设置", loadApiSettings));
+  const [prompt, setPrompt] = useState(() => startupStage("读取叙事设置", () => {
     const saved = localStorage.getItem("mist-system-prompt");
     if (!saved) return DEFAULT_SYSTEM_PROMPT;
     const migrated = migrateSystemPrompt(saved);
     if (migrated !== saved) localStorage.setItem("mist-system-prompt", migrated);
     return migrated;
-  });
+  }));
   const [modal, setModal] = useState(null);
   const [mapFocus, setMapFocus] = useState(null);
   const openMap = (locationId = null) => { setMapFocus(typeof locationId === "string" ? locationId : null); setModal("map"); };
-  const [saves, setSaves] = useState(listSaves);
+  const [saves, setSaves] = useState(() => startupStage("读取存档列表", listSaves));
+  const [onboardingStep, setOnboardingStep] = useState(() => loadOnboarding(saves.length > 0));
   const [loading, setLoading] = useState(false);
   const [streamText, setStreamText] = useState("");
   const [turnPhase, setTurnPhase] = useState("idle");
@@ -74,8 +81,10 @@ export default function App() {
   const summaryJobRef = useRef(null);
   const refreshSaves = () => setSaves(listSaves());
 
+  useEffect(() => { saveOnboarding(onboardingStep); }, [onboardingStep]);
+
   useEffect(() => {
-    if (!isNativeAndroid()) return undefined;
+    if (IS_STARTUP_TEST || !isNativeAndroid()) return undefined;
     let active = true;
     const timer = window.setTimeout(() => {
       checkForUpdate().then(async (result) => {
@@ -193,6 +202,14 @@ export default function App() {
 
   const runTurn = async (action, options = {}) => {
     if (!game || busyRef.current || !action.trim()) return false;
+    const requestedVisit = requestedPersonVisit(game, action);
+    if (requestedVisit && !options.personConversation) {
+      lastActionRef.current = actionRequest(action, options);
+      prayerRetryRef.current = null;
+      const result = handleSpecialAction({ operation: "visit-person", id: requestedVisit.id, revision: specialState(game).revision });
+      if (!result.ok) setError(result.error);
+      return result.ok;
+    }
     prayerRetryRef.current = null;
     const selectedRisk = (Array.isArray(game.choices) ? game.choices : []).find((choice) => choice.label === action)?.risk;
     busyRef.current = true; lastActionRef.current = actionRequest(action, options); setLoading(true); setTurnPhase(options.manualRetry ? "manualRetry" : "generating"); setError(""); resetStreamPreview();
@@ -223,8 +240,13 @@ export default function App() {
       };
 
       const advancementIntent = isExplicitAdvancementIntent(action) && game.inventory.some((item) => item.potion);
+      const talismanRequest = validateTalismanRequest(game, options.talismanRequest);
+      if (options.personConversation) {
+        const reason = visitPersonGate(game, options.personConversation, { conversation: true });
+        if (reason) throw new Error(reason);
+      }
       // All sleep, rest and waiting narration must use the settled clock.
-      const fastMode = Boolean(settings.fastMode) && !advancementIntent && timedAction(action, game.worldTime) === null;
+      const fastMode = Boolean(settings.fastMode) && !options.personConversation && !advancementIntent && !talismanRequest && !activeEnemies(game).length && !/符咒/.test(action) && timedAction(action, game.worldTime) === null;
       let planningResponse;
       let fastPresentationTask = null;
       if (fastMode) {
@@ -232,7 +254,7 @@ export default function App() {
         // 不必等待仍在流式输出的剧情草稿。
         const fastTasks = launchFastModeTasks({
           planning: () => requestModel(
-            buildPlanningContext(game, action, prompt, { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation }),
+            buildPlanningContext(game, action, prompt, { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation, talismanRequest }),
             { toolSet: "state", disableJsonMode: Boolean(settings.nativeTools) },
           ),
           presentation: () => requestModel(
@@ -248,13 +270,14 @@ export default function App() {
       }
       if (!fastMode) {
         planningResponse = await requestModel(
-          buildPlanningContext(game, action, prompt, { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation }),
+          buildPlanningContext(game, action, prompt, { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation, talismanRequest }),
           { toolSet: "state", disableJsonMode: Boolean(settings.nativeTools) },
         );
       }
       const discoveryAdjustedCalls = ensureMapDiscoveryToolCall(normalizeToolCalls(planningResponse.toolCalls, game), options.mapInvestigation, game.turn + 1, game);
       const advancementAdjustedCalls = ensureRequestedAdvancementToolCall(discoveryAdjustedCalls, options.advancementRequest, game.turn + 1, game);
       let proposedToolCalls = dedupeToolCalls(normalizeToolCalls(ensureMapMoveToolCall(advancementAdjustedCalls, options.mapDestination, game.turn + 1), game));
+      proposedToolCalls = ensureTalismanToolCall(proposedToolCalls, talismanRequest, game);
 
       // 两种模式都并发修复最多三条独立参数错误；修复完成后仍按原顺序进入串行状态执行。
       const repairPlan = await repairToolCallsConcurrently(game, proposedToolCalls, async ({ call, error }) => {
@@ -272,13 +295,17 @@ export default function App() {
         maxRepairs: 3,
         onRepairsStarted: () => setTurnPhase("toolRetry"),
       });
-      proposedToolCalls = repairPlan.calls;
+      proposedToolCalls = ensureTalismanToolCall(repairPlan.calls, talismanRequest, game);
       const advancementProposed = proposedToolCalls.some((call) => call.name === "advancement.promote");
       if (advancementProposed) resetStreamPreview();
       markTurnMetric(metrics, "planningCompletedAt");
 
       setTurnPhase("validating");
       let execution = executeToolCalls(game, proposedToolCalls, { playerAction: action });
+      if (talismanRequest) {
+        const index = proposedToolCalls.findIndex(call => call.name === "item.use" && call.args.instanceId === talismanRequest.instanceId);
+        if (!execution.results[index]?.ok) throw new Error(`${execution.results[index]?.reason || "符咒效果未能完成"}。符咒与回合均未消耗，可重试。`);
+      }
       let progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results);
       let resolvedGame = {
         ...execution.game,
@@ -490,6 +517,10 @@ export default function App() {
 
   const runLocalTool = async (name, args, reason, showStory) => {
     if (!game || busyRef.current) return;
+    if (name === "item.use" && getChurchTalisman(game.inventory.find(item => item.instanceId === args.instanceId))) {
+      showStory?.();
+      return runTurn(reason, { talismanRequest: args });
+    }
     if (name === "item.use" && medicineRecipe(game.inventory.find(item => item.instanceId === args.instanceId))) {
       const result = handleSpecialAction({ operation: "use", id: args.instanceId, revision: specialState(game).revision });
       if (!result.ok) setError(result.error);
@@ -562,13 +593,13 @@ export default function App() {
   return <>
     <a className="skip-link" href="#main">跳到主要内容</a>
     {screen === "splash" && <Splash onEnter={() => setScreen("welcome")} />}
-    {screen === "welcome" && <Welcome loading={loading} hasSave={saves.some((slot) => slot.slotId === "autosave")} saves={saves} apiSettings={settings} onNew={() => { if (!busyRef.current) setScreen("create"); }} onContinue={handleContinue} onLoadSlot={loadSlot} onImport={handleImport} onApi={() => setModal("api")} onUpdate={() => setModal("update")} onChangelog={() => setModal("changelog")} />}
+    {screen === "welcome" && <Welcome loading={loading} hasSave={saves.some((slot) => slot.slotId === "autosave")} saves={saves} apiSettings={settings} onNew={() => { if (!busyRef.current) setScreen("create"); }} onContinue={handleContinue} onLoadSlot={loadSlot} onImport={handleImport} onApi={() => setModal("api")} onUpdate={() => setModal("update")} onChangelog={() => setModal("changelog")} onDiagnostics={openStartupDiagnostics} onboardingStep={!modal && onboardingStep !== "complete" ? onboardingStep : null} onOnboardingStep={setOnboardingStep} />}
     {screen === "create" && <CharacterCreation onBack={() => setScreen("welcome")} onCreate={handleCreate} settings={settings} onApi={() => setModal("api")} />}
     {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onRegenerateChoices={regenerateChoices} onLocalTool={runLocalTool} onOpenMap={openMap} onSpecialAction={handleSpecialAction} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => { if (!busyRef.current) { resetAction(); setScreen("welcome"); } }} />}
     {itemConfirmation && <ImportantItemConfirmation changes={itemConfirmation.changes} onConfirm={(approvedKeys) => settleImportantItemConfirmation({ approvedKeys })} onCancel={() => settleImportantItemConfirmation({ cancelled: true })} />}
     {modal === "map" && game && <WorldMap game={game} loading={loading} initialLocationId={mapFocus} onSpecial={() => setModal("special")} onClose={() => setModal(null)} onTravel={(location) => { setModal(null); return runTurn(`前往${location.name}`, { mapDestination: location }); }} onInvestigate={(location, knowledge) => { setModal(null); return runTurn(`根据地图上的传闻，调查${knowledge.note || location.district}。`, { mapInvestigation: { locationId: location.id, currentStatus: knowledge.status, rumor: knowledge.note || location.rumor } }); }} onExplore={handleExplore} onPray={handlePray} />}
-    {modal === "special" && game && <Modal title="特殊行动" onClose={() => setModal(null)}><SpecialActions game={game} loading={loading} onExecute={handleSpecialAction} onOpenMap={openMap} /></Modal>}
-    {modal === "api" && <ApiSettings settings={settings} onSave={handleSettingsSave} onClose={() => setModal(null)} />}
+    {modal === "special" && game && <Modal title="特殊行动" onClose={() => setModal(null)}><SpecialActions game={game} loading={loading} onExecute={handleSpecialAction} onOpenMap={openMap} onAction={(action, options) => { setModal(null); return runTurn(action, options); }} /></Modal>}
+    {modal === "api" && <ApiSettings settings={settings} onSave={handleSettingsSave} onClose={() => setModal(null)} onSetupComplete={screen === "welcome" && onboardingStep === "setup" ? () => { setOnboardingStep("import"); setScreen("welcome"); setModal(null); } : undefined} />}
     {(modal === "update" || modal === "update-auto") && <UpdateDialog automatic={modal === "update-auto"} onClose={() => setModal(null)} />}
     {modal === "changelog" && <ChangelogDialog onClose={() => setModal(null)} />}
     {modal === "prompt" && <PromptEditor value={prompt} onSave={handlePromptSave} onClose={() => setModal(null)} />}

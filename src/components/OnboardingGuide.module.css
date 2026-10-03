@@ -1,0 +1,32 @@
+.guide { width: 100%; max-width: 42rem; margin: .6rem auto 2.2rem; padding: 1.3rem 1.5rem 1rem; border: 1px solid #a88b54; border-top: 3px solid #d4b779; background: #14211f; color: #f0e4c9; box-shadow: 0 8px 26px #0005; }
+.caption { display: grid; grid-template-columns: 1fr auto; gap: .8rem; color: #d4b779; font: .7rem/1.5 var(--font-sans); letter-spacing: .05em; }
+.guide h2 { margin: .7rem 0; font: 500 1.35rem/1.45 var(--font-serif); }
+.guide h2:focus { outline: none; }
+.intro, .description { margin: 0; color: #ded4bf; font: .85rem/1.8 var(--font-sans); }
+.description { min-height: 3.5rem; }
+.steps { display: grid; gap: .8rem; margin: 1rem 0; padding: 0; list-style: none; }
+.steps li { display: grid; grid-template-columns: 1.65rem minmax(0, 1fr); gap: .55rem; }
+.number { padding-top: .1rem; color: #d4b779; font: .73rem/1.5 var(--font-mono); }
+.steps strong { display: block; font: 600 .86rem/1.5 var(--font-sans); }
+.steps p { margin: .2rem 0 0; color: #c9c3b3; font: .8rem/1.7 var(--font-sans); }
+.actions { display: flex; flex-wrap: wrap; align-items: center; margin-top: 1.1rem; }
+.actions button { min-height: 2.75rem; padding: .6rem .85rem; font: .8rem/1.4 var(--font-sans); cursor: pointer; }
+.skip { margin-right: auto; padding-left: 0 !important; color: #c9c3b3; background: transparent; border: 1px solid transparent; }
+.back { margin-right: .5rem; border: 1px solid #9b885f; background: transparent; color: #f0e4c9; }
+.next { border: 1px solid #d4b779; background: #d4b779; color: #18241f; font-weight: 600 !important; }
+.next:hover { background: #e5cca0; }
+.back:hover, .skip:hover { color: #fff4d9; text-decoration: underline; }
+.actions button:focus { outline: 2px solid #e6c587; outline-offset: 3px; }
+.footnote { margin: .65rem 0 0; color: #aaa99a; font: .67rem/1.6 var(--font-sans); }
+.setupCard { padding: 1rem; border: 1px solid #8b7a5a66; border-left: 3px solid var(--verdigris); background: #1f55470d; }
+.setupCard h3 { margin: 0; font: 600 1.05rem/1.5 var(--font-serif); color: var(--ink); }
+.setupCard .steps { margin-bottom: 0; }
+.setupCard .number { color: var(--verdigris); }
+.setupCard .steps strong { color: var(--ink); }
+.setupCard .steps p { color: var(--ink-soft); }
+@media (max-width: 600px) {
+  .guide { margin-top: .3rem; padding: 1rem; }
+  .guide h2 { font-size: 1.16rem; }
+  .caption { font-size: .64rem; gap: .35rem; }
+  .actions button { padding: .6rem .65rem; font-size: .76rem; }
+}
