@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import Modal from "./Modal.jsx";
+import DiagnosticsButton from "./DiagnosticsButton.jsx";
 import styles from "./Welcome.module.css";
 import { APP_VERSION, WEB_BUILD, isNativeAndroid } from "../services/updates.js";
 import { recentArchives, archiveLocation } from "../data/titleArchive.js";
@@ -104,6 +105,7 @@ export default function Welcome({ hasSave, saves = [], loading = false, apiSetti
           <button type="button" disabled={loading} onClick={() => inputRef.current?.click()}>导入存档</button>
           <button type="button" onClick={onApi}>API 设置</button>
           <button type="button" onClick={onChangelog}>更新日志</button>
+          <DiagnosticsButton />
           <a href="https://bemyself001.github.io/backlund-chronicle/privacy.html" target="_blank" rel="noreferrer">隐私政策<span className="sr-only">（新窗口打开）</span></a>
           <button type="button" aria-pressed={stillScene} onClick={() => setStillScene((current) => !current)}>静态场景{stillScene ? " · 开" : " · 关"}</button>
         </div>

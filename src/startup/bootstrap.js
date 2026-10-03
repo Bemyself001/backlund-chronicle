@@ -7,6 +7,7 @@
   var bound = false;
   var nativeInfo = null;
   var inputEvents = [];
+  var opener = null;
   var variant = document.querySelector('meta[name="startup-variant"]').content;
   var version = document.querySelector('meta[name="startup-version"]').content;
   var capabilities = {
@@ -40,11 +41,12 @@
     }
     return type + (location ? ' @ ' + location[1] + ':' + (Number(line) || 0) + ':' + (Number(column) || 0) : '');
   }
-  function show() {
+  function show(expand) {
     var panel = element('startup-panel');
     if (!panel) return;
     panel.hidden = false;
-    element('startup-details').open = true;
+    panel.scrollTop = 0;
+    element('startup-details').open = !!expand;
     element('startup-retry').hidden = false;
     refresh();
   }
@@ -55,13 +57,20 @@
       element('startup-title').textContent = '游戏启动未完成';
       element('startup-message').textContent = '请复制诊断信息反馈给作者，然后尝试重新启动。此操作不会删除存档。';
     }
-    show();
+    show(true);
   }
   var timer = window.setTimeout(function () {
     if (!completed) fail('等待首屏超过 15 秒');
   }, 15000);
   window.__startupDiagnostics = {
     mark: mark, fail: fail, report: report, bind: bind,
+    open: function () {
+      opener = document.activeElement;
+      element('startup-title').textContent = '启动与输入诊断';
+      element('startup-message').textContent = '兼容性检测工具 · 报告仅保留在本机，不会自动上传。';
+      show(false);
+      if (element('startup-close')) element('startup-close').focus();
+    },
     native: function (info) { nativeInfo = info; refresh(); },
     input: function (records) { inputEvents = records; },
     ready: function () {
@@ -70,7 +79,6 @@
       window.clearTimeout(timer);
       mark('首屏渲染完成');
       if (!failed && element('startup-panel')) element('startup-panel').hidden = true;
-      if (element('startup-open')) element('startup-open').hidden = variant === 'standard' && !failed;
       if (element('startup-close')) element('startup-close').hidden = false;
     }
   };
@@ -93,13 +101,9 @@
     refresh();
     if (failed) fail('页面已显示故障信息');
     element('startup-retry').onclick = function () { window.location.reload(); };
-    element('startup-open').onclick = function () {
-      element('startup-title').textContent = '启动诊断';
-      element('startup-message').textContent = '测试版本：' + variant + '。自动热更新已暂停。';
-      show();
-    };
     element('startup-copy').onclick = function () {
       var field = element('startup-report');
+      element('startup-details').open = true;
       refresh(); field.focus(); field.select(); field.setSelectionRange(0, field.value.length);
       var copied = false;
       try { copied = document.execCommand('copy'); } catch (error) { mark('剪贴板复制失败：' + describe(error)); }
@@ -110,8 +114,12 @@
     close.id = 'startup-close';
     close.hidden = !completed;
     close.textContent = '返回游戏';
-    close.onclick = function () { if (completed) element('startup-panel').hidden = true; };
-    element('startup-panel').appendChild(close);
+    close.onclick = function () {
+      if (!completed) return;
+      element('startup-panel').hidden = true;
+      if (opener && document.documentElement.contains(opener)) opener.focus({ preventScroll: true });
+    };
+    element('startup-toolbar').appendChild(close);
   }
   mark('入口 HTML 已加载');
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', bind);

@@ -1,14 +1,35 @@
-/* Inlined before the application stylesheet so even a failed bundle has a readable screen. */
-#startup-panel { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 2147483646; overflow: auto; box-sizing: border-box; padding: 28px 22px; background: #0c1112; color: #eee3cf; font: 16px/1.6 "Microsoft YaHei", sans-serif; }
-#startup-panel h1 { margin: 20px 0; font-size: 24px; color: #eee3cf; }
-#startup-panel p { margin: 16px 0; max-width: 640px; }
-#startup-panel details { margin: 20px 0; max-width: 720px; }
-#startup-panel summary { cursor: pointer; }
-#startup-report { display: block; box-sizing: border-box; width: 100%; height: 240px; margin: 14px 0; padding: 12px; border: 1px solid #a78750; background: #17201f; color: #eee3cf; font: 13px/1.5 monospace; }
-#startup-panel button, #startup-open { min-height: 44px; padding: 10px 16px; border: 1px solid #c3a363; background: #17201f; color: #eee3cf; font: 15px/1.5 sans-serif; cursor: pointer; }
-#startup-open { position: fixed; bottom: 12px; right: 12px; z-index: 2147483645; }
-#startup-panel [hidden], #startup-panel[hidden], #startup-open[hidden] { display: none !important; }
-#input-diagnostics { max-width: 720px; margin: 24px 0; padding: 16px; border: 1px solid #a78750; }
-#input-diagnostics label { display: block; margin: 12px 0; }
-#input-diagnostics input { display: block; box-sizing: border-box; width: 100%; min-height: 46px; padding: 10px; border: 1px solid #a78750; background: #eee3cf; color: #17201f; font: 16px/1.5 sans-serif; }
+/* Inlined before the app bundle; failures remain readable without React or app CSS. */
+#startup-panel { position: fixed; top: 0; right: 0; bottom: 0; left: 0; z-index: 2147483646; overflow: auto; box-sizing: border-box; padding: 32px 16px; background: #080e10f5; color: #eee3cf; font: 15px/1.65 "Microsoft YaHei", sans-serif; }
+#startup-sheet { box-sizing: border-box; width: 100%; max-width: 680px; margin: 0 auto; padding: 0 28px 28px; border: 1px solid #8f784b; border-top: 3px solid #c8a76b; border-radius: 3px; background: #111a19; box-shadow: 0 20px 64px #0006; }
+#startup-toolbar { position: sticky; top: -32px; z-index: 1; display: flex; align-items: center; justify-content: space-between; gap: 16px; padding: 24px 0 18px; border-bottom: 1px solid #a68a5240; background: #111a19; }
+#startup-panel h1 { margin: 0; color: #eee3cf; font: 500 23px/1.4 "Microsoft YaHei", sans-serif; }
+#startup-panel p { margin: 12px 0; }
+#startup-panel #startup-eyebrow { margin: 0 0 6px; color: #c6a66c; font-size: 11px; letter-spacing: .16em; }
+#startup-message { color: #bcb7a6; font-size: 13px; }
+#startup-panel details { margin: 20px 0; border: 1px solid #8f784b66; border-radius: 2px; padding: 12px 16px; }
+#startup-panel details p { color: #bcb7a6; font-size: 12px; }
+#startup-panel summary { cursor: pointer; color: #d2ba88; font-size: 13px; }
+#startup-report { display: block; box-sizing: border-box; width: 100%; height: 210px; margin: 12px 0 0; padding: 12px; border: 1px solid #647366; border-radius: 2px; background: #0b1212; color: #d1d6c7; font: 12px/1.65 monospace; }
+#startup-panel button { min-height: 44px; padding: 9px 14px; border: 1px solid #927b50; border-radius: 2px; background: transparent; color: #ddcfaf; font: 13px/1.5 "Microsoft YaHei", sans-serif; cursor: pointer; }
+#startup-panel button:hover { background: #25332a; border-color: #d0b477; }
+#startup-panel button:focus-visible, #startup-panel summary:focus-visible, #startup-panel input:focus-visible, #startup-report:focus-visible { outline: 2px solid #d4b77a; outline-offset: 3px; }
+#startup-close { flex-shrink: 0; }
+#startup-actions { display: flex; flex-wrap: wrap; gap: 10px; }
+#startup-panel #startup-copy { border-color: #c9aa70; background: #c9aa70; color: #14201a; font-weight: 700; }
+#startup-panel [hidden], #startup-panel[hidden] { display: none !important; }
+#input-diagnostics { margin: 22px 0; padding: 18px; border: 1px solid #70857966; border-radius: 2px; background: #1b2a24; }
+#input-diagnostics h2 { margin: 0; color: #e4d8b9; font-size: 17px; font-weight: 500; }
+#input-diagnostics p { color: #bdc7b9; font-size: 13px; }
+#input-probes { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+#input-diagnostics label { display: block; margin: 10px 0; color: #cec9b3; font-size: 12px; }
+#input-diagnostics input { display: block; box-sizing: border-box; width: 100%; min-height: 46px; margin-top: 7px; padding: 10px; border: 1px solid #ab976e; border-radius: 2px; background: #eee3cf; color: #17201f; font: 16px/1.5 sans-serif; }
 #input-status { overflow-wrap: anywhere; }
+@media (max-width: 480px) {
+  #startup-panel { padding: 12px 10px; }
+  #startup-sheet { padding: 0 16px 20px; }
+  #startup-toolbar { top: -12px; gap: 10px; padding: 18px 0 14px; }
+  #startup-panel h1 { font-size: 20px; }
+  #input-diagnostics { padding: 14px; }
+  #input-probes { grid-template-columns: minmax(0, 1fr); gap: 0; }
+  #startup-actions > button { flex: 1; }
+}

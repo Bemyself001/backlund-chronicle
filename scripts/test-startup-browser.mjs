@@ -60,6 +60,9 @@ try {
             }
             if (scenario === "fresh") {
               await page.screenshot({ path: resolve(output, `${variant}-first-screen.png`) });
+              await page.getByRole("button", { name: /签署档案并进入/ }).click();
+              await page.locator("#startup-open").scrollIntoViewIfNeeded();
+              await page.screenshot({ path: resolve(output, `${variant}-diagnostics-entry.png`) });
               await page.locator("#startup-open").click();
               assert.equal(await page.locator("#startup-panel").isVisible(), true);
               for (const id of ["input-probe-plain", "input-probe-controlled"]) {
@@ -110,7 +113,6 @@ try {
               await page.locator("#startup-copy").click();
               await page.locator("#startup-close").click();
               assert.equal(await page.locator("#startup-panel").isVisible(), false);
-              await page.getByRole("button", { name: /签署档案并进入/ }).click();
               await page.getByRole("button", { name: /建立新档案/ }).click();
               const character = page.locator('#main input[type="text"]').first();
               await character.fill("输入测试员");

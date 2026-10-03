@@ -9,6 +9,7 @@ import styles from "./CharacterCreation.module.css";
 import { getMapLocation } from "../system/map.js";
 import { SEFIRAH_CASTLE_EASTER_EGG } from "../content/backlund/easterEggs.js";
 import Modal from "./Modal.jsx";
+import DiagnosticsButton from "./DiagnosticsButton.jsx";
 
 const AVATAR_SIZE = 192;
 
@@ -163,7 +164,7 @@ export default function CharacterCreation({ onBack, onCreate, settings, onApi })
             <label className={styles.field}><span>随身物品名称（可留空）</span><input maxLength={40} value={character.carriedItemName} onChange={(event) => update("carriedItemName", event.target.value)} placeholder="例如：旧相机" aria-describedby="carried-help" /></label>
             <label className={styles.field}><span>随身物品描述</span><textarea maxLength={300} rows={2} value={character.carriedItemDescription} onChange={(event) => update("carriedItemDescription", event.target.value)} placeholder="例如：父亲留下的折叠式相机，镜头边缘有一道划痕。" /></label>
             <p id="carried-help">可自选一件普通随身物品，数量为 1；容器按空容器计算，描述不会直接赋予特殊能力。家传怀表由对应天赋额外发放，不占此名额。罗盘、笔记本和火柴不再默认赠送。</p>
-            <p>使用当前配置的 AI 整理行装，仅发送衣着和随身物品描述。 <button className={styles.apiLink} type="button" onClick={onApi}>API 设置</button></p>
+            <p>使用当前配置的 AI 整理行装，仅发送衣着和随身物品描述。 <button className={styles.apiLink} type="button" onClick={onApi}>API 设置</button> <DiagnosticsButton className={styles.apiLink} /></p>
           </fieldset>
           <fieldset className={styles.identity}><legend>非凡身份</legend>
             <label><input type="radio" name="extraordinary" value="ordinary" checked={character.extraordinary === "ordinary"} onChange={() => selectExtraordinary("ordinary")} /><span><strong>普通人</strong><small>以知识、人脉与谨慎面对未知</small></span></label>
