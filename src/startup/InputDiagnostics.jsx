@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
-import { IS_STARTUP_TEST, STARTUP_VARIANT, readNativeStartup } from "../services/startup.js";
+import { IS_STARTUP_TEST, STARTUP_VARIANT, readNativeStartup, recoverNativeInput } from "../services/startup.js";
 import { watchInput } from "../services/inputFocus.js";
 
 export default function InputDiagnostics() {
@@ -13,6 +13,7 @@ export default function InputDiagnostics() {
     const monitor = watchInput(window, {
       recover: STARTUP_VARIANT === "compat",
       nativeInfo: readNativeStartup,
+      nativeRecovery: recoverNativeInput,
       // Do not mutate diagnostic UI during a gesture: layout changes can redirect its click.
       publish: records => window.__startupDiagnostics?.input(records),
     });

@@ -11,8 +11,15 @@ export function startupStage(stage, initialize) {
 
 export function readNativeStartup() {
   if (!Capacitor.isPluginAvailable("StartupDiagnostics")) return;
-  return NativeStartup.getInfo().then(info => globalThis.__startupDiagnostics?.native(info))
+  return NativeStartup.getInfo().then(info => { globalThis.__startupDiagnostics?.native(info); return info; })
     .catch(() => globalThis.__startupDiagnostics?.mark("原生诊断读取失败"));
+}
+
+export function recoverNativeInput(requestId) {
+  if (!Capacitor.isNativePlatform() || !Capacitor.isPluginAvailable("StartupDiagnostics")) {
+    return Promise.resolve({ status: "unsupported", attempted: false });
+  }
+  return NativeStartup.recoverInput({ requestId });
 }
 
 export function reportStartupReady() {

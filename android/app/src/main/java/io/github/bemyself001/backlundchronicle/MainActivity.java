@@ -57,9 +57,22 @@ public class MainActivity extends BridgeActivity {
 
     @Override
     public void onDestroy() {
+        if (inputFocus != null) inputFocus.destroy();
         startupDiagnostics.destroy();
         startupHandler.removeCallbacks(startupTimeout);
         super.onDestroy();
+    }
+
+    @Override
+    public void onWindowFocusChanged(boolean hasFocus) {
+        super.onWindowFocusChanged(hasFocus);
+        if (inputFocus != null) inputFocus.cancelPending();
+    }
+
+    @Override
+    public void onPause() {
+        if (inputFocus != null) inputFocus.cancelPending();
+        super.onPause();
     }
 
     @Override

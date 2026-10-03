@@ -29,7 +29,7 @@ try {
     const url = `http://127.0.0.1:${server.address().port}/`;
     try {
       for (const scenario of ["fresh", "missing-script", "syntax-error", "render-error", "blocked-storage", "missing-style", "offline-html", ...(variant === "compat" ? ["missing-apis"] : ["timeout", "stalled-script"])]) {
-        const context = await browser.newContext({ viewport: { width: 393, height: 820 }, deviceScaleFactor: 1, hasTouch: true });
+        const context = await browser.newContext({ viewport: { width: 374, height: 755 }, deviceScaleFactor: 1, hasTouch: true });
         const page = await context.newPage();
         const pageErrors = [];
         page.on("pageerror", error => pageErrors.push(error.name));
@@ -61,6 +61,18 @@ try {
             if (scenario === "fresh") {
               await page.screenshot({ path: resolve(output, `${variant}-first-screen.png`) });
               await page.getByRole("button", { name: /签署档案并进入/ }).click();
+              // Chromium 83 ignores gap in flex layouts. Force the same limitation for this check.
+              await page.evaluate(() => {
+                for (const element of document.querySelectorAll("*")) {
+                  if (["flex", "inline-flex"].includes(getComputedStyle(element).display)) element.style.gap = "0px";
+                }
+              });
+              const buttons = await page.locator('[aria-label="辅助操作"] > button, [aria-label="辅助操作"] > a').evaluateAll(elements =>
+                elements.map(element => { const r = element.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; }));
+              assert.equal(buttons.length, 6);
+              assert.ok(buttons[1].x > buttons[0].x + buttons[0].width + 8, "horizontal button spacing");
+              assert.ok(buttons[2].y > buttons[0].y + buttons[0].height + 4, "buttons wrap with vertical spacing");
+              assert.ok(buttons.every(button => Math.abs(button.width - buttons[0].width) < 1 && button.height === buttons[0].height), "equal button sizes");
               await page.locator("#startup-open").scrollIntoViewIfNeeded();
               await page.screenshot({ path: resolve(output, `${variant}-diagnostics-entry.png`) });
               await page.locator("#startup-open").click();
