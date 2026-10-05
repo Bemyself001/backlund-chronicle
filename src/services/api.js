@@ -4,6 +4,7 @@ import { createProviderProfile, inferApiProvider } from "./apiProviders.js";
 import { normalizeAIResponse, textFromContent } from "./protocol.js";
 import { CLOTHING_SLOTS } from "../system/loadout.js";
 import { MAX_ENEMY_HEALTH, MAX_ENEMY_ID_LENGTH, MAX_ENEMY_NAME_LENGTH, MAX_COMBAT_ENEMIES } from "../system/combat.js";
+import { ENEMY_MOVES } from "../system/healthRules.js";
 import { QUEST_INPUT_SCHEMA, QUEST_RESOLVE_PROPERTIES } from "./questSchema.js";
 import { normalizeTokenUsage } from "./apiUsage.js";
 
@@ -229,7 +230,7 @@ const TOOL_PARAMETER_SCHEMAS = {
   },
   "ability.use": {
     type: "object", additionalProperties: false, required: ["abilityId", "reason"],
-    properties: { abilityId: { type: "string", description: "当前角色unlockedAbilities中的稳定ID" }, targetId: { type: "string", description: "能力目标：当前敌人或已知线索ID；自身能力省略" }, reason: { type: "string" } },
+    properties: { abilityId: { type: "string", description: "当前角色unlockedAbilities中的稳定ID" }, targetId: { type: "string", description: "能力目标：当前敌人或已知线索ID；自身能力省略" }, boostStacks: { type: "integer", minimum: 0, maximum: 3, description: "玩家明确选择的本回合强化次数；每层1点灵性，仅已解锁狼人强化的伤害行动可用" }, reason: { type: "string" } },
   },
   "enemy.encounter": {
     type: "object", additionalProperties: false, required: ["enemies", "reason"],
@@ -246,13 +247,13 @@ const TOOL_PARAMETER_SCHEMAS = {
       reason: { type: "string" },
     },
   },
-  "enemy.damage": {
-    type: "object", additionalProperties: false, required: ["enemyId", "amount", "reason"],
-    properties: { enemyId: { type: "string" }, amount: { type: "integer", minimum: 1, maximum: MAX_ENEMY_HEALTH }, reason: { type: "string" } },
+  "combat.action": {
+    type: "object", additionalProperties: false, required: ["actionId", "reason"],
+    properties: { actionId: { type: "string", enum: ["attack", "defend", "wait"] }, enemyId: { type: "string", description: "普通攻击的目标敌人ID" }, boostStacks: { type: "integer", minimum: 0, maximum: 3 }, reason: { type: "string" } },
   },
   "enemy.act": {
-    type: "object", additionalProperties: false, required: ["enemyId", "damage", "action", "reason"],
-    properties: { enemyId: { type: "string" }, damage: { type: "integer", minimum: 0, maximum: MAX_ENEMY_HEALTH, description: "对玩家的生命伤害，非攻击行动为0" }, action: { type: "string", maxLength: 500 }, reason: { type: "string" } },
+    type: "object", additionalProperties: false, required: ["enemyId", "moveId", "reason"],
+    properties: { enemyId: { type: "string" }, moveId: { type: "string", enum: Object.keys(ENEMY_MOVES), description: "登记招式ID；重击需先蓄力且冷却结束。不能直接提供伤害数值" }, action: { type: "string", maxLength: 500 }, reason: { type: "string" } },
   },
   "enemy.leave": {
     type: "object", additionalProperties: false, required: ["enemyId", "reason"],
@@ -498,7 +499,7 @@ const TOOL_PARAMETER_SCHEMAS = {
         },
       },
       requiresOccult: { type: "boolean", description: "仅非凡相关变化为 true，需已接触非凡世界" },
-      damageSource: { type: "string", enum: ["environment"], description: "仅独立环境伤害可用；敌人战斗伤害必须通过 enemy.act" },
+      damageSource: { type: "string", enum: ["environment"], description: "仅非战斗环境事件可用；战斗生命变化必须使用登记的战斗行动或技能" },
       reason: { type: "string" },
     },
   },
@@ -519,9 +520,8 @@ const TOOL_PARAMETER_SCHEMAS = {
           tick: {
             type: "object",
             additionalProperties: false,
-            description: "可选：该状态存在期间每轮结算的数值增减（引擎截断到单项 ±3 与 0 至上限），例如 {\"health\":-1}",
+            description: "可选：该状态存在期间每轮结算的数值增减（引擎截断到单项 ±3 与 0 至上限），仅理智和灵性",
             properties: {
-              health: { type: "integer" },
               sanity: { type: "integer" },
               spirituality: { type: "integer" },
             },
@@ -584,7 +584,7 @@ const TOOL_PARAMETER_SCHEMAS = {
   },
 };
 
-const STATE_TOOL_NAMES = ["context.lookup", "inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "potion.identify", "ability.use", "enemy.encounter", "enemy.damage", "enemy.act", "enemy.leave", "item.equip", "item.unequip", "occult.contact", "trigger.engage", "trigger.progress", "trigger.abandon", "organization.join", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.grow", "location.discover", "location.move", "location.archive", "clue.add", "quest.add", "quest.update", "quest.resolve", "dice.check"];
+const STATE_TOOL_NAMES = ["context.lookup", "inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "potion.identify", "ability.use", "enemy.encounter", "combat.action", "enemy.act", "enemy.leave", "item.equip", "item.unequip", "occult.contact", "trigger.engage", "trigger.progress", "trigger.abandon", "organization.join", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.grow", "location.discover", "location.move", "location.archive", "clue.add", "quest.add", "quest.update", "quest.resolve", "dice.check"];
 
 const CHOICE_TOOL_SCHEMA = {
   type: "object",

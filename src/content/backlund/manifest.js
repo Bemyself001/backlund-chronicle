@@ -24,7 +24,7 @@ export const BACKLUND_CONTENT = {
   id: "backlund-core",
   name: "贝克兰德核心内容",
   schemaVersion: 2,
-  contentVersion: "2026.10.03.3",
+  contentVersion: "2026.10.05.1",
   specialActions: SPECIAL_ACTIONS,
   specialRecipes: SPECIAL_RECIPES,
   specialContacts: SPECIAL_CONTACTS,

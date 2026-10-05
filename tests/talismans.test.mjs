@@ -78,8 +78,9 @@ test("storm damage uses maximum HP, rounds upward, clamps at zero and consumes e
   assert.equal(replay.results[0].ok, false);
   assert.equal(replay.game.combat.enemies[0].health, 49);
   game = result.game;
+  game.turn += 1;
   game.combat.enemies[0].health = 2;
-  const killed = executeToolCalls(game, [call("item.use", request.args, "storm-two"), call("enemy.act", { enemyId: "guard", damage: 3, action: "反击" }), call("character.update", { patch: { health: -3 } })]);
+  const killed = executeToolCalls(game, [call("item.use", request.args, "storm-two"), call("enemy.act", { enemyId: "guard", moveId: "attack", action: "反击" }), call("character.update", { patch: { health: -3 } })]);
   assert.equal(killed.game.combat.enemies[0].health, 0);
   assert.equal(killed.game.combat.enemies[0].status, "defeated");
   assert.equal(killed.game.combat.enemies[0].lastUpdatedTurn, game.turn + 1);
@@ -93,18 +94,18 @@ test("crimson prevents exactly one turn of the selected enemy, leaving other ene
   const game = encounter(fresh(), [{ id: "guard", name: "守卫", maxHealth: 40 }, { id: "hound", name: "猎犬", maxHealth: 12 }]);
   const charm = addCharm(game, "crimson-charm");
   const calls = ensureTalismanToolCall([
-    call("enemy.act", { enemyId: "guard", damage: 5, action: "抡起棍棒" }, "guard-one"),
-    call("enemy.act", { enemyId: "hound", damage: 1, action: "扑击" }, "hound-one"),
+    call("enemy.act", { enemyId: "guard", moveId: "attack", action: "抡起棍棒" }, "guard-one"),
+    call("enemy.act", { enemyId: "hound", moveId: "attack", action: "扑击" }, "hound-one"),
   ], { instanceId: charm.instanceId, enemyId: "guard" }, game);
   const result = executeToolCalls(game, calls);
   assert.equal(result.results[0].ok, true);
   assert.equal(result.results[1].ok, false);
   assert.equal(result.results[2].ok, true);
-  assert.equal(result.game.character.stats.health, 19);
+  assert.equal(result.game.character.stats.health, 17);
   result.game.turn += 1;
-  const next = executeToolCalls(result.game, [call("enemy.act", { enemyId: "guard", damage: 2, action: "恢复行动" }, "guard-two")]);
+  const next = executeToolCalls(result.game, [call("enemy.act", { enemyId: "guard", moveId: "attack", action: "恢复行动" }, "guard-two")]);
   assert.equal(next.results[0].ok, true);
-  assert.equal(next.game.character.stats.health, 17);
+  assert.equal(next.game.character.stats.health, 14);
 });
 
 test("missing and stale targets do not consume charms; invalid UI requests fail before planning", () => {
@@ -188,8 +189,8 @@ test("combat HP and charm intent reach AI contexts and survive save round trips"
   const context = buildPlanningContext(game, "使用符咒", DEFAULT_SYSTEM_PROMPT, { talismanRequest: request, nativeTools: false });
   assert.match(context.at(-1).content, /requestedTalisman/);
   assert.match(context.map(message => message.content).join(""), /enemy\.encounter|enemy\.act/);
-  const parsed = normalizeAIResponse(JSON.stringify({ toolCalls: [call("enemy.damage", { enemyId: "guard", amount: 5 })] }));
-  assert.equal(executeToolCalls(game, normalizeToolCalls(parsed.toolCalls, game)).game.combat.enemies[0].health, 75);
+  const parsed = normalizeAIResponse(JSON.stringify({ toolCalls: [call("combat.action", { enemyId: "guard", actionId: "attack" })] }));
+  assert.equal(executeToolCalls(game, normalizeToolCalls(parsed.toolCalls, game)).game.combat.enemies[0].health, 67);
 });
 
 test("native AI schemas include validated enemy tools and atomic talisman clue fields", async context => {
@@ -202,7 +203,7 @@ test("native AI schemas include validated enemy tools and atomic talisman clue f
   };
   await requestAI({ baseUrl: "https://example.test/v1", apiKey: "test", customHeaders: "", model: "test", nativeTools: true, stream: false, maxTokens: 1000 }, [{ role: "user", content: "测试" }]);
   const tools = Object.fromEntries(body.tools.map(entry => [entry.function.name, entry.function.parameters]));
-  for (const name of ["enemy__encounter", "enemy__damage", "enemy__act", "enemy__leave"]) assert.ok(tools[name]);
+  for (const name of ["enemy__encounter", "combat__action", "enemy__act", "enemy__leave"]) assert.ok(tools[name]);
   assert.deepEqual(tools.item__use.properties.clue.required, ["id", "title", "detail"]);
   assert.ok(tools.item__use.properties.enemyId);
 });

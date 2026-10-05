@@ -47,9 +47,13 @@ test("money tools keep currency separate and the audit reports denomination-awar
   assert.equal(audit.money.after.solers, 2);
 });
 
-test("starting money is capped at three pounds", () => {
-  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "上限测试员", startingMoneyPence: 9999 });
-  assert.deepEqual(game.money, moneyFromPence(720));
+test("starting money accepts up to five pounds and caps excess before the savings bonus", () => {
+  for (const [startingMoneyPence, expected] of [[0, 0], [720, 720], [960, 960], [1200, 1200], [9999, 1200]]) {
+    const game = createInitialGame({ ...EMPTY_CHARACTER, name: "上限测试员", startingMoneyPence });
+    assert.deepEqual(game.money, moneyFromPence(expected));
+  }
+  const saver = createInitialGame({ ...EMPTY_CHARACTER, name: "积蓄测试员", startingMoneyPence: 1200, talent: "savings" });
+  assert.deepEqual(saver.money, moneyFromPence(1440));
 });
 
 test("important item confirmations ignore ordinary items and all money changes", () => {

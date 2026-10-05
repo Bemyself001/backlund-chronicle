@@ -3,6 +3,7 @@ import { getOrganization } from "../content/index.js";
 import { activeEnemies, isEnemyStunned } from "../system/combat.js";
 import { getChurchTalisman } from "../system/talismans.js";
 import styles from "./EnemyEncounter.module.css";
+import CombatActions from "./CombatActions.jsx";
 
 export function TalismanControl({ game, item, onAction, disabled, tone = "paper" }) {
   const [targetId, setTargetId] = useState("");
@@ -51,8 +52,8 @@ export default function EnemyEncounter({ game, onAction, disabled }) {
     <div className={styles.heading}><h2>{active.length ? "当前遭遇" : "遭遇结果"}</h2><span>{active.length ? `${active.length} 名敌人仍在场` : "敌人已被击败"}</span></div>
     <div className={styles.enemies}>{enemies.map(enemy => {
       const defeated = enemy.status === "defeated" || enemy.health <= 0;
-      const stunned = !defeated && isEnemyStunned(enemy, game.turn);
-      const status = defeated ? "已击败" : stunned ? "眩晕 · 本回合无法行动" : "可行动";
+      const stunned = !defeated && isEnemyStunned(enemy, game.turn + 1);
+      const status = defeated ? "已击败" : stunned ? "眩晕 · 本回合无法行动" : enemy.windupTurn >= 0 ? "正在蓄力 · 警惕20%重击" : enemy.guardedThroughTurn >= game.turn + 1 ? "正在防御" : "可行动";
       const maximum = Math.max(1, Number(enemy.maxHealth) || 1);
       const health = Math.max(0, Math.min(maximum, Number(enemy.health) || 0));
       return <article key={enemy.id} className={styles.enemy} data-status={defeated ? "defeated" : stunned ? "stunned" : "active"}>
@@ -61,6 +62,7 @@ export default function EnemyEncounter({ game, onAction, disabled }) {
         <div className={styles.health} role="meter" aria-label={`${enemy.name}的生命`} aria-valuemin={0} aria-valuemax={maximum} aria-valuenow={health} aria-valuetext={`${health} / ${maximum}，${status}`}><span style={{ width: `${health / maximum * 100}%` }} /></div>
       </article>;
     })}</div>
+    {active.length > 0 && <CombatActions key={game.turn} game={game} onAction={onAction} disabled={disabled} />}
     {active.length > 0 && charms.length > 0 && <details className={styles.quickActions}><summary>使用战斗符咒 <span>{charms.reduce((total, item) => total + item.quantity, 0)} 枚可用</span></summary><div className={styles.charms}>{charms.map(item => <TalismanControl key={item.instanceId} game={game} item={item} onAction={onAction} disabled={disabled} />)}</div></details>}
   </section>;
 }

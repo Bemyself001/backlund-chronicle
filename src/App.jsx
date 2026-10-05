@@ -265,7 +265,7 @@ export default function App() {
         if (reason) throw new Error(reason);
       }
       // All sleep, rest and waiting narration must use the settled clock.
-      const fastMode = Boolean(settings.fastMode) && !questTrackingPlan && !playerRequests.abilityRequest && !playerRequests.identificationRequest && !playerRequests.advancementRequest && !options.personConversation && !advancementIntent && !talismanRequest && !activeEnemies(game).length && !/符咒/.test(action) && timedAction(action, game.worldTime) === null;
+      const fastMode = Boolean(settings.fastMode) && !questTrackingPlan && !playerRequests.abilityRequest && !playerRequests.combatRequest && !playerRequests.identificationRequest && !playerRequests.advancementRequest && !options.personConversation && !advancementIntent && !talismanRequest && !activeEnemies(game).length && !/符咒/.test(action) && timedAction(action, game.worldTime) === null;
       const planningOptions = { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation, talismanRequest, ...playerRequests, questTrackingPlan };
       let planningResponse;
       let fastPresentationTask = null;
@@ -304,7 +304,7 @@ export default function App() {
       let proposedToolCalls = dedupeToolCalls(normalizeToolCalls(ensureMapMoveToolCall(advancementAdjustedCalls, options.mapDestination, game.turn + 1), game));
       const enforceRequests = calls => {
         if (questTrackingPlan && ["travel", "progress"].includes(questTrackingPlan.kind)) return [{ id: `track:${game.turn + 1}:${options.questTrackingRequest.id}`, name: "quest.track", args: { ...options.questTrackingRequest }, reason: action }];
-        return ensurePlayerActionTools(ensureRequestedAdvancementToolCall(ensureTalismanToolCall(calls, talismanRequest, game), playerRequests.advancementRequest, game.turn + 1, game), playerRequests, game);
+        return ensurePlayerActionTools(ensureRequestedAdvancementToolCall(ensureTalismanToolCall(calls, talismanRequest, game), playerRequests.advancementRequest, game.turn + 1, game), { ...playerRequests, talismanRequest }, game, action);
       };
       proposedToolCalls = enforceRequests(proposedToolCalls);
 

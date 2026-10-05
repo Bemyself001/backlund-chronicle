@@ -1,19 +1,21 @@
 import { getAdvancement } from "../system/character.js";
 import { normalizeCombatState } from "../system/combat.js";
 import { applyStatDelta } from "./statChanges.js";
+import { actionPreview, mainActionGate, markMainAction, preparationGate } from "../system/combatActions.js";
+import { addHealthOverTime, damageEnemy, healCharacter, stealLife } from "./healthEffects.js";
+import { displayPercent } from "../system/healthRules.js";
 
 const findAbility = (game, id) => getAdvancement(game.character).unlockedAbilities.find(entry => entry.id === id);
 export function passiveAbilityModifier(game, abilityId, checkKind) {
   const ability = findAbility(game, abilityId);
   return ability?.kind === "passive" && ability.rule.checkKind === checkKind ? ability.rule.modifier : 0;
 }
-export function abilityAvailability(game, abilityId, targetId, turn = Number(game.turn || 0) + 1) {
+export function abilityAvailability(game, abilityId, targetId, turn = Number(game.turn || 0) + 1, boostStacks = 0) {
   const ability = findAbility(game, abilityId);
   if (!ability) return "角色尚未解锁此能力";
   if (ability.kind === "passive") return "被动能力会在适用检定中提供加值，无需主动施放";
-  if (Number(game.character?.stats?.health) <= 0 || Number(game.character?.stats?.sanity) <= 0) return "当前生命或理智归零，无法使用能力";
-  if (Number(game.character?.abilityLastUsedTurn ?? -1) >= turn) return "本回合已经使用过能力";
-  if (!Number.isFinite(game.character?.stats?.spirituality) || game.character.stats.spirituality < ability.rule.cost) return "灵性不足，无法支付能力消耗";
+  const gate = mainActionGate(game, turn) || preparationGate(game, ability.rule, boostStacks);
+  if (gate) return gate;
   if (ability.target.kind === "enemy") {
     const enemy = game.combat?.enemies?.find(entry => entry.id === targetId);
     if (!enemy || enemy.status !== "active" || enemy.health <= 0) return "请选择当前遭遇中尚未被击败的敌人";
@@ -33,12 +35,15 @@ export function abilityAvailability(game, abilityId, targetId, turn = Number(gam
 
 export function resolveAbilityUse(game, args = {}, { turn = Number(game.turn || 0) + 1 } = {}) {
   const targetId = args.targetId || args.enemyId || args.clueId;
-  const reason = abilityAvailability(game, args.abilityId, targetId, turn);
+  const stacks = args.boostStacks ?? 0;
+  const reason = abilityAvailability(game, args.abilityId, targetId, turn, stacks);
   if (reason) return { name: "ability.use", ok: false, reason, log: reason };
   if (!Number.isSafeInteger(turn) || turn < 0) return { name: "ability.use", ok: false, reason: "能力回合无效" };
   const ability = findAbility(game, args.abilityId);
-  const { effect, amount, duration, cost } = ability.rule;
-  const abilityEffect = { abilityId: ability.id, name: ability.name, effect, targetId, spiritualityCost: cost };
+  const { effect, amount, duration, healPercent } = ability.rule;
+  const preview = actionPreview(game, ability.rule, stacks);
+  const cost = preview.spiritualityCost;
+  const abilityEffect = { abilityId: ability.id, name: ability.name, effect, targetId, spiritualityCost: cost, boostStacks: stacks, multiplier: preview.multiplier, healthCost: preview.healthCost };
   const statChanges = [];
   if (ability.target.kind === "enemy") {
     const combat = normalizeCombatState(game.combat);
@@ -46,9 +51,8 @@ export function resolveAbilityUse(game, args = {}, { turn = Number(game.turn || 
     if (!enemy) return { name: "ability.use", ok: false, reason: "敌人数据无效" };
     abilityEffect.before = enemy.health;
     if (effect === "damage") {
-      enemy.health = Math.max(0, enemy.health - amount);
-      if (enemy.health === 0) enemy.status = "defeated";
-      abilityEffect.damage = abilityEffect.before - enemy.health;
+      Object.assign(abilityEffect, damageEnemy(enemy, ability.rule.damagePercent, stacks, turn));
+      if (ability.rule.healthOverTime) addHealthOverTime(enemy.statusEffects, ability, turn);
     } else if (effect === "control") {
       const progress = Math.max(0, Math.min(2, Number(game.character.abilityControl?.[targetId]) || 0)) + 1;
       game.character.abilityControl = { ...game.character.abilityControl, [targetId]: progress === 3 ? 0 : progress };
@@ -73,12 +77,29 @@ export function resolveAbilityUse(game, args = {}, { turn = Number(game.turn || 
     clue.analyzedBy = [...new Set([...(Array.isArray(clue.analyzedBy) ? clue.analyzedBy : []), ability.id])];
     abilityEffect.after = clue.analysisProgress;
     abilityEffect.clueId = clue.id;
-  } else {
+  } else if (effect !== "health") {
     const change = applyStatDelta(game, effect, amount);
     if (change) statChanges.push(change);
+  }
+  const healthCostChange = applyStatDelta(game, "health", -preview.healthCost);
+  if (healthCostChange) statChanges.push(healthCostChange);
+  if (effect === "health") {
+    const change = healCharacter(game, healPercent);
+    if (change) statChanges.push(change);
+    Object.assign(abilityEffect, { healPercent, healing: change?.delta || 0, before: change?.before, after: change?.after });
+    if (ability.rule.healthOverTime) addHealthOverTime(game.statusEffects, ability, turn);
+  }
+  if (effect === "damage" && ability.rule.lifeSteal) {
+    const change = stealLife(game, abilityEffect.damage, abilityEffect.maxHealth, ability.rule.lifeSteal);
+    if (change) statChanges.push(change);
+    abilityEffect.lifeStealHealing = change?.delta || 0;
   }
   const costChange = applyStatDelta(game, "spirituality", -cost);
   if (costChange) statChanges.push(costChange);
   game.character.abilityLastUsedTurn = turn;
-  return { name: "ability.use", ok: true, log: `使用「${ability.name}」，消耗${cost}点灵性。${ability.description}`, data: { abilityEffect, statChanges } };
+  markMainAction(game, turn, stacks);
+  const summary = effect === "damage"
+    ? `按目标最大生命值的${displayPercent(abilityEffect.effectivePercent)}结算（向上取整）：${abilityEffect.enemyName}受到${abilityEffect.damage}点伤害，生命值${abilityEffect.before}→${abilityEffect.after} / ${abilityEffect.maxHealth}${abilityEffect.after === 0 ? "，已被击败" : ""}。`
+    : effect === "health" ? `按自身最大生命值${healPercent}%治疗，实际恢复${abilityEffect.healing}点生命。` : ability.description;
+  return { name: "ability.use", ok: true, log: `使用「${ability.name}」，消耗${cost}点灵性。${summary}`, data: { abilityEffect, statChanges } };
 }

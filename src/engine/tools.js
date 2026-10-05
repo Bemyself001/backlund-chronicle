@@ -21,7 +21,8 @@ import { getPotionUseGate } from "../services/advancement.js";
 import { registerQuest, validateQuestPatch } from "./questLifecycle.js";
 import { resolveQuestTrackingRequest } from "../services/questTracking.js";
 import { executeCombatTool } from "./combat.js";
-import { activeEnemies } from "../system/combat.js";
+import { activeEnemies, MAX_COMBAT_ENEMIES } from "../system/combat.js";
+import { mainActionGate, markMainAction } from "../system/combatActions.js";
 import { getChurchTalisman } from "../system/talismans.js";
 import { grantOrganizationTalisman, executeTalismanUse, validateTalismanClue } from "./talismans.js";
 
@@ -38,8 +39,8 @@ export const TOOL_SCHEMAS = {
   "potion.identify": { required: ["instanceId", "feePence"], description: "夏洛克当面鉴定一瓶未知魔药，已确认收费1镑；鉴定与扣费同时结算" },
   "ability.use": { required: ["abilityId"], description: "使用已解锁的途径能力；本地规则决定目标、灵性消耗、效果与冷却" },
   "enemy.encounter": { required: ["enemies"], description: "登记当前实际遭遇的敌人与 AI 生成的生命值，同一敌人不重置血量" },
-  "enemy.damage": { required: ["enemyId", "amount"], description: "扣除指定敌人的生命值，归零后失去战斗能力" },
-  "enemy.act": { required: ["enemyId", "damage", "action"], description: "结算敌人本轮行动与对玩家的伤害，禁锢或已击败敌人不能行动" },
+  "combat.action": { required: ["actionId"], description: "玩家普通攻击、防御或观察；可附带本回合强化层数，伤害和消耗由本地结算" },
+  "enemy.act": { required: ["enemyId", "moveId"], description: "使用敌人登记的招式：attack、windup、heavy、guard、wait；本地计算伤害、蓄力和冷却" },
   "enemy.leave": { required: ["enemyId"], description: "确认敌人离场或玩家成功脱离该敌人" },
   "item.equip": { required: ["instanceId"], description: "装备可装备物品" },
   "item.unequip": { required: ["instanceId"], description: "卸下已装备物品" },
@@ -51,7 +52,7 @@ export const TOOL_SCHEMAS = {
   "occult.reveal": { required: ["topic", "evidence"], description: "在已有非凡接触后揭示有限神秘知识" },
   "advancement.promote": { required: ["pathwayId", "sequence", "potionInstanceId", "evidence"], description: "服用已鉴定成品魔药，按当前途径逐级晋升，无配方与接触门槛" },
   "character.update": { required: ["patch"], description: "以增减量调整受限角色数值（可为负），由引擎截断到 0 至上限" },
-  "status.add": { required: ["status"], description: "添加状态效果，可通过 tick 声明每轮数值增减（单项 ±3）" },
+  "status.add": { required: ["status"], description: "添加描述性状态；tick仅允许理智、灵性（单项±3），生命效果必须由登记技能产生" },
   "status.remove": { required: ["statusId"], description: "移除状态效果" },
   "relationship.update": { required: ["npcId", "delta"], description: "更新已知 NPC 关系" },
   "location.grow": { required: ["location"], description: "把剧情中新出现的可复用地点登记到动态地图" },
@@ -411,7 +412,7 @@ function executeOne(game, call, options = {}) {
   const args = call.args;
   const turnLabel = `第 ${game.turn + 1} 轮`;
   const findItem = () => game.inventory.find((item) => item.instanceId === args.instanceId);
-  if (call.name.startsWith("enemy.")) {
+  if (call.name.startsWith("enemy.") || call.name === "combat.action") {
     const result = executeCombatTool(game, call.name, args);
     return result.ok ? succeed(call.name, `${turnLabel}：${result.log}`, result.data) : fail(call.name, result.reason);
   }
@@ -675,7 +676,7 @@ function executeOne(game, call, options = {}) {
     case "character.update": {
       if (args.requiresOccult && Number(game.occult?.contact) !== 1) return fail(call.name, "尚未接触非凡世界，不能应用非凡相关角色变化");
       const combatTurn = activeEnemies(game).length || game.combat?.enemies?.some(enemy => enemy.lastUpdatedTurn === game.turn + 1);
-      if (Number(args.patch?.health) < 0 && combatTurn && args.damageSource !== "environment") return fail(call.name, "遭遇中的敌人伤害必须使用 enemy.act 结算；独立的环境伤害才可标记 damageSource=environment");
+      if (Number(args.patch?.health) !== 0 && args.patch?.health !== undefined && (combatTurn || game.character.mainActionLastUsedTurn === game.turn + 1)) return fail(call.name, "战斗生命变化必须使用combat.action、ability.use或enemy.act，由本地百分比规则结算，不能通过环境标记绕过");
       const changes = Object.entries(args.patch || {}).map(([key, value]) => applyStatDelta(game, key, value)).filter(Boolean);
       if (!changes.length) return fail(call.name, "没有有效的数值变化；patch 只接受生命、理智、灵性的非零增减量");
       const autoStatuses = changes.map((change) => change.autoStatus).filter(Boolean);
@@ -685,11 +686,12 @@ function executeOne(game, call, options = {}) {
     }
     case "status.add": {
       if (!args.status?.id || !args.status?.name) return fail(call.name, "状态必须包含 id 与 name");
+      if (args.status.tick?.health !== undefined || args.status.healthEffect !== undefined || args.status.tickPercent !== undefined) return fail(call.name, "持续生命效果必须由已登记技能产生，不能自行填写点数或百分比");
       if (game.statusEffects.some((status) => status.id === args.status.id)) return fail(call.name, "该状态已存在，本轮不重复添加");
-      // tick：每轮结算的数值增减（可选），单项截断到 ±3，只允许生命、理智、灵性
+      // Only non-health ticks can be proposed by the model.
       const tick = {};
       Object.entries(args.status.tick || {}).forEach(([key, value]) => {
-        if (!["health", "sanity", "spirituality"].includes(key) || !Number.isFinite(Number(value))) return;
+        if (!["sanity", "spirituality"].includes(key) || !Number.isFinite(Number(value))) return;
         const delta = Math.max(-3, Math.min(3, Math.trunc(Number(value))));
         if (delta !== 0) tick[key] = delta;
       });
@@ -841,7 +843,9 @@ export function executeToolCalls(currentGame, calls = [], options = {}) {
   const game = structuredClone(currentGame);
   const processed = new Set(game.processedToolCalls || []);
   const results = [];
-  for (const [index, call] of normalizeToolCalls(calls, game).slice(0, 12).entries()) {
+  // Preserve one result per call while allowing every registered foe to respond.
+  for (const [index, call] of normalizeToolCalls(calls, game).slice(0, 12 + MAX_COMBAT_ENEMIES).entries()) {
+    if (index >= 12 && call.name !== "enemy.act") { results.push(fail(call.name, "本轮非敌方回应的工具调用超出上限")); continue; }
     const callId = call.id || signature(game.turn + 1, call);
     if (processed.has(callId)) { results.push(fail(call.name, "重复工具调用已忽略")); continue; }
     if (options.blockedCallIndexes?.includes(index)) {
@@ -851,7 +855,13 @@ export function executeToolCalls(currentGame, calls = [], options = {}) {
     }
     const validationError = validateCall(game, call);
     if (validationError) { results.push(fail(call.name, validationError)); continue; }
+    const combatItem = call.name === "item.use" && (activeEnemies(game).length > 0 || game.character?.mainActionLastUsedTurn === game.turn + 1);
+    if (combatItem) {
+      const gate = mainActionGate(game);
+      if (gate) { results.push(fail(call.name, gate)); continue; }
+    }
     const result = executeOne(game, call, options);
+    if (result.ok && combatItem) markMainAction(game, game.turn + 1);
     if (call.repairNote) {
       result.repairNote = call.repairNote;
       result.log = `${result.log}（${call.repairNote}）`;

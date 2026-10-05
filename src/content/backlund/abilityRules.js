@@ -27,9 +27,12 @@ const PROFILES = {
 export function abilityRule(effect, sequence = 9, upgraded = false) {
   const tier = sequence <= 5 ? 3 : sequence <= 7 ? 2 : 1;
   const power = tier + (upgraded ? 1 : 0);
-  const amount = effect === "damage" ? 2 + power * 2 : effect === "analysis" ? power : 1 + power;
+  const magnitude = effect === "damage"
+    ? { damagePercent: (tier === 3 ? 50 : tier === 2 ? 30 : 20) + (upgraded ? 10 : 0) }
+    : effect === "health" ? { healPercent: (tier === 3 ? 30 : tier === 2 ? 20 : 10) + (upgraded ? 5 : 0) }
+      : { amount: effect === "analysis" ? power : 1 + power };
   const target = ["damage", "stun", "control"].includes(effect) ? "enemy" : effect === "analysis" ? "clue" : "self";
-  return { effect, target: { kind: target }, cost: tier, amount, duration: effect === "stun" ? (upgraded ? 2 : 1) : 0 };
+  return { effect, target: { kind: target }, cost: tier, ...magnitude, duration: effect === "stun" ? (upgraded ? 2 : 1) : 0 };
 }
 
 export function buildPathwayAbilities(pathwayId, sequence9) {
@@ -42,7 +45,9 @@ export function buildPathwayAbilities(pathwayId, sequence9) {
   }));
   for (const [offset, sequence] of [[3, 7], [6, 5]]) {
     const [id, name, effect] = profile.slice(offset, offset + 3);
-    abilities.push({ id: `${pathwayId}:${id}`, name, description: `${name}的本地规则效果（原著职业特色的游戏改编）。`, sequence, rule: abilityRule(effect, sequence), upgrades: [] });
+    const rule = abilityRule(effect, sequence);
+    if (pathwayId === "prisoner" && sequence === 7) rule.preparation = { id: "wolf-strength", name: "狼人强化", multiplier: 1.2, maxStacks: 3, cost: 1, duration: 1 };
+    abilities.push({ id: `${pathwayId}:${id}`, name, description: `${name}的本地规则效果（原著职业特色的游戏改编）。`, sequence, rule, upgrades: [] });
   }
   return abilities;
 }
@@ -52,6 +57,7 @@ export function describeAbilityRule(rule) {
     const label = { investigation: "调查", combat: "战斗", avoidance: "闪避潜行", endurance: "体能耐受", composure: "专注镇定" }[rule.checkKind];
     return `被动：适用的${label}检定+${rule.modifier}，不消耗灵性；单次检定只采用一项能力加值。`;
   }
-  const effects = { damage: `对目标造成${rule.amount}点伤害`, stun: `令目标${rule.duration}回合无法行动`, control: "同一目标的控制进度增加1点；跨回合累计3次后令其2回合无法行动并重置进度（无需连续，不产生永久秘偶）", analysis: `为已有线索增加${rule.amount}点解析进度（上限5，不编造新事实）`, health: `恢复${rule.amount}点生命`, sanity: `恢复${rule.amount}点理智` };
-  return `消耗${rule.cost}点灵性；${effects[rule.effect]}。每回合至多使用一次能力。`;
+  const effects = { damage: `对目标造成其最大生命值${rule.damagePercent}%的伤害（向上取整，至少1点）`, stun: `令目标${rule.duration}回合无法行动`, control: "同一目标的控制进度增加1点；跨回合累计3次后令其2回合无法行动并重置进度（无需连续，不产生永久秘偶）", analysis: `为已有线索增加${rule.amount}点解析进度（上限5，不编造新事实）`, health: `恢复自身最大生命值${rule.healPercent}%的生命（向下取整，至少1点，不超过上限）`, sanity: `恢复${rule.amount}点理智` };
+  const preparation = rule.preparation ? ` 可在本回合攻击前使用${rule.preparation.name}，每层消耗${rule.preparation.cost}点灵性、伤害乘1.2，最多3层；回合结束清空，伤害比例最高60%。` : "";
+  return `消耗${rule.cost}点灵性；${effects[rule.effect]}。每回合至多执行一次主要行动。${preparation}`;
 }

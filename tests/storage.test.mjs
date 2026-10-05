@@ -14,7 +14,7 @@ test("version 1 saves migrate from Grayharbor to Backlund without losing progres
     recentDialogues: [{ role: "assistant", content: "灰檐港市档案馆已经关门。" }],
     longTermSummary: "已经听说灰檐港市档案馆的传闻。",
   });
-  assert.equal(migrated.version, 13);
+  assert.equal(migrated.version, 14);
   assert.equal(migrated.systemVersion, 2);
   assert.deepEqual(migrated.content, { packId: "backlund-core", schemaVersion: 2, contentVersion: CONTENT_VERSION });
   assert.equal(migrated.turn, 8);
@@ -55,7 +55,7 @@ test("dynamic map nodes survive save migration with routes and knowledge intact"
       routes: [{ from: "iron-gate", to: "dyn-shop", minutes: 11, transport: "步行", source: "dynamic" }],
     },
   });
-  assert.equal(migrated.version, 13);
+  assert.equal(migrated.version, 14);
   assert.equal(migrated.mapExtensions.locations[0].id, "dyn-shop");
   assert.equal(migrated.mapExtensions.routes[0].to, "dyn-shop");
   assert.equal(migrated.locationKnowledge["dyn-shop"].status, "discovered");
@@ -73,7 +73,7 @@ test("structured advancement repairs contradictory legacy ordinary fields", () =
     },
     inventory: [],
   });
-  assert.equal(migrated.version, 13);
+  assert.equal(migrated.version, 14);
   assert.equal(migrated.character.extraordinary, "low");
   assert.equal(migrated.character.pathway, "占卜家（序列9）");
   assert.equal(migrated.character.advancement.unlockedAbilities.length, 3);

@@ -2,6 +2,7 @@ import { getAdvancement } from "../system/character.js";
 import { normalizeCombatState } from "../system/combat.js";
 import { getChurchTalisman, normalizeTalismanItem, organizationTalisman } from "../system/talismans.js";
 import { makeId } from "../utils/id.js";
+import { damageEnemy } from "./healthEffects.js";
 
 export function grantOrganizationTalisman(game, turn = Number(game.turn || 0)) {
   const membership = game.organizationState?.membership;
@@ -57,10 +58,7 @@ export function executeTalismanUse(game, item, args = {}, { turn = Number(game.t
       effect = { effect: "stun", enemyId: enemy.id, enemyName: enemy.name, stunnedThroughTurn: enemy.stunnedThroughTurn };
       log = `使用「${definition.name}」：${enemy.name}在第 ${blockedTurn} 轮无法行动（一回合）。`;
     } else {
-      const damage = Math.ceil(enemy.maxHealth * 3 / 10);
-      enemy.health = Math.max(0, before - damage);
-      if (enemy.health === 0) enemy.status = "defeated";
-      effect = { effect: "damage", enemyId: enemy.id, enemyName: enemy.name, damage: before - enemy.health, requestedDamage: damage, before, after: enemy.health, maxHealth: enemy.maxHealth };
+      effect = { effect: "damage", ...damageEnemy(enemy, 30, 0, turn) };
       log = `使用「${definition.name}」：${enemy.name}受到 ${before - enemy.health} 点伤害，生命值 ${before}→${enemy.health} / ${enemy.maxHealth}${enemy.health === 0 ? "，已被击败" : ""}。`;
     }
     game.combat = combat;

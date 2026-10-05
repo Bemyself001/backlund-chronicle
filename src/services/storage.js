@@ -18,6 +18,7 @@ import { MAX_MANUAL_SAVES, normalizeSaveSlots } from "./saveSlots.js";
 import { normalizeCombatState } from "../system/combat.js";
 import { grantOrganizationTalisman } from "../engine/talismans.js";
 import { migrateCharacterStatRules } from "./statMigrations.js";
+import { migrateHealthEffects } from "../engine/healthEffects.js";
 
 const SAVES_KEY = "mist-chronicle-saves-v1";
 const AUTOSAVE_ID = "autosave";
@@ -145,6 +146,7 @@ export function migrateSave(raw) {
     }
   }
   migrateCharacterStatRules(result);
+  migrateHealthEffects(result);
   grantOrganizationTalisman(result);
   result.specialActions = specialState(result);
   result.triggerState = normalizeTriggerState(result);

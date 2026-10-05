@@ -5,6 +5,7 @@ import { resolve } from "node:path";
 import { createInitialGame, EMPTY_CHARACTER, DEFAULT_API_SETTINGS } from "../src/data/defaults.js";
 import { normalizeInventoryItem } from "../src/system/items.js";
 import { executeToolCalls } from "../src/engine/tools.js";
+import { healthPoints } from "../src/system/healthRules.js";
 
 const require = createRequire(import.meta.url);
 const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "C:/Users/ASUS/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright");
@@ -39,7 +40,7 @@ await page.route("**/*", async route => {
   let message;
   if (names.includes("item__use")) {
     const action = data.playerAction || "";
-    const proposals = action.includes("深红") ? [{ name: "enemy.act", args: { enemyId: "guard", damage: 3, action: "挥棍反击" } }]
+    const proposals = action.includes("深红") ? [{ name: "enemy.act", args: { enemyId: "guard", moveId: "attack", action: "挥棍反击" } }]
       : action.includes("风暴") ? [{ name: "enemy.damage", args: { enemyId: "guard", amount: 31 } }]
         : knowledgeFailure ? [] : [{ name: "clue.add", args: { clue: { id: "clue-bootmark", title: "仓库的靴印", detail: "守卫的靴底沾着仓库独有的蓝色粉笔，留下通往后门的足迹。" } } }];
     message = { content: proposals.length ? null : "NO_STATE_CHANGE", tool_calls: proposals.map((call, index) => ({ id: `mock-${Date.now()}-${index}`, type: "function", function: { name: call.name.replace(".", "__"), arguments: JSON.stringify({ ...call.args, reason: "响应玩家使用符咒" }) } })) };
@@ -67,15 +68,15 @@ try {
   assert.equal(await page.getByRole("meter").count(), 2);
   await page.getByText("使用战斗符咒", { exact: false }).click();
   assert.equal(await button("使用深红符咒").isDisabled(), true);
-  const controls = page.getByRole("region", { name: "当前遭遇" }).locator("select");
+  const controls = page.getByRole("region", { name: "当前遭遇" }).getByLabel("选择符咒目标");
   await controls.nth(0).selectOption("guard");
   await button("使用深红符咒").click();
   await waitTurn(4);
-  assert.equal((await saved()).character.stats.health, fixture.character.stats.maxHealth);
+  assert.equal((await saved()).character.stats.health, fixture.character.stats.maxHealth - healthPoints(fixture.character.stats.maxHealth, 12), "the unstunned hound still responds");
   assert.equal((await saved()).combat.enemies[0].stunnedThroughTurn, 4);
   assert.equal((await saved()).inventory.some(item => item.itemId === "crimson-charm"), false);
   await button("使用风暴符咒").waitFor();
-  await page.getByRole("region", { name: "当前遭遇" }).locator("select").selectOption("guard");
+  await page.getByRole("region", { name: "当前遭遇" }).getByLabel("选择符咒目标").selectOption("guard");
   await button("使用风暴符咒").click();
   await waitTurn(5);
   assert.equal((await saved()).combat.enemies[0].health, 49);

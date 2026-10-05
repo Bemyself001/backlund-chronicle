@@ -82,6 +82,7 @@ test("promotion finishes at full health and sanity after same-turn damage; ongoi
   assert.deepEqual(result.progress.advancementRecovery.map(change => change.stat), ["health", "sanity"]);
   const resolution = createTurnResolution(calls, result.results, result.progress, result.game);
   assert.deepEqual(resolution.derivedEffects.advancementRecovery, result.progress.advancementRecovery);
+  result.game.turn += 1;
   const later = resolveTurnProgress(result.game, "等待片刻", "low");
   assert.equal(result.game.character.stats.health, 20);
   assert.equal(result.game.character.stats.sanity, 11);

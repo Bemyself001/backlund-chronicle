@@ -4,17 +4,22 @@ import { timedAction } from "./restTime.js";
 import { advanceWorldTime } from "./worldTime.js";
 import { settleInnRest } from "./recovery.js";
 import { resolveSelectedQuestRoute } from "./questActions.js";
+import { settleHealthEffects } from "./healthEffects.js";
 
 export { advanceWorldTime } from "./worldTime.js";
 
 // 每轮结算：所有带 tick 的状态对角色数值生效（截断与归零联动由 applyStatDelta 统一处理）。
 export function settleStatusTicks(game) {
-  const ticks = [];
+  const turn = Number(game.turn || 0) + 1;
+  const ticks = settleHealthEffects(game, turn);
   for (const status of game.statusEffects || []) {
+    if (status.lastTickTurn >= turn) continue;
     for (const [stat, delta] of Object.entries(status.tick || {})) {
+      if (stat === "health") continue;
       const change = applyStatDelta(game, stat, delta);
       if (change) ticks.push({ status: status.name, ...change });
     }
+    if (Object.keys(status.tick || {}).some(key => key !== "health")) status.lastTickTurn = turn;
   }
   return ticks;
 }
@@ -69,6 +74,8 @@ export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], 
   const localTaskTiming = toolResults.find(result => result?.ok && Number.isInteger(result.data?.taskMinutes) && result.data.taskMinutes > 0);
   const dangerDelta = dangerDeltaForTurn({ action, selectedRisk, toolCalls, toolResults });
   const statusTicks = settleStatusTicks(game);
+  if (game.character?.combatBoost?.expiresTurn <= Number(game.turn || 0) + 1) delete game.character.combatBoost;
+  if (game.character?.guardedThroughTurn <= Number(game.turn || 0) + 1) delete game.character.guardedThroughTurn;
   const restRecovery = settleInnRest(game, action, elapsedMinutes);
   const statusTickLogs = statusTicks.map((tick) => `状态「${tick.status}」结算：${tick.label} ${tick.before}→${tick.after}（${tick.delta > 0 ? "+" : ""}${tick.delta}）${tick.autoStatus ? `；${tick.autoStatus}` : ""}`);
   const nextTurn = Number(game.turn || 0) + 1;

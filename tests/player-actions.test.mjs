@@ -45,11 +45,12 @@ test("active ability requests keep one local effect and avoid duplicate model co
   const ability = getAdvancement(game.character).unlockedAbilities.find(ability => ability.sequence === 7);
   const requests = { abilityRequest: { abilityId: ability.id, targetId: "enemy" } };
   const calls = ensurePlayerActionTools([call("enemy.damage", { enemyId: "enemy", amount: 9 }), call("character.update", { patch: { spirituality: -9 } })], requests, game);
-  assert.deepEqual(calls.map(call => call.name), ["ability.use"]);
+  assert.deepEqual(calls.map(call => call.name), ["ability.use", "enemy.act"]);
   const result = executeToolCalls(game, calls);
   assert.equal(result.results[0].ok, true);
   assert.equal(result.game.character.stats.spirituality, game.character.stats.spirituality - ability.cost);
-  assert.equal(result.game.combat.enemies[0].health, 30 - ability.rule.amount);
+  assert.equal(result.game.combat.enemies[0].health, 21);
+  assert.equal(result.results[0].data.abilityEffect.damage, 9);
 });
 
 test("unknown potion names and private metadata remain absent from logs, audit and rendering", () => {

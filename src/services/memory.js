@@ -20,6 +20,9 @@ import { nearbyPeopleContext } from "../engine/visitablePeople.js";
 import { medicinePurchaseGate } from "../engine/medicineAccess.js";
 import { normalizeCombatState } from "../system/combat.js";
 import { talismanCatalog } from "../system/talismans.js";
+import { BASIC_ATTACK_PERCENT, ENEMY_MOVES, MAX_ATTACK_PERCENT } from "../system/healthRules.js";
+import { actionPreview, attackPreparation } from "../system/combatActions.js";
+import { getAdvancement } from "../system/character.js";
 
 const SHARED_AUTHORITY_RULES = LOCAL_STATE_AUTHORITY_RULES + "【地图调查与公共常识】玩家未揭开地图迷雾只表示其个人尚未确认地点，不表示当地居民不知道该地点。圣赛缪尔教堂是黑夜女神教会的公开教堂，永恒烈阳教堂也是公开宗教场所；正常描写居民指路、公开礼拜与日常活动，不因地图未发现就编造集体不知情、避讳或秘密据点。其他公共地点同理，按身份与当地知识差异自然回应。明确的地图调查在本轮正常完成后由本地规则确认所选地点，只揭开该地点，不自动到访、加入组织或解锁内部秘密；不要把本次调查写成仍无法确认地址。快速模式草稿先写核实过程，具体确认结果留给本地结算后的叙事。";
 
@@ -135,6 +138,7 @@ export function visibleGameState(game) {
   // Portrait bytes are UI assets, never narrative context or state differences.
   delete character.avatar;
   delete character.portraitSeed;
+  character.advancement = getAdvancement(game.character);
   return {
     turn: game.turn,
     chapter: game.chapter,
@@ -148,6 +152,8 @@ export function visibleGameState(game) {
     money: game.money,
     statusEffects: game.statusEffects,
     combat: normalizeCombatState(game.combat),
+    combatRules: { basicAttackPercent: BASIC_ATTACK_PERCENT, maxAttackPercent: MAX_ATTACK_PERCENT, enemyMoves: ENEMY_MOVES,
+      preparation: attackPreparation(game), mainActionAvailable: Math.max(game.character.mainActionLastUsedTurn ?? -1, game.character.abilityLastUsedTurn ?? -1) < game.turn + 1 },
     churchTalismans: talismanCatalog(),
     relationships: visiblePeopleContext(game),
     nearbyPeople: nearbyPeopleContext(game),
@@ -236,6 +242,14 @@ function privatePlanningState(game, options = {}) {
     requestedMapInvestigation: options.mapInvestigation || null,
     requestedTalisman: options.talismanRequest || null,
     requestedAbility: options.abilityRequest || null,
+    requestedCombatAction: options.combatRequest || null,
+    requestedCombatPreview: (() => {
+      const request = options.abilityRequest || options.combatRequest;
+      if (!request) return null;
+      const rule = options.abilityRequest ? getAdvancement(game.character).unlockedAbilities.find(entry => entry.id === request.abilityId)?.rule
+        : { effect: request.actionId === "attack" ? "damage" : "defend", damagePercent: BASIC_ATTACK_PERCENT, cost: 0 };
+      return rule ? actionPreview(game, rule, request.boostStacks ?? 0, game.combat?.enemies?.find(enemy => enemy.id === (request.targetId || request.enemyId))) : null;
+    })(),
     requestedIdentification: options.identificationRequest || null,
     requestedQuestTracking: options.questTrackingPlan || null,
     mapGrowthAnchors: shouldExposeMapCandidates(game, options) ? mapGrowthAnchors(game) : undefined,

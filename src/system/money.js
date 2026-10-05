@@ -2,7 +2,7 @@
 export const PENCE_PER_SOLER = 12;
 export const SOLERS_PER_POUND = 20;
 export const PENCE_PER_POUND = PENCE_PER_SOLER * SOLERS_PER_POUND;
-export const MAX_STARTING_MONEY_PENCE = 3 * PENCE_PER_POUND;
+export const MAX_STARTING_MONEY_PENCE = 5 * PENCE_PER_POUND;
 
 export function moneyFromPence(totalPence = 0) {
   const safePence = Math.max(0, Math.floor(Number(totalPence) || 0));

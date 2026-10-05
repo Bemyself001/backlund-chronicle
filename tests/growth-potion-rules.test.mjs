@@ -153,16 +153,17 @@ test("untrusted identity, wrong location or insufficient funds never charge or m
   }
 });
 
-test("ability execution uses fixed costs and values, rejects wrong targets and repeat casts atomically", () => {
+test("ability execution uses local costs and damage percentages, rejects wrong targets and repeat casts atomically", () => {
   const state = game(7, "warrior");
   const ability = getUnlockedAbilities("warrior", 7)[3];
   const initialSpirituality = state.character.stats.spirituality;
   const wrongTarget = structuredClone(state);
   assert.equal(resolveAbilityUse(state, { abilityId: ability.id, targetId: "missing" }).ok, false);
   assert.deepEqual(state, wrongTarget);
-  const result = resolveAbilityUse(state, { abilityId: ability.id, targetId: "enemy", amount: 999, cost: 0 });
+  const result = resolveAbilityUse(state, { abilityId: ability.id, targetId: "enemy", amount: 999, damagePercent: 100, cost: 0 });
   assert.equal(result.ok, true);
-  assert.equal(state.combat.enemies[0].health, 20 - ability.rule.amount);
+  assert.equal(state.combat.enemies[0].health, 14);
+  assert.equal(result.data.abilityEffect.damagePercent, 30);
   assert.equal(state.character.stats.spirituality, initialSpirituality - ability.rule.cost);
   const before = structuredClone(state);
   assert.match(abilityAvailability(state, ability.id, "enemy"), /已经使用/);

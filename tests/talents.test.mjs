@@ -29,12 +29,13 @@ test("new games start without status effects", () => {
   assert.deepEqual(game.statusEffects, []);
 });
 
-test("status.add stores a validated tick clamped to ±3 and drops invalid keys", () => {
+test("status.add rejects life ticks but clamps non-health ticks to ±3", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "持续伤害测试员" });
   const added = executeToolCalls(game, [{ id: "bleed", name: "status.add", args: { status: { id: "bleeding", name: "失血", tick: { health: -9, luck: -1 } } }, reason: "伤口没有包扎" }]);
-  assert.equal(added.results[0].ok, true);
-  const status = added.game.statusEffects.find((entry) => entry.id === "bleeding");
-  assert.deepEqual(status.tick, { health: -3 });
+  assert.equal(added.results[0].ok, false);
+  assert.deepEqual(added.game.statusEffects, []);
+  const calm = executeToolCalls(game, [{ id: "calm", name: "status.add", args: { status: { id: "calm", name: "静心", tick: { sanity: 9, luck: 1 } } }, reason: "静心" }]);
+  assert.deepEqual(calm.game.statusEffects[0].tick, { sanity: 3 });
   const noTick = executeToolCalls(game, [{ id: "plain", name: "status.add", args: { status: { id: "calm", name: "平静", tick: {} } }, reason: "喝了热茶" }]);
   assert.equal(noTick.game.statusEffects.find((entry) => entry.id === "calm").tick, undefined);
 });
@@ -50,6 +51,7 @@ test("status ticks settle every turn through resolveTurnProgress and respect bou
   assert.equal(progress.statusTicks.length, 2);
   assert.match(progress.statusTickLogs[0], /状态「失血」结算：生命 20→18（-2）/);
   // 再结算两轮直至归零，触发自动状态
+  game.turn += 1;
   game.character.stats.health = 2;
   const finalProgress = resolveTurnProgress(game, "等待片刻", "low", [], []);
   assert.equal(game.character.stats.health, 0);

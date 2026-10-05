@@ -1,3 +1,5 @@
+import { normalizeHealthEffect } from "./healthRules.js";
+
 export const MAX_ENEMY_HEALTH = 1_000_000;
 export const MAX_COMBAT_ENEMIES = 100;
 export const MAX_ENEMY_ID_LENGTH = 80;
@@ -38,6 +40,12 @@ export function normalizeCombatState(rawCombat = {}) {
       stunnedThroughTurn: savedTurn(raw.stunnedThroughTurn),
       lastActedTurn: savedTurn(raw.lastActedTurn),
       lastUpdatedTurn: Math.max(0, savedTurn(raw.lastUpdatedTurn)),
+      moveSet: "standard", windupTurn: savedTurn(raw.windupTurn), heavyReadyTurn: savedTurn(raw.heavyReadyTurn),
+      guardedThroughTurn: savedTurn(raw.guardedThroughTurn),
+      statusEffects: (Array.isArray(raw.statusEffects) ? raw.statusEffects : []).flatMap(status => {
+        const healthEffect = normalizeHealthEffect(status?.healthEffect);
+        return typeof status?.id === "string" && typeof status.name === "string" && healthEffect ? [{ id: status.id, name: status.name, description: String(status.description || ""), healthEffect }] : [];
+      }).slice(0, 30),
     };
     enemies.push(enemy);
     byId.set(id, enemy);

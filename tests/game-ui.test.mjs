@@ -52,7 +52,7 @@ test("release metadata remains aligned across UI, package, changelog and APK wor
   assert.match(RELEASE_VERSION, /^\d+\.\d+\.\d+$/);
   assert.equal(pkg.version, RELEASE_VERSION);
   assert.equal(GAME_SYSTEM_VERSION, 2);
-  assert.equal(SAVE_VERSION, 13);
+  assert.equal(SAVE_VERSION, 14);
   const publishedUpdate = LATEST_UPDATE.pending ? PREVIOUS_UPDATES[0] : LATEST_UPDATE;
   assert.ok(publishedUpdate.title.startsWith(`${RELEASE_VERSION} ·`));
   if (LATEST_UPDATE.pending) assert.match(LATEST_UPDATE.title, /^开发中 ·/);

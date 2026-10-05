@@ -1,6 +1,10 @@
 import { WATCH_NOTE_DETAIL } from "./watchNote.js";
 
 export const CONTENT_MIGRATIONS = [
+  { id: "backlund.percentage-combat", fromVersion: "2026.10.05", toVersion: "2026.10.05.1" },
+  {
+    id: "backlund.percentage-ability-damage", fromVersion: "2026.10.03.3", toVersion: "2026.10.05",
+  },
   {
     id: "backlund.sherlock-moriarty", fromVersion: "2026.10.03.2", toVersion: "2026.10.03.3",
     locationDiscoveries: [{ locationId: "minsk-street-15", note: "公开侦探广告登载了夏洛克·莫里亚蒂在乔伍德区明斯克街15号的地址；尚未登门见面。" }],
