@@ -56,6 +56,7 @@ try {
       await page.goto(url);
       await enter();
       await button("特殊行动").click();
+      await button("人物").click();
       assert.equal(await button("需先到达乔伍德区·明斯克街15号").isDisabled(), true);
       assert.equal(await button("聊聊侦探工作").isDisabled(), true);
       await button("在地图查看乔伍德区·明斯克街15号").click();
@@ -64,6 +65,8 @@ try {
       assert.equal((await saved()).location.id, "minsk-street-15");
       assert.equal((await saved()).relationships.find(person => person.id === personId).contact, "heard");
       const beforeVisitCalls = requests.length;
+      const specialPanel = page.getByRole("dialog", { name: "特殊行动", exact: true });
+      if (await specialPanel.count()) await specialPanel.getByRole("button", { name: "人物", exact: true }).click();
       await button("敲门拜访夏洛克·莫里亚蒂 · 1回合").click();
       await waitTurn(2);
       assert.equal(requests.length, beforeVisitCalls, "first visit must complete locally");
@@ -96,6 +99,7 @@ try {
       await page.reload();
       await enter();
       await button("特殊行动").click();
+      await button("人物").click();
       await button("再次拜访夏洛克·莫里亚蒂 · 1回合").click();
       await waitTurn(4);
       const reloaded = await saved();

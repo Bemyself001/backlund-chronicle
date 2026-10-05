@@ -1,3 +1,4 @@
+import { buildPathwayAbilities } from "./abilityRules.js";
 // 贝克兰德内容包：非凡途径及能力定义。
 // 每条途径包含：id、名称（序列9 称号）、完整序列阶梯 sequences（序列9 → 序列0）、序列9 初始能力。
 export const PATHWAYS = [
@@ -71,5 +72,5 @@ export const PATHWAYS = [
   id,
   name,
   sequences,
-  abilities: sequence9.map(([abilityId, abilityName, description]) => ({ id: `${id}:${abilityId}`, name: abilityName, description, sequence: 9 })),
+  abilities: buildPathwayAbilities(id, sequence9),
 }));

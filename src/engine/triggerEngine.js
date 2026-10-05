@@ -17,6 +17,7 @@ import { renderContentData } from "./contentTemplates.js";
 import { questStagePolicy, settleQuestAttempts, syncQuestJournal } from "./questRuntime.js";
 import { getMapLocation, normalizeLocationKnowledge } from "../system/map.js";
 import { RENARD_AUCTION_MEDICINE } from "../content/index.js";
+import { migrateQuestLifecycle } from "./questLifecycle.js";
 
 function definitionEligible(definition, context) {
   if (!allConditionsMatch(definition.eligibility || [], context)) return false;
@@ -116,7 +117,7 @@ function makeAvailableInstance(game, state, definition, turn, action, signals) {
   instance.status = "available";
   instance.stage = definition.initialStage || "discovered";
   instance.createdTurn = turn;
-  instance.expiresTurn = definition.expiresAfterTurns == null ? null : turn + Number(definition.expiresAfterTurns);
+  instance.expiresTurn = ["occult-entry", "pathway-quest", "random", "random-opportunity"].includes(definition.category) ? turn + 10 : null;
   instance.engagedTurn = null;
   instance.completedTurn = null;
   instance.source = { action: String(action || ""), evidenceIds };
@@ -219,13 +220,13 @@ function completePreparedRenardTreatment(game, state, instance, definition, turn
   return true;
 }
 
-function advanceExisting(game, state, signals, action, turn, events) {
+function advanceExisting(game, state, signals, action, turn, events, travelOnly = false) {
   const context = { game, state, signals, action, turn };
   updateRenardTreatmentReady(game, state);
   for (const instance of [...state.active]) {
     const definition = getInstanceTriggerDefinition(instance, game);
     if (!definition) continue;
-    if (instance.status === "available" && definition.autoEngageWhen?.length && allConditionsMatch(definition.autoEngageWhen, context)) {
+    if (!travelOnly && instance.status === "available" && definition.autoEngageWhen?.length && allConditionsMatch(definition.autoEngageWhen, context)) {
       instance.status = "engaged";
       instance.engagedTurn = turn;
       const previousStage = instance.stage;
@@ -234,7 +235,7 @@ function advanceExisting(game, state, signals, action, turn, events) {
       events.engaged.push(structuredClone(instance));
     }
     if (instance.status !== "engaged") continue;
-    if (completePreparedRenardTreatment(game, state, instance, definition, turn, events)) continue;
+    if (!travelOnly && completePreparedRenardTreatment(game, state, instance, definition, turn, events)) continue;
     if (instance.processedTurn != null && instance.processedTurn >= turn) continue;
     instance.processedTurn = turn;
     const stage = (definition.stages || []).find((entry) => entry.id === instance.stage);
@@ -244,6 +245,7 @@ function advanceExisting(game, state, signals, action, turn, events) {
       if (failed) events.failed.push(failed);
       continue;
     }
+    if (travelOnly) { settleTimers(game, state, instance, definition, turn, events); continue; }
     const transition = (stage?.transitions || []).find((entry) => signals.some((signal) => (
       signal.kind === "trigger.progress"
       && signal.instanceId === instance.instanceId
@@ -309,14 +311,15 @@ function selectNewDefinitions(game, state, signals, action, turn) {
   return first.revealGroup ? candidates.filter((definition) => definition.revealGroup === first.revealGroup) : [first];
 }
 
-export function processTriggers(game, { action = "", toolCalls = [], toolResults = [], turn = Number(game.turn || 0) + 1 } = {}) {
+export function processTriggers(game, { action = "", toolCalls = [], toolResults = [], turn = Number(game.turn || 0) + 1, travelOnly = false } = {}) {
   const state = normalizeTriggerState(game);
   game.triggerState = state;
+  migrateQuestLifecycle(game, Number(game.turn || 0));
   const signals = buildTriggerSignals(game, action, toolCalls, toolResults, turn);
   const events = { available: [], engaged: [], advanced: [], completed: [], failed: [], expired: [], abandoned: [] };
   applySignalsAsFacts(state, signals, turn);
   if (Number(game.occult?.contact) === 1) setTriggerFact(state, "occult.contact", turn, ["legacy:occult.contact"]);
-  advanceExisting(game, state, signals, action, turn, events);
+  advanceExisting(game, state, signals, action, turn, events, travelOnly);
   expireAvailable(state, turn, events);
   refreshEligibility(game, state, signals, action, turn);
   const definitions = selectNewDefinitions(game, state, signals, action, turn) || [];
@@ -335,8 +338,10 @@ export function processTriggers(game, { action = "", toolCalls = [], toolResults
 export function engageTrigger(game, instanceId, turn, action = "") {
   const state = normalizeTriggerState(game);
   game.triggerState = state;
+  migrateQuestLifecycle(game, turn);
   const instance = state.active.find((entry) => entry.instanceId === instanceId);
   if (!instance || instance.status !== "available") return { ok: false, reason: "当前没有匹配的可追查事件" };
+  if (instance.expiresTurn != null && turn >= instance.expiresTurn) return { ok: false, reason: "该随机机会已到期，不能接取" };
   const definition = getInstanceTriggerDefinition(instance, game);
   const previousStage = instance.stage;
   instance.status = "engaged";

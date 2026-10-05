@@ -28,8 +28,8 @@ function useWideScreen() {
   useEffect(() => {
     const query = window.matchMedia("(min-width: 1280px)");
     const update = () => setWide(query.matches);
-    query.addEventListener("change", update);
-    return () => query.removeEventListener("change", update);
+    if (query.addEventListener) query.addEventListener("change", update); else query.addListener(update);
+    return () => { if (query.removeEventListener) query.removeEventListener("change", update); else query.removeListener(update); };
   }, []);
   return wide;
 }
@@ -235,15 +235,15 @@ function GameSession({ game, loading, turnPhase, streamText, error, onAction, on
           </div>
           {!followingLatest && <button className={styles.jumpLatest} type="button" onClick={jumpToLatest}>{loading ? "跟随新剧情 ↓" : "回到最新 ↓"}</button>}
         </div>
-        <form className={styles.composer} onSubmit={event => { event.preventDefault(); submit(); }}>
-          <div className={styles.composerInner}><label className={styles.inputLabel}><span>自由行动</span><textarea aria-label="自由行动" ref={inputRef} rows="1" value={input} onChange={event => setInput(event.target.value)} onFocus={() => setEditing(true)} onBlur={() => setEditing(false)} onKeyDown={event => { if (shouldSubmitAction(event) && !window.matchMedia("(pointer: coarse)").matches) { event.preventDefault(); submit(); } }} placeholder="描述你的行动、问题或对话…" disabled={loading} /></label>{loading ? <button type="button" className={styles.abort} onClick={onAbort}>中止生成</button> : <button type="submit" className={styles.submit} disabled={!input.trim()}>提交行动 <span aria-hidden="true">↗</span></button>}</div>
+        <form className={styles.composer} onFocus={() => setEditing(true)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setEditing(false); }} onSubmit={event => { event.preventDefault(); submit(); }}>
+          <div className={styles.composerInner}><label className={styles.inputLabel}><span>自由行动</span><textarea aria-label="自由行动" ref={inputRef} rows="1" value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (shouldSubmitAction(event) && !window.matchMedia("(pointer: coarse)").matches) { event.preventDefault(); submit(); } }} placeholder="描述你的行动、问题或对话…" disabled={loading} /></label>{loading ? <button type="button" className={styles.abort} onClick={onAbort}>中止生成</button> : <button type="submit" className={styles.submit} disabled={!input.trim()}>提交行动 <span aria-hidden="true">↗</span></button>}</div>
           <div className={styles.composerMeta}><span>Enter 发送 · Shift + Enter 换行</span><span>{turnPhase === "choiceRetry" ? "剧情已保存 · 正在补全建议" : loading ? "本轮尚未保存" : "进度自动保存"}</span></div>
         </form>
       </section>
       {panelOpen && <><button className={styles.panelScrim} type="button" onClick={closePanel} aria-label="关闭资料面板" tabIndex={-1} /><aside id="game-dossier" className={styles.dossier} aria-label={PANEL_NAMES[panel]}><div className={styles.dossierHeading}><div><small>PRIVATE DOSSIER</small><h2>{PANEL_NAMES[panel]}</h2></div><button ref={closeRef} type="button" onClick={closePanel} aria-label="关闭资料，返回剧情">返回剧情 <span aria-hidden="true">×</span></button></div><div className={styles.dossierScroll} ref={paneRef}>
-        <div hidden={panel !== "character"}><CharacterPanel game={game} /></div>
+        <div hidden={panel !== "character"}><CharacterPanel game={game} onAction={performAction} disabled={loading} /></div>
         <div hidden={panel !== "inventory"}><InventoryPanel game={game} onLocalTool={(name, args, reason) => onLocalTool(name, args, reason, () => setPanel(null))} onAction={performAction} disabled={loading} /></div>
-        <div hidden={panel !== "journal"}><JournalPanel key={journalRequest} game={game} /></div>
+        <div hidden={panel !== "journal"}><JournalPanel key={journalRequest} game={game} onAction={performAction} disabled={loading} /></div>
         {panel === "special" && <SpecialActions game={game} loading={loading} onExecute={onSpecialAction} onOpenMap={onOpenMap} onAction={performAction} />}
         <div hidden={panel !== "menu"}><MenuPanel loading={loading} reading={reading} onReadingChange={updateReading} onOpenApi={onOpenApi} onOpenPrompt={onOpenPrompt} onOpenSaves={onOpenSaves} onHome={onHome} version={`${RELEASE_NAME} · ${APP_VERSION}`} />{readingNotice && <p className={styles.readingNotice} role="status">{readingNotice}</p>}</div>
       </div></aside></>}

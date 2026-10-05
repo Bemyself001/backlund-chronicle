@@ -1,4 +1,4 @@
-import { getUnlockedAbilities, pathwayIdForName, pathwayNameForId } from "../content/index.js";
+import { getUnlockedAbilities, getSequenceName, pathwayIdForName, pathwayNameForId } from "../content/index.js";
 import { spiritualGrowthForSequence } from "./characterStats.js";
 
 export function createAdvancement(character = {}) {
@@ -9,6 +9,7 @@ export function createAdvancement(character = {}) {
       pathwayName: null,
       sequence: null,
       sequenceLabel: "普通人",
+      sequenceName: "普通人",
       status: "none",
       acquiredAt: "character_creation",
       unlockedAbilities: [],
@@ -24,6 +25,7 @@ export function createAdvancement(character = {}) {
     pathwayName,
     sequence,
     sequenceLabel: `序列${sequence}`,
+    sequenceName: getSequenceName(pathwayIdForName(pathwayName), sequence),
     status: "stable",
     acquiredAt: "character_creation",
     unlockedAbilities: getUnlockedAbilities(pathwayIdForName(pathwayName), sequence),
@@ -35,7 +37,7 @@ export function withAdvancement(character = {}) {
   const supplied = character.advancement && typeof character.advancement === "object" ? character.advancement : null;
   const type = supplied?.type === "extraordinary" || (!supplied && legacy.type === "extraordinary") ? "extraordinary" : "ordinary";
   if (type === "ordinary") {
-    const advancement = { ...legacy, ...supplied, type: "ordinary", pathwayId: null, pathwayName: null, sequence: null, sequenceLabel: "普通人", status: "none", unlockedAbilities: [] };
+    const advancement = { ...legacy, ...supplied, type: "ordinary", pathwayId: null, pathwayName: null, sequence: null, sequenceLabel: "普通人", sequenceName: "普通人", status: "none", unlockedAbilities: [] };
     return { ...character, extraordinary: "ordinary", pathway: "无", advancement };
   }
   const pathwayId = String(supplied?.pathwayId || legacy.pathwayId || "");
@@ -50,6 +52,7 @@ export function withAdvancement(character = {}) {
     pathwayName,
     sequence,
     sequenceLabel: `序列${sequence}`,
+    sequenceName: getSequenceName(pathwayId, sequence),
     status: supplied?.status || "stable",
     unlockedAbilities: getUnlockedAbilities(pathwayId, sequence),
   };
@@ -64,11 +67,16 @@ export function applyAdvancement(character = {}, pathwayId, sequence, acquiredAt
   const pathwayName = pathwayNameForId(pathwayId);
   if (!pathwayName || !Number.isInteger(sequence) || sequence < 0 || sequence > 9) return null;
   const previous = getAdvancement(character);
+  if (previous.type === "ordinary" ? sequence !== 9 : previous.pathwayId !== pathwayId || sequence !== previous.sequence - 1) return null;
   const spiritualGrowth = spiritualGrowthForSequence(sequence);
   const stats = { ...(character.stats || {}) };
   const previousMax = Number(stats.maxSpirituality || 0);
   stats.maxSpirituality = previousMax + spiritualGrowth;
   stats.spirituality = Math.min(stats.maxSpirituality, Number(stats.spirituality || 0) + spiritualGrowth);
+  if (sequence < 9) {
+    stats.maxHealth = Number(stats.maxHealth) + spiritualGrowth;
+    stats.maxSanity = Number(stats.maxSanity) + spiritualGrowth;
+  }
   stats.health = Number(stats.maxHealth);
   stats.sanity = Number(stats.maxSanity);
   return {
@@ -82,6 +90,7 @@ export function applyAdvancement(character = {}, pathwayId, sequence, acquiredAt
       pathwayName,
       sequence,
       sequenceLabel: `序列${sequence}`,
+      sequenceName: getSequenceName(pathwayId, sequence),
       status: "newly_promoted",
       acquiredAt,
       previousSequence: previous.sequence,
@@ -92,5 +101,7 @@ export function applyAdvancement(character = {}, pathwayId, sequence, acquiredAt
 
 export function isExplicitAdvancementIntent(action = "") {
   const text = String(action).replace(/\s+/g, "");
-  return /(服用|喝下|饮下|吞下|摄入).{0,8}(魔药|药剂)|(魔药|药剂).{0,8}(服用|喝下|饮下|吞下|摄入)|正式晋升|开始晋升|成为非凡者|晋升(?:到|至)?序列/.test(text);
+  if (/[?？]|是否|能否|可否|要不要|能不能|可不可以|明天|改天|下次|以后|稍后/.test(text)
+    || /(?:不|别|取消|放弃|拒绝|暂缓|考虑|打算|计划).{0,16}(?:使用|服用|喝下|饮下|吞下|摄入|晋升|成为非凡者)/.test(text)) return false;
+  return /使用.{0,12}魔药|(服用|喝下|饮下|吞下|摄入).{0,8}(魔药|药剂)|(魔药|药剂).{0,8}(服用|喝下|饮下|吞下|摄入)|正式晋升|开始晋升|成为非凡者|晋升(?:到|至)?序列/.test(text);
 }

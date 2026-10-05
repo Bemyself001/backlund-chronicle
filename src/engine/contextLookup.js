@@ -2,6 +2,7 @@ import { LORE_ENTRIES, getLoreEntry } from "../content/index.js";
 import { allConditionsMatch } from "./triggerConditions.js";
 import { normalizeTriggerState } from "./triggerState.js";
 import { renderContentText } from "./contentTemplates.js";
+import { retrieveContext } from "../services/contextIndex.js";
 
 const normalizeText = (value) => String(value || "").toLowerCase().replace(/\s+/g, "");
 
@@ -29,7 +30,7 @@ function playerSafeLore(game, entry) {
   return { id: entry.id, type: "loreFact", text: renderContentText(entry.text, { game }) };
 }
 
-export function lookupContext(game, { query = "", ids = [], limit = 6 } = {}) {
+function lookupLore(game, { query = "", ids = [], limit = 6 } = {}) {
   const requested = [...new Set((Array.isArray(ids) ? ids : []).filter(Boolean).map(String))];
   const candidates = requested.length
     ? requested.map(getLoreEntry).filter(Boolean)
@@ -44,11 +45,30 @@ export function lookupContext(game, { query = "", ids = [], limit = 6 } = {}) {
   return { query: String(query || ""), entries: available, missing: requested.filter((id) => !available.some((entry) => entry.id === id)) };
 }
 
+export function lookupContext(game, { query = "", ids = [], limit = 6, maxChars = 6000 } = {}) {
+  const requested = [...new Set((Array.isArray(ids) ? ids : []).filter(Boolean).map(String))];
+  const count = Math.max(1, Math.min(8, Number(limit) || 6));
+  const budget = Math.max(0, Math.min(24000, Number(maxChars) || 0));
+  const lore = lookupLore(game, { query, ids: requested, limit: count }).entries;
+  const entries = [];
+  let used = 0;
+  for (const entry of lore) {
+    const cost = JSON.stringify(entry).length;
+    if (entries.length >= count) break;
+    if (used + cost > budget) continue;
+    entries.push(entry);
+    used += cost;
+  }
+  const local = retrieveContext(game, { query, ids: requested, limit: count - entries.length, maxChars: budget - used, includeAmbient: false });
+  entries.push(...local.entries);
+  return { query: String(query || ""), entries, missing: requested.filter(id => !entries.some(entry => entry.id === id || entry.entityIds?.[0] === id)) };
+}
+
 export function progressiveContext(game, action = "") {
   const state = normalizeTriggerState(game);
   // Keep authored evidence even for vague actions such as “继续”.
   const pinned = LORE_ENTRIES.filter(entry => entry.alwaysInclude && visibleLore(game, entry)).map(entry => playerSafeLore(game, entry));
-  const relevant = lookupContext(game, { query: action, limit: 6 }).entries;
+  const relevant = lookupLore(game, { query: action, limit: 6 }).entries;
   return {
     hardFacts: Object.fromEntries(Object.entries(state.facts || {}).map(([id, fact]) => [id, fact?.value ?? true])),
     loreFacts: [...pinned, ...relevant.filter(entry => !pinned.some(fact => fact.id === entry.id))],

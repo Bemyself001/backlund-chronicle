@@ -43,6 +43,6 @@ export function getAuditRows(audit) {
     ...(inventory.equipped || []).map(item => ({ tone: "update", text: `装备「${item.name}」` })),
     ...(inventory.unequipped || []).map(item => ({ tone: "update", text: `卸下「${item.name}」` })),
     ...(inventory.updated || []).map(item => ({ tone: "update", text: `更新「${item.name}」` })),
-    ...(audit.character?.advancementChanged ? [{ tone: "gain", text: `非凡档案：${audit.character.beforeAdvancement.sequenceLabel} → ${audit.character.afterAdvancement.pathwayName || ""}${audit.character.afterAdvancement.sequenceLabel}` }] : []),
+    ...(audit.character?.advancementChanged ? [{ tone: "gain", text: `非凡档案：${audit.character.beforeAdvancement.sequenceLabel} → ${audit.character.afterAdvancement.sequenceName || audit.character.afterAdvancement.pathwayName || ""}${audit.character.afterAdvancement.sequenceLabel}` }] : []),
   ];
 }

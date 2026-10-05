@@ -53,7 +53,7 @@ const button = name => page.getByRole("button", { name, exact: true });
 const openPotion = async () => {
   await button("行囊").click();
   await page.getByRole("button", { name: /小丑魔药.*非凡物品/ }).click();
-  await button("服用并晋升").click();
+  await button("使用 · 服用魔药").click();
   await page.getByRole("dialog", { name: "确认序列晋升" }).waitFor();
 };
 try {
@@ -62,7 +62,7 @@ try {
   await page.getByRole("button", { name: /继续调查/ }).click();
   await openPotion();
   const preview = page.getByRole("region", { name: "晋升结果预览" });
-  for (const [label, before, after] of [["当前灵性", 4, 6], ["灵性上限", 8, 10], ["生命回满", 3, 20], ["理智回满", 2, 10]]) {
+  for (const [label, before, after] of [["当前灵性", 4, 6], ["灵性上限", 8, 10], ["生命回满", 3, 22], ["理智回满", 2, 12]]) {
     assert.match(await preview.locator("dl > div").filter({ hasText: label }).innerText(), new RegExp(`${before} → ${after}`));
   }
   assert.equal((await saved()).turn, 4);
@@ -80,11 +80,12 @@ try {
   await button("确认服用并晋升序列8").click();
   await waitTurn(6);
   const promoted = await saved();
-  assert.deepEqual(promoted.character.stats, { health: 20, maxHealth: 20, sanity: 10, maxSanity: 10, spirituality: 6, maxSpirituality: 10 });
+  assert.deepEqual(promoted.character.stats, { health: 22, maxHealth: 22, sanity: 12, maxSanity: 12, spirituality: 6, maxSpirituality: 10 });
   assert.equal(promoted.character.advancement.sequence, 8);
   assert.equal(promoted.inventory.some(item => item.instanceId === "potion-seer-8"), false);
-  await page.getByRole("button", { name: "生命 20/20，查看角色", exact: true }).waitFor();
+  await page.getByRole("button", { name: "生命 22/22，查看角色", exact: true }).waitFor();
   await button("特殊行动").click();
+  await button("组织").click();
   await button("申请正式加入军情九处").click();
   assert.equal((await saved()).organizationState.membership, null);
   await button("确认加入军情九处").click();
@@ -95,7 +96,7 @@ try {
   await page.reload();
   await page.getByRole("button", { name: /签署档案并进入贝克兰德/ }).click();
   await page.getByRole("button", { name: /继续调查/ }).click();
-  await page.getByRole("button", { name: "生命 20/20，查看角色", exact: true }).waitFor();
+  await page.getByRole("button", { name: "生命 22/22，查看角色", exact: true }).waitFor();
   await page.getByRole("button", { name: "灵性 6/10，查看角色", exact: true }).waitFor();
   assert.deepEqual((await saved()).character.stats, promoted.character.stats);
   assert.equal((await saved()).organizationState.membership.organizationId, "mi9");

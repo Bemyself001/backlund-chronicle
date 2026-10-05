@@ -8,9 +8,11 @@ import { QUEST_ENGINE_RULE } from "../engine/questRuntime.js";
 import { COMBAT_RULES } from "./combatRules.js";
 import { ADVANCEMENT_STAT_RULE } from "./characterStats.js";
 import { VISITABLE_PERSON_RULE } from "../content/backlund/visitablePeople.js";
+import { PLAYER_ACTION_RULES } from "../services/playerActions.js";
 
 export function fixedNarrativeMessages() {
   return [
+    { role: "system", content: PLAYER_ACTION_RULES },
     { role: "system", content: QUEST_ENGINE_RULE },
     { role: "system", content: COMBAT_RULES },
     { role: "system", content: ADVANCEMENT_STAT_RULE },

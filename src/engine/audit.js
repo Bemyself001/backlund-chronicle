@@ -1,6 +1,6 @@
 import { getAdvancement } from "../system/character.js";
 import { formatMoney, moneyFromPence, moneyToPence } from "../system/money.js";
-import { isImportantNonMoneyItem, normalizeItemImportance } from "../system/items.js";
+import { isImportantNonMoneyItem, normalizeItemImportance, playerVisibleItem } from "../system/items.js";
 
 const ITEM_FIELDS = ["name", "category", "description", "weight", "rarity", "condition", "equipped", "tags", "properties", "discoveredInfo", "potion"];
 
@@ -9,6 +9,7 @@ function equalValue(left, right) {
 }
 
 function itemRecord(item, quantity) {
+  item = playerVisibleItem(item);
   return {
     instanceId: item.instanceId,
     itemId: item.itemId,
@@ -24,21 +25,24 @@ function itemRecord(item, quantity) {
 
 export function collectImportantItemConfirmations(toolCalls = [], results = []) {
   return results.flatMap((result, index) => {
-    const change = result?.data?.inventoryChange;
+    const changes = result?.data?.inventoryChanges || (result?.data?.inventoryChange ? [result.data.inventoryChange] : []);
+    return changes.flatMap(rawChange => {
+    const change = rawChange ? { ...playerVisibleItem(rawChange), delta: rawChange.delta } : null;
     if (!result?.ok || !change || !Number(change.delta) || !isImportantNonMoneyItem(change)) return [];
     const call = toolCalls[index] || {};
     return [{
-      key: call.id || `${index}:${call.name || result.name || "inventory"}`,
+      key: `${call.id || `${index}:${call.name || result.name || "inventory"}`}${changes.length > 1 ? `:${change.instanceId}` : ""}`,
       callIndex: index,
       toolName: call.name || result.name,
       direction: change.delta > 0 ? "gain" : "loss",
       name: change.name,
       quantity: Math.abs(change.delta),
-      reason: change.reason || call.reason || "本轮状态变化",
+      reason: change.potionStatus === "unidentified" ? "未鉴定魔药发生数量变化，身份仍待核实" : change.reason || call.reason || "本轮状态变化",
       importance: change.importance,
       confirmationKind: result.data?.advancement ? "advancement" : "item",
       advancement: result.data?.advancement || null,
     }];
+    });
   });
 }
 

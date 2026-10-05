@@ -1,5 +1,5 @@
 /* Flex spacing fallbacks are activated only by the startup layout probe. */
-.panel { display: grid; gap: 1.5rem; padding: 1rem; color: inherit; overflow-wrap: anywhere; }
+.panel { display: grid; gap: 1.2rem; padding: 1rem; color: inherit; overflow-wrap: anywhere; min-width: 0; }
 .panel header, .panel section { display: grid; gap: .7rem; }
 .panel h3, .panel h4, .panel p { margin: 0; }
 .panel h3 { font-size: 1.15rem; }
@@ -10,8 +10,8 @@
 
 :global(.no-flex-gap) .meta { gap: 0; }
 :global(.no-flex-gap) .meta > :not(:last-child) { margin-right: .4rem; margin-bottom: .4rem; }
-.card, .active { display: grid; gap: .75rem; padding: 1rem; border: 1px solid #8f896e66; border-radius: .6rem; background: #8888770a; }
-.active { border-color: #b0955c; background: #b0955c10; }
+.card, .active { display: grid; gap: .7rem; padding: 1rem; border: 1px solid #8f896e55; border-radius: .6rem; background: #8888770a; min-width: 0; }
+.active { border-color: #b0955c; background: #b0955c14; border-top: 3px solid #b0955c; }
 .hint { font-size: .8rem; opacity: .8; }
 .buttons { display: flex; flex-wrap: wrap; gap: .6rem; }
 
@@ -28,3 +28,15 @@
 .history { list-style: none; padding: 0; margin: 0; display: grid; gap: .7rem; }
 .history li { display: grid; gap: .2rem; }
 .history small { opacity: .75; }
+.tabs { display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); padding: .25rem; border-radius: .55rem; background: #53614b15; border: 1px solid #8f896e44; }
+.panel .tabs button { min-width: 0; text-align: center; border: 0; background: transparent; padding: .6rem .1rem; font-size: .9rem; }
+.panel .tabs button[aria-pressed="true"] { background: #b0955c25; color: inherit; box-shadow: inset 0 -2px #b89552; font-weight: 700; }
+.panel summary { cursor: pointer; min-height: 36px; padding: .4rem 0; font-size: .85rem; }
+.panel details > p { margin: .4rem 0; }
+.panel .primary { background: #dbc28e; color: #17241c; border-color: #dbc28e; font-weight: 700; }
+.service { border-top: 1px solid #8f896e55; padding-top: 1rem; }
+.field { display: grid; gap: .5rem; }
+.field select { min-height: 44px; max-width: 100%; width: 100%; padding: .65rem; border: 1px solid #8f896e; border-radius: .3rem; color: inherit; background: transparent; }
+.field option { color: #15231c; background: #f1ecdf; }
+.panel button:focus, .panel summary:focus, .field select:focus { outline: 2px solid #b89552; outline-offset: 3px; }
+@media (min-width: 768px) { .panel { padding: 1.4rem; } }

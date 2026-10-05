@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createInitialGame, EMPTY_CHARACTER } from '../src/system/game.js';
 import { executeToolCalls } from '../src/engine/tools.js';
-import { processTriggers } from '../src/engine/triggerEngine.js';
+import { engageTrigger, processTriggers } from '../src/engine/triggerEngine.js';
 import { syncQuestJournal, questAssistance, visibleQuestJournal, questJournalEvents, questStagePolicy } from '../src/engine/questRuntime.js';
 import { migrateSave } from '../src/services/storage.js';
 import { markNarrativeEventsDelivered } from '../src/services/narrativeEvents.js';
@@ -32,6 +32,11 @@ function run(game, action, args, turn = game.turn + 1) {
   execution.game.turn = turn;
   return { ...execution, calls };
 }
+function engagedFixture(policy = {}) {
+  const game = fixture(policy);
+  engageTrigger(game, 'test-task', 0, '接受遗失信件调查');
+  return game;
+}
 
 test('semantic pursuit registers a journal atomically and chains ordinary steps with local requirements', () => {
   const game = fixture();
@@ -55,14 +60,16 @@ test('a later unmet requirement preserves earlier progress but does not skip or 
   assert.equal(result.game.triggerState.facts['test.completed'], undefined);
 });
 
-test('two stalled related actions clarify goals, third offers an executable time-cost recovery; rest and reload do not count', () => {
-  let result = run(fixture(), '向门房打听信件', { start: true, outcome: 'blocked' });
+test('first stall explains cause, second offers a verified route; rejected fictional blockers and reload do not invent progress', () => {
+  let result = run(engagedFixture(), '向门房打听信件', { outcome: 'blocked' });
+  assert.equal(result.results[0].ok, false);
   let game = migrateSave(result.game);
   processTriggers(game, { action: '睡觉', turn: 2 });
   assert.equal(game.questJournal.attempts['test-task'].stalled, 1);
   result = run(game, '继续向门房打听信件', { outcome: 'blocked' }, 3);
   game = result.game;
   assert.equal(questAssistance(game, game.questJournal.entries['test-task']).level, 2);
+  assert.equal(questAssistance(game, game.questJournal.entries['test-task']).recoverable, true);
   result = run(game, '请门房再次查找信件', { outcome: 'blocked' }, 4);
   game = migrateSave(result.game);
   const assistance = questAssistance(game, game.questJournal.entries['test-task']);
@@ -82,7 +89,7 @@ test('two stalled related actions clarify goals, third offers an executable time
 test('finales neither chain nor receive guaranteed recovery; old snapshots keep current safety policy', () => {
   let result = run(fixture({ finale: true }), '询问门房再核对记录', { start: true, outcome: 'progress', steps: [{ objectiveId: 'ask' }, { objectiveId: 'read' }] });
   assert.equal(result.results[0].data.completedSteps.length, 1);
-  let game = fixture({ finale: true });
+  let game = engagedFixture({ finale: true });
   for (let turn = 1; turn <= 3; turn++) game = run(game, '询问门房', { start: turn === 1, outcome: 'failed' }, turn).game;
   assert.equal(questAssistance(game, game.questJournal.entries['test-task']).recoverable, false);
   result = run(game, '整理证据并请教门房', { outcome: 'recover' }, 4);
@@ -104,7 +111,7 @@ test('all completed records survive reload without the previous five-entry histo
   const loaded = migrateSave(game);
   assert.equal(visibleQuestJournal(loaded).filter(entry => entry.status === 'completed').length, 9);
   assert.ok(visibleQuestJournal(loaded).every(entry => entry.title && entry.summary && entry.objective));
-  const result = run(fixture(), '询问信件', { start: true, outcome: 'blocked' });
+  const result = run(engagedFixture(), '询问信件', { outcome: 'blocked' });
   const events = questJournalEvents(result.game);
   const delivered = markNarrativeEventsDelivered(result.game, events);
   assert.match(delivered.choices[0].label, /门房/);
@@ -136,12 +143,11 @@ test('entering a dangerous stage cannot consume its step in the same turn', () =
 
 test('ordinary created tasks always have summary and goal; managed commissions cannot be altered by AI', () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: '任务测试' });
-  const created = executeToolCalls(game, [{ id: 'new', name: 'quest.add', args: { quest: { id: 'letter', title: '送信' } }, reason: '答应把信交给旅店老板' }]);
-  assert.equal(created.game.questJournal.entries['quest:letter'].status, 'engaged');
+  const created = executeToolCalls(game, [{ id: 'new', name: 'quest.add', args: { quest: { id: 'letter', title: '送信', summary: '答应把信交给旅店老板', objective: '把信交给旅店老板' } }, reason: '答应把信交给旅店老板' }]);
+  assert.equal(created.game.questJournal.entries['quest:letter'].status, 'available');
   assert.match(created.game.questJournal.entries['quest:letter'].summary, /旅店老板/);
-  const withEvidence = executeToolCalls(created.game, [{ id: 'receipt', name: 'clue.add', args: { clue: { id: 'receipt', title: '收信回执', detail: '老板已签收信件' } }, reason: '老板收信后交付回执' }]);
-  const updated = run(withEvidence.game, '找到旅店老板，请他收下信件', { instanceId: 'quest:letter', evidenceIds: ['receipt'], outcome: 'progress', evidence: '老板已收下信件并要求核对寄件人', nextObjective: '核对寄件人的姓名' });
-  assert.equal(updated.game.questJournal.entries['quest:letter'].objective, '核对寄件人的姓名');
+  const updated = run(created.game, '接受送信，答应把信交给旅店老板', { instanceId: 'quest:letter', start: true, outcome: 'progress', evidence: '老板已收下信件，原约定完成', steps: [{ objectiveId: 'fulfil-original-agreement' }] });
+  assert.equal(updated.game.questJournal.entries['quest:letter'].status, 'completed');
   game.quests.push({ id: 'managed', title: '途径委托', summary: '现场调查', source: '特殊行动', status: 'active' });
   syncQuestJournal(game);
   assert.equal(game.questJournal.entries['quest:managed'].status, 'engaged');
@@ -150,7 +156,7 @@ test('ordinary created tasks always have summary and goal; managed commissions c
 });
 
 test('omitted and rejected quest tools count focused attempts, unrelated conversation does not', () => {
-  let game = run(fixture(), '询问门房', { start: true, outcome: 'blocked' }).game;
+  let game = run(engagedFixture(), '询问门房', { outcome: 'blocked' }).game;
   processTriggers(game, { action: '询问门房信件的去向', turn: 2 });
   assert.equal(game.questJournal.attempts['test-task'].stalled, 2);
   processTriggers(game, { action: '询问餐馆今天的菜价', turn: 3 });
@@ -160,7 +166,7 @@ test('omitted and rejected quest tools count focused attempts, unrelated convers
 });
 
 test('local recovery executes when AI omits every tool, charges time and survives reload', () => {
-  let game = fixture();
+  let game = engagedFixture();
   for (let turn = 1; turn <= 3; turn++) game = run(game, '询问门房', { start: turn === 1, outcome: 'blocked' }, turn).game;
   const action = questAssistance(game, game.questJournal.entries['test-task']).recoveryAction;
   const result = resolveTurnProgress(game, action, 'low');

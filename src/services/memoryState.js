@@ -206,9 +206,29 @@ export function applyMemorySummary(game, job, digest) {
   return { ...game, memoryState: nextState, longTermSummary: composeMemorySummary(nextState.digest) };
 }
 
-export function memoryPromptState(game) {
+// A foreground request can finish after a background digest updated the same save.
+// Merge only memory metadata; the caller's settled story and gameplay state stay authoritative.
+export function mergeLatestMemory(next, current) {
+  if (!next || !current || next.id !== current.id || Number(next.turn) < Number(current.turn)) return next;
+  const nextState = normalizeMemoryState(next);
+  const currentState = normalizeMemoryState(current);
+  const currentIsNewer = currentState.revision > nextState.revision
+    || (currentState.revision === nextState.revision && currentState.throughTurn > nextState.throughTurn);
+  const latest = currentIsNewer ? currentState : nextState;
+  const throughTurn = Math.max(nextState.throughTurn, currentState.throughTurn);
+  // Let the foreground copy win for matching episode IDs, since it may contain a corrected narrative.
+  const byId = new Map([...currentState.pending, ...nextState.pending].map(episode => [episode.id, episode]));
+  const pending = [...byId.values()].filter(episode => episode.turn > throughTurn && episode.turn <= Number(next.turn))
+    .sort((left, right) => left.turn - right.turn || left.id.localeCompare(right.id));
+  const memoryState = { ...latest, throughTurn, pending };
+  const longTermSummary = currentIsNewer ? current.longTermSummary || composeMemorySummary(latest.digest) : next.longTermSummary || "";
+  if (JSON.stringify(memoryState) === JSON.stringify(next.memoryState) && longTermSummary === next.longTermSummary) return next;
+  return { ...next, memoryState, longTermSummary };
+}
+
+export function memoryPromptState(game, options = {}) {
   const state = normalizeMemoryState(game);
-  const cutoff = Math.max(0, Number(game.turn) - 3);
+  const cutoff = options.beforeTurn === undefined ? Math.max(0, Number(game.turn) - 3) : options.beforeTurn - 1;
   const olderPending = state.pending.filter((episode) => episode.turn <= cutoff);
   const selected = [];
   let budget = 0;

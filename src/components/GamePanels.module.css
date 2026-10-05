@@ -20,6 +20,8 @@
 .content progress::-webkit-progress-bar { background: #3b4a36; }
 .content progress::-webkit-progress-value { background: #b3b67e; }
 .muted { color: #bdbeaa; font-size: .8rem; }
+.abilityTarget { display: grid; gap: .4rem; margin: .65rem 0; font-size: .8rem; }
+.abilityTarget select { width: 100%; min-width: 0; min-height: 44px; background: #243329; color: #e3dcc6; border: 1px solid #748267; padding: .6rem; }
 .highlight { padding: .8rem; border-left: 2px solid #c6ad74; background: #29382b; color: #ead7a9; }
 .profile { display: flex; align-items: center; gap: 1rem; padding-bottom: 1.3rem; border-bottom: 1px solid #536149; }
 

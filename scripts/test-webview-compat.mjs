@@ -181,6 +181,7 @@ try {
       const panel = page.getByRole("complementary", { name: "特殊行动" });
       const panelBounds = await panel.boundingBox();
       assert.ok(panelBounds.height > 300 && panelBounds.x >= 0 && panelBounds.x + panelBounds.width <= width + 1, "dossier fallback must stay on screen");
+      await panel.getByRole("button", { name: "补给", exact: true }).click();
       await panel.getByRole("button", { name: "睡觉8小时 · 1回合", exact: true }).click();
       await page.waitForFunction(() => JSON.parse(localStorage.getItem("mist-chronicle-saves-v1")).find(slot => slot.slotId === "autosave").game.turn === 1);
       assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("mist-chronicle-saves-v1")).find(slot => slot.slotId === "autosave").game.character.stats.health), 16);

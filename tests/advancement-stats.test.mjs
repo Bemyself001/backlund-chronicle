@@ -8,6 +8,7 @@ import { buildRenderingContext } from "../src/services/memory.js";
 import { createTurnResolution } from "../src/services/turnResolution.js";
 import { migrateSave } from "../src/services/storage.js";
 import { CONTENT_VERSION } from "../src/content/index.js";
+import { totalRankGrowth } from "../src/system/characterStats.js";
 
 const action = "服用已鉴定的魔药，正式晋升";
 function fresh(sequence = 9, talent = "none") {
@@ -45,8 +46,8 @@ test("every promotion grants the agreed spirituality amount and restores health 
     assert.equal(stats.spirituality, game.character.stats.spirituality + growth);
     assert.equal(stats.maxSpirituality, game.character.stats.maxSpirituality + growth);
     assert.equal(stats.maxSpirituality - stats.spirituality, 4);
-    assert.equal(stats.health, 20);
-    assert.equal(stats.sanity, 10);
+    assert.equal(stats.health, 20 + totalRankGrowth(sequence));
+    assert.equal(stats.sanity, 10 + totalRankGrowth(sequence));
     assert.equal(result.game.inventory.some(item => item.instanceId === call.args.potionInstanceId), false);
     assert.equal(result.results[0].data.advancement.spiritualGrowth, growth);
     assert.deepEqual(game, original, "preview execution must not mutate the saved original");
@@ -63,7 +64,7 @@ test("promotion restores talent-adjusted maxima and clears only stat collapse st
   ];
   const result = promote(game, [call]);
   assert.equal(result.results[0].ok, true);
-  assert.deepEqual(result.game.character.stats, { health: 22, maxHealth: 22, sanity: 13, maxSanity: 13, spirituality: 2, maxSpirituality: 10 });
+  assert.deepEqual(result.game.character.stats, { health: 24, maxHealth: 24, sanity: 15, maxSanity: 15, spirituality: 2, maxSpirituality: 10 });
   assert.deepEqual(result.game.statusEffects, [{ id: "curse", name: "尚未解除的诅咒", kind: "danger" }]);
   assert.equal(result.results[0].data.autoStatuses.length, 3);
 });
@@ -74,23 +75,23 @@ test("promotion finishes at full health and sanity after same-turn damage; ongoi
   const calls = [call, { name: "character.update", args: { patch: { health: -30, sanity: -20 } }, reason: "晋升仪式中的额外消耗" }];
   const result = promote(game, calls);
   assert.ok(result.results.every(entry => entry.ok));
-  assert.equal(result.game.character.stats.health, 20);
-  assert.equal(result.game.character.stats.sanity, 10);
+  assert.equal(result.game.character.stats.health, 22);
+  assert.equal(result.game.character.stats.sanity, 12);
   assert.equal(result.game.character.stats.spirituality, 5);
   assert.deepEqual(result.game.statusEffects.map(status => status.id), ["bleeding"]);
   assert.deepEqual(result.progress.advancementRecovery.map(change => change.stat), ["health", "sanity"]);
   const resolution = createTurnResolution(calls, result.results, result.progress, result.game);
   assert.deepEqual(resolution.derivedEffects.advancementRecovery, result.progress.advancementRecovery);
   const later = resolveTurnProgress(result.game, "等待片刻", "low");
-  assert.equal(result.game.character.stats.health, 18);
-  assert.equal(result.game.character.stats.sanity, 9);
+  assert.equal(result.game.character.stats.health, 20);
+  assert.equal(result.game.character.stats.sanity, 11);
   assert.deepEqual(later.advancementRecovery, []);
 });
 
 test("declined, invalid, and replayed promotions neither restore stats nor consume another potion", () => {
-  for (const rejected of ["declined", "missing recipe", "wrong sequence", "no player intent"]) {
+  for (const rejected of ["declined", "unknown potion", "wrong sequence", "no player intent"]) {
     const { game, call } = ready(8);
-    if (rejected === "missing recipe") game.clues = [];
+    if (rejected === "unknown potion") game.inventory.find(item => item.instanceId === call.args.potionInstanceId).potion.identified = false;
     if (rejected === "wrong sequence") call.args.sequence = 7;
     const result = promote(game, [call], rejected === "declined" ? { blockedCallIndexes: [0] } : rejected === "no player intent" ? { playerAction: "观察房间" } : {});
     assert.equal(result.results[0].ok, false, rejected);
@@ -113,11 +114,12 @@ test("confirmation, audit, and AI rendering agree on promotion gains and restora
   const result = promote(game, [call]);
   const confirmation = collectImportantItemConfirmations([call], result.results)[0];
   assert.deepEqual(confirmation.advancement.statChanges, {
-    health: { before: 3, after: 20 }, sanity: { before: 2, after: 10 },
+    health: { before: 3, after: 22 }, sanity: { before: 2, after: 12 },
+    maxHealth: { before: 20, after: 22 }, maxSanity: { before: 10, after: 12 },
     spirituality: { before: 4, after: 6 }, maxSpirituality: { before: 8, after: 10 },
   });
   const audit = auditTurnChanges(createAuditBaseline(game), result.game);
-  assert.deepEqual(audit.character.stats.health, { before: 3, after: 20, delta: 17 });
+  assert.deepEqual(audit.character.stats.health, { before: 3, after: 22, delta: 19 });
   const resolution = createTurnResolution([call], result.results, result.progress, result.game);
   const context = buildRenderingContext(game, result.game, action, DEFAULT_SYSTEM_PROMPT, resolution);
   assert.match(JSON.stringify(context), /生命和理智恢复至各自上限/);
@@ -129,11 +131,12 @@ test("legacy saves receive stat differences exactly once without losing wounds, 
   old.turn = 6;
   old.initialStatsVersion = 1;
   delete old.advancementStatsVersion;
+  delete old.allStatGrowthVersion;
   old.character.stats = { health: 7, maxHealth: 12, sanity: 4, maxSanity: 11, spirituality: 4, maxSpirituality: 12 };
   old.statusEffects.push({ id: "curse", name: "诅咒", tick: { sanity: -1 } });
   const original = structuredClone(old);
   const migrated = migrateSave(old);
-  assert.deepEqual(migrated.character.stats, { health: 17, maxHealth: 22, sanity: 4, maxSanity: 11, spirituality: 7, maxSpirituality: 15 });
+  assert.deepEqual(migrated.character.stats, { health: 22, maxHealth: 27, sanity: 9, maxSanity: 16, spirituality: 7, maxSpirituality: 15 });
   for (const key of ["inventory", "money", "clues", "statusEffects"]) assert.deepEqual(migrated[key], old[key], key);
   assert.deepEqual(migrated.relationships.filter(person => person.id !== "sherlock-moriarty"), old.relationships);
   const advertisedDetectives = migrated.relationships.filter(person => person.id === "sherlock-moriarty");
@@ -167,7 +170,7 @@ test("legacy spirituality catch-up covers all ranks and is independent of the he
     assert.equal(migrated.character.stats.maxSpirituality, newMaxima[sequence]);
     assert.equal(migrated.character.stats.spirituality, newMaxima[sequence] - 4);
     assert.equal(migrated.character.stats.health, 7);
-    assert.equal(migrated.character.stats.maxHealth, 20);
+    assert.equal(migrated.character.stats.maxHealth, 20 + totalRankGrowth(sequence));
   }
   const { game, call } = ready(8);
   const promoted = promote(game, [call]).game;

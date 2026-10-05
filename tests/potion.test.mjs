@@ -37,7 +37,7 @@ function ordinaryWithRecipeAndPotion() {
   return game;
 }
 
-test("ordinary players can identify a sequence 9 potion with a matching recipe", () => {
+test("inspection and a recipe cannot identify a potion for free", () => {
   const game = ordinaryWithRecipeAndPotion();
   const execution = executeToolCalls(game, [{
     id: "inspect-potion",
@@ -46,8 +46,8 @@ test("ordinary players can identify a sequence 9 potion with a matching recipe",
     reason: "依据已确认的配方核对魔药",
   }]);
   assert.equal(execution.results[0].ok, true);
-  assert.equal(execution.game.inventory.find((item) => item.instanceId === "potion-seer-9-instance").potion.identified, true);
-  assert.match(execution.results[0].log, /占卜家.*序列9/);
+  assert.equal(execution.game.inventory.find((item) => item.instanceId === "potion-seer-9-instance").potion.identified, false);
+  assert.doesNotMatch(execution.results[0].log, /占卜家.*序列9/);
 });
 
 test("promotion atomically consumes the confirmed potion and opens the extraordinary path", () => {
@@ -57,6 +57,7 @@ test("promotion atomically consumes the confirmed potion and opens the extraordi
     args: { instanceId: "potion-seer-9-instance" },
     reason: "依据配方完成鉴定",
   }]).game;
+  inspected.inventory.at(-1).potion.identified = true;
   const call = {
     id: "promote-seer-9",
     name: "advancement.promote",
@@ -93,6 +94,7 @@ test("promotion atomically consumes the confirmed potion and opens the extraordi
 
 test("promotion requires explicit player intent and potion consumption cannot bypass it", () => {
   const inspected = executeToolCalls(ordinaryWithRecipeAndPotion(), [{ id: "inspect-intent", name: "item.inspect", args: { instanceId: "potion-seer-9-instance" }, reason: "依据配方完成鉴定" }]).game;
+  inspected.inventory.at(-1).potion.identified = true;
   const promoteCall = {
     id: "promote-without-intent",
     name: "advancement.promote",
@@ -114,6 +116,7 @@ test("promotion requires explicit player intent and potion consumption cannot by
 
 test("inventory promotion requests produce a deterministic complete advancement call", () => {
   const inspected = executeToolCalls(ordinaryWithRecipeAndPotion(), [{ id: "inspect-ui", name: "item.inspect", args: { instanceId: "potion-seer-9-instance" }, reason: "依据配方完成鉴定" }]).game;
+  inspected.inventory.at(-1).potion.identified = true;
   const eligible = getPotionAdvancementEligibility(inspected, "potion-seer-9-instance");
   assert.equal(eligible.sequence, 9);
   assert.equal(eligible.recipe.id, "recipe-seer-9");
@@ -131,7 +134,7 @@ test("inventory promotion requests produce a deterministic complete advancement 
   });
 });
 
-test("promotion rejects missing story contact, mismatched recipe, and blind potion use", () => {
+test("unknown potions cannot be consumed or promoted even if a recipe is known", () => {
   const game = ordinaryWithRecipeAndPotion();
   game.occult.contact = 0;
   const blindUse = executeToolCalls(game, [{ id: "blind", name: "item.use", args: { instanceId: "potion-seer-9-instance" }, reason: "直接尝试服用" }]);
@@ -145,14 +148,14 @@ test("promotion rejects missing story contact, mismatched recipe, and blind poti
     reason: "尝试跳过剧情入口",
   }]);
   assert.equal(promote.results[0].ok, false);
-  assert.match(promote.results[0].reason, /剧情.*接触/);
+  assert.match(promote.results[0].reason, /未知魔药|鉴定/);
 });
 
-test("unidentified potion truth is private to planning and redacted from final rendering", () => {
+test("unidentified potion truth is redacted from planning and final rendering", () => {
   const before = ordinaryWithRecipeAndPotion();
   const planning = buildPlanningContext(before, "检查瓶子", DEFAULT_SYSTEM_PROMPT, { nativeTools: true });
   assert.match(planning.at(-1).content, /potionFacts/);
-  assert.match(planning.at(-1).content, /seer/);
+  assert.doesNotMatch(planning.at(-1).content, /"potion":\{"pathwayId":"seer"/);
 
   const result = {
     ok: true,

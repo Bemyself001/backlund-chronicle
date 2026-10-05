@@ -4,7 +4,7 @@ import { choiceResult, choiceValidationError, hasValidModelChoices, mergeChoiceR
 
 // A bounded, choice-only recovery. Errors must not undo an already settled turn.
 export async function recoverChoices({ game, action, narrative, prompt, settings, signal, initialResponse,
-  request = requestAI, onResponse, timeoutMs = 25000 }) {
+  request = requestAI, onResponse, onRequestMetrics, timeoutMs = 25000 }) {
   let result = choiceResult(modelChoices(initialResponse), choiceValidationError(initialResponse));
   const attempts = [];
   if (hasValidModelChoices(result)) return result;
@@ -21,6 +21,7 @@ export async function recoverChoices({ game, action, narrative, prompt, settings
       const messages = buildChoiceRegenerationContext(game, action, narrative, result.choiceMeta.reason, prompt,
         { nativeTools, existingChoices: result.choices });
       const response = await request({ ...settings, nativeTools, jsonMode: !nativeTools }, messages, controller.signal, undefined, {
+        phase: "choices", onRequestMetrics, recoveryAttempt: attempts.length,
         toolSet: "choices", requireChoiceTool: nativeTools, disableTools: !nativeTools,
         disableJsonMode: nativeTools, forceDisableReasoning: true, skipReasoningRetry: true,
         streamOverride: false, maxTokensModeOverride: "manual", maxTokensOverride: 1200,

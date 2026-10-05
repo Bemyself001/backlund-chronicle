@@ -16,6 +16,74 @@ const settings = {
   stream: false,
 };
 
+test("attempt metrics include all reasoning retries and successful raw summary usage", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const events = [];
+  let calls = 0;
+  globalThis.fetch = async () => {
+    calls += 1;
+    return new Response(JSON.stringify({
+      usage: { prompt_tokens: 100, prompt_cache_hit_tokens: calls === 1 ? 0 : 80, prompt_cache_miss_tokens: calls === 1 ? 100 : 20, completion_tokens: 30, completion_tokens_details: { reasoning_tokens: 10 } },
+      choices: [{ finish_reason: calls < 3 ? "length" : "stop", message: { content: calls < 3 ? "" : "摘要正文", reasoning_content: "推理" } }],
+    }), { headers: { "Content-Type": "application/json" } });
+  };
+  const result = await requestAIWithReasoningFallback(settings, [], undefined, undefined, { rawContent: true, phase: "memory", onRequestMetrics: event => events.push(event) });
+  assert.equal(result.content, "摘要正文");
+  assert.equal(result.responseMetadata.usage.prompt_tokens, 100);
+  assert.deepEqual(events.map(event => event.status), ["failed", "failed", "success"]);
+  assert.deepEqual(events.map(event => event.recoveryAttempt), [0, 1, 2]);
+  assert.equal(new Set(events.map(event => event.requestId)).size, 3);
+  assert.ok(events.every(event => event.phase === "memory" && event.promptTokens === 100 && event.usageComplete && event.totalMs >= 0));
+  assert.equal(events[0].cacheHitTokens, 0);
+  assert.equal(events[0].reasoningTokens, 10);
+  assert.equal(JSON.stringify(events).includes(settings.apiKey), false);
+  assert.equal(JSON.stringify(events).includes("摘要正文"), false);
+});
+
+test("streaming metrics request usage and preserve partial usage on reader failure", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const events = [];
+  let requestBody;
+  let reads = 0;
+  globalThis.fetch = async (_url, init) => {
+    requestBody = JSON.parse(init.body);
+    return {
+      ok: true, status: 200, headers: new Headers({ "content-type": "text/event-stream" }),
+      body: { getReader: () => ({ read: async () => {
+        if (++reads === 1) return { done: false, value: new TextEncoder().encode('data: {"usage":{"prompt_tokens":70,"completion_tokens":0,"prompt_cache_hit_tokens":0,"prompt_cache_miss_tokens":70},"choices":[{"delta":{"content":"雨"}}]}\n\n') };
+        throw new DOMException("aborted", "AbortError");
+      } }) },
+    };
+  };
+  await assert.rejects(requestAI({ ...settings, provider: "deepseek", stream: true }, [], undefined, undefined, { onRequestMetrics: event => events.push(event) }), { name: "AbortError" });
+  assert.deepEqual(requestBody.stream_options, { include_usage: true });
+  assert.equal(events.length, 1);
+  assert.equal(events[0].status, "aborted");
+  assert.equal(events[0].promptTokens, 70);
+  assert.equal(events[0].completionTokens, 0);
+  assert.equal(events[0].usageComplete, false);
+  assert.equal(events[0].cacheUsageComplete, false);
+  assert.equal(events[0].cacheHitTokens, 0);
+  assert.ok(events[0].firstContentMs >= 0);
+});
+
+test("HTTP failures report usage without persisting error messages and callback errors are isolated", async (context) => {
+  const originalFetch = globalThis.fetch;
+  context.after(() => { globalThis.fetch = originalFetch; });
+  const events = [];
+  globalThis.fetch = async () => new Response(JSON.stringify({ error: { message: "sensitive diagnostic" }, usage: { prompt_tokens: 12 } }), { status: 429, headers: { "Content-Type": "application/json" } });
+  await assert.rejects(requestAI(settings, [], undefined, undefined, { onRequestMetrics: event => events.push(event) }), /429/);
+  assert.equal(events[0].promptTokens, 12);
+  assert.equal(events[0].usageComplete, false);
+  assert.equal(events[0].httpStatus, 429);
+  assert.equal(JSON.stringify(events).includes("sensitive diagnostic"), false);
+  globalThis.fetch = async () => new Response(JSON.stringify({ choices: [{ message: { content: "正常正文" } }] }), { headers: { "Content-Type": "application/json" } });
+  const result = await requestAI(settings, [], undefined, undefined, { onRequestMetrics: () => { throw new Error("listener failure"); } });
+  assert.equal(result.narrative, "正常正文");
+});
+
 test("requestAI accepts a non-stream plain-text compatible response", async (context) => {
   const originalFetch = globalThis.fetch;
   context.after(() => { globalThis.fetch = originalFetch; });

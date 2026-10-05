@@ -2,16 +2,18 @@ import { playerVisibleItem } from "../system/items.js";
 import { narrativeEventsForTurn, pendingQuestNarration } from "./narrativeEvents.js";
 
 function playerVisibleResultData(data = {}) {
-  if (!data.inventoryChange) return data;
-  return { ...data, inventoryChange: playerVisibleItem(data.inventoryChange) };
+  return { ...data, ...(data.inventoryChange ? { inventoryChange: playerVisibleItem(data.inventoryChange) } : {}),
+    ...(data.inventoryChanges ? { inventoryChanges: data.inventoryChanges.map(playerVisibleItem) } : {}) };
 }
 
 export function createTurnResolution(toolCalls = [], results = [], progress = {}, game = null) {
   const entries = toolCalls.map((call, index) => {
     const result = results[index] || { ok: false, reason: "本地引擎没有返回执行结果" };
+    const item = result.data?.inventoryChange || call.args?.item || game?.inventory?.find(entry => entry.instanceId === call.args?.instanceId);
+    const unidentified = item && playerVisibleItem(item).potionStatus === "unidentified";
     return {
       name: call.name,
-      reason: call.reason || "",
+      reason: unidentified ? "对未鉴定魔药的操作；真实身份尚未揭示" : call.reason || "",
       ok: Boolean(result.ok),
       log: result.log || "",
       rejectionReason: result.ok ? "" : result.reason || "未知校验错误",

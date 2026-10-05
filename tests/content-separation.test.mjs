@@ -49,7 +49,7 @@ test("core runtime contains no concrete watch, whistle, or official organization
 
 test("lore lookup obeys progressive disclosure and remains read-only", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "资料披露测试员", talent: "heirloom-watch" });
-  assert.equal(lookupContext(game, { query: "怀表纸条" }).entries.length, 0);
+  assert.equal(lookupContext(game, { query: "怀表纸条" }).entries.filter(entry => entry.type === "loreFact").length, 0);
   game.triggerState.facts["watch.note-recovered"] = { value: true, firstTurn: 1, evidenceIds: ["test"] };
   const revealed = lookupContext(game, { query: "怀表纸条" });
   assert.ok(revealed.entries.some((entry) => entry.id === "lore.watch.recovered-note"));

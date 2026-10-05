@@ -2,8 +2,9 @@ import { getInstanceTriggerDefinition, getTriggerDefinition } from "./triggerDef
 import { inspectQuestRoutes } from "./questRoutes.js";
 import { triggerGuidance } from "./triggerGuidance.js";
 import { syncKnownPeople } from "./people.js";
+import { migrateQuestLifecycle, normalizeQuestStatus } from "./questLifecycle.js";
 
-export const QUEST_ENGINE_RULE = "【最高优先级：任务引擎契约】任何已开始任务必须通过工具登记名称、简要信息、当前目标；禁止只在正文宣称接受、推进、完成任务。已有特殊任务使用quest.resolve，新产生的普通任务使用quest.add并提供summary和objective。每次与任务相关的行动都调用quest.resolve：引用玩家原话actionQuote，说明实际结果evidence；steps仅包含本轮真实完成的目标，普通阶段可连续至多三个，重大选择、危险、倒计时、终章必须单独行动。自然语言等价行动不必匹配固定关键词，但不得把否定、假设、意图当作完成。失败或受阻也要登记outcome=failed或blocked；休息、闲逛和无关行动不登记。连续两次无进展明确提示，第三次提供可执行的替代调查途径；普通失败可花时间整理证据并寻求帮助，恢复路线必须经过本地条件验证，玩家明确选择后才结算。普通任务推进必须提供新登记线索的evidenceIds，不能靠改写summary或objective伪造进展。连续碰壁不得增加无依据的新障碍，不得重复推荐已被本地拒绝的行动；先说明实际缺少的条件。恢复失败不能清空停滞次数。终章和危险阶段没有保成功、免代价或自动解围兜底。叙事、手记和行动选项必须服从本地确认的任务状态及当前目标；不得提前透露后续真相。";
+export const QUEST_ENGINE_RULE = "【最高优先级：任务引擎契约】开始任务必须通过工具登记名称、摘要、当前目标；固定调查使用quest.resolve，source=特殊行动的委托必须通过特殊行动引擎处理。普通任务用quest.add登记有限contract：coreGoal、nodes[{id,objective,conditions,minutes}]、completionConditions、failureConditions、rewards；conditions只引用当前可验证的地点、物品、事实、线索或行动，不能自造已满足事实。接取时冻结核心目标、条件与奖励。随机小任务2—3必要节点、最多1主要阻碍；支线3—5节点、最多2阻碍；主线每章3—5节点，跑腿最多1层。真实到达、交付、治疗、谈话、战斗及既有证据均可推进，不要求每回合新增线索或新目标。普通步骤最多串行3个，危险、重大选择、倒计时、终章独立结算。引用真实actionQuote并提交冻结目标的steps，不能把意图、否定、假设当作完成。blocked/failed必须有本地现存状态验证；技术工具失败不能改写成NPC阻碍或消耗时间。第一次无进展说明具体原因，第二次展示本地验证的执行路线，玩家选后才执行。语义改名、重复线索不重置停滞；证据和许可持续有效，除非有真实事件改变。完成则按冻结条件结算并归档；后续钩子只能是可选的新任务。quest.update不得改变状态、目标、条件或奖励。未接随机机会10回合到期，接取后只受自身期限约束，固定主支线保留。叙事必须服从本地状态，不提前揭露未知目的地或后续真相。旧复杂任务requiresInvestigation时，玩家调查原任务后通过quest.resolve.legacyPlan一次性补录：coreGoal须逐字不变，evidenceIds引用已登记线索/事实，nodes限定1—3个真实可验证阶段，completionConditions至少包含具体事实、物品或状态；不得改奖励。补录只固定计划，不算完成或进展，后续执行steps才能结案。有契约后不得再次补录。付款/交付可用节点cost{amountPence,itemId,quantity}原子扣除；后续用quest-proof{nodeId,minPaidPence,itemId,quantity}核验永久凭证，不能要求已交付物品仍留在背包。不要再重复调用扣款/移除物品工具。";
 
 const text = value => typeof value === "string" ? value.trim() : "";
 const active = status => ["available", "engaged"].includes(status);
@@ -27,6 +28,7 @@ function journalEntry(game, instance) {
     id: instance.instanceId, source: "trigger", title: text(instance.presentation?.title) || text(definition?.presentation?.title) || "未命名调查",
     summary: text(instance.lastProgressEvidence) || text(instance.presentation?.text) || text(goal), objective: text(goal),
     status: instance.status, stage: instance.stage, revision: `${instance.status}:${instance.stage}:${instance.stageHistory?.length || 0}:${guidance.key}`,
+    expiresAtTurn: instance.status === "available" ? instance.expiresTurn : undefined,
     ...(instance.definitionId === "side.queens.renard-fall" ? { treatmentReady: instance.treatmentReady === 1 ? 1 : 0 } : {}),
     startedTurn: instance.engagedTurn ?? instance.createdTurn, updatedTurn: game.turn,
     policy: questStagePolicy(definition, stage),
@@ -34,6 +36,7 @@ function journalEntry(game, instance) {
 }
 
 export function syncQuestJournal(game) {
+  migrateQuestLifecycle(game);
   const previous = game.questJournal && typeof game.questJournal === "object" ? game.questJournal : {};
   const entries = { ...(previous.entries || {}) };
   for (const instance of [...(game.triggerState?.active || []), ...(game.triggerState?.history || [])]) {
@@ -42,13 +45,16 @@ export function syncQuestJournal(game) {
     entries[entry.id] = { ...entries[entry.id], ...entry };
   }
   for (const quest of game.quests || []) {
-    const status = ({ active: "engaged", "进行中": "engaged", "已完成": "completed", "失败": "failed", "已失败": "failed", "已放弃": "abandoned" })[quest.status] || quest.status || "engaged";
+    const status = normalizeQuestStatus(quest.status);
     const id = `quest:${quest.id}`;
     const summary = text(quest.summary) || `你已开始调查「${quest.title || "未命名任务"}」。`;
+    const currentNode = quest.lifecycle?.contract?.nodes?.find(node => !quest.lifecycle.completedNodeIds.includes(node.id));
     const objective = status === "engaged" ? text(quest.objective) || quest.objectives?.find(item => !item.completed)?.text || summary : ({ completed: "任务已完成", failed: "任务失败，后果已保留", abandoned: "已主动放弃" }[status]) || summary;
     entries[id] = { ...entries[id], id, source: "quest", questId: quest.id, title: text(quest.title) || "未命名任务", summary, objective, status,
-      stage: String(quest.stage || "investigate"), revision: `${status}:${quest.stage || "investigate"}:${objective}:${summary}`,
-      policy: quest.source === "特殊行动" ? { finale: false, isolated: true, canChain: false, canRecover: false } : questStagePolicy(quest, quest), startedTurn: entries[id]?.startedTurn ?? game.turn, updatedTurn: game.turn };
+      stage: String(quest.stage || currentNode?.id || "investigate"), revision: `${status}:${quest.stage || "investigate"}:${quest.lifecycle?.progressCount || 0}:${objective}`,
+      kind: quest.kind, expiresTurn: status === "available" ? quest.lifecycle?.offerExpiresTurn : quest.lifecycle?.deadlineTurn,
+      expiresAtTurn: status === "available" ? quest.lifecycle?.offerExpiresTurn : quest.lifecycle?.deadlineTurn,
+      policy: quest.source === "特殊行动" ? { finale: false, isolated: true, canChain: false, canRecover: false } : questStagePolicy(quest, { ...quest, dangerous: quest.dangerous || currentNode?.dangerous, majorDecision: quest.majorDecision || currentNode?.majorDecision }), startedTurn: entries[id]?.startedTurn ?? game.turn, updatedTurn: game.turn };
   }
   game.questJournal = { version: 1, entries, attempts: { ...(previous.attempts || {}) } };
   syncKnownPeople(game);
@@ -56,8 +62,16 @@ export function syncQuestJournal(game) {
 }
 
 export function visibleQuestJournal(game) {
-  const projection = { ...game, questJournal: structuredClone(game.questJournal), triggerState: structuredClone(game.triggerState) };
+  const projection = { ...game, quests: structuredClone(game.quests), questJournal: structuredClone(game.questJournal), triggerState: structuredClone(game.triggerState) };
   return Object.values(syncQuestJournal(projection).entries);
+}
+
+export function projectQuestJournal(game) {
+  const entries = visibleQuestJournal(game);
+  const byTracked = (a, b) => Number(b.id === game.trackedQuestId) - Number(a.id === game.trackedQuestId);
+  return { active: entries.filter(entry => entry.status === "engaged").sort(byTracked),
+    opportunities: entries.filter(entry => entry.status === "available").sort(byTracked),
+    archive: entries.filter(entry => !["available", "engaged"].includes(entry.status)) };
 }
 
 export function recordQuestAttempt(game, id, { outcome, evidence = "", stage, turn }) {
@@ -66,8 +80,8 @@ export function recordQuestAttempt(game, id, { outcome, evidence = "", stage, tu
   if (!entry || entry.status !== "engaged") return;
   const previous = journal.attempts[id] || {};
   if (previous.lastTurn === turn) return;
-  const progressed = outcome === "progress" || previous.stage && previous.stage !== entry.stage;
-  const stalled = progressed ? 0 : (previous.stage === entry.stage ? Number(previous.stalled || 0) : 0) + 1;
+  const progressed = outcome === "progress";
+  const stalled = progressed ? 0 : Number(previous.stalled || 0) + 1;
   journal.attempts[id] = {
     stage: entry.stage, lastTurn: turn, stalled, hintLevel: Math.min(3, stalled), outcome,
     evidence: text(evidence), recoveryUsed: progressed ? false : previous.recoveryUsed || outcome === "recover",
@@ -81,25 +95,25 @@ export function questAssistance(game, entry) {
   if (!attempt || attempt.stage !== entry.stage || entry.status !== "engaged") return null;
   const level = attempt.hintLevel || 0;
   const inspection = inspectQuestRoutes(game, entry);
-  const routes = level >= 3 ? inspection.routes.filter(route => route.automatic) : [];
+  const routes = level >= 2 ? inspection.routes.filter(route => route.automatic) : [];
   const recoveryAction = routes[0] ? `花${routes[0].costMinutes}分钟${routes[0].label}` : "";
   const blocker = inspection.blockers.join("；") || attempt.evidence;
   return { level, recoverable: routes.length > 0, recoveryAction,
     recoveryCostMinutes: routes[0]?.costMinutes || 20, routes, availableActions: inspection.routes, blockers: inspection.blockers,
-    text: level >= 2 ? `${entry.objective}\n${blocker ? `当前阻碍：${blocker}。` : ""}${routes.length ? "已有可行的行动路线，可以选择其中一条继续。" : entry.policy.isolated ? "这是关键或危险阶段，需要权衡当前条件与行动后果。" : "请先解决上述条件；仅仅重复打听并不能带来新的进展。"}` : "",
+    text: level >= 1 ? `${entry.objective}\n${blocker ? `本轮未推进原因：${blocker}。` : "尚未确认约定行动已经实际完成。"}${routes.length ? "已有可行的行动路线，可以选择其中一条继续。" : entry.policy.isolated ? "这是关键或危险阶段，需要权衡当前条件与行动后果。" : "按已登记的目标与条件执行即可，无须额外寻找新线索。"}` : "",
   };
 }
 
 export function settleQuestAttempts(game, calls, results, turn, action = "") {
   syncQuestJournal(game);
   const attempts = new Map();
-  const priority = { blocked: 0, failed: 1, recover: 2, progress: 3 };
+  const priority = { unconfirmed: -1, planned: -1, blocked: 0, failed: 1, recover: 2, progress: 3 };
   for (const [index, call] of calls.entries()) {
     const result = results[index];
     let attempt = result?.data?.questAttempt;
     if (!attempt && ["trigger.progress", "quest.update", "quest.resolve"].includes(call.name)) {
       const id = call.name === "quest.update" ? `quest:${call.args?.questId}` : call.args?.instanceId;
-      attempt = { id, outcome: "blocked", evidence: result?.reason || call.args?.evidence };
+      attempt = { id, outcome: "unconfirmed", evidence: result?.ok === false ? "任务工具未通过本地校验，尚未产生游戏内结果" : "尚未确认实际目标进展" };
     }
     if (attempt && (!attempts.has(attempt.id) || priority[attempt.outcome] >= priority[attempts.get(attempt.id).outcome])) attempts.set(attempt.id, attempt);
   }
@@ -120,7 +134,7 @@ export function settleQuestAttempts(game, calls, results, turn, action = "") {
         return /^[\u4e00-\u9fff]{2}$/.test(word) && !/调查|询问|了解|线索|继续|查找|记录|寻找|前往|查阅|确认|已经|相关|资料|完成|任务|当前|一步|进行|处理/.test(word) && action.includes(word);
       });
       const matches = specific && (/调查|询问|寻找|查阅|检查|打听|核对|请教|帮忙|查看|交谈/.test(action) || stage?.transitions?.some(transition => transition.actionTerms?.some(term => term.length >= 2 && action.includes(term))));
-      if (action.includes(entry.title) || matches) attempts.set(entry.id, { id: entry.id, outcome: "blocked", evidence: "本轮未确认阶段推进或新增任务证据" });
+      if (action.includes(entry.title) || matches) attempts.set(entry.id, { id: entry.id, outcome: "unconfirmed", evidence: "本轮尚未确认约定行动已经完成，无须另外制造线索或障碍" });
     }
   }
   for (const attempt of attempts.values()) {

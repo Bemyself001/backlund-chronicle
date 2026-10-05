@@ -23,7 +23,7 @@ import { timedAction } from "./engine/restTime.js";
 import { processTriggers } from "./engine/triggerEngine.js";
 import { loadApiSettings, requestAIWithReasoningFallback, saveApiSettings } from "./services/api.js";
 import { buildFastNarrativeContinuationContext, buildFastPresentationContext, buildItemInspectionContext, buildPlanningContext, buildRenderingContext, buildSummaryContext, buildToolRepairContext, computeMemoryUpdate } from "./services/memory.js";
-import { applyMemorySummary, createMemorySummaryJob, parseMemoryDigestPayload } from "./services/memoryState.js";
+import { applyMemorySummary, createMemorySummaryJob, parseMemoryDigestPayload, mergeLatestMemory } from "./services/memoryState.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
 import { extractNarrativePreview } from "./services/streamPreview.js";
 import { ensureMapMoveToolCall, ensureMapDiscoveryToolCall } from "./services/mapTravel.js";
@@ -34,6 +34,7 @@ import { pendingQuestNarration, markNarrativeEventsDelivered, eventDirections, a
 import { makeId } from "./utils/id.js";
 import { canHotUpdate, checkForUpdate, downloadAndApplyOta, isNativeAndroid } from "./services/updates.js";
 import { finishTurnMetrics, markTurnMetric, recordModelRequest, startTurnMetrics } from "./services/turnMetrics.js";
+import { recordUsageEvent, attachCreationUsage } from "./services/usageHistory.js";
 import { isExplicitAdvancementIntent } from "./system/character.js";
 import { exploreHex } from "./system/hexworld.js";
 import { ensureRequestedAdvancementToolCall } from "./services/advancement.js";
@@ -49,6 +50,9 @@ import { ensureTalismanToolCall, validateTalismanRequest } from "./services/tali
 import { getChurchTalisman } from "./system/talismans.js";
 import { activeEnemies } from "./system/combat.js";
 import { requestedPersonVisit, visitPersonGate } from "./engine/visitablePeople.js";
+import { validatePlayerActions, ensurePlayerActionTools } from "./services/playerActions.js";
+import { inspectQuestTracking } from "./services/questTracking.js";
+import { prepareContextIndex } from "./services/contextIndex.js";
 
 export default function App() {
   const [screen, setScreen] = useState("splash");
@@ -82,6 +86,7 @@ export default function App() {
   const refreshSaves = () => setSaves(listSaves());
 
   useEffect(() => { saveOnboarding(onboardingStep); }, [onboardingStep]);
+  useEffect(() => game ? prepareContextIndex(game) : undefined, [game]);
 
   useEffect(() => {
     if (IS_STARTUP_TEST || !isNativeAndroid()) return undefined;
@@ -121,13 +126,12 @@ export default function App() {
   };
 
   const commitGame = (next) => {
-    const saved = saveGame(next);
-    setGame(saved);
+    setGame(current => saveGame(mergeLatestMemory(next, current)));
     refreshSaves();
   };
   const resetAction = () => { lastActionRef.current = null; prayerRetryRef.current = null; setError(""); resetStreamPreview(); };
   const requireIdle = () => { if (busyRef.current) throw new Error("请先中止生成或等待本轮完成，再切换档案。"); };
-  const handleCreate = (character, loadout) => { requireIdle(); const next = createInitialGame(character, loadout); commitGame(next); resetAction(); setScreen("game"); };
+  const handleCreate = (character, loadout) => { requireIdle(); const next = createInitialGame(character, loadout); attachCreationUsage(next.id); commitGame(next); resetAction(); setScreen("game"); };
   const handleContinue = () => loadSlot("autosave");
   const handleImport = async (file) => {
     requireIdle();
@@ -153,8 +157,9 @@ export default function App() {
 
   const settleImportantItemConfirmation = (decision) => itemConfirmationResolverRef.current?.(decision);
 
-  const requestChoicesFromAI = (targetGame, action, narrative, initialResponse, signal, onResponse) => recoverChoices({
-    game: targetGame, action, narrative, initialResponse, signal, prompt, settings, onResponse,
+  const requestChoicesFromAI = (targetGame, action, narrative, initialResponse, signal, onRequestMetrics) => recoverChoices({
+    game: targetGame, action, narrative, initialResponse, signal, prompt, settings,
+    onRequestMetrics: event => { recordUsageEvent(targetGame.id, targetGame.turn, event); onRequestMetrics?.(event); },
   });
 
   const saveRecoveredChoices = (target, response, metrics) => {
@@ -178,6 +183,7 @@ export default function App() {
     (async () => {
       try {
         const response = await requestAIWithReasoningFallback(settings, buildSummaryContext(job), summaryController.signal, undefined, {
+          phase: "memory", onRequestMetrics: event => recordUsageEvent(job.gameId, job.throughTurn, event),
           disableTools: true,
           forceDisableReasoning: true,
           skipReasoningRetry: true,
@@ -202,6 +208,18 @@ export default function App() {
 
   const runTurn = async (action, options = {}) => {
     if (!game || busyRef.current || !action.trim()) return false;
+    let questTrackingPlan = null;
+    let playerRequests;
+    try {
+      if (options.questTrackingRequest) {
+        questTrackingPlan = inspectQuestTracking(game, options.questTrackingRequest);
+        if (!questTrackingPlan.ok) throw new Error(questTrackingPlan.reason);
+        if (questTrackingPlan.kind === "special-action") { commitGame({ ...game, trackedQuestId: questTrackingPlan.entry.id }); setModal("special"); return false; }
+        if (questTrackingPlan.kind === "choice") throw new Error(questTrackingPlan.reason || "请在任务簿选择具体行动。");
+        action = questTrackingPlan.action;
+      }
+      playerRequests = validatePlayerActions(game, action, options);
+    } catch (err) { setError(err.message); return false; }
     const requestedVisit = requestedPersonVisit(game, action);
     if (requestedVisit && !options.personConversation) {
       lastActionRef.current = actionRequest(action, options);
@@ -231,11 +249,12 @@ export default function App() {
       const requestModel = async (requestMessages, requestOptions = {}, preview = false) => {
         const response = await requestAIWithReasoningFallback(settings, requestMessages, controller.signal, preview ? handleTurnPreview : undefined, {
         ...requestOptions,
+        phase: requestOptions.phase || (requestOptions.toolSet === "choices" ? "narrative" : "planning"),
+        onRequestMetrics: event => { recordModelRequest(metrics, event); recordUsageEvent(game.id, game.turn + 1, event); },
         onReasoningChunk: () => { armWatchdog(); setTurnPhase((current) => ["generating", "manualRetry", "finalizing"].includes(current) ? "thinking" : current); },
         onReasoningRecovery: () => { if (preview) resetStreamPreview(); setTurnPhase("budgetRecovery"); },
         onReasoningFallback: () => { if (preview) resetStreamPreview(); setTurnPhase("reasoningRetry"); },
         });
-        recordModelRequest(metrics, response);
         return response;
       };
 
@@ -246,7 +265,8 @@ export default function App() {
         if (reason) throw new Error(reason);
       }
       // All sleep, rest and waiting narration must use the settled clock.
-      const fastMode = Boolean(settings.fastMode) && !options.personConversation && !advancementIntent && !talismanRequest && !activeEnemies(game).length && !/符咒/.test(action) && timedAction(action, game.worldTime) === null;
+      const fastMode = Boolean(settings.fastMode) && !questTrackingPlan && !playerRequests.abilityRequest && !playerRequests.identificationRequest && !playerRequests.advancementRequest && !options.personConversation && !advancementIntent && !talismanRequest && !activeEnemies(game).length && !/符咒/.test(action) && timedAction(action, game.worldTime) === null;
+      const planningOptions = { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation, talismanRequest, ...playerRequests, questTrackingPlan };
       let planningResponse;
       let fastPresentationTask = null;
       if (fastMode) {
@@ -254,35 +274,45 @@ export default function App() {
         // 不必等待仍在流式输出的剧情草稿。
         const fastTasks = launchFastModeTasks({
           planning: () => requestModel(
-            buildPlanningContext(game, action, prompt, { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation, talismanRequest }),
+            buildPlanningContext(game, action, prompt, planningOptions),
             { toolSet: "state", disableJsonMode: Boolean(settings.nativeTools) },
           ),
           presentation: () => requestModel(
             buildFastPresentationContext(game, action, prompt),
-            { disableTools: true, maxTokensModeOverride: "manual", maxTokensOverride: 5200, skipReasoningRetry: true },
+            { phase: "draft", disableTools: true, maxTokensModeOverride: "manual", maxTokensOverride: 5200, skipReasoningRetry: true },
             true,
           ),
         });
         fastPresentationTask = fastTasks.presentation;
         const planningOutcome = await fastTasks.planning;
         throwIfFastTaskAborted(planningOutcome);
-        planningResponse = planningOutcome.value || { toolCalls: [], narrative: "", hasNarrative: false };
+        if (planningOutcome.error) {
+          controller.abort();
+          await fastPresentationTask;
+          throw planningOutcome.error;
+        }
+        planningResponse = planningOutcome.value;
       }
       if (!fastMode) {
         planningResponse = await requestModel(
-          buildPlanningContext(game, action, prompt, { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation, talismanRequest }),
+          buildPlanningContext(game, action, prompt, planningOptions),
           { toolSet: "state", disableJsonMode: Boolean(settings.nativeTools) },
         );
       }
       const discoveryAdjustedCalls = ensureMapDiscoveryToolCall(normalizeToolCalls(planningResponse.toolCalls, game), options.mapInvestigation, game.turn + 1, game);
-      const advancementAdjustedCalls = ensureRequestedAdvancementToolCall(discoveryAdjustedCalls, options.advancementRequest, game.turn + 1, game);
+      const advancementAdjustedCalls = ensureRequestedAdvancementToolCall(discoveryAdjustedCalls, playerRequests.advancementRequest, game.turn + 1, game);
       let proposedToolCalls = dedupeToolCalls(normalizeToolCalls(ensureMapMoveToolCall(advancementAdjustedCalls, options.mapDestination, game.turn + 1), game));
-      proposedToolCalls = ensureTalismanToolCall(proposedToolCalls, talismanRequest, game);
+      const enforceRequests = calls => {
+        if (questTrackingPlan && ["travel", "progress"].includes(questTrackingPlan.kind)) return [{ id: `track:${game.turn + 1}:${options.questTrackingRequest.id}`, name: "quest.track", args: { ...options.questTrackingRequest }, reason: action }];
+        return ensurePlayerActionTools(ensureRequestedAdvancementToolCall(ensureTalismanToolCall(calls, talismanRequest, game), playerRequests.advancementRequest, game.turn + 1, game), playerRequests, game);
+      };
+      proposedToolCalls = enforceRequests(proposedToolCalls);
 
       // 两种模式都并发修复最多三条独立参数错误；修复完成后仍按原顺序进入串行状态执行。
       const repairPlan = await repairToolCallsConcurrently(game, proposedToolCalls, async ({ call, error }) => {
         const repairMessages = buildToolRepairContext(game, action, call, error, prompt, { nativeTools: settings.nativeTools });
         const repairResponse = await requestModel(repairMessages, {
+          phase: "repair",
           toolSet: "state",
           allowedToolNames: [call.name],
           disableJsonMode: Boolean(settings.nativeTools),
@@ -295,18 +325,21 @@ export default function App() {
         maxRepairs: 3,
         onRepairsStarted: () => setTurnPhase("toolRetry"),
       });
-      proposedToolCalls = ensureTalismanToolCall(repairPlan.calls, talismanRequest, game);
+      proposedToolCalls = enforceRequests(repairPlan.calls);
       const advancementProposed = proposedToolCalls.some((call) => call.name === "advancement.promote");
       if (advancementProposed) resetStreamPreview();
       markTurnMetric(metrics, "planningCompletedAt");
 
       setTurnPhase("validating");
-      let execution = executeToolCalls(game, proposedToolCalls, { playerAction: action });
+      let execution = executeToolCalls(game, proposedToolCalls, { playerAction: action, questTrackingRequest: options.questTrackingRequest });
+      const rejected = execution.results.filter((result, index) => !result.ok && !(proposedToolCalls[index]?.name === "enemy.act" && /眩晕|已被击败/.test(result.reason)));
+      if (questTrackingPlan) execution.game.trackedQuestId = questTrackingPlan.entry.id;
       if (talismanRequest) {
         const index = proposedToolCalls.findIndex(call => call.name === "item.use" && call.args.instanceId === talismanRequest.instanceId);
         if (!execution.results[index]?.ok) throw new Error(`${execution.results[index]?.reason || "符咒效果未能完成"}。符咒与回合均未消耗，可重试。`);
       }
-      let progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results);
+      if (rejected.length) throw new Error(`本轮规则核验未完成：${rejected[0].reason}。游戏进度与物品未改变，可重试。`);
+      let progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results, { travelOnly: questTrackingPlan?.kind === "travel" });
       let resolvedGame = {
         ...execution.game,
         turn: game.turn + 1,
@@ -330,19 +363,20 @@ export default function App() {
         const approvedKeys = new Set(decision.approvedKeys || []);
         const advancementChange = importantChanges.find((change) => change.confirmationKind === "advancement");
         const blockedCallIndexes = importantChanges.filter((change) => !approvedKeys.has(change.key)).map((change) => change.callIndex);
+        const rejectedChanges = importantChanges.filter(change => blockedCallIndexes.includes(change.callIndex)).length;
         confirmationStatus = {
           required: true,
           status: blockedCallIndexes.length ? (approvedKeys.size ? "partially-confirmed" : "rejected") : "confirmed",
-          confirmed: importantChanges.length - blockedCallIndexes.length,
-          rejected: blockedCallIndexes.length,
+          confirmed: importantChanges.length - rejectedChanges,
+          rejected: rejectedChanges,
           advancement: advancementChange ? {
             status: blockedCallIndexes.includes(advancementChange.callIndex) ? "declined" : "confirmed",
             target: advancementChange.advancement.after,
           } : null,
         };
         if (blockedCallIndexes.length) {
-          execution = executeToolCalls(game, proposedToolCalls, { blockedCallIndexes, playerAction: action });
-          progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results);
+          execution = executeToolCalls(game, proposedToolCalls, { blockedCallIndexes, playerAction: action, questTrackingRequest: options.questTrackingRequest });
+          progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results, { travelOnly: questTrackingPlan?.kind === "travel" });
           resolvedGame = {
             ...execution.game,
             turn: game.turn + 1,
@@ -372,8 +406,8 @@ export default function App() {
           continuation: () => finalizeFastPresentation(
             fastPresentationResponse, resolution,
             (draft, settled) => requestModel(
-              buildFastNarrativeContinuationContext(game, resolvedGame, action, draft, prompt, settled),
-              { disableTools: true, disableJsonMode: true, forceDisableReasoning: true, maxTokensModeOverride: "manual", maxTokensOverride: 5200 },
+              buildFastNarrativeContinuationContext(game, resolvedGame, action, draft, prompt, settled, { nativeTools: settings.nativeTools }),
+              { phase: "narrative", toolSet: "choices", disableJsonMode: Boolean(settings.nativeTools), forceDisableReasoning: true, maxTokensModeOverride: "manual", maxTokensOverride: 5200 },
             ),
           ),
         });
@@ -397,7 +431,7 @@ export default function App() {
           resetStreamPreview();
           setTurnPhase("reasoningRetry");
           const narrativeOnlyMessages = [...renderMessages, { role: "system", content: "上一次响应没有最终剧情。现在只在 assistant.content 中返回纯文本剧情，不要调用任何工具，不要输出 JSON。" }];
-          const narrativeResponse = await requestModel(narrativeOnlyMessages, { disableTools: true, disableJsonMode: true, forceDisableReasoning: true }, true);
+          const narrativeResponse = await requestModel(narrativeOnlyMessages, { phase: "narrative", disableTools: true, disableJsonMode: true, forceDisableReasoning: true }, true);
           response = { ...narrativeResponse, ...originalChoices };
         }
         if (!response.hasNarrative) throw new Error("模型没有返回最终剧情正文，请重试本轮。");
@@ -439,7 +473,7 @@ export default function App() {
             choiceResponse => recordModelRequest(metrics, choiceResponse));
           saveRecoveredChoices(next, recovered, metrics);
         } catch {
-          saveRecoveredChoices(next, choiceResult(next.choices, "request_failed"));
+          saveRecoveredChoices(next, choiceResult(next.choices, "request_failed"), metrics);
         }
       }
       return true;
@@ -461,7 +495,7 @@ export default function App() {
     const controller = new AbortController(); controllerRef.current = controller;
     const timer = setTimeout(() => controller.abort(), 60000);
     try {
-      const text = await generatePrayer(available.church, settings, controller.signal);
+      const text = await generatePrayer(available.church, settings, controller.signal, event => recordUsageEvent(game.id, game.turn, event));
       if (controller.signal.aborted) throw new DOMException("祷告已取消", "AbortError");
       const { next, action, progress, recovered, sanityRecovered } = settlePrayer(game, locationId);
       let narrative = `${text}\n\n${available.church.environment}`;
@@ -517,6 +551,11 @@ export default function App() {
 
   const runLocalTool = async (name, args, reason, showStory) => {
     if (!game || busyRef.current) return;
+    if (name === "item.use" && game.inventory.find(item => item.instanceId === args.instanceId)?.potion) {
+      showStory?.();
+      const bottle = game.inventory.find(item => item.instanceId === args.instanceId);
+      return runTurn(`服用${bottle.name}魔药并尝试逐级晋升`, { advancementRequest: { potionInstanceId: args.instanceId } });
+    }
     if (name === "item.use" && getChurchTalisman(game.inventory.find(item => item.instanceId === args.instanceId))) {
       showStory?.();
       return runTurn(reason, { talismanRequest: args });
@@ -550,7 +589,7 @@ export default function App() {
     const timer = setTimeout(() => controller.abort(), 150000);
     try {
       resolution.derivedEffects.narrativeEvents = events;
-      const response = await requestAIWithReasoningFallback(settings, buildItemInspectionContext(game, next, reason, prompt, resolution, inspection), controller.signal, queueStreamPreview, { disableTools: true, disableJsonMode: true });
+      const response = await requestAIWithReasoningFallback(settings, buildItemInspectionContext(game, next, reason, prompt, resolution, inspection), controller.signal, queueStreamPreview, { phase: "inspection", onRequestMetrics: event => recordUsageEvent(game.id, game.turn, event), disableTools: true, disableJsonMode: true });
       if (controller.signal.aborted) throw new DOMException("已取消", "AbortError");
       if (!response.hasNarrative) throw new Error("模型没有返回剧情正文");
       const memory = computeMemoryUpdate({ ...settled, turn: settled.turn - 1 }, reason, response.narrative, resolution, { settledGame: settled });

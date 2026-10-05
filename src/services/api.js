@@ -4,10 +4,13 @@ import { createProviderProfile, inferApiProvider } from "./apiProviders.js";
 import { normalizeAIResponse, textFromContent } from "./protocol.js";
 import { CLOTHING_SLOTS } from "../system/loadout.js";
 import { MAX_ENEMY_HEALTH, MAX_ENEMY_ID_LENGTH, MAX_ENEMY_NAME_LENGTH, MAX_COMBAT_ENEMIES } from "../system/combat.js";
+import { QUEST_INPUT_SCHEMA, QUEST_RESOLVE_PROPERTIES } from "./questSchema.js";
+import { normalizeTokenUsage } from "./apiUsage.js";
 
 const SETTINGS_KEY = "mist-api-settings-v1";
 const LEGACY_SESSION_KEY = "mist-api-key";
 const SESSION_KEY_PREFIX = "mist-api-key:";
+let metricSequence = 0;
 
 function sessionKey(provider) {
   return `${SESSION_KEY_PREFIX}${provider}`;
@@ -82,10 +85,11 @@ function requestHeaders(settings, withContentType = false) {
   };
 }
 
-async function apiError(response, prefix) {
+async function apiError(response, prefix, onData) {
   let detail = "";
   try {
     const data = await response.json();
+    onData?.(data);
     detail = data?.error?.message || data?.message || "";
   } catch { /* response body is not JSON */ }
   throw new Error(`${prefix}：HTTP ${response.status}${detail ? ` · ${detail}` : ""}`);
@@ -219,6 +223,14 @@ const TOOL_PARAMETER_SCHEMAS = {
       reason: { type: "string" },
     },
   },
+  "potion.identify": {
+    type: "object", additionalProperties: false, required: ["instanceId", "feePence", "reason"],
+    properties: { instanceId: { type: "string" }, feePence: { type: "integer", enum: [240], description: "玩家明确确认支付每瓶1镑时填写240" }, reason: { type: "string" } },
+  },
+  "ability.use": {
+    type: "object", additionalProperties: false, required: ["abilityId", "reason"],
+    properties: { abilityId: { type: "string", description: "当前角色unlockedAbilities中的稳定ID" }, targetId: { type: "string", description: "能力目标：当前敌人或已知线索ID；自身能力省略" }, reason: { type: "string" } },
+  },
   "enemy.encounter": {
     type: "object", additionalProperties: false, required: ["enemies", "reason"],
     properties: {
@@ -331,12 +343,12 @@ const TOOL_PARAMETER_SCHEMAS = {
   "advancement.promote": {
     type: "object",
     additionalProperties: false,
-    required: ["pathwayId", "sequence", "potionInstanceId", "recipeClueId", "evidence", "reason"],
+    required: ["pathwayId", "sequence", "potionInstanceId", "evidence", "reason"],
     properties: {
       pathwayId: { type: "string", enum: PATHWAYS.map((pathway) => pathway.id), description: "目标途径的规范 ID" },
       sequence: { type: "integer", minimum: 0, maximum: 9, description: "普通人只能填 9；非凡者只能填当前序列减 1" },
       potionInstanceId: { type: "string", description: "背包中已鉴定且完全匹配的魔药 instanceId" },
-      recipeClueId: { type: "string", description: "已记录的对应魔药配方线索 ID" },
+      recipeClueId: { type: "string", description: "可选的配方出处；已持有成品魔药时无需配方" },
       evidence: { type: "string", description: "本轮剧情中实际完成的准备、服用与引导条件" },
       reason: { type: "string", description: "玩家主动晋升的原因" },
     },
@@ -531,40 +543,14 @@ const TOOL_PARAMETER_SCHEMAS = {
   "quest.resolve": {
     type: "object", additionalProperties: false,
     required: ["instanceId", "actionQuote", "outcome", "evidence", "reason"],
-    properties: {
-      instanceId: { type: "string", description: "taskJournal中的id，特殊任务实例ID或quest:普通任务ID" },
-      actionQuote: { type: "string", description: "玩家本轮行动原话" },
-      outcome: { type: "string", enum: ["progress", "blocked", "failed", "recover"] },
-      evidence: { type: "string", description: "实际结果、受阻原因或付出时间后得到的具体新线索" },
-      start: { type: "boolean", description: "玩家明确开始追查可选线索时为true" },
-      nextObjective: { type: "string", description: "普通任务推进后的当前目标" },
-      evidenceIds: { type: "array", items: { type: "string" }, description: "普通任务推进时，引用本轮clue.add成功登记的新增证据ID；不接受重复旧线索" },
-      steps: { type: "array", maxItems: 3, items: { type: "object", additionalProperties: false, required: ["objectiveId", "actionQuote", "evidence"], properties: {
-        objectiveId: { type: "string" }, actionQuote: { type: "string" }, evidence: { type: "string" },
-      } } },
-      reason: { type: "string" },
-    },
+    properties: { ...QUEST_RESOLVE_PROPERTIES, reason: { type: "string" } },
   },
   "quest.add": {
     type: "object",
     additionalProperties: false,
     required: ["quest", "reason"],
     properties: {
-      quest: {
-        type: "object",
-        additionalProperties: false,
-        required: ["id", "title"],
-        properties: {
-          id: { type: "string", description: "稳定且可去重的任务 ID" },
-          title: { type: "string" },
-          summary: { type: "string" },
-          objective: { type: "string", description: "当前可行动的目标，不含后续剧透" },
-          finale: { type: "boolean" },
-          dangerous: { type: "boolean" },
-          majorDecision: { type: "boolean" },
-          status: { type: "string" },
-        },
-      },
+      quest: QUEST_INPUT_SCHEMA,
       reason: { type: "string" },
     },
   },
@@ -578,9 +564,7 @@ const TOOL_PARAMETER_SCHEMAS = {
         type: "object",
         additionalProperties: false,
         properties: {
-          status: { type: "string" },
           summary: { type: "string" },
-          objective: { type: "string" },
         },
       },
       reason: { type: "string" },
@@ -591,6 +575,8 @@ const TOOL_PARAMETER_SCHEMAS = {
     additionalProperties: false,
     required: ["difficulty", "reason"],
     properties: {
+      abilityId: { type: "string", description: "可选，被动能力的已解锁ID；使用时不再提供modifier" },
+      checkKind: { type: "string", enum: ["investigation", "combat", "avoidance", "endurance", "composure"], description: "与当前被动能力rule.checkKind匹配" },
       difficulty: { type: "integer", minimum: 2, maximum: 20, description: "1d20 检定难度" },
       modifier: { type: "integer", description: "正负修正值" },
       reason: { type: "string", description: "本次检定对应的行动" },
@@ -598,7 +584,7 @@ const TOOL_PARAMETER_SCHEMAS = {
   },
 };
 
-const STATE_TOOL_NAMES = ["context.lookup", "inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "enemy.encounter", "enemy.damage", "enemy.act", "enemy.leave", "item.equip", "item.unequip", "occult.contact", "trigger.engage", "trigger.progress", "trigger.abandon", "organization.join", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.grow", "location.discover", "location.move", "location.archive", "clue.add", "quest.add", "quest.update", "quest.resolve", "dice.check"];
+const STATE_TOOL_NAMES = ["context.lookup", "inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "potion.identify", "ability.use", "enemy.encounter", "enemy.damage", "enemy.act", "enemy.leave", "item.equip", "item.unequip", "occult.contact", "trigger.engage", "trigger.progress", "trigger.abandon", "organization.join", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.grow", "location.discover", "location.move", "location.archive", "clue.add", "quest.add", "quest.update", "quest.resolve", "dice.check"];
 
 const CHOICE_TOOL_SCHEMA = {
   type: "object",
@@ -731,7 +717,7 @@ function normalizeChatCompletion(data, requestMaxTokens = 0, options = {}) {
   if (!textFromContent(payload).trim() && !(payload && typeof payload === "object" && !Array.isArray(payload)) && !nativeCalls.length) {
     throw emptyResponseError(choice.finish_reason, Boolean(reasoningFromMessage(message).trim()), { ...responseMetadata(data), requestMaxTokens });
   }
-  if (options.rawContent) return { content: typeof payload === "string" ? payload : JSON.stringify(payload) };
+  if (options.rawContent) return { content: typeof payload === "string" ? payload : JSON.stringify(payload), responseMetadata: { ...responseMetadata(data), requestMaxTokens } };
   return { ...normalizeAIResponse(payload, nativeCalls), reasoningContent: reasoningFromMessage(message), responseMetadata: { ...responseMetadata(data), requestMaxTokens } };
 }
 
@@ -890,7 +876,7 @@ function parseStreamEventData(eventData, state, onChunk, onReasoningChunk) {
   }
 }
 
-async function readStreamResponse(response, onChunk, onReasoningChunk) {
+async function readStreamResponse(response, onChunk, onReasoningChunk, telemetry) {
   const reader = response.body?.getReader();
   if (!reader) return { content: "", calls: {}, finishReason: "", reasoningContent: "", responseId: "", usage: null, rawResponse: "" };
   const decoder = new TextDecoder();
@@ -898,6 +884,8 @@ async function readStreamResponse(response, onChunk, onReasoningChunk) {
   let rawResponse = "";
   let eventLines = [];
   const state = { content: "", calls: {}, finishReason: "", reasoningContent: "", responseId: "", usage: null };
+  // Keep the latest packet usage even when a later read aborts or fails.
+  telemetry.streamState = state;
   const consumeEvent = (event) => {
     const dataLines = event.split(/\r?\n/).filter((line) => line.trimStart().startsWith("data:"));
     if (dataLines.length) parseStreamEventData(dataLines.map((line) => line.slice(line.indexOf(":") + 1).trimStart()).join("\n"), state, onChunk, onReasoningChunk);
@@ -933,10 +921,11 @@ async function readStreamResponse(response, onChunk, onReasoningChunk) {
   rawResponse += finalChunk;
   buffer += finalChunk;
   consumeBuffer(true);
+  telemetry.streamComplete = true;
   return { ...state, rawResponse };
 }
 
-export async function requestAI(settings, messages, signal, onChunk, options = {}) {
+async function performAIRequest(settings, messages, signal, onChunk, options, telemetry) {
   const maxTokens = requestMaxTokens(settings, options, messages);
   const body = {
     model: settings.model,
@@ -947,6 +936,8 @@ export async function requestAI(settings, messages, signal, onChunk, options = {
   };
   applyReasoningSettings(body, settings, options);
   applyProviderCompatibility(body, settings);
+  const provider = settings.provider || inferApiProvider(settings.baseUrl);
+  if (body.stream && ["deepseek", "openai"].includes(provider)) body.stream_options = { include_usage: true };
   if (settings.jsonMode && !options.disableJsonMode) body.response_format = { type: "json_object" };
   if (settings.nativeTools && !options.disableTools) {
     const definitions = toolDefinitions(options.toolSet || "state", options.allowedToolNames);
@@ -955,12 +946,17 @@ export async function requestAI(settings, messages, signal, onChunk, options = {
       body.tool_choice = { type: "function", function: { name: "ui__present_choices" } };
     }
   }
+  const headers = requestHeaders(settings, true);
+  const serializedBody = JSON.stringify(body);
+  telemetry.started = true;
   const response = await fetch(endpoint(settings.baseUrl, "/chat/completions"), {
     method: "POST", signal,
-    headers: requestHeaders(settings, true),
-    body: JSON.stringify(body),
+    headers,
+    body: serializedBody,
   });
-  if (!response.ok) await apiError(response, "API 请求失败");
+  telemetry.httpStatus = response.status;
+  telemetry.firstResponseMs = elapsedSince(telemetry.startedAt);
+  if (!response.ok) await apiError(response, "API 请求失败", (data) => { telemetry.metadata = responseMetadata(data); });
   const contentType = response.headers.get("content-type") || "";
   if (!body.stream || contentType.includes("application/json")) {
     const raw = await response.text();
@@ -969,14 +965,16 @@ export async function requestAI(settings, messages, signal, onChunk, options = {
       if (raw.trim()) return options.rawContent ? { content: raw } : { ...normalizeAIResponse(raw), responseMetadata: { contentType, rawLength: raw.length, requestMaxTokens: maxTokens } };
       throw emptyResponseError("", false, { contentType, rawLength: raw.length, requestMaxTokens: maxTokens });
     }
+    telemetry.metadata = responseMetadata(data);
     return normalizeChatCompletion(data, maxTokens, options);
   }
-  const streamed = await readStreamResponse(response, onChunk, options.onReasoningChunk);
+  const streamed = await readStreamResponse(response, onChunk, options.onReasoningChunk, telemetry);
   const nativeCalls = nativeCallsFromMessage({ tool_calls: Object.values(streamed.calls) }, { finishReason: streamed.finishReason, streamed: true });
   if (!streamed.content.trim() && !nativeCalls.length) {
     try {
       const parsed = JSON.parse(streamed.rawResponse.trim());
-      return normalizeChatCompletion(parsed, maxTokens);
+      telemetry.metadata = responseMetadata(parsed);
+      return normalizeChatCompletion(parsed, maxTokens, options);
     } catch (error) {
       if (!(error instanceof SyntaxError)) throw error;
       const rawText = streamed.rawResponse.trim();
@@ -986,6 +984,60 @@ export async function requestAI(settings, messages, signal, onChunk, options = {
     }
   }
   return { ...normalizeAIResponse(streamed.content, nativeCalls), reasoningContent: streamed.reasoningContent, responseMetadata: { finishReason: streamed.finishReason, id: streamed.responseId, usage: streamed.usage, contentType, requestMaxTokens: maxTokens } };
+}
+
+function metricTime() {
+  return globalThis.performance?.now?.() ?? Date.now();
+}
+
+function elapsedSince(startedAt) {
+  return Math.max(0, Math.round(metricTime() - startedAt));
+}
+
+export async function requestAI(settings, messages, signal, onChunk, options = {}) {
+  const telemetry = { startedAt: metricTime(), started: false, firstResponseMs: null, firstContentMs: null, httpStatus: null };
+  let status = "failed";
+  let errorCode = "";
+  const observeContent = (content) => {
+    if (content && telemetry.firstContentMs === null) telemetry.firstContentMs = elapsedSince(telemetry.startedAt);
+    onChunk?.(content);
+  };
+  try {
+    const result = await performAIRequest(settings, messages, signal, observeContent, options, telemetry);
+    if (telemetry.firstContentMs === null && (result.content || result.narrative || result.toolCalls?.length)) telemetry.firstContentMs = elapsedSince(telemetry.startedAt);
+    telemetry.metadata = result.responseMetadata || telemetry.metadata;
+    status = "success";
+    return result;
+  } catch (error) {
+    status = error.name === "AbortError" ? "aborted" : "failed";
+    errorCode = ["REASONING_EXHAUSTED", "EMPTY_RESPONSE"].includes(error.code) ? error.code : status === "aborted" ? "ABORTED" : "REQUEST_FAILED";
+    telemetry.metadata = error.metadata || telemetry.metadata;
+    throw error;
+  } finally {
+    if (telemetry.started) {
+      const metadata = telemetry.metadata || telemetry.streamState || {};
+      const usage = normalizeTokenUsage(metadata.usage);
+      if (telemetry.streamState && !telemetry.streamComplete) {
+        usage.usageComplete = false;
+        usage.cacheUsageComplete = false;
+      }
+      const event = {
+        requestId: `${Date.now()}-${++metricSequence}`,
+        phase: typeof options.phase === "string" && /^[a-z][a-zA-Z0-9_-]{0,39}$/.test(options.phase) ? options.phase : "unknown",
+        provider: settings.provider || inferApiProvider(settings.baseUrl),
+        model: String(settings.model || "").slice(0, 160),
+        recoveryAttempt: options.recoveryAttempt || 0,
+        status, errorCode, httpStatus: telemetry.httpStatus,
+        finishReason: ["stop", "length", "tool_calls", "function_call", "content_filter"].includes(metadata.finishReason) ? metadata.finishReason : "",
+        firstResponseMs: telemetry.firstResponseMs,
+        firstContentMs: telemetry.firstContentMs,
+        totalMs: elapsedSince(telemetry.startedAt),
+        ...usage,
+      };
+      // Diagnostic listeners must never change gameplay or trigger a duplicate request.
+      try { options.onRequestMetrics?.(event); } catch { /* optional diagnostics */ }
+    }
+  }
 }
 
 export async function requestAIWithReasoningFallback(settings, messages, signal, onChunk, options = {}) {

@@ -1,8 +1,12 @@
 import { engageTrigger, settleQuestStep } from "./triggerEngine.js";
 import { questAssistance, syncQuestJournal } from "./questRuntime.js";
-import { selectedQuestRoute } from "./questRoutes.js";
+import { inspectQuestRoutes, selectedQuestRoute } from "./questRoutes.js";
 import { getMapLocation, normalizeLocationKnowledge } from "../system/map.js";
 import { travelToLocation } from "../system/hexworld.js";
+import { acceptOrdinaryQuest, resolveOrdinaryQuest } from "./questLifecycle.js";
+import { getInstanceTriggerDefinition } from "./triggerDefinitions.js";
+import { allConditionsMatch } from "./triggerConditions.js";
+import { terminalTrigger } from "./triggerState.js";
 
 export function resolveSelectedQuestRoute(game, action, turn, expectedId) {
   const selected = selectedQuestRoute(game, syncQuestJournal(game).entries, action);
@@ -19,7 +23,9 @@ export function resolveSelectedQuestRoute(game, action, turn, expectedId) {
     return { ok: true, taskMinutes: route.costMinutes,
       questAttempt: { id: entry.id, stage: entry.stage, outcome: "progress", localProgress: true, evidence: route.description } };
   }
-  const result = settleQuestStep(game, entry.id, route.objectiveId, turn, action, `按已确认条件完成：${route.description}`, action);
+  const result = entry.source === "quest"
+    ? resolveOrdinaryQuest(game, game.quests.find(quest => quest.id === entry.questId), { outcome: "progress", steps: [{ objectiveId: route.objectiveId }], evidence: route.description }, action, turn)
+    : settleQuestStep(game, entry.id, route.objectiveId, turn, action, `按已确认条件完成：${route.description}`, action);
   return { ...result, taskMinutes: result.ok ? Math.max(route.costMinutes, result.taskMinutes || 0) : undefined,
     questAttempt: { id: entry.id, stage: entry.stage, outcome: result.ok ? "progress" : "blocked", evidence: result.reason || route.description } };
 }
@@ -36,39 +42,55 @@ export function resolveQuestAction(game, args, action, turn) {
   if (quote.length < 2 || !String(action || "").includes(quote)) return { ok: false, reason: "任务判断必须引用玩家本轮真实行动" };
   if (evidence.length < 4) return { ok: false, reason: "必须提供当前行动的具体结果或受阻原因" };
   if (!["progress", "blocked", "failed", "recover"].includes(args.outcome)) return { ok: false, reason: "无效的任务行动结果" };
+  if (entry.source === "quest" && ["progress", "recover"].includes(args.outcome) && /不要|不想|不愿|不再|拒绝|取消|放弃|暂不|先不|是否|能否|如果|假如/.test(quote)) return { ok: false, reason: "否定、取消、假设或询问意图不能当作普通任务行动已经完成" };
   if (entry.status === "available") {
     if (!args.start || /不要|不想|不愿|不再|拒绝|是否|能否|如果|假如|路过|休息|睡觉/.test(quote)) return { ok: false, reason: "尚未明确开始追查，不能自动接取任务" };
-    const engagement = engageTrigger(draft, id, turn, quote);
+    const engagement = entry.source === "quest" ? acceptOrdinaryQuest(draft, draft.quests.find(quest => quest.id === entry.questId), turn) : engageTrigger(draft, id, turn, quote);
     if (!engagement.ok) return engagement;
   } else if (entry.status !== "engaged") return { ok: false, reason: "任务已经结束，不能重复推进或重新发奖" };
   let outcome = args.outcome;
   let taskMinutes;
   const completedSteps = [];
+  const inventoryChanges = [];
   let blockedReason = "";
+  if (["blocked", "failed"].includes(outcome)) {
+    if (entry.source === "quest") {
+      const result = resolveOrdinaryQuest(draft, draft.quests.find(quest => quest.id === entry.questId), args, action, turn);
+      if (!result.ok) return result;
+      evidence = result.evidence || evidence;
+    } else if (outcome === "blocked") {
+      const inspection = inspectQuestRoutes(draft, syncQuestJournal(draft).entries[id]);
+      if (inspection.routes.some(route => route.objectiveId && !route.failure)) return { ok: false, reason: "当前存在经本地验证的可执行任务分支，不能宣称整个任务受阻" };
+      if (!inspection.blockers.length) return { ok: false, reason: "当前没有本地状态证实这项阻碍，不能凭文字增加障碍" };
+      evidence = inspection.blockers.join("；");
+    } else {
+      const instance = draft.triggerState.active.find(item => item.instanceId === id);
+      const definition = getInstanceTriggerDefinition(instance, draft);
+      const stage = definition?.stages?.find(item => item.id === instance.stage);
+      const conditions = stage?.failWhen || definition?.failWhen || [];
+      if (!conditions.length || !allConditionsMatch(conditions, { game: draft, state: draft.triggerState, instance, action, turn })) return { ok: false, reason: "当前状态尚未满足既有任务定义的失败条件" };
+      terminalTrigger(draft.triggerState, instance, "failed", turn);
+    }
+  }
   if (outcome === "recover") {
     const assistance = questAssistance(draft, syncQuestJournal(draft).entries[id]);
     if (!assistance?.recoverable) return { ok: false, reason: "当前任务没有可用的恢复路线，终章和危险阶段不得自动解围" };
     const recovery = resolveSelectedQuestRoute(draft, action, turn, id);
     if (!recovery?.ok) return { ok: false, reason: recovery?.reason || "必须选择当前经过本地核验的具体路线，不能用一段建议替代实际突破" };
     completedSteps.push(recovery);
+    inventoryChanges.push(...(recovery.inventoryChanges || []));
     taskMinutes = recovery.taskMinutes;
     evidence = recovery.questAttempt.evidence;
     outcome = "progress";
   } else if (outcome === "progress") {
     if (entry.source === "quest") {
-      // Freeform tasks use the same journal and attempts, but cannot mint rewards.
       const quest = draft.quests.find(item => item.id === entry.questId);
-      const objective = String(args.nextObjective || "").trim();
-      if (!objective || !evidence) return { ok: false, reason: "普通任务推进必须说明结果与新的当前目标" };
-      if (quest.lastProgressTurn === turn) return { ok: false, reason: "普通任务本轮已经结算" };
-      const evidenceIds = [...new Set(Array.isArray(args.evidenceIds) ? args.evidenceIds : [])];
-      if (!evidenceIds.length || evidenceIds.some(id => !draft.clues.some(clue => clue.id === id && clue.discoveredTurn === turn) || quest.progressEvidenceIds?.includes(id))) return { ok: false, reason: "普通任务推进需要本轮通过clue.add登记的新证据及evidenceIds；改写目标或重复旧线索不算进展" };
-      if (objective === entry.objective) return { ok: false, reason: "当前目标没有变化，不能重复结算相同步骤" };
-      quest.summary = evidence;
-      quest.objective = objective;
-      quest.lastProgressTurn = turn;
-      quest.progressEvidenceIds = [...(quest.progressEvidenceIds || []), ...evidenceIds];
-      completedSteps.push({ from: entry.objective, to: objective });
+      const result = resolveOrdinaryQuest(draft, quest, args, action, turn);
+      if (!result.ok) return result;
+      completedSteps.push(...result.completedSteps);
+      taskMinutes = result.taskMinutes;
+      outcome = result.outcome;
+      inventoryChanges.push(...(result.inventoryChanges || []));
     } else {
       if (!Array.isArray(args.steps) || !args.steps.length || args.steps.length > 3) return { ok: false, reason: "每次必须提交一至三个实际完成的连续目标" };
       for (const step of args.steps) {
@@ -78,12 +100,13 @@ export function resolveQuestAction(game, args, action, turn) {
         taskMinutes = (taskMinutes || 0) + (result.taskMinutes || 0);
         if (result.isolated && completedSteps.length < args.steps.length) { blockedReason = "关键或危险阶段已结算，下一步需玩家另行决定"; break; }
       }
-      if (!completedSteps.length) outcome = "blocked";
+      if (!completedSteps.length) return { ok: false, reason: blockedReason || "任务行动未通过本地校验" };
     }
   }
   syncQuestJournal(draft);
   Object.assign(game, draft);
   return { ok: true, outcome, completedSteps, blockedReason, taskMinutes: taskMinutes || undefined,
+    ...(inventoryChanges.length ? { inventoryChanges, inventoryChange: inventoryChanges[0] } : {}),
     questAttempt: { id, stage: entry.stage, outcome, localProgress: completedSteps.some(step => step.questAttempt?.localProgress), evidence: blockedReason || evidence },
   };
 }

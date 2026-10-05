@@ -1,4 +1,5 @@
 import { BACKLUND_CONTENT } from "./backlund/manifest.js";
+import { describeAbilityRule } from "./backlund/abilityRules.js";
 
 function freezeContent(value) {
   if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;
@@ -83,7 +84,16 @@ export function getUnlockedAbilities(pathwayId, currentSequence) {
   const pathway = getPathway(pathwayId);
   const sequence = Number(currentSequence);
   if (!pathway || !Number.isInteger(sequence)) return [];
-  return pathway.abilities.filter((ability) => ability.sequence >= sequence).map((ability) => ({ ...ability }));
+  if (sequence < 0 || sequence > 9) return [];
+  return pathway.abilities.filter((ability) => ability.sequence >= sequence).map((ability) => {
+    const upgrade = ability.upgrades.filter(entry => entry.sequence >= sequence).at(-1);
+    const rule = { ...(upgrade?.rule || ability.rule), target: { ...ability.rule.target } };
+    return { ...ability, rule, target: rule.target, cost: rule.cost, spiritualityCost: rule.cost, cooldown: rule.effect === "check" ? 0 : 1, kind: rule.effect === "check" ? "passive" : "active", upgraded: Boolean(upgrade), upgradeSequence: upgrade?.sequence ?? null, description: `${ability.description} ${describeAbilityRule(rule)}` };
+  });
+}
+
+export function getSequenceName(pathwayId, sequence) {
+  return Number.isInteger(sequence) && sequence >= 0 && sequence <= 9 ? getPathway(pathwayId)?.sequences[9 - sequence] || `序列${sequence}` : "普通人";
 }
 
 function duplicateIds(entries = [], key = "id") {

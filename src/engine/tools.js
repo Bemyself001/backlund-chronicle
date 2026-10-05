@@ -4,7 +4,7 @@ import { applyStatDelta, syncStatCollapseStatuses } from "./statChanges.js";
 import { findLocationRelations, getMapLocation, getMapLocations, isDiscoveredLocationStatus, normalizeLocationKnowledge, normalizeMapExtensions, planDynamicLocation } from "../system/map.js";
 import { ensureWorld, travelToLocation } from "../system/hexworld.js";
 import { amountToPence, formatMoney, moneyFromPence, moneyToPence } from "../system/money.js";
-import { isImportantNonMoneyItem, normalizeInventoryItem, normalizeItemImportance } from "../system/items.js";
+import { isConsumable, isImportantNonMoneyItem, normalizeInventoryItem, normalizeItemImportance, playerVisibleItem } from "../system/items.js";
 import { equipmentSlot } from "../system/loadout.js";
 import { applyAdvancement, getAdvancement, isExplicitAdvancementIntent } from "../system/character.js";
 import { getOrganization, getPathway, RENARD_AUCTION_MEDICINE, SPECIAL_RECIPES } from "../content/index.js";
@@ -15,6 +15,11 @@ import { executeItemContentAction, hasItemContentAction } from "./itemActions.js
 import { lookupContext } from "./contextLookup.js";
 import { resolveQuestAction } from "./questActions.js";
 import { syncQuestJournal } from "./questRuntime.js";
+import { identifyPotion } from "./potionIdentification.js";
+import { passiveAbilityModifier, resolveAbilityUse } from "./abilities.js";
+import { getPotionUseGate } from "../services/advancement.js";
+import { registerQuest, validateQuestPatch } from "./questLifecycle.js";
+import { resolveQuestTrackingRequest } from "../services/questTracking.js";
 import { executeCombatTool } from "./combat.js";
 import { activeEnemies } from "../system/combat.js";
 import { getChurchTalisman } from "../system/talismans.js";
@@ -30,6 +35,8 @@ export const TOOL_SCHEMAS = {
   "context.lookup": { required: ["query"], description: "按当前披露权限查询本地设定资料，不修改状态" },
   "item.inspect": { required: ["instanceId"], description: "检查物品并揭示已发现信息" },
   "item.use": { required: ["instanceId"], description: "使用消耗品或工具" },
+  "potion.identify": { required: ["instanceId", "feePence"], description: "夏洛克当面鉴定一瓶未知魔药，已确认收费1镑；鉴定与扣费同时结算" },
+  "ability.use": { required: ["abilityId"], description: "使用已解锁的途径能力；本地规则决定目标、灵性消耗、效果与冷却" },
   "enemy.encounter": { required: ["enemies"], description: "登记当前实际遭遇的敌人与 AI 生成的生命值，同一敌人不重置血量" },
   "enemy.damage": { required: ["enemyId", "amount"], description: "扣除指定敌人的生命值，归零后失去战斗能力" },
   "enemy.act": { required: ["enemyId", "damage", "action"], description: "结算敌人本轮行动与对玩家的伤害，禁锢或已击败敌人不能行动" },
@@ -42,7 +49,7 @@ export const TOOL_SCHEMAS = {
   "trigger.abandon": { required: ["instanceId"], description: "确认玩家明确放弃一个已出现或正在追查的特殊事件" },
   "organization.join": { required: ["organizationId", "name", "kind", "evidence"], description: "在玩家明确加入后登记当前组织成员身份" },
   "occult.reveal": { required: ["topic", "evidence"], description: "在已有非凡接触后揭示有限神秘知识" },
-  "advancement.promote": { required: ["pathwayId", "sequence", "potionInstanceId", "recipeClueId", "evidence"], description: "验证剧情接触、配方与魔药后完成晋升" },
+  "advancement.promote": { required: ["pathwayId", "sequence", "potionInstanceId", "evidence"], description: "服用已鉴定成品魔药，按当前途径逐级晋升，无配方与接触门槛" },
   "character.update": { required: ["patch"], description: "以增减量调整受限角色数值（可为负），由引擎截断到 0 至上限" },
   "status.add": { required: ["status"], description: "添加状态效果，可通过 tick 声明每轮数值增减（单项 ±3）" },
   "status.remove": { required: ["statusId"], description: "移除状态效果" },
@@ -53,6 +60,7 @@ export const TOOL_SCHEMAS = {
   "location.archive": { required: ["locationId", "evidence"], description: "归档不再使用且无关联档案的临时动态地点" },
   "clue.add": { required: ["clue"], description: "添加一条新线索" },
   "quest.add": { required: ["quest"], description: "添加任务" },
+  "quest.track": { required: ["id", "revision"], description: "执行玩家从任务簿选定并核验的追踪行动" },
   "quest.resolve": { required: ["instanceId", "actionQuote", "outcome", "evidence"], description: "任务引擎：登记自然语言行动结果、连续普通步骤、受阻或付出时间后的新线索；本地核验阶段与条件" },
   "quest.update": { required: ["questId", "patch"], description: "更新任务进度" },
   "dice.check": { required: ["difficulty"], description: "执行 1d20 检定" },
@@ -425,7 +433,8 @@ function executeOne(game, call, options = {}) {
       if (!Number.isInteger(quantity) || quantity < 1 || quantity > 10) return fail(call.name, "物品数量必须是 1—10 的整数");
       const projected = weightOf(game.inventory) + Number(source.weight || 0) * quantity;
       if (projected > game.capacity.maxWeight) return fail(call.name, `背包将超过 ${game.capacity.maxWeight}kg 容量`);
-      const existing = game.inventory.find((item) => item.itemId === source.itemId && !item.equipped);
+      const existing = game.inventory.find((item) => item.itemId === source.itemId && !item.equipped
+        && JSON.stringify(item.potion || null) === JSON.stringify(source.potion || null));
       let changedItem;
       if (existing) {
         existing.quantity += quantity;
@@ -438,7 +447,9 @@ function executeOne(game, call, options = {}) {
         changedItem = normalizeInventoryItem({ instanceId: makeId("item"), category: "杂物", weight: 0, rarity: "普通", condition: "良好", equipped: false, tags: [], properties: {}, hiddenInfo: "", discoveredInfo: source.description, ...source, quantity, acquiredAt: turnLabel, source: source.source || call.reason, isNew: true });
         game.inventory.push(changedItem);
       }
-      return succeed(call.name, `${turnLabel}：获得「${source.name}」×${quantity}——${source.source || call.reason}。`, { inventoryChange: { ...changedItem, delta: quantity, reason: source.source || call.reason } });
+      const visible = playerVisibleItem(changedItem);
+      const acquisitionReason = visible.potionStatus === "unidentified" ? "获得一瓶身份待核实的魔药" : source.source || call.reason;
+      return succeed(call.name, `${turnLabel}：获得「${visible.name}」×${quantity}——${acquisitionReason}。`, { inventoryChange: { ...visible, delta: quantity, reason: acquisitionReason } });
     }
     case "inventory.remove": {
       const target = findItem();
@@ -447,21 +458,24 @@ function executeOne(game, call, options = {}) {
       if (target.itemId === RENARD_AUCTION_MEDICINE.itemId && game.triggerState?.active?.some(entry => entry.definitionId === "side.queens.renard-fall" && entry.status === "engaged")) return fail(call.name, "任务药剂由高窗之下结算时扣除，不能先从行囊移除");
       if (target.potion && /服用|喝下|饮下|吞下|摄入|晋升|消耗/.test(call.reason)) return fail(call.name, "魔药不能通过普通物品移除来服用；必须经过晋升确认");
       if (!Number.isInteger(quantity) || quantity < 1 || quantity > target.quantity) return fail(call.name, "移除数量无效或超过持有数量");
-      const change = { ...target, delta: -quantity, reason: call.reason, importance: normalizeItemImportance(target) };
+      const visible = playerVisibleItem(target);
+      const removalReason = visible.potionStatus === "unidentified" ? "移除尚未鉴定的魔药" : call.reason;
+      const change = { ...visible, delta: -quantity, reason: removalReason, importance: normalizeItemImportance(target) };
       target.quantity -= quantity;
       if (target.quantity === 0) {
         game.inventory = game.inventory.filter((item) => item.instanceId !== target.instanceId);
         Object.keys(game.equipment).forEach((slot) => { if (game.equipment[slot] === target.instanceId) delete game.equipment[slot]; });
       }
-      return succeed(call.name, `${turnLabel}：失去「${target.name}」×${quantity}——${call.reason}。`, { inventoryChange: change });
+      return succeed(call.name, `${turnLabel}：失去「${visible.name}」×${quantity}——${removalReason}。`, { inventoryChange: change });
     }
     case "inventory.update": {
       const target = findItem();
       if (!target) return fail(call.name, "背包中不存在该物品实例");
       const allowed = ["description", "condition", "discoveredInfo", "properties", "tags"];
       Object.entries(args.patch || {}).forEach(([key, value]) => { if (allowed.includes(key)) target[key] = value; });
-      if (getChurchTalisman(target)) Object.assign(target, normalizeInventoryItem(target));
-      return succeed(call.name, `${turnLabel}：更新「${target.name}」——${call.reason}。`);
+      if (getChurchTalisman(target) || target.potion) Object.assign(target, normalizeInventoryItem(target));
+      const visible = playerVisibleItem(target);
+      return succeed(call.name, `${turnLabel}：更新「${visible.name}」——${visible.potionStatus === "unidentified" ? "身份仍未确认" : call.reason}。`);
     }
     case "money.add": {
       const amountPence = amountToPence(amountArg(args));
@@ -490,17 +504,8 @@ function executeOne(game, call, options = {}) {
       const target = findItem();
       if (!target) return fail(call.name, "找不到要检查的物品");
       if (target.potion && !target.potion.identified) {
-        if (Number(game.occult?.contact) !== 1) return fail(call.name, "尚未接触非凡世界，无法可靠鉴定这份未知液体");
-        const advancement = getAdvancement(game.character);
-        const samePathKnowledge = advancement.type === "extraordinary" && advancement.pathwayId === target.potion.pathwayId;
-        const recipe = (game.clues || []).find((clue) => clue.kind === "potion_recipe" && clue.pathwayId === target.potion.pathwayId && Number(clue.sequence) === target.potion.sequence);
-        if (!samePathKnowledge && !recipe) return fail(call.name, "缺少与这份魔药对应的已确认配方，无法鉴定其途径与序列");
-        target.potion = { ...target.potion, identified: true };
-        const observation = `依据${recipe ? `配方「${recipe.title}」` : "同途径经验"}，确认「${target.name}」是${target.potion.pathwayName}途径序列${target.potion.sequence}魔药。`;
-        return succeed(call.name, `${turnLabel}：${observation}`, {
-          identifiedPotion: { ...target.potion, instanceId: target.instanceId },
-          itemInspection: { instanceId: target.instanceId, itemId: target.itemId, name: target.name, observation, narrative: false },
-        });
+        const observation = "这是一瓶尚未鉴定的魔药。可以请明斯克街15号的夏洛克·莫里亚蒂鉴定，每瓶1镑。";
+        return succeed(call.name, observation, { itemInspection: { instanceId: target.instanceId, name: "未知魔药", observation, narrative: false } });
       }
       const narrativeInspection = hasItemContentAction(target, "inspect") || isImportantNonMoneyItem(target);
       const contentAction = executeItemContentAction(game, target, "inspect", { turn: game.turn + 1, playerAction: options.playerAction ?? call.reason });
@@ -535,7 +540,7 @@ function executeOne(game, call, options = {}) {
         if (!contentAction.ok) return fail(call.name, contentAction.reason);
         return succeed(call.name, `${turnLabel}：${contentAction.text}`, contentAction.data);
       }
-      if (target.tags.includes("消耗品")) {
+      if (isConsumable(target)) {
         const change = { ...target, delta: -1, reason: call.reason, importance: normalizeItemImportance(target) };
         target.quantity -= 1;
         if (target.quantity <= 0) game.inventory = game.inventory.filter((item) => item.instanceId !== target.instanceId);
@@ -612,9 +617,12 @@ function executeOne(game, call, options = {}) {
       game.occult = { ...occult, revealLevel: 1, lastReveal: { topic: String(args.topic).trim(), evidence: String(args.evidence).trim(), at: turnLabel } };
       return succeed(call.name, `${turnLabel}：你从「${args.evidence}」中确认了关于「${args.topic}」的有限神秘信息——${call.reason}。`, { revealLevel: 1 });
     }
+    case "potion.identify": return identifyPotion(game, args, { ...options, turn: game.turn + 1, reason: call.reason });
+    case "ability.use": return resolveAbilityUse(game, args, { ...options, turn: game.turn + 1, reason: call.reason });
     case "advancement.promote": {
       if (options.playerAction !== undefined && !isExplicitAdvancementIntent(options.playerAction)) return fail(call.name, "玩家本轮没有明确表示服用魔药或开始晋升");
-      if (Number(game.occult?.contact) !== 1) return fail(call.name, "尚未完成剧情中的非凡接触，不能晋升");
+      const potionGate = getPotionUseGate(game, args.potionInstanceId);
+      if (potionGate) return fail(call.name, potionGate);
       const pathway = getPathway(String(args.pathwayId || ""));
       const sequence = Number(args.sequence);
       if (!pathway || !Number.isInteger(sequence) || sequence < 0 || sequence > 9) return fail(call.name, "晋升途径或序列不在本地登记范围内");
@@ -628,7 +636,6 @@ function executeOne(game, call, options = {}) {
       if (!potion.potion.identified) return fail(call.name, "魔药尚未鉴定，不能用于晋升");
       if (potion.potion.pathwayId !== pathway.id || Number(potion.potion.sequence) !== sequence) return fail(call.name, "魔药的途径或序列与本次晋升不匹配");
       const recipe = (game.clues || []).find((clue) => clue.id === args.recipeClueId && clue.kind === "potion_recipe");
-      if (!recipe || recipe.pathwayId !== pathway.id || Number(recipe.sequence) !== sequence) return fail(call.name, "缺少与本次晋升完全匹配的已确认配方");
       if (String(args.evidence || "").trim().length < 4) return fail(call.name, "需要说明本轮剧情中实际完成的服用与晋升条件");
       const beforeStats = { ...game.character.stats };
       const nextCharacter = applyAdvancement(game.character, pathway.id, sequence, turnLabel);
@@ -637,6 +644,7 @@ function executeOne(game, call, options = {}) {
       potion.quantity -= 1;
       if (potion.quantity <= 0) game.inventory = game.inventory.filter((item) => item.instanceId !== potion.instanceId);
       game.character = nextCharacter;
+      game.occult = { ...game.occult, contact: 1 };
       const autoStatuses = syncStatCollapseStatuses(game);
       const after = getAdvancement(game.character);
       const previouslyUnlockedIds = new Set((before.unlockedAbilities || []).map((ability) => ability.id));
@@ -650,13 +658,16 @@ function executeOne(game, call, options = {}) {
           before,
           after,
           newlyUnlockedAbilities: (after.unlockedAbilities || []).filter((ability) => !previouslyUnlockedIds.has(ability.id)),
-          recipeClueId: recipe.id,
+          recipeClueId: recipe?.id || null,
+          strengthenedAbilities: (after.unlockedAbilities || []).filter(ability => previouslyUnlockedIds.has(ability.id) && JSON.stringify(ability) !== JSON.stringify(before.unlockedAbilities.find(previous => previous.id === ability.id))),
           spiritualGrowth,
           statChanges: {
             health: { before: beforeStats.health, after: Number(game.character.stats.health) },
             sanity: { before: beforeStats.sanity, after: Number(game.character.stats.sanity) },
             spirituality: { before: beforeStats.spirituality, after: Number(game.character.stats.spirituality) },
             maxSpirituality: { before: beforeStats.maxSpirituality, after: Number(game.character.stats.maxSpirituality) },
+            maxHealth: { before: beforeStats.maxHealth, after: Number(game.character.stats.maxHealth) },
+            maxSanity: { before: beforeStats.maxSanity, after: Number(game.character.stats.maxSanity) },
           },
         },
       });
@@ -788,35 +799,39 @@ function executeOne(game, call, options = {}) {
       return succeed(call.name, `${turnLabel}：发现线索「${args.clue.title}」——${call.reason}。`);
     }
     case "quest.add": {
-      if (!args.quest?.id || !args.quest?.title) return fail(call.name, "任务必须包含 id 与 title");
-      if (game.quests.some((quest) => quest.id === args.quest.id)) return fail(call.name, "任务已存在");
-      const summary = String(args.quest.summary || call.reason || `开始调查「${args.quest.title}」`).trim();
-      const objective = String(args.quest.objective || summary).trim();
-      game.quests.push({ id: args.quest.id, title: args.quest.title, status: "进行中", summary, objective,
-        finale: Boolean(args.quest.finale), dangerous: Boolean(args.quest.dangerous), majorDecision: Boolean(args.quest.majorDecision) });
-      return succeed(call.name, `${turnLabel}：新增任务「${args.quest.title}」。`);
+      const result = registerQuest(game, args.quest, game.turn + 1, options.playerAction);
+      if (!result.ok) return fail(call.name, result.reason);
+      return succeed(call.name, `${turnLabel}：新增任务「${result.quest.title}」。`, { quest: result.quest });
     }
     case "quest.update": {
-      const quest = game.quests.find((entry) => entry.id === args.questId);
+      const quest = game.quests.find(entry => entry.id === args.questId);
       if (!quest) return fail(call.name, "任务不存在");
-      if (quest.source === "特殊行动") return fail(call.name, "此委托由特殊行动引擎独立结算，不能改写任务记录");
-      const allowed = ["status", "summary", "objective"];
-      if (args.patch?.objective && args.patch.objective.trim() !== quest.objective) return fail(call.name, "改变当前目标请使用quest.resolve并引用本轮新增证据，不能仅改写任务说明");
-      if (["已完成", "已失败", "失败", "已放弃", "completed", "failed", "abandoned"].includes(quest.status)) return fail(call.name, "已结束任务保留最终记录，不能重复修改结局");
-      if (args.patch?.status && !["进行中", "已完成", "已失败", "失败", "已放弃", "engaged", "completed", "failed", "abandoned"].includes(args.patch.status)) return fail(call.name, "无效的任务状态");
-      Object.entries(args.patch || {}).forEach(([key, value]) => { if (allowed.includes(key) && typeof value === "string" && value.trim()) quest[key] = value.trim(); });
-      return succeed(call.name, `${turnLabel}：任务「${quest.title}」已更新为${quest.status}。`);
+      const checked = validateQuestPatch(quest, args.patch);
+      if (!checked.ok) return fail(call.name, checked.reason);
+      if (typeof args.patch.summary === "string" && args.patch.summary.trim()) quest.summary = args.patch.summary.trim();
+      return succeed(call.name, `${turnLabel}：任务「${quest.title}」的摘要已更新。`);
     }
     case "quest.resolve": {
       const result = resolveQuestAction(game, args, options.playerAction ?? call.reason, game.turn + 1);
       if (!result.ok) return fail(call.name, result.reason);
       return succeed(call.name, `${turnLabel}：任务行动已记录（${result.outcome}）${result.blockedReason ? `：${result.blockedReason}` : `：${args.evidence}`}。`, result);
     }
+    case "quest.track": {
+      const request = options.questTrackingRequest;
+      if (!request || request.id !== args.id || request.revision !== args.revision || request.routeId !== args.routeId) return fail(call.name, "请通过任务簿选择当前任务与路线");
+      const result = resolveQuestTrackingRequest(game, request, game.turn + 1);
+      if (!result.ok || !["travel", "progress"].includes(result.kind)) return fail(call.name, result.reason || "请先选择任务的具体行动");
+      return succeed(call.name, `${turnLabel}：${result.action}`, result);
+    }
     case "dice.check": {
       const difficulty = Math.max(2, Math.min(20, Number(args.difficulty)));
+      const passiveModifier = args.abilityId ? passiveAbilityModifier(game, args.abilityId, args.checkKind) : 0;
+      if (args.abilityId && !passiveModifier) return fail(call.name, "该能力未解锁，或不适用于此次检定类别");
+      if (args.abilityId && Number(args.modifier || 0) !== 0) return fail(call.name, "能力检定加值由本地决定，不能重复追加modifier");
       const roll = Math.floor(Math.random() * 20) + 1;
-      const total = roll + Number(args.modifier || 0);
-      return succeed(call.name, `${turnLabel}：检定 ${total >= difficulty ? "成功" : "失败"}（1d20=${roll}${args.modifier ? `，修正${Number(args.modifier) >= 0 ? "+" : ""}${args.modifier}` : ""}，难度${difficulty}）。`, { roll, total, difficulty });
+      const modifier = passiveModifier || Number(args.modifier || 0);
+      const total = roll + modifier;
+      return succeed(call.name, `${turnLabel}：检定 ${total >= difficulty ? "成功" : "失败"}（1d20=${roll}${modifier ? `，修正${modifier >= 0 ? "+" : ""}${modifier}` : ""}，难度${difficulty}）。`, { roll, total, difficulty, passiveModifier });
     }
     default: return fail(call.name, "工具未实现");
   }

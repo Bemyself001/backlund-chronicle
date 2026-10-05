@@ -22,24 +22,26 @@ export default function ImportantItemConfirmation({ changes, onConfirm, onCancel
     {promotion ? <>
       <div className={`${styles.intro} ${styles.advancementIntro}`}>
         <strong>魔药尚未消耗，晋升也尚未写入存档</strong>
-        <p>本地规则已经验证配方、魔药身份与目标序列。确认后消耗魔药并完成晋升，增加当前灵性和上限，同时回满生命与理智。</p>
+        <p>本地规则已验证魔药身份、途径与目标序列。确认后生成晋升剧情；剧情完成后消耗一瓶魔药，更新人物类型与能力，增加三项上限并回满生命和理智。</p>
       </div>
       <section className={styles.advancement} aria-label="晋升结果预览">
         <div className={styles.advancementRoute}>
-          <span>{promotion.advancement.before.type === "ordinary" ? "普通人" : `${promotion.advancement.before.pathwayName} · ${promotion.advancement.before.sequenceLabel}`}</span><i aria-hidden="true">→</i><strong>{promotion.advancement.after.pathwayName} · {promotion.advancement.after.sequenceLabel}</strong>
+          <span>{promotion.advancement.before.type === "ordinary" ? "普通人" : `${promotion.advancement.before.sequenceName || promotion.advancement.before.pathwayName} · ${promotion.advancement.before.sequenceLabel}`}</span><i aria-hidden="true">→</i><strong>{promotion.advancement.after.sequenceName || promotion.advancement.after.pathwayName} · {promotion.advancement.after.sequenceLabel}</strong>
         </div>
         <div className={styles.potionCost}><span aria-hidden="true">−</span><p><strong>将消耗「{promotion.name}」×{promotion.quantity}</strong><small>{promotion.reason}</small></p></div>
         <dl className={styles.statPreview}>
+          {[["maxHealth", "生命上限"], ["maxSanity", "理智上限"]].map(([key, label]) => promotion.advancement.statChanges[key] && <div key={key}><dt>{label}</dt><dd>{promotion.advancement.statChanges[key].before} → {promotion.advancement.statChanges[key].after}</dd></div>)}
           <div><dt>当前灵性</dt><dd>{promotion.advancement.statChanges.spirituality.before} → {promotion.advancement.statChanges.spirituality.after}</dd></div>
           <div><dt>灵性上限</dt><dd>{promotion.advancement.statChanges.maxSpirituality.before} → {promotion.advancement.statChanges.maxSpirituality.after}</dd></div>
           {promotion.advancement.statChanges.health && <div><dt>生命回满</dt><dd>{promotion.advancement.statChanges.health.before} → {promotion.advancement.statChanges.health.after}</dd></div>}
           {promotion.advancement.statChanges.sanity && <div><dt>理智回满</dt><dd>{promotion.advancement.statChanges.sanity.before} → {promotion.advancement.statChanges.sanity.after}</dd></div>}
         </dl>
         {promotion.advancement.newlyUnlockedAbilities.length > 0 && <div className={styles.abilities}><p>将解锁的非凡能力</p><ul>{promotion.advancement.newlyUnlockedAbilities.map((ability) => <li key={ability.id}><strong>{ability.name}</strong><span>{ability.description}</span></li>)}</ul></div>}
+        {promotion.advancement.strengthenedAbilities?.length > 0 && <div className={styles.abilities}><p>将强化的非凡能力</p><ul>{promotion.advancement.strengthenedAbilities.map(ability => <li key={ability.id}><strong>{ability.name}</strong><span>{ability.description}</span></li>)}</ul></div>}
       </section>
     </> : <div className={styles.intro}>
       <strong>回合尚未写入存档</strong>
-      <p>本地审计发现重要非货币物品发生增减。只勾选与实际剧情相符的变更；未勾选项目会被本地引擎拒绝。</p>
+      <p>本地审计发现重要物品发生增减。只勾选与实际剧情相符的变更；同一行动的任一交付被拒绝，该行动的其他交付与报酬也会一并取消。</p>
     </div>}
     {otherChanges.length > 0 && <fieldset className={styles.list}>
       <legend>{promotion ? "同一回合的其他重要变更" : "待确认变更"}</legend>

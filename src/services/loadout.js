@@ -1,3 +1,4 @@
+import { CREATION_USAGE_ID, recordUsageEvent } from "./usageHistory.js";
 import { requestAIWithReasoningFallback } from "./api.js";
 import { extractJson } from "./protocol.js";
 import { CLOTHING_SLOTS, loadoutInput, validateLoadout } from "../system/loadout.js";
@@ -12,7 +13,7 @@ export async function generateLoadout(character, settings, signal) {
 clothes 必须包含 1—7 项，每项名称最多 40 字，描述最多 240 字，weight 为 0.01—4 的 kg 数值。随身物品名称为空则 carriedItem=null，否则 carriedItem={"accepted":true,"weight":1}，估算 0.01—5 kg。carriedItem.accepted 仅判断用户的 carriedItem，不得因为 clothingDescription 中的衣着而拒绝随身物品。只有随身物品实为多件、装满物资的容器或明确要求直接获得超常能力、魔药、封印物时，才将 accepted 设为 false；材质贵重、款式少见或装饰精美不是拒绝理由，普通容器按空容器处理。衣物与物品总重不超过 11.9 kg。数量均为 1。不生成剧情或工具调用。` },
     { role: "user", content: JSON.stringify({ clothingDescription: input.clothing, carriedItem: input.name ? { name: input.name, description: input.description } : null }) },
   ];
-  const response = await requestAIWithReasoningFallback(settings, messages, signal, undefined, { rawContent: true, streamOverride: false, disableTools: true });
+  const response = await requestAIWithReasoningFallback(settings, messages, signal, undefined, { phase: "loadout", onRequestMetrics: event => recordUsageEvent(CREATION_USAGE_ID, 0, event), rawContent: true, streamOverride: false, disableTools: true });
   if (signal?.aborted) throw new DOMException("整理已取消", "AbortError");
   return { ...validateLoadout(extractJson(response.content), character), mode: "ai" };
 }

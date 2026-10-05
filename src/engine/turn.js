@@ -75,7 +75,7 @@ export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], 
   statusTickLogs.push(...restRecovery.map(change => `旅馆休息：${change.label} ${change.before}→${change.after}`));
   const worldTime = advanceWorldTime(game.worldTime, elapsedMinutes);
   game.worldTime = worldTime;
-  const triggerProgress = processTriggers(game, { action, toolCalls, toolResults, turn: nextTurn });
+  const triggerProgress = processTriggers(game, { action, toolCalls, toolResults, turn: nextTurn, travelOnly: Boolean(options.travelOnly) });
   // Promotion recovery is the final stat settlement of this turn; ongoing effects remain.
   const advancementRecovery = successfulTool(toolCalls, toolResults, call => call.name === "advancement.promote")
     ? ["health", "sanity"].map(stat => {

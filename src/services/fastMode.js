@@ -1,4 +1,4 @@
-import { choiceResult } from "./choices.js";
+import { choiceResult, choiceValidationError, modelChoices } from "./choices.js";
 
 // Even an empty tool plan advances the clock. Never commit its uncorrected draft.
 export async function finalizeFastPresentation(draft, resolution, render) {
@@ -8,7 +8,7 @@ export async function finalizeFastPresentation(draft, resolution, render) {
     ...draft,
     narrative: result.narrative.trim(),
     hasNarrative: true,
-    ...choiceResult([], "scene_changed"),
+    ...choiceResult(modelChoices(result), choiceValidationError(result) || "scene_changed"),
   };
 }
 
