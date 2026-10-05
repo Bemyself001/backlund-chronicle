@@ -9,6 +9,7 @@ import { medicineRecipe, consumeMedicine } from "./recovery.js";
 import { medicinePurchaseGate } from "./medicineAccess.js";
 import { grantOrganizationTalisman } from "./talismans.js";
 import { visitPerson } from "./visitablePeople.js";
+import { quickWaitGate, quickWaitPreview } from "./quickWait.js";
 
 export function specialState(game) {
   const raw = game.specialActions || {};
@@ -111,6 +112,14 @@ export function executeSpecialAction(game, request) {
   }
   if (operation === "visit-person") {
     ({ action, narrative, minutes } = visitPerson(next, request.id));
+  } else if (operation === "wait") {
+    requireCondition(request.expectedTurn === game.turn && request.expectedWorldTime === game.worldTime, "时间或回合已更新，请重新选择等待时长");
+    const reason = quickWaitGate(next, request.hours);
+    requireCondition(!reason, reason);
+    const preview = quickWaitPreview(next, request.hours);
+    action = `原地等待${request.hours}小时`;
+    narrative = `你在${next.location.name}等候了${request.hours}小时。\n\n时间从${game.worldTime}来到${preview.worldTime}。`;
+    minutes = preview.elapsedMinutes;
   } else if (operation === "sleep") {
     requireCondition(next.location.id === "soot-lamp", "需到达雾鸦旅店才能睡觉");
     action = "在雾鸦旅店睡觉8小时";

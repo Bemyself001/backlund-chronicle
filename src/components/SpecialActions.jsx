@@ -5,6 +5,7 @@ import { getAdvancement } from "../system/character.js";
 import { getMapLocation } from "../system/map.js";
 import { formatMoney, moneyToPence } from "../system/money.js";
 import PotionIdentification from "./PotionIdentification.jsx";
+import QuickWait from "./QuickWait.jsx";
 import styles from "./SpecialActions.module.css";
 import { medicinePurchaseGate } from "../engine/medicineAccess.js";
 import { hasMetPerson, visitPersonGate } from "../engine/visitablePeople.js";
@@ -23,10 +24,11 @@ export default function SpecialActions({ game, loading, onExecute, onOpenMap, on
   const remaining = Math.max(0, state.availableTurn - game.turn);
   const money = moneyToPence(game.money);
   const medicineReason = medicinePurchaseGate(game);
-  const execute = (operation, id, optionId) => {
-    const result = onExecute({ operation, id, optionId, revision: state.revision });
+  const execute = (operation, id, optionId, extra = {}) => {
+    const result = onExecute({ ...extra, operation, id, optionId, revision: state.revision });
     setNotice(result?.ok ? result.message : result?.error || "行动未完成，请重试。");
     if (result?.ok) setConfirmJoin(null);
+    return result;
   };
   const go = (id) => onOpenMap(id);
   const locationLink = (id) => id && <button className={styles.link} type="button" onClick={() => go(id)}>在地图查看{getMapLocation(id, game)?.name || "地点"}</button>;
@@ -34,11 +36,13 @@ export default function SpecialActions({ game, loading, onExecute, onOpenMap, on
   const activeReason = state.active ? actionGate(game, activeDefinition) : "";
 
   return <div className={styles.panel}>
-    <header><p className={styles.eyebrow}>贝克兰德 · 日常与非凡</p><h3>今天，如何度过？</h3><p className={styles.hint}>{advancement.pathwayName || "普通人的城市生活"} · 从一件具体的小事开始。</p>
+    {tab !== "wait" && <header><p className={styles.eyebrow}>贝克兰德 · 日常与非凡</p><h3>今天，如何度过？</h3><p className={styles.hint}>{advancement.pathwayName || "普通人的城市生活"} · 从一件具体的小事开始。</p>
       <div className={styles.meta}><span>工作声誉 {state.reputation}</span><span>{formatMoney(game.money)}</span></div>
-    </header>
-    <nav className={styles.tabs} aria-label="特殊行动分类">{[["work", "委托"], ["people", "人物"], ["supplies", "补给"], ["craft", "制作"], ["organization", "组织"]].map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => { setTab(id); setNotice(""); }}>{label}</button>)}</nav>
-    {notice && <p role="status" className={styles.notice}>{notice}</p>}
+    </header>}
+    <nav className={styles.tabs} aria-label="特殊行动分类">{[["work", "委托"], ["people", "人物"], ["supplies", "补给"], ["craft", "制作"], ["organization", "组织"], ["wait", "等待"]].map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => { setTab(id); setNotice(""); }}>{label}</button>)}</nav>
+    {notice && tab !== "wait" && <p role="status" className={styles.notice}>{notice}</p>}
+    {tab === "wait" && <QuickWait game={game} loading={loading} onWait={hours => execute("wait", undefined, undefined, { hours, expectedTurn: game.turn, expectedWorldTime: game.worldTime })} />}
+    {notice && tab === "wait" && <p role="status" className={styles.notice}>{notice}</p>}
     {tab === "people" && <section aria-label="人物拜访"><h3>可以拜访的人</h3>
       {VISITABLE_PEOPLE.map(person => {
         const reason = visitPersonGate(game, person.id);

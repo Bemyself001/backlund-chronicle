@@ -151,6 +151,19 @@ const RELEASE_149_UPDATE = {
 export const LATEST_UPDATE = {
   pending: false,
   date: "2026-10-05", dateLabel: "2026.10.05",
+  title: "1.7.1 · 24小时快速等待",
+  summary: "特殊行动新增快速等待，以24小时圆环选择时长，预览抵达时刻并立即推进游戏时间。",
+  changes: [
+    "特殊行动新增「等待」分类：拖动24小时圆环选择1至24小时，也可用快捷时长、加减按钮和键盘调整，实时预览当前与结束日期、时间。",
+    "确认后由本地引擎立即结算并自动保存，无需AI请求；一次等待推进1回合，持续状态、任务与冷却按原有回合规则结算，等待本身不提供睡眠恢复。",
+    "支持跨日、跨月与跨年；战斗中及生命或理智归零时禁止快速等待，校验过期请求以避免重复推进；起止时间写入剧情与后续AI上下文，状态变化按原规则记入回合摘要。",
+    "产品版本更新为1.7.1，沿用原包名与正式签名，支持APK覆盖升级和网页资源热更新。",
+  ],
+};
+
+const RELEASE_170_UPDATE = {
+  pending: false,
+  date: "2026-10-05", dateLabel: "2026.10.05",
   title: "1.7.0 · 百分比战斗与单回合强化",
   summary: "开局资金上限5镑；普攻、敌方招式与生命技能统一采用本地百分比结算，加入狼人单回合叠层强化及战斗预览。",
   changes: [
@@ -679,6 +692,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_170_UPDATE,
   RELEASE_1619_UPDATE,
   RELEASE_1618_UPDATE,
   RELEASE_1617_UPDATE,
