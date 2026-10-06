@@ -31,7 +31,7 @@ test('inventory button inspections at the same turn queue narration, recover mis
   assert.deepEqual(game.choices, originalChoices, 'pending narration must not replace choices before success');
   game = migrateSave(markNarrativeEventsDelivered(game, events));
   assert.deepEqual(game.choices.map(choice => choice.label), [
-    '前往皇后区公共图书馆，查找文字与符号资料',
+    '前往乔伍德区公共图书馆，查找文字与符号资料',
     '前往希尔斯顿区商会街，打听舅舅工作过的钟表行',
     '暂时收起纸条，处理其他事情',
   ]);
@@ -63,7 +63,7 @@ test('fourth watch inspection emits one story event in both rendering modes, sur
       for (const messages of [buildRenderingContext(before, game, '检查怀表', '', resolution), buildFastNarrativeContinuationContext(before, game, '检查怀表', '检查过程', '', resolution)]) {
         assert.ok(messages.some(message => message.role === 'system' && message.content.includes('必须在本轮剧情正文')));
         const payload = messages.at(-1).content;
-        assert.match(payload, /皇后区公共图书馆/);
+        assert.match(payload, /乔伍德区公共图书馆/);
         assert.match(payload, /希尔斯顿区商会街/);
         assert.match(payload, /任选其一/);
       }

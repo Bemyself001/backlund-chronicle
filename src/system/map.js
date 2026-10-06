@@ -3,6 +3,8 @@ import {
   LOCATION_KNOWLEDGE_STATUSES, DYNAMIC_LOCATION_SCOPES, DYNAMIC_LOCATION_KINDS, MAP_DISTRICTS,
   DISTRICT_LAYOUT,
 } from "../content/index.js";
+import { CITY_GEOGRAPHY, cellKey, cityRoute, crossingAt, hexForMapPoint, mapPointForHex, nearestCityHex } from "./mapGeometry.js";
+export { hexDistance } from "./mapGeometry.js";
 
 export {
   MAP_LOCATIONS, MAP_ROUTES, INITIAL_DISCOVERED_LOCATION_IDS, INITIAL_RUMORED_LOCATION_IDS,
@@ -49,6 +51,7 @@ function normalizeDynamicLocation(location = {}) {
     district,
     x: clamp(Number(location.x) || 50, 4, 96),
     y: clamp(Number(location.y) || 50, 4, 96),
+    ...(Number.isInteger(location.q) && Number.isInteger(location.r) ? { q: location.q, r: location.r } : {}),
     code: cleanText(location.code, 8) || "+",
     rumor: cleanText(location.rumor, 180),
     description: cleanText(location.description, 300),
@@ -86,7 +89,43 @@ export function normalizeMapExtensions(value = {}) {
     if (!anchor || anchor.scope === "interior") return false;
     return hasValidAnchorPath(anchor, new Set([...trail, location.id]));
   };
-  const locations = candidates.filter((location) => location.anchorId !== location.id && hasValidAnchorPath(location));
+  const validCandidates = candidates.filter((location) => location.anchorId !== location.id && hasValidAnchorPath(location));
+  const placed = new Map(MAP_LOCATIONS.map(location => [location.id, location]));
+  const occupied = new Set(MAP_LOCATIONS.map(cellKey));
+  // 历史地点随已校正的锚点迁移；有意跨区连接的地点仍留在自己所属城区。
+  const formerDistricts = { "queen-library": "皇后区", "saint-wind": "桥区", "iron-gate": "东区", "east-industry": "东区", "machinery-heart": "东区", "bridge-docks": "桥区" };
+  const originalDistricts = new Map(candidates.map(location => [location.id, location.district]));
+  const place = (location) => {
+    if (placed.has(location.id)) return placed.get(location.id);
+    let anchor = placed.get(location.anchorId) || place(byId.get(location.anchorId));
+    if (!anchor) return null;
+    if (anchor.scope === "interior") {
+      location.anchorId = anchor.parentId;
+      anchor = placed.get(anchor.parentId);
+    }
+    const migrating = source.geographyVersion !== CITY_GEOGRAPHY.version;
+    const oldDistrict = location.district;
+    if (location.scope === "interior" || (migrating && oldDistrict === (formerDistricts[anchor.id] || originalDistricts.get(anchor.id)))) location.district = anchor.district;
+    if (oldDistrict !== location.district) location.name = location.name.replace(`${oldDistrict}·`, `${location.district}·`);
+    const origin = migrating && location.district === anchor.district ? anchor : hexForLocation(location);
+    let hex = location.scope === "interior" ? hexForLocation(anchor) : nearestCityHex(origin, { district: location.district, occupied: location.lifecycle === "archived" ? new Set() : occupied });
+    // 老地图允许无限挤在一处；迁移拥挤旧档时保留地点 ID 和进度，
+    // 以同区锚点内部区域承接溢出地标，不能静默丢弃玩家已有地点。
+    if (!hex) {
+      const parent = anchor.district === location.district ? anchor : MAP_LOCATIONS.find(entry => entry.district === location.district);
+      location.scope = "interior";
+      location.anchorId = parent.id;
+      location.parentId = parent.id;
+      hex = hexForLocation(parent);
+    } else if (location.scope === "interior") location.parentId = anchor.id;
+    const prefix = DISTRICT_LAYOUT[location.district].prefix;
+    if (!location.code.startsWith(prefix) || [...placed.values()].some(entry => entry.code === location.code)) location.code = nextLocationCode(location.district, [...placed.values()]);
+    const result = { ...location, ...hex, ...mapPointForHex(hex) };
+    placed.set(location.id, result);
+    if (location.scope !== "interior" && location.lifecycle !== "archived") occupied.add(cellKey(hex));
+    return result;
+  };
+  const locations = validCandidates.map(place).filter(Boolean);
   const validIds = new Set([...staticIds, ...locations.map((location) => location.id)]);
   const routeKeys = new Set();
   const routes = (Array.isArray(source.routes) ? source.routes : []).flatMap((raw) => {
@@ -97,12 +136,12 @@ export function normalizeMapExtensions(value = {}) {
     routeKeys.add(key);
     return [{ from, to, minutes: clamp(Math.round(Number(raw.minutes) || 15), 2, 90), transport: cleanText(raw.transport, 40) || "步行", source: "dynamic" }];
   });
-  return { locations, routes };
+  return { geographyVersion: CITY_GEOGRAPHY.version, locations, routes };
 }
 
 export function getMapLocations(gameOrExtensions = {}, options = {}) {
   const extensions = normalizeMapExtensions(gameOrExtensions);
-  const staticLocations = MAP_LOCATIONS.map((location) => ({ ...location, source: "static", scope: "landmark", kind: "landmark", lifecycle: "active", parentId: null }));
+  const staticLocations = MAP_LOCATIONS.map((location) => ({ ...location, source: "static", scope: "landmark", kind: location.kind || "landmark", lifecycle: "active", parentId: null }));
   const dynamic = extensions.locations.filter((location) => (options.includeArchived || location.lifecycle !== "archived") && (options.includeInteriors !== false || location.scope !== "interior"));
   return [...staticLocations, ...dynamic];
 }
@@ -154,22 +193,10 @@ function nextLocationCode(district, locations) {
   return `${prefix}${highest + 1}`;
 }
 
-function placeCoordinates(anchor, district, id, locations) {
-  const bounds = DISTRICT_LAYOUT[district];
-  const hash = stableHash(id);
-  let fallback = { x: anchor.x, y: anchor.y };
-  for (let attempt = 0; attempt < 14; attempt += 1) {
-    const angle = ((hash % 360) + attempt * 137.5) * Math.PI / 180;
-    const radius = 6 + ((hash >>> 8) % 5) + Math.floor(attempt / 4) * 2;
-    const candidate = {
-      x: Number(clamp(anchor.x + Math.cos(angle) * radius, bounds.minX, bounds.maxX).toFixed(1)),
-      y: Number(clamp(anchor.y + Math.sin(angle) * radius, bounds.minY, bounds.maxY).toFixed(1)),
-    };
-    fallback = candidate;
-    const collides = locations.filter((location) => location.scope !== "interior").some((location) => Math.hypot(location.x - candidate.x, location.y - candidate.y) < 5.5);
-    if (!collides) return candidate;
-  }
-  return fallback;
+function placeCoordinates(anchor, district, locations) {
+  const occupied = new Set(locations.filter(location => location.scope !== "interior" && location.lifecycle !== "archived").map(location => cellKey(hexForLocation(location))));
+  const hex = nearestCityHex(hexForLocation(anchor), { district, occupied });
+  return hex ? { ...hex, ...mapPointForHex(hex) } : null;
 }
 
 function routeForLocation(anchor, location) {
@@ -208,7 +235,8 @@ export function planDynamicLocation(game, proposal = {}, turn = game?.turn + 1) 
     if (activeRumors >= MAX_ACTIVE_RUMORS_PER_DISTRICT) return { ok: false, error: `该城区已有 ${MAX_ACTIVE_RUMORS_PER_DISTRICT} 条活跃地点传闻，请先调查现有传闻` };
   }
   const id = `dyn-${stableHash(`${district}:${name}:${anchor.id}:${scope}`).toString(36)}`;
-  const coordinates = scope === "interior" ? { x: anchor.x, y: anchor.y } : placeCoordinates(anchor, district, id, locations);
+  const coordinates = scope === "interior" ? { x: anchor.x, y: anchor.y, ...hexForLocation(anchor) } : placeCoordinates(anchor, district, locations);
+  if (!coordinates) return { ok: false, error: "该城区暂无可登记的新街区，请使用已有地点或其内部区域" };
   const location = normalizeDynamicLocation({ id, name: name.includes("·") ? name : `${district}·${name}`, district, ...coordinates, code: nextLocationCode(district, locations), rumor, description, scope, kind, anchorId: anchor.id, temporary: proposal.temporary, createdTurn: turn });
   return { ok: true, reused: false, location, route: routeForLocation(anchor, location), status };
 }
@@ -220,26 +248,22 @@ export function hexForLocation(location) {
   const x = Number(location.x);
   const y = Number(location.y);
   if (!Number.isFinite(x) || !Number.isFinite(y)) return null;
-  return { q: Math.round((x - 50) / 7), r: Math.round((y - 50) / 7) };
+  return hexForMapPoint({ x, y });
 }
 
-/** 六边形格数距离 */
-export function hexDistance(a, b) {
-  const dq = a.q - b.q;
-  const dr = a.r - b.r;
-  return (Math.abs(dq) + Math.abs(dr) + Math.abs(dq + dr)) / 2;
-}
-
-/** 按格网距离估算旅行耗时与交通方式 */
+/** 按实际可通行的道路估算旅行；跨河必须经过大桥。 */
 export function estimateTravelByHex(fromLocation, toLocation) {
   const fromHex = hexForLocation(fromLocation);
   const toHex = hexForLocation(toLocation);
   if (!fromHex || !toHex) return null;
-  const grids = hexDistance(fromHex, toHex);
-  if (grids === 0) return { minutes: 0, grids, path: [fromLocation.id], transports: [] };
-  const minutes = 6 + grids * 7;
+  const hexPath = cityRoute(fromHex, toHex);
+  if (!hexPath) return null;
+  const grids = hexPath.length - 1;
+  const samePlace = fromLocation.id === toLocation.id;
+  const minutes = grids === 0 ? (samePlace ? 0 : 3) : 6 + grids * 7;
   const transport = grids <= 3 ? "步行" : grids <= 6 ? "公共马车" : "轨道马车";
-  return { minutes, grids, path: [fromLocation.id, toLocation.id], transports: [transport] };
+  const crossings = hexPath.map(crossingAt).filter(Boolean).map(crossing => crossing.name);
+  return { minutes, grids, path: samePlace ? [fromLocation.id] : [fromLocation.id, toLocation.id], hexPath, crossings, transports: minutes ? [transport] : [] };
 }
 
 export function findTravelRoute(fromId, toId, allowedIds = getMapLocations().map((location) => location.id), gameOrExtensions = {}) {

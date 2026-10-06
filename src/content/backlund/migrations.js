@@ -1,6 +1,26 @@
 import { WATCH_NOTE_DETAIL } from "./watchNote.js";
 
 export const CONTENT_MIGRATIONS = [
+  {
+    id: "backlund.city-geography", fromVersion: "2026.10.05.1", toVersion: "2026.10.06",
+    textReplacementFields: ["choices", "clues", "relationships", "locationKnowledge", "discoveredLocations", "memoryNotes", "longTermSummary", "memoryState"],
+    textReplacements: [
+      { from: "皇后区公共图书馆", to: "乔伍德区公共图书馆" },
+      { from: "皇后区·公共图书馆", to: "乔伍德区·公共图书馆" },
+      { from: "报童说皇后区有一座对公众开放的图书馆。", to: "报童说乔伍德区有一座对公众开放的图书馆。" },
+      { from: "桥区南岸货栈", to: "大桥南区南岸货栈" },
+      { from: "桥区·南岸货栈", to: "大桥南区·南岸货栈" },
+      { from: "东区·机械之心教堂", to: "圣乔治区·圣希尔兰大教堂" },
+      { from: "机械之心教堂", to: "圣希尔兰大教堂" },
+      { from: "蒸汽与机械之神教会的东区教堂", to: "蒸汽与机械之神教会在圣乔治区的圣希尔兰大教堂" },
+      { from: "桥区·圣风大教堂", to: "乔伍德区·圣风大教堂" },
+      { from: "东区·铁门街", to: "桥区·铁门街" },
+    ],
+    definitionRefreshes: [
+      { definitionId: "watch.heirloom.hidden-note", refreshPresentation: true },
+      { definitionId: "watch.heirloom.late-hour", refreshPresentation: true },
+    ],
+  },
   { id: "backlund.percentage-combat", fromVersion: "2026.10.05", toVersion: "2026.10.05.1" },
   {
     id: "backlund.percentage-ability-damage", fromVersion: "2026.10.03.3", toVersion: "2026.10.05",

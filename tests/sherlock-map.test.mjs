@@ -63,7 +63,7 @@ test("Cherwood accepts nearby dynamic locations within its own map bounds", () =
   const planned = planDynamicLocation(game, proposal, 1);
   assert.equal(planned.ok, true);
   assert.equal(planned.location.district, "乔伍德区");
-  assert.equal(planned.location.code, "J2");
+  assert.equal(planned.location.code, "J4");
   assert.equal(planned.route.from, addressId);
   const bounds = DISTRICT_LAYOUT["乔伍德区"];
   assert.ok(planned.location.x >= bounds.minX && planned.location.x <= bounds.maxX);

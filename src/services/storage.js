@@ -92,8 +92,9 @@ export function migrateSave(raw) {
   const legacyContact = advancement?.type === "extraordinary" || migrated.character?.extraordinary === "low" ? 1 : 0;
   const contact = migrated.occult?.contact === 1 || legacyContact === 1 ? 1 : 0;
   const mapExtensions = normalizeMapExtensions(migrated.mapExtensions);
-  const registeredLocationIds = new Set(getMapLocations({ mapExtensions }, { includeArchived: true }).map((location) => location.id));
-  const discoveredLocations = Array.isArray(migrated.discoveredLocations) ? migrated.discoveredLocations.filter((location) => location?.id && registeredLocationIds.has(location.id)) : [];
+  const registeredLocations = new Map(getMapLocations({ mapExtensions }, { includeArchived: true }).map(location => [location.id, location]));
+  const currentLocation = registeredLocations.get(migrated.location?.id);
+  const discoveredLocations = Array.isArray(migrated.discoveredLocations) ? migrated.discoveredLocations.filter(location => registeredLocations.has(location?.id)).map(location => ({ ...location, name: registeredLocations.get(location.id).name })) : [];
   const locationKnowledge = normalizeLocationKnowledge(migrated.locationKnowledge, discoveredLocations, migrated.location?.id, { mapExtensions });
   const occult = {
     contact,
@@ -121,6 +122,8 @@ export function migrateSave(raw) {
     inventory,
     money,
     mapExtensions,
+    location: currentLocation ? { ...migrated.location, name: currentLocation.name, district: `贝克兰德${currentLocation.district}`, q: currentLocation.q, r: currentLocation.r } : { ...migrated.location },
+    world: migrated.world ? structuredClone(migrated.world) : undefined,
     discoveredLocations,
     locationKnowledge,
     occult,

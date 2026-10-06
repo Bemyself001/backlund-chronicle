@@ -33,8 +33,8 @@ export const STORY_PEOPLE = [
     questIds: [NOTE, WATCH],
     discoveries: [
       event("remembered", any(fact("watch.note-recovered"), quest(NOTE), decoded), "家传怀表", "你想起舅舅数年前失踪，怀表后来被身份不明的人送回家中。", { contact: "known", status: "下落待查" }),
-      event("old-records", clue("clue-missing-uncle-history"), "失踪前的旧档", "旧档确认他曾是序列9通识者，失踪前在南岸货栈追查军火与文物交接。", { role: "你的舅舅 · 曾为序列9通识者", lastKnownLocation: "桥区南岸货栈（失踪前的记录）" }),
-      event("found", any(fact("watch.uncle-found-alive"), stage(WATCH, "identify-sequence")), "货栈调查", "你在货栈内找到仍然活着的舅舅。", { contact: "met", status: "已找到", lastKnownLocation: "桥区南岸货栈" }),
+      event("old-records", clue("clue-missing-uncle-history"), "失踪前的旧档", "旧档确认他曾是序列9通识者，失踪前在南岸货栈追查军火与文物交接。", { role: "你的舅舅 · 曾为序列9通识者", lastKnownLocation: "大桥南区南岸货栈（失踪前的记录）" }),
+      event("found", any(fact("watch.uncle-found-alive"), stage(WATCH, "identify-sequence")), "货栈调查", "你在货栈内找到仍然活着的舅舅。", { contact: "met", status: "已找到", lastKnownLocation: "大桥南区南岸货栈" }),
       event("sequence", any(fact("watch.uncle-sequence-confirmed"), clue("clue-uncle-forced-advancement")), "非凡身份调查", "已确认他被强制晋升为序列8考古学家，失去自主行动能力。", { role: "你的舅舅 · 序列8考古学家", contact: "met" }),
       event("control", fact("watch.control-confirmed"), "与舅舅交谈", "尝试呼唤、交谈后，你确认他受人控制，现有手段似乎无法将他唤回。", { status: "受控制" }),
       event("restrained", fact("watch.uncle-restrained"), "货栈行动", "你成功限制了舅舅的行动；这并不等于解除控制。", { status: "行动受限", contact: "met" }),
@@ -47,7 +47,7 @@ export const STORY_PEOPLE = [
     questIds: [WATCH],
     discoveries: [
       event("mentioned", decoded, "怀表纸条译文", "纸条提及白鸢尾的警告，她的身份仍需查证。"),
-      event("encountered", irisEncounter, "货栈遭遇", "你在南岸货栈与白鸢尾遭遇，脱身成为眼前的要事。", { contact: "met", role: "货栈事件中的对手", status: "曾与你敌对", lastKnownLocation: "桥区南岸货栈" }),
+      event("encountered", irisEncounter, "货栈遭遇", "你在南岸货栈与白鸢尾遭遇，脱身成为眼前的要事。", { contact: "met", role: "货栈事件中的对手", status: "曾与你敌对", lastKnownLocation: "大桥南区南岸货栈" }),
       event("identity", any(ledger, fact("demoness.white-iris.true-name")), "南岸账册", "账册确认白鸢尾的真名为塞西莉亚·沃恩，是序列7魔女。", { name: "塞西莉亚·沃恩", alias: "白鸢尾", role: "魔女会成员 · 序列7魔女" }),
       event("escaped", fact("watch.white-iris-outcome"), "货栈撤离", "你已经从货栈冲突中脱身，之后她的去向未获确认。", { contact: "met", status: "曾与你敌对" }),
     ],

@@ -1,4 +1,5 @@
 import { OPENINGS } from "./openings.js";
+import { CITY_GEOGRAPHY } from "./geography.js";
 import { TALENTS } from "./talents.js";
 import { PATHWAYS } from "./pathways.js";
 import { DEFAULT_CHARACTER, RANDOM_CHARACTERS } from "./characters.js";
@@ -24,7 +25,7 @@ export const BACKLUND_CONTENT = {
   id: "backlund-core",
   name: "贝克兰德核心内容",
   schemaVersion: 2,
-  contentVersion: "2026.10.05.1",
+  contentVersion: "2026.10.06",
   specialActions: SPECIAL_ACTIONS,
   specialRecipes: SPECIAL_RECIPES,
   specialContacts: SPECIAL_CONTACTS,
@@ -47,6 +48,7 @@ export const BACKLUND_CONTENT = {
   migrations: CONTENT_MIGRATIONS,
   narrative: { scenarioRules: BACKLUND_SCENARIO_RULES },
   map: {
+    geography: CITY_GEOGRAPHY,
     locations: MAP_LOCATIONS,
     routes: MAP_ROUTES,
     districts: MAP_DISTRICTS,

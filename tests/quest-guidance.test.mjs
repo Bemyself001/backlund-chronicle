@@ -47,12 +47,12 @@ test('decoded note leads to warehouse without requiring knowledge of the next ta
   game.location.id = 'queen-library';
   mark(game, 'watch.note-recovered');
   const { next, resolution } = settle(game, 'decode-watch-note', '查阅速记资料并解读纸条');
-  assert.match(eventDirections(resolution.derivedEffects.narrativeEvents), /桥区南岸货栈/);
+  assert.match(eventDirections(resolution.derivedEffects.narrativeEvents), /大桥南区南岸货栈/);
   assert.ok(next.triggerState.active.some(entry => entry.definitionId === WATCH && entry.status === 'available'));
   assert.equal(resolution.derivedEffects.narrativeEvents.some(event => event.id === 'watch.investigation-routes'), false);
   for (const messages of [buildRenderingContext(game, next, '解读', '', resolution), buildFastNarrativeContinuationContext(game, next, '解读', '此前正文', '', resolution)]) {
     assert.ok(messages.some(message => message.role === 'system' && message.content.includes('采用含蓄风格')));
-    assert.match(messages.at(-1).content, /桥区南岸货栈/);
+    assert.match(messages.at(-1).content, /大桥南区南岸货栈/);
   }
 });
 

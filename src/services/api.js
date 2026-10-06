@@ -1,4 +1,5 @@
 import { DEFAULT_API_SETTINGS } from "../system/game.js";
+import { abortable, throwIfAborted } from "./cancellation.js";
 import { PATHWAYS, DYNAMIC_LOCATION_KINDS, DYNAMIC_LOCATION_SCOPES, MAP_DISTRICTS } from "../content/index.js";
 import { createProviderProfile, inferApiProvider } from "./apiProviders.js";
 import { normalizeAIResponse, textFromContent } from "./protocol.js";
@@ -876,7 +877,7 @@ function parseStreamEventData(eventData, state, onChunk, onReasoningChunk) {
   }
 }
 
-async function readStreamResponse(response, onChunk, onReasoningChunk, telemetry) {
+async function readStreamResponse(response, onChunk, onReasoningChunk, telemetry, signal) {
   const reader = response.body?.getReader();
   if (!reader) return { content: "", calls: {}, finishReason: "", reasoningContent: "", responseId: "", usage: null, rawResponse: "" };
   const decoder = new TextDecoder();
@@ -909,20 +910,27 @@ async function readStreamResponse(response, onChunk, onReasoningChunk, telemetry
       eventLines = [];
     }
   };
-  while (true) {
-    const { done, value } = await reader.read();
-    if (done) break;
-    const decoded = decoder.decode(value, { stream: true });
-    rawResponse += decoded;
-    buffer += decoded;
-    consumeBuffer();
+  const cancelReader = () => { Promise.resolve().then(() => reader.cancel()).catch(() => {}); };
+  signal?.addEventListener("abort", cancelReader, { once: true });
+  try {
+    while (true) {
+      const { done, value } = await abortable(() => reader.read(), signal);
+      if (done) break;
+      const decoded = decoder.decode(value, { stream: true });
+      rawResponse += decoded;
+      buffer += decoded;
+      consumeBuffer();
+    }
+    const finalChunk = decoder.decode();
+    rawResponse += finalChunk;
+    buffer += finalChunk;
+    consumeBuffer(true);
+    telemetry.streamComplete = true;
+    return { ...state, rawResponse };
+  } finally {
+    signal?.removeEventListener("abort", cancelReader);
+    try { reader.releaseLock(); } catch { /* a noncompliant reader may still be pending */ }
   }
-  const finalChunk = decoder.decode();
-  rawResponse += finalChunk;
-  buffer += finalChunk;
-  consumeBuffer(true);
-  telemetry.streamComplete = true;
-  return { ...state, rawResponse };
 }
 
 async function performAIRequest(settings, messages, signal, onChunk, options, telemetry) {
@@ -949,17 +957,17 @@ async function performAIRequest(settings, messages, signal, onChunk, options, te
   const headers = requestHeaders(settings, true);
   const serializedBody = JSON.stringify(body);
   telemetry.started = true;
-  const response = await fetch(endpoint(settings.baseUrl, "/chat/completions"), {
+  const response = await abortable(() => fetch(endpoint(settings.baseUrl, "/chat/completions"), {
     method: "POST", signal,
     headers,
     body: serializedBody,
-  });
+  }), signal);
   telemetry.httpStatus = response.status;
   telemetry.firstResponseMs = elapsedSince(telemetry.startedAt);
   if (!response.ok) await apiError(response, "API 请求失败", (data) => { telemetry.metadata = responseMetadata(data); });
   const contentType = response.headers.get("content-type") || "";
   if (!body.stream || contentType.includes("application/json")) {
-    const raw = await response.text();
+    const raw = await abortable(() => response.text(), signal);
     let data;
     try { data = JSON.parse(raw); } catch {
       if (raw.trim()) return options.rawContent ? { content: raw } : { ...normalizeAIResponse(raw), responseMetadata: { contentType, rawLength: raw.length, requestMaxTokens: maxTokens } };
@@ -968,7 +976,7 @@ async function performAIRequest(settings, messages, signal, onChunk, options, te
     telemetry.metadata = responseMetadata(data);
     return normalizeChatCompletion(data, maxTokens, options);
   }
-  const streamed = await readStreamResponse(response, onChunk, options.onReasoningChunk, telemetry);
+  const streamed = await readStreamResponse(response, onChunk, options.onReasoningChunk, telemetry, signal);
   const nativeCalls = nativeCallsFromMessage({ tool_calls: Object.values(streamed.calls) }, { finishReason: streamed.finishReason, streamed: true });
   if (!streamed.content.trim() && !nativeCalls.length) {
     try {
@@ -999,11 +1007,13 @@ export async function requestAI(settings, messages, signal, onChunk, options = {
   let status = "failed";
   let errorCode = "";
   const observeContent = (content) => {
+    if (signal?.aborted) return;
     if (content && telemetry.firstContentMs === null) telemetry.firstContentMs = elapsedSince(telemetry.startedAt);
     onChunk?.(content);
   };
   try {
-    const result = await performAIRequest(settings, messages, signal, observeContent, options, telemetry);
+    const guardedOptions = { ...options, onReasoningChunk: (...args) => { if (!signal?.aborted) options.onReasoningChunk?.(...args); } };
+    const result = await abortable(() => performAIRequest(settings, messages, signal, observeContent, guardedOptions, telemetry), signal);
     if (telemetry.firstContentMs === null && (result.content || result.narrative || result.toolCalls?.length)) telemetry.firstContentMs = elapsedSince(telemetry.startedAt);
     telemetry.metadata = result.responseMetadata || telemetry.metadata;
     status = "success";
@@ -1044,6 +1054,8 @@ export async function requestAIWithReasoningFallback(settings, messages, signal,
   try {
     return await requestAI(settings, messages, signal, onChunk, options);
   } catch (error) {
+    throwIfAborted(signal);
+    if (error.name === "AbortError") throw error;
     const shouldRetry = ["REASONING_EXHAUSTED", "EMPTY_RESPONSE"].includes(error.code)
       && settings.autoRetryReasoning !== false
       && !options.forceDisableReasoning
@@ -1056,6 +1068,7 @@ export async function requestAIWithReasoningFallback(settings, messages, signal,
     try {
       return await requestAI(settings, messages, signal, onChunk, { ...options, maxTokensOverride: expandedMax, recoveryAttempt: 1 });
     } catch (retryError) {
+      throwIfAborted(signal);
       if (retryError.name === "AbortError") throw retryError;
       options.onReasoningFallback?.();
       onChunk?.("");

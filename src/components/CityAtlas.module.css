@@ -1,0 +1,32 @@
+.viewport { height: 34rem; overflow: auto; overscroll-behavior: contain; border: 1px solid #a5977b; background: #ece2cf; scrollbar-color: #988366 #e4d7bd; }
+.viewport:focus-visible { outline: 2px solid #275a4c; outline-offset: 3px; }
+.atlas { display: block; min-width: 100%; min-height: 100%; max-width: none; }
+.boundaries { stroke: #77694f; stroke-width: 1.8; stroke-dasharray: 5 4; fill: none; opacity: .65; }
+.river { fill: none; stroke: #91b4b4; stroke-width: 36; stroke-linejoin: round; stroke-linecap: round; }
+.current { fill: none; stroke: #e4efdf; stroke-width: 1.5; opacity: .65; stroke-linejoin: round; }
+.flowArrow { fill: #33595c; font: 28px var(--font-sans); text-anchor: middle; }
+.riverName, .downstream { fill: #345f64; font: italic 17px var(--font-serif); letter-spacing: 2px; }
+.downstream { font-size: 13px; letter-spacing: 0; }
+.district { fill: #5a503a; font: 700 26px var(--font-serif); letter-spacing: 3px; text-anchor: middle; paint-order: stroke; stroke: #e8dfce; stroke-width: 5px; stroke-linejoin: round; }
+.district[data-muted="true"] { opacity: .35; }
+.bridge rect { fill: #c1ab7e; stroke: #68552f; stroke-width: 2; }
+.bridge path { fill: none; stroke: #68552f; stroke-width: 1; }
+.bridge text { fill: #504329; font: 13px var(--font-sans); paint-order: stroke; stroke: #e4d9bd; stroke-width: 3px; }
+.compass { fill: #51442f; stroke: #51442f; stroke-width: 2; }
+.compass text { stroke: none; text-anchor: middle; font: 700 15px var(--font-sans); }
+.route { fill: none; stroke: #9c6134; stroke-width: 5; stroke-dasharray: 7 5; stroke-linecap: round; opacity: .9; }
+.cell polygon { fill: transparent; stroke: #77694f15; stroke-width: .7; }
+.cell[data-discovered="true"] polygon { stroke: #77694f45; }
+.cell[role="button"] { cursor: pointer; outline: none; }
+.cell[role="button"]:hover polygon, .cell:focus-visible polygon { fill: #fcf8e580; stroke: #365e51; stroke-width: 2; }
+.cell[data-selected="true"] polygon { fill: #f9f4dc70; stroke: #8b6131; stroke-width: 2.5; }
+.cell[data-current="true"] polygon { stroke: #3c6855; stroke-width: 2; }
+.cell[data-muted="true"] { opacity: .35; }
+.pin { fill: #315e50; stroke: #eee6d2; stroke-width: 2; }
+.cell[data-current="true"] .pin { fill: #966b30; }
+.pinMark { fill: #fff4da; text-anchor: middle; font: 700 18px var(--font-sans); }
+.code { fill: #344b3b; text-anchor: middle; font: 700 16px var(--font-sans); paint-order: stroke; stroke: #e5dcc7; stroke-width: 3px; }
+.placeName { fill: #263e32; text-anchor: middle; font: 700 14px var(--font-sans); paint-order: stroke; stroke: #f3ead6; stroke-width: 4px; stroke-linejoin: round; pointer-events: none; }
+.exploreDot { fill: #907849; }
+@media (max-width: 760px) { .viewport { height: 27rem; } }
+@media (max-width: 460px) { .viewport { height: 24rem; } }

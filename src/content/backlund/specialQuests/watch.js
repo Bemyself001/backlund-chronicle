@@ -104,7 +104,7 @@ export const WATCH_MAIN_QUESTS = [{
   expiresAfterTurns: null,
   presentation: {
     title: "家传怀表：迟到的整点",
-    text: "译文把你失踪的舅舅雷金纳德{characterSurnameSuffix}最后的活动地点指向桥区南岸货栈。这是一条可以搁置的家族旧事；只有你主动追查，正式任务才会开始。",
+    text: "译文把你失踪的舅舅雷金纳德{characterSurnameSuffix}最后的活动地点指向大桥南区南岸货栈。这是一条可以搁置的家族旧事；只有你主动追查，正式任务才会开始。",
     choice: { label: "追查雷金纳德{characterSurnameSuffix}与南岸货栈（可选）", intent: "trigger", risk: "high" },
   },
   engagedStage: "trace-uncle",
@@ -112,7 +112,7 @@ export const WATCH_MAIN_QUESTS = [{
     { id: "trace-uncle", transitions: [{ objectiveId: "trace-uncle", description: "核对舅舅雷金纳德{characterSurnameSuffix}失踪前的经历与南岸记录", actionTerms: ["雷金纳德", "舅舅", "亲属", "家人", "档案", "记录", "打听", "追查"], nextStage: "enter-south-warehouse", rewards: [
       { id: "watch.late-hour.uncle-history", type: "clue", clue: { id: "clue-missing-uncle-history", title: "雷金纳德{characterSurnameSuffix}失踪前的旧档", detail: "主角的舅舅雷金纳德{characterSurnameSuffix}曾是通识者途径序列9，失踪前在南岸货栈追查魔女会的军火与文物交接。", kind: "personal_story" } },
     ] }] },
-    { id: "enter-south-warehouse", transitions: [{ objectiveId: "enter-south-warehouse", description: "前往桥区南岸货栈并进入仓库", actionTerms: ["南岸", "货栈", "仓库", "潜入", "进入"], requirements: [{ type: "location", locationId: "bridge-docks" }], requirementMessage: "必须先实际到达桥区南岸货栈", nextStage: "warehouse-bomb" }] },
+    { id: "enter-south-warehouse", transitions: [{ objectiveId: "enter-south-warehouse", description: "前往大桥南区南岸货栈并进入仓库", actionTerms: ["南岸", "货栈", "仓库", "潜入", "进入"], requirements: [{ type: "location", locationId: "bridge-docks" }], requirementMessage: "必须先实际到达大桥南区南岸货栈", nextStage: "warehouse-bomb" }] },
     { id: "warehouse-bomb", transitions: [
       {
         objectiveId: "disarm-with-dual-safety-knowledge",

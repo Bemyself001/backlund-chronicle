@@ -143,6 +143,7 @@ export default function App() {
   const handlePromptSave = (next) => { localStorage.setItem("mist-system-prompt", next); setPrompt(next); };
 
   const requestImportantItemConfirmation = (changes, signal) => new Promise((resolve) => {
+    if (signal.aborted) { resolve({ cancelled: true, aborted: true }); return; }
     const finish = (decision) => {
       signal.removeEventListener("abort", handleAbort);
       itemConfirmationResolverRef.current = null;
@@ -241,6 +242,7 @@ export default function App() {
     };
     armWatchdog();
     const handleTurnPreview = (rawContent) => {
+      if (controller.signal.aborted) return;
       armWatchdog();
       const hasPreview = queueStreamPreview(rawContent);
       if (hasPreview) markTurnMetric(metrics, "firstNarrativeAt");
@@ -482,7 +484,7 @@ export default function App() {
         ? (timedOut ? "等待模型响应超过 150 秒，本轮已自动中止；游戏状态没有改变，可直接重试。" : "生成已由你中止；游戏状态没有改变。")
         : err.message || "未知错误，请重试本轮。");
       return false;
-    } finally { clearTimeout(watchdogTimer); resetStreamPreview(); setItemConfirmation(null); itemConfirmationResolverRef.current = null; setTurnPhase("idle"); setLoading(false); busyRef.current = false; controllerRef.current = null; }
+    } finally { clearTimeout(watchdogTimer); controller.abort(); resetStreamPreview(); setItemConfirmation(null); itemConfirmationResolverRef.current = null; setTurnPhase("idle"); setLoading(false); busyRef.current = false; controllerRef.current = null; }
   };
 
   const handlePray = async (locationId) => {

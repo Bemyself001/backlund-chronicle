@@ -1,4 +1,5 @@
 import { requestAI } from "./api.js";
+import { abortable, throwIfAborted } from "./cancellation.js";
 import { buildChoiceRegenerationContext } from "./memory.js";
 import { choiceResult, choiceValidationError, hasValidModelChoices, mergeChoiceResponses, modelChoices } from "./choices.js";
 
@@ -20,12 +21,13 @@ export async function recoverChoices({ game, action, narrative, prompt, settings
       const nativeTools = mode === "tool";
       const messages = buildChoiceRegenerationContext(game, action, narrative, result.choiceMeta.reason, prompt,
         { nativeTools, existingChoices: result.choices });
-      const response = await request({ ...settings, nativeTools, jsonMode: !nativeTools }, messages, controller.signal, undefined, {
+      const response = await abortable(() => request({ ...settings, nativeTools, jsonMode: !nativeTools }, messages, controller.signal, undefined, {
         phase: "choices", onRequestMetrics, recoveryAttempt: attempts.length,
         toolSet: "choices", requireChoiceTool: nativeTools, disableTools: !nativeTools,
         disableJsonMode: nativeTools, forceDisableReasoning: true, skipReasoningRetry: true,
         streamOverride: false, maxTokensModeOverride: "manual", maxTokensOverride: 1200,
-      });
+      }), controller.signal);
+      throwIfAborted(signal);
       onResponse?.(response);
       result = mergeChoiceResponses(result, response);
       attempts.push({ mode, reason: hasValidModelChoices(result) ? "" : choiceValidationError(response) });

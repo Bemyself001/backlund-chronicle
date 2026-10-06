@@ -39,7 +39,7 @@ test("version 1 saves migrate from Grayharbor to Backlund without losing progres
   assert.equal(migrated.relationships[0].value, 0);
   assert.doesNotMatch(JSON.stringify(migrated.relationships), /克莱恩|愚者|序列|非凡/);
   assert.equal(migrated.locationKnowledge["queen-archive"].status, "rumored");
-  assert.deepEqual(migrated.mapExtensions, { locations: [], routes: [] });
+  assert.deepEqual(migrated.mapExtensions, { geographyVersion: 2, locations: [], routes: [] });
 });
 
 test("dynamic map nodes survive save migration with routes and knowledge intact", () => {

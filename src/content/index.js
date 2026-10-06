@@ -20,6 +20,7 @@ export const MAP_LOCATIONS = ACTIVE_CONTENT.map.locations;
 export const MAP_ROUTES = ACTIVE_CONTENT.map.routes;
 export const MAP_DISTRICTS = ACTIVE_CONTENT.map.districts;
 export const DISTRICT_LAYOUT = ACTIVE_CONTENT.map.districtLayout;
+export const CITY_GEOGRAPHY = ACTIVE_CONTENT.map.geography;
 export const INITIAL_DISCOVERED_LOCATION_IDS = ACTIVE_CONTENT.map.initialDiscoveredLocationIds;
 export const INITIAL_RUMORED_LOCATION_IDS = ACTIVE_CONTENT.map.initialRumoredLocationIds;
 export const LOCATION_KNOWLEDGE_STATUSES = ACTIVE_CONTENT.map.locationKnowledgeStatuses;

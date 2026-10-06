@@ -1,0 +1,84 @@
+import assert from "node:assert/strict";
+import { createRequire } from "node:module";
+import { mkdir, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { createInitialGame, EMPTY_CHARACTER, DEFAULT_API_SETTINGS } from "../src/data/defaults.js";
+import { getMapLocations, getMapLocation, findTravelRoute } from "../src/system/map.js";
+import { migrateSave } from "../src/services/storage.js";
+
+const require = createRequire(import.meta.url);
+const { chromium } = require(process.env.PLAYWRIGHT_MODULE || "C:/Users/ASUS/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright");
+const url = process.env.MAP_TEST_URL || "http://127.0.0.1:5173/";
+const output = resolve(".shots/city-map");
+await mkdir(output, { recursive: true });
+const browser = await chromium.launch({ headless: true, channel: "msedge" });
+const results = [];
+try {
+  for (const [width, height] of [[1440, 900], [768, 1024], [375, 812]]) {
+    const page = await browser.newPage({ viewport: { width, height }, isMobile: width === 375, hasTouch: width === 375 });
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    const fixture = createInitialGame({ ...EMPTY_CHARACTER, name: "地图验收", startingDistrict: "乔伍德区" });
+    fixture.location = { id: "queen-library", name: "皇后区·公共图书馆", district: "皇后区" };
+    fixture.content.contentVersion = "2026.10.05.1";
+    fixture.world.geographyVersion = 1;
+    fixture.world.tiles["0,-2"] = { terrain: "plain", locationId: "queen-library", name: "旧图书馆", discovered: true };
+    fixture.discoveredLocations = getMapLocations().filter(location => location.id !== "queen-archive").map(location => ({ id: location.id, name: location.name }));
+    fixture.locationKnowledge["queen-archive"] = { status: "unknown" };
+    const migrated = migrateSave(structuredClone(fixture));
+    const expectedRoute = findTravelRoute("queen-library", "bridge-docks", ["bridge-docks"], migrated);
+    await page.addInitScript(({ fixture, settings }) => {
+      if (!localStorage.getItem("mist-chronicle-saves-v1")) localStorage.setItem("mist-chronicle-saves-v1", JSON.stringify([{ slotId: "autosave", label: "旧地图测试", updatedAt: new Date().toISOString(), game: fixture }]));
+      localStorage.setItem("mist-api-settings-v1", JSON.stringify(settings));
+    }, { fixture, settings: { ...DEFAULT_API_SETTINGS, baseUrl: "https://map.invalid/v1", apiKey: "test", model: "test", nativeTools: true, stream: false, fastMode: false } });
+    await page.route("**/*", async route => {
+      if (route.request().url().startsWith(new URL(url).origin)) return route.continue();
+      if (!route.request().url().startsWith("https://map.invalid")) return route.fulfill({ status: 404, body: "isolated" });
+      const body = route.request().postDataJSON();
+      const planning = body.tools?.some(tool => tool.function.name === "location__move");
+      const content = planning ? "NO_STATE_CHANGE" : JSON.stringify({ narrative: "你沿着贝克兰德大桥抵达南岸货栈，过桥的路程已计入抵达时间。", choices: ["查看货栈门牌", "询问登记员", "观察附近街道"].map(label => ({ label, intent: "observe", risk: "low" })) });
+      return route.fulfill({ contentType: "application/json", body: JSON.stringify({ choices: [{ message: { content }, finish_reason: "stop" }] }) });
+    });
+    await page.goto(url);
+    await page.getByRole("button", { name: /签署档案并进入贝克兰德/ }).click();
+    await page.getByRole("button", { name: /继续调查/ }).click();
+    await page.getByRole("button", { name: "地图", exact: true }).click();
+    const modal = page.getByRole("dialog", { name: "贝克兰德城区图", exact: true });
+    assert.match(await modal.innerText(), /11 个城区/);
+    assert.equal(await modal.getByRole("heading", { name: "乔伍德区·公共图书馆" }).count(), 1);
+    assert.equal(await modal.getByRole("button", { name: /皇后区·公共图书馆/ }).count(), 0);
+    assert.equal(await modal.getByRole("button", { name: /市政档案馆/ }).count(), 0, "unknown landmark name must remain hidden");
+    const districts = modal.getByRole("combobox", { name: "选择城区" });
+    await districts.selectOption("西区");
+    await modal.getByRole("combobox", { name: "选择地图地点" }).selectOption("west-museum");
+    assert.equal(await modal.getByRole("heading", { name: "西区·王国博物馆" }).count(), 1);
+    await districts.selectOption("");
+    const library = modal.getByRole("button", { name: "乔伍德区·公共图书馆，玩家当前位置", exact: true });
+    await library.focus();
+    await library.press("Enter");
+    assert.equal(await modal.getByRole("heading", { name: "乔伍德区·公共图书馆" }).count(), 1);
+    await modal.getByRole("combobox", { name: "选择地图地点" }).selectOption("bridge-docks");
+    assert.match(await modal.innerText(), new RegExp(`约 ${expectedRoute.minutes} 分钟`));
+    assert.match(await modal.innerText(), /沿大桥过河/);
+    await page.screenshot({ path: resolve(output, `${width}-overview.png`), fullPage: true });
+    await modal.getByRole("button", { name: "放大地图", exact: true }).click();
+    await modal.getByRole("button", { name: "放大地图", exact: true }).click();
+    const viewport = modal.getByLabel("城区地图，可放大后滚动查看", { exact: true });
+    assert.equal(await viewport.evaluate(node => node.scrollWidth > node.clientWidth && node.scrollHeight > node.clientHeight), true);
+    await page.screenshot({ path: resolve(output, `${width}-zoom.png`), fullPage: true });
+    await modal.getByRole("button", { name: "恢复全城总览", exact: true }).click();
+    assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth), true);
+    assert.equal(await modal.evaluate(node => node.scrollWidth <= node.clientWidth), true);
+    await modal.getByRole("button", { name: "前往此处", exact: true }).click();
+    await page.waitForFunction(() => JSON.parse(localStorage.getItem("mist-chronicle-saves-v1"))[0].game.turn === 1);
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem("mist-chronicle-saves-v1"))[0].game);
+    assert.equal(saved.location.id, "bridge-docks");
+    assert.deepEqual(saved.world.player, { q: getMapLocation("bridge-docks").q, r: getMapLocation("bridge-docks").r });
+    assert.equal(Object.values(saved.world.tiles).filter(tile => tile.locationId === "queen-library").length, 1);
+    assert.deepEqual(errors, []);
+    results.push({ width, height, legacyMigration: true, keyboardSelection: true, riverCrossingMinutes: expectedRoute.minutes, zoom: true, overflow: false, errors });
+    await page.close();
+  }
+  await writeFile(resolve(output, "verification.json"), JSON.stringify(results, null, 2));
+  console.log(JSON.stringify(results));
+} finally { await browser.close(); }

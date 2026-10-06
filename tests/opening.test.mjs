@@ -28,7 +28,7 @@ test("new characters begin freely at the East Borough railway station", () => {
 test("every district initializes a coherent, independent opening and survives save reload", () => {
   assert.deepEqual(OPENINGS.map((entry) => entry.district).sort(), [...MAP_DISTRICTS].sort());
   const games = OPENINGS.map((opening) => createInitialGame({ ...EMPTY_CHARACTER, name: "本地调查员", origin: "间海郡", startingDistrict: opening.district }));
-  assert.equal(new Set(games.map((game) => game.recentDialogues[0].content)).size, 6);
+  assert.equal(new Set(games.map((game) => game.recentDialogues[0].content)).size, MAP_DISTRICTS.length);
   for (const game of games) {
     assert.equal(game.character.origin, "间海郡");
     assert.equal(game.location.district, `贝克兰德${game.character.startingDistrict}`);
