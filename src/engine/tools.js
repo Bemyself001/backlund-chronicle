@@ -6,6 +6,7 @@ import { ensureWorld, travelToLocation } from "../system/hexworld.js";
 import { amountToPence, formatMoney, moneyFromPence, moneyToPence } from "../system/money.js";
 import { isConsumable, isImportantNonMoneyItem, normalizeInventoryItem, normalizeItemImportance, playerVisibleItem } from "../system/items.js";
 import { equipmentSlot } from "../system/loadout.js";
+import { describeWeapon, newWeaponGate, weaponProfile } from "../system/weapons.js";
 import { applyAdvancement, getAdvancement, isExplicitAdvancementIntent } from "../system/character.js";
 import { getOrganization, getPathway, RENARD_AUCTION_MEDICINE, SPECIAL_RECIPES } from "../content/index.js";
 import { medicinePurchaseGate } from "./medicineAccess.js";
@@ -205,9 +206,10 @@ function repairToolArgs(name, rawArgs = {}, game = null) {
         tags: args.tags,
         properties: args.properties,
         potion: args.potion,
+        weapon: args.weapon,
         source: args.source,
       };
-      ["itemId", "name", "description", "detail", "category", "slot", "quantity", "weight", "rarity", "condition", "importance", "tags", "properties", "potion", "source"].forEach((key) => delete args[key]);
+      ["itemId", "name", "description", "detail", "category", "slot", "quantity", "weight", "rarity", "condition", "importance", "tags", "properties", "potion", "weapon", "source"].forEach((key) => delete args[key]);
       repairNote = appendRepairNote(repairNote, "已将物品字段整理到 item 对象");
     }
     if (typeof args.item === "string" && args.item.trim()) {
@@ -413,11 +415,13 @@ function executeOne(game, call, options = {}) {
   const turnLabel = `第 ${game.turn + 1} 轮`;
   const findItem = () => game.inventory.find((item) => item.instanceId === args.instanceId);
   if (call.name.startsWith("enemy.") || call.name === "combat.action") {
-    const result = executeCombatTool(game, call.name, args);
+    const result = executeCombatTool(game, call.name, args, { playerAction: options.playerAction });
     return result.ok ? succeed(call.name, `${turnLabel}：${result.log}`, result.data) : fail(call.name, result.reason);
   }
   switch (call.name) {
     case "inventory.add": {
+      const weaponGate = newWeaponGate(args.item || {});
+      if (weaponGate) return fail(call.name, weaponGate);
       const source = normalizeInventoryItem(args.item || {});
       const purchasedMedicine = SPECIAL_RECIPES.some(recipe => recipe.stat && (source?.itemId === `special-${recipe.id}` || source?.name === recipe.name))
         && /买|购|purchase|buy/i.test(`${options.playerAction || ""} ${call.reason || ""} ${source?.source || ""}`);
@@ -434,7 +438,7 @@ function executeOne(game, call, options = {}) {
       if (!Number.isInteger(quantity) || quantity < 1 || quantity > 10) return fail(call.name, "物品数量必须是 1—10 的整数");
       const projected = weightOf(game.inventory) + Number(source.weight || 0) * quantity;
       if (projected > game.capacity.maxWeight) return fail(call.name, `背包将超过 ${game.capacity.maxWeight}kg 容量`);
-      const existing = game.inventory.find((item) => item.itemId === source.itemId && !item.equipped
+      const existing = game.inventory.find((item) => item.itemId === source.itemId && !item.equipped && !weaponProfile(item) && !source.weapon
         && JSON.stringify(item.potion || null) === JSON.stringify(source.potion || null));
       let changedItem;
       if (existing) {
@@ -445,12 +449,14 @@ function executeOne(game, call, options = {}) {
         existing.importance = normalizeItemImportance({ ...existing, importance: source.importance || existing.importance, tags: [...(existing.tags || []), ...(source.tags || [])] });
         changedItem = existing;
       } else {
-        changedItem = normalizeInventoryItem({ instanceId: makeId("item"), category: "杂物", weight: 0, rarity: "普通", condition: "良好", equipped: false, tags: [], properties: {}, hiddenInfo: "", discoveredInfo: source.description, ...source, quantity, acquiredAt: turnLabel, source: source.source || call.reason, isNew: true });
+        changedItem = normalizeInventoryItem({ instanceId: makeId("item"), category: "杂物", weight: 0, rarity: "普通", condition: "良好", equipped: false, tags: [], properties: {}, hiddenInfo: "", discoveredInfo: source.description, ...source,
+          ...(source.weapon ? { instanceId: makeId("weapon"), equipped: false, weapon: { kind: source.weapon.kind, quality: source.weapon.quality } } : {}),
+          quantity, acquiredAt: turnLabel, source: source.source || call.reason, isNew: true });
         game.inventory.push(changedItem);
       }
       const visible = playerVisibleItem(changedItem);
       const acquisitionReason = visible.potionStatus === "unidentified" ? "获得一瓶身份待核实的魔药" : source.source || call.reason;
-      return succeed(call.name, `${turnLabel}：获得「${visible.name}」×${quantity}——${acquisitionReason}。`, { inventoryChange: { ...visible, delta: quantity, reason: acquisitionReason } });
+      return succeed(call.name, `${turnLabel}：获得「${visible.name}」×${quantity}——${acquisitionReason}。${source.weapon ? `${describeWeapon(visible)}，伤害已固定，装备后生效。` : ""}`, { inventoryChange: { ...visible, delta: quantity, reason: acquisitionReason } });
     }
     case "inventory.remove": {
       const target = findItem();
@@ -472,9 +478,10 @@ function executeOne(game, call, options = {}) {
     case "inventory.update": {
       const target = findItem();
       if (!target) return fail(call.name, "背包中不存在该物品实例");
+      if (["weapon", "bonusPercent", "damagePercent", "rarity", "quality"].some(key => Object.hasOwn(args.patch || {}, key))) return fail(call.name, "物品品质与武器伤害在创建时已固定，不能通过更新重掷或修改");
       const allowed = ["description", "condition", "discoveredInfo", "properties", "tags"];
       Object.entries(args.patch || {}).forEach(([key, value]) => { if (allowed.includes(key)) target[key] = value; });
-      if (getChurchTalisman(target) || target.potion) Object.assign(target, normalizeInventoryItem(target));
+      if (getChurchTalisman(target) || target.potion || target.weapon) Object.assign(target, normalizeInventoryItem(target));
       const visible = playerVisibleItem(target);
       return succeed(call.name, `${turnLabel}：更新「${visible.name}」——${visible.potionStatus === "unidentified" ? "身份仍未确认" : call.reason}。`);
     }
@@ -551,7 +558,7 @@ function executeOne(game, call, options = {}) {
     }
     case "item.equip": {
       const target = findItem();
-      if (!target) return fail(call.name, "找不到要装备的物品");
+      if (!target || target.quantity <= 0) return fail(call.name, "找不到要装备的物品");
       if (!target.tags.includes("装备")) return fail(call.name, "该物品不允许装备");
       const slot = equipmentSlot(target);
       Object.entries(game.equipment).forEach(([key, id]) => {
@@ -560,7 +567,7 @@ function executeOne(game, call, options = {}) {
       });
       target.equipped = true;
       game.equipment[slot] = target.instanceId;
-      return succeed(call.name, `${turnLabel}：装备「${target.name}」。`);
+      return succeed(call.name, `${turnLabel}：装备「${target.name}」。${weaponProfile(target) ? `${describeWeapon(target)}。` : ""}`);
     }
     case "item.unequip": {
       const target = findItem();

@@ -1,8 +1,8 @@
 import { healthPoints, attackPercent, normalizeHealthEffect } from "../system/healthRules.js";
 import { applyStatDelta, syncStatCollapseStatuses } from "./statChanges.js";
 
-export function damageEnemy(enemy, basePercent, stacks = 0, turn = 0) {
-  const damagePercent = attackPercent(basePercent, stacks);
+export function damageEnemy(enemy, basePercent, stacks = 0, turn = 0, weakPointBonus = 0) {
+  const damagePercent = attackPercent(basePercent, stacks, 1.2, weakPointBonus);
   const effectivePercent = enemy.guardedThroughTurn >= turn ? damagePercent / 2 : damagePercent;
   const requestedDamage = healthPoints(enemy.maxHealth, effectivePercent);
   const before = enemy.health;

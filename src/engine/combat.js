@@ -3,9 +3,10 @@ import {
   isEnemyStunned, normalizeCombatState,
 } from "../system/combat.js";
 import { applyStatDelta } from "./statChanges.js";
-import { BASIC_ATTACK_PERCENT, ENEMY_MOVES, displayPercent, healthPoints } from "../system/healthRules.js";
+import { BASIC_ATTACK_RULE, ENEMY_MOVES, displayPercent, healthPoints } from "../system/healthRules.js";
 import { actionPreview, mainActionGate, markMainAction, preparationGate } from "../system/combatActions.js";
 import { damageEnemy } from "./healthEffects.js";
+import { weakPointAssessment } from "../system/weakPoints.js";
 
 const record = (value) => value !== null && typeof value === "object" && !Array.isArray(value);
 const integer = (value, minimum = 0) => Number.isSafeInteger(value) && value >= minimum && value <= MAX_ENEMY_HEALTH;
@@ -22,11 +23,11 @@ export function combatActionAvailability(game, args = {}, turn = Number(game.tur
   if (!["attack", "defend", "wait"].includes(args.actionId)) return "请选择普通攻击、防御或观察";
   if (!(game.combat?.enemies || []).some(enemy => enemy.status === "active" && enemy.health > 0)) return "当前没有仍在场的敌人";
   if (args.actionId === "attack" && !game.combat.enemies.some(enemy => enemy.id === args.enemyId && enemy.status === "active" && enemy.health > 0)) return "请选择当前遭遇中尚未被击败的敌人";
-  return preparationGate(game, { effect: args.actionId === "attack" ? "damage" : "defend", damagePercent: BASIC_ATTACK_PERCENT, cost: 0 }, args.boostStacks ?? 0);
+  return preparationGate(game, { ...BASIC_ATTACK_RULE, effect: args.actionId === "attack" ? "damage" : "defend" }, args.boostStacks ?? 0);
 }
 
 // Validate against a detached state; failed calls leave the entire game untouched.
-export function executeCombatTool(game, name, args, { turn = game.turn + 1 } = {}) {
+export function executeCombatTool(game, name, args, { turn = game.turn + 1, playerAction = "" } = {}) {
   if (!record(args)) return failure("战斗工具参数必须是对象。");
   if (!Number.isSafeInteger(turn) || turn < 0) return failure("战斗回合无效。");
   const combat = normalizeCombatState(game.combat);
@@ -36,18 +37,20 @@ export function executeCombatTool(game, name, args, { turn = game.turn + 1 } = {
     const gate = combatActionAvailability(game, args, turn);
     if (gate) return failure(gate);
     const stacks = args.boostStacks ?? 0;
-    const preview = actionPreview(game, { effect: args.actionId === "attack" ? "damage" : "defend", damagePercent: BASIC_ATTACK_PERCENT, cost: 0 }, stacks);
+    const assessment = weakPointAssessment(args.weakPoint, { playerAction, damage: args.actionId === "attack" });
+    if (assessment.reason) return failure(assessment.reason);
+    const preview = actionPreview(game, { ...BASIC_ATTACK_RULE, effect: args.actionId === "attack" ? "damage" : "defend" }, stacks, null, assessment.bonus);
     let attack = null;
     if (args.actionId === "attack") {
       const enemy = combat.enemies.find(entry => entry.id === args.enemyId);
       if (!enemy) return failure("敌人数据无效");
-      attack = damageEnemy(enemy, BASIC_ATTACK_PERCENT, stacks, turn);
+      attack = damageEnemy(enemy, preview.combinedDamagePercent, stacks, turn, preview.weakPointBonusPercent);
     }
     const cost = applyStatDelta(game, "spirituality", -preview.spiritualityCost);
     if (args.actionId === "defend") game.character.guardedThroughTurn = turn;
     markMainAction(game, turn, stacks);
     game.combat = combat;
-    return { ok: true, log: attack ? `普通攻击按目标最大生命值${displayPercent(attack.effectivePercent)}结算：${attack.enemyName}受到${attack.damage}点伤害，生命${attack.before}→${attack.after}/${attack.maxHealth}${attack.after === 0 ? "，已被击败" : ""}。`
+    return { ok: true, log: attack ? `普通攻击${preview.weapon ? `（${preview.weapon.name}附加${displayPercent(preview.weaponBonusPercent)}）` : ""}${preview.weakPoint ? `；弱点「${preview.weakPoint.name}」奖励${displayPercent(preview.weakPointBonusPercent)}：${preview.weakPoint.evidence}；` : ""}按目标最大生命值${displayPercent(attack.effectivePercent)}结算：${attack.enemyName}受到${attack.damage}点伤害，生命${attack.before}→${attack.after}/${attack.maxHealth}${attack.after === 0 ? "，已被击败" : ""}。`
       : args.actionId === "defend" ? "采取防御姿态，本回合敌人的直接攻击伤害比例减半。" : "观察局势，结束本回合的主要行动。",
     data: { combatAction: { actionId: args.actionId, ...preview, ...attack, stacks, turn }, statChanges: cost ? [cost] : [],
       enemyChanges: attack ? [change(combat.enemies.find(entry => entry.id === args.enemyId), attack.before, "damage")] : [] } };

@@ -20,7 +20,8 @@ import { nearbyPeopleContext } from "../engine/visitablePeople.js";
 import { medicinePurchaseGate } from "../engine/medicineAccess.js";
 import { normalizeCombatState } from "../system/combat.js";
 import { talismanCatalog } from "../system/talismans.js";
-import { BASIC_ATTACK_PERCENT, ENEMY_MOVES, MAX_ATTACK_PERCENT } from "../system/healthRules.js";
+import { BASIC_ATTACK_PERCENT, BASIC_ATTACK_RULE, ENEMY_MOVES, MAX_ATTACK_PERCENT, WEAK_POINT_BONUS_PERCENT } from "../system/healthRules.js";
+import { equippedWeapon, WEAPON_QUALITIES } from "../system/weapons.js";
 import { actionPreview, attackPreparation } from "../system/combatActions.js";
 import { getAdvancement } from "../system/character.js";
 
@@ -153,6 +154,8 @@ export function visibleGameState(game) {
     statusEffects: game.statusEffects,
     combat: normalizeCombatState(game.combat),
     combatRules: { basicAttackPercent: BASIC_ATTACK_PERCENT, maxAttackPercent: MAX_ATTACK_PERCENT, enemyMoves: ENEMY_MOVES,
+      equippedWeapon: equippedWeapon(game), weaponQualities: WEAPON_QUALITIES, weakPointBonusPercent: WEAK_POINT_BONUS_PERCENT,
+      damageFormula: "min(60,(基础比例+适用的已装备武器比例)×1.2^强化层数+本次已确认弱点奖励5)；防御减半；最终向上取整一次",
       preparation: attackPreparation(game), mainActionAvailable: Math.max(game.character.mainActionLastUsedTurn ?? -1, game.character.abilityLastUsedTurn ?? -1) < game.turn + 1 },
     churchTalismans: talismanCatalog(),
     relationships: visiblePeopleContext(game),
@@ -247,7 +250,7 @@ function privatePlanningState(game, options = {}) {
       const request = options.abilityRequest || options.combatRequest;
       if (!request) return null;
       const rule = options.abilityRequest ? getAdvancement(game.character).unlockedAbilities.find(entry => entry.id === request.abilityId)?.rule
-        : { effect: request.actionId === "attack" ? "damage" : "defend", damagePercent: BASIC_ATTACK_PERCENT, cost: 0 };
+        : { ...BASIC_ATTACK_RULE, effect: request.actionId === "attack" ? "damage" : "defend" };
       return rule ? actionPreview(game, rule, request.boostStacks ?? 0, game.combat?.enemies?.find(enemy => enemy.id === (request.targetId || request.enemyId))) : null;
     })(),
     requestedIdentification: options.identificationRequest || null,

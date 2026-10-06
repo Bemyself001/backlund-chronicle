@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { activeEnemies } from "../system/combat.js";
-import { BASIC_ATTACK_PERCENT } from "../system/healthRules.js";
+import { BASIC_ATTACK_RULE } from "../system/healthRules.js";
 import { combatActionAvailability } from "../engine/combat.js";
 import CombatPreparation from "./CombatPreparation.jsx";
 import styles from "./EnemyEncounter.module.css";
@@ -17,7 +17,7 @@ export default function CombatActions({ game, onAction, disabled }) {
     <strong>本回合行动</strong>
     {enemies.length > 1 && <label className={styles.target}><span>选择攻击目标</span><select disabled={disabled} value={target?.id || ""} onChange={event => setTargetId(event.target.value)}><option value="">请选择敌人</option>{enemies.map(enemy => <option key={enemy.id} value={enemy.id}>{enemy.name} · {enemy.health}/{enemy.maxHealth}</option>)}</select></label>}
     {enemies.length === 1 && <p>目标：{target.name}</p>}
-    <CombatPreparation game={game} rule={{ effect: "damage", damagePercent: BASIC_ATTACK_PERCENT, cost: 0 }} target={target} stacks={stacks} onChange={setStacks} disabled={disabled} />
+    <CombatPreparation game={game} rule={BASIC_ATTACK_RULE} target={target} stacks={stacks} onChange={setStacks} disabled={disabled} />
     {reason && <p>{reason}</p>}
     <button type="button" disabled={disabled || !onAction || Boolean(reason)} onClick={() => onAction(`${stacks ? `狼人强化${stacks}次后，` : ""}普通攻击${target.name}`, { combatRequest: request })}>提交普通攻击</button>
     <button type="button" disabled={disabled || !onAction || Boolean(defendReason)} onClick={() => onAction("采取防御姿态，抵御敌人的下一轮攻击", { combatRequest: { actionId: "defend" } })}>防御 · 本回合直接受伤比例减半</button>

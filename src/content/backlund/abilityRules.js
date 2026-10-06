@@ -46,6 +46,7 @@ export function buildPathwayAbilities(pathwayId, sequence9) {
   for (const [offset, sequence] of [[3, 7], [6, 5]]) {
     const [id, name, effect] = profile.slice(offset, offset + 3);
     const rule = abilityRule(effect, sequence);
+    if (pathwayId === "warrior" && effect === "damage") rule.weaponAttack = true;
     if (pathwayId === "prisoner" && sequence === 7) rule.preparation = { id: "wolf-strength", name: "狼人强化", multiplier: 1.2, maxStacks: 3, cost: 1, duration: 1 };
     abilities.push({ id: `${pathwayId}:${id}`, name, description: `${name}的本地规则效果（原著职业特色的游戏改编）。`, sequence, rule, upgrades: [] });
   }
@@ -59,5 +60,5 @@ export function describeAbilityRule(rule) {
   }
   const effects = { damage: `对目标造成其最大生命值${rule.damagePercent}%的伤害（向上取整，至少1点）`, stun: `令目标${rule.duration}回合无法行动`, control: "同一目标的控制进度增加1点；跨回合累计3次后令其2回合无法行动并重置进度（无需连续，不产生永久秘偶）", analysis: `为已有线索增加${rule.amount}点解析进度（上限5，不编造新事实）`, health: `恢复自身最大生命值${rule.healPercent}%的生命（向下取整，至少1点，不超过上限）`, sanity: `恢复${rule.amount}点理智` };
   const preparation = rule.preparation ? ` 可在本回合攻击前使用${rule.preparation.name}，每层消耗${rule.preparation.cost}点灵性、伤害乘1.2，最多3层；回合结束清空，伤害比例最高60%。` : "";
-  return `消耗${rule.cost}点灵性；${effects[rule.effect]}。每回合至多执行一次主要行动。${preparation}`;
+  return `消耗${rule.cost}点灵性；${effects[rule.effect]}。${rule.weaponAttack ? "武器技能：附加当前装备武器的固定伤害比例，再计算强化，总比例最高60%。" : ""}每回合至多执行一次主要行动。${preparation}`;
 }

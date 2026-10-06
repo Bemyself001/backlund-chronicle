@@ -107,7 +107,7 @@ export default function SpecialActions({ game, loading, onExecute, onOpenMap, on
     {tab === "craft" && Object.keys(state.products).length > 0 && <section aria-label="制作成品"><h3>行囊中的制作成品</h3>{Object.entries(state.products).map(([id, recipeId]) => {
       const recipe = SPECIAL_RECIPES.find((entry) => entry.id === recipeId);
       const item = game.inventory.find((entry) => entry.instanceId === id && entry.quantity > 0);
-      return recipe && item ? <article className={styles.card} key={id}><h4>{item.name} ×{item.quantity}</h4><div className={styles.buttons}>
+      return recipe && item ? <article className={styles.card} key={id}><h4>{item.name} ×{item.quantity}</h4>{item.weapon && <p>固定附加伤害：目标最大生命值的{item.weapon.bonusPercent}%，在行囊装备后生效。</p>}<div className={styles.buttons}>
         {recipe.stat && <button type="button" disabled={loading} onClick={() => execute("use", id)}>使用一份</button>}
         <button type="button" disabled={loading || item.equipped} onClick={() => execute("sell", id)}>{item.equipped ? "先卸下装备" : `出售一份 · ${recipe.sale}便士`}</button>
       </div></article> : null;

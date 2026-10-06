@@ -8,6 +8,7 @@ export default function CombatPreparation({ game, rule, target, stacks, onChange
   const next = stacks < 3 ? actionPreview(game, rule, stacks + 1, target) : null;
   const capped = next && next.damagePercent === preview.damagePercent;
   return <div className={styles.preparation}>
+    {rule.weaponAttack && <p>{preview.weapon ? `持用：${preview.weapon.name} · 武器附加${displayPercent(preview.weaponBonusPercent)}` : "当前徒手；在行囊装备武器可增加伤害。"}</p>}
     {preparation && <>
       <div className={styles.heading}><strong>{preparation.name}</strong><span>{stacks}层 · ×{Number(preview.multiplier.toFixed(3))}</span></div>
       <div className={styles.controls}>
@@ -18,6 +19,8 @@ export default function CombatPreparation({ game, rule, target, stacks, onChange
       <small>每层消耗{preparation.cost}点灵性，最多{preparation.maxStacks}层；提交行动时扣费，本回合结束清空。{capped ? "已达60%伤害上限，继续强化无收益。" : ""}</small>
     </>}
     <p aria-live="polite">预计伤害：目标最大生命值的<strong>{displayPercent(preview.effectivePercent)}</strong>{target ? `，实际扣除${preview.damage}点生命` : "（请选择目标）"}{preview.guarded ? "；目标正在防御" : ""}。</p>
+    {preview.weapon && <small>基础{displayPercent(preview.baseDamagePercent)}＋武器{displayPercent(preview.weaponBonusPercent)}{stacks ? `，再乘${Number(preview.multiplier.toFixed(3))}` : ""}；总比例最高60%{preview.capped ? "（已达上限）" : ""}。装备中的一件武器生效。</small>}
+    <small>在自由行动中明确攻击具体弱点，AI确认成立时额外加5个百分点；以上预览未计入RP奖励。</small>
     <small>本次共消耗{preview.spiritualityCost}点灵性{stacks ? `（强化${preview.preparationCost}＋技能${rule.cost || 0}）` : ""}。{preview.healthCost ? `另消耗${preview.healthCost}点生命。` : ""}</small>
   </div>;
 }

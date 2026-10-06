@@ -6,6 +6,8 @@ export const FACT_DISCLOSURE_RULES = "【信息分层】hardFact 是本地确认
 
 import { QUEST_ENGINE_RULE } from "../engine/questRuntime.js";
 import { COMBAT_RULES } from "./combatRules.js";
+import { WEAPON_RULES } from "./weapons.js";
+import { WEAK_POINT_RULES } from "./weakPoints.js";
 import { ADVANCEMENT_STAT_RULE } from "./characterStats.js";
 import { VISITABLE_PERSON_RULE } from "../content/backlund/visitablePeople.js";
 import { PLAYER_ACTION_RULES } from "../services/playerActions.js";
@@ -15,6 +17,8 @@ export function fixedNarrativeMessages() {
     { role: "system", content: PLAYER_ACTION_RULES },
     { role: "system", content: QUEST_ENGINE_RULE },
     { role: "system", content: COMBAT_RULES },
+    { role: "system", content: WEAPON_RULES },
+    { role: "system", content: WEAK_POINT_RULES },
     { role: "system", content: ADVANCEMENT_STAT_RULE },
     { role: "system", content: VISITABLE_PERSON_RULE },
     { role: "system", content: FIXED_NARRATIVE_CONTRACT },

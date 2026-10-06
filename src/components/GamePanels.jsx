@@ -15,6 +15,7 @@ import PeoplePanel from "./PeoplePanel.jsx";
 import { TalismanControl } from "./EnemyEncounter.jsx";
 import { isConsumable, playerVisibleItem } from "../system/items.js";
 import { getChurchTalisman } from "../system/talismans.js";
+import { describeWeapon, weaponProfile } from "../system/weapons.js";
 
 export const CharacterPanel = memo(function CharacterPanel({ game, onAction, disabled }) {
   const { character } = game;
@@ -49,6 +50,7 @@ export const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, 
   const selected = inventory.find(item => item.instanceId === selectedId);
   const potionGate = selected?.potion ? getPotionUseGate(game, selected.instanceId) : "";
   const talisman = selected && getChurchTalisman(selected);
+  const weapon = selected && weaponProfile(selected);
   const weight = game.inventory.reduce((sum, item) => sum + item.weight * item.quantity, 0);
   const returnToList = () => {
     setSelectedId(null);
@@ -60,6 +62,7 @@ export const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, 
     {selected ? <section className={styles.itemDetail}>
       <button ref={backRef} type="button" className={styles.back} onClick={returnToList}>← 返回物品列表</button>
       <p className={styles.muted}>{selected.rarity} · {selected.category}{selected.potion ? " · 魔药" : ""}</p><h3>{selected.name}</h3><p>{selected.discoveredInfo || selected.description}</p>
+      {weapon && <div className={styles.record} aria-label="武器伤害"><h4>{describeWeapon(selected)}</h4><p>伤害在获得时固定。{selected.equipped ? "当前已装备。" : "装备后生效。"}只对普通攻击和武器类技能附加；每次只使用一件武器。</p><small>先加武器伤害，再计算强化；RP弱点成立时额外加5个百分点，总比例最高60%。</small></div>}
       {selected.potion && <div className={styles.record}><h4>{selected.potion.identified ? `${selected.potion.pathwayName}途径 · 序列${selected.potion.sequence}魔药` : "性质未明的魔药"}</h4><p>{selected.potion.identified ? potionGate || "已鉴定的成品魔药可直接服用。确认后生成晋升剧情并更新非凡档案。" : "可拜访明斯克街15号的夏洛克·莫里亚蒂，每瓶1镑鉴定；鉴定前不能服用。"}</p></div>}
       <dl className={styles.dataList}><div><dt>重量</dt><dd>{selected.weight} kg</dd></div><div><dt>状态</dt><dd>{selected.condition}</dd></div><div><dt>数量</dt><dd>{selected.quantity}</dd></div><div><dt>来源</dt><dd>{selected.source}</dd></div></dl>
       {talisman && <TalismanControl key={selected.instanceId} game={game} item={selected} onAction={onAction} disabled={disabled} tone="panel" />}

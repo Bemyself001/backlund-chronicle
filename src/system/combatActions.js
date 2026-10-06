@@ -1,5 +1,6 @@
 import { getAdvancement } from "./character.js";
 import { attackPercent, healthPoints } from "./healthRules.js";
+import { weaponBonus } from "./weapons.js";
 
 export function attackPreparation(game) {
   return getAdvancement(game.character).unlockedAbilities.find(ability => ability.rule.preparation)?.rule.preparation || null;
@@ -12,9 +13,14 @@ export function mainActionGate(game, turn = Number(game.turn || 0) + 1) {
   return "";
 }
 
-export function actionPreview(game, rule, stacks = 0, target = null) {
+export function actionPreview(game, rule, stacks = 0, target = null, weakPoint = null) {
   const preparation = attackPreparation(game);
-  const damagePercent = rule.effect === "damage" ? attackPercent(rule.damagePercent, stacks, preparation?.multiplier || 1.2) : 0;
+  const weapon = weaponBonus(game, rule);
+  const baseDamagePercent = rule.effect === "damage" ? rule.damagePercent : 0;
+  const weaponBonusPercent = weapon?.bonusPercent || 0;
+  const combinedDamagePercent = baseDamagePercent + weaponBonusPercent;
+  const weakPointBonusPercent = rule.effect === "damage" ? weakPoint?.bonusPercent || 0 : 0;
+  const damagePercent = rule.effect === "damage" ? attackPercent(combinedDamagePercent, stacks, preparation?.multiplier || 1.2, weakPointBonusPercent) : 0;
   const guarded = target && target.guardedThroughTurn >= Number(game.turn || 0) + 1;
   const effectivePercent = guarded ? damagePercent / 2 : damagePercent;
   const healthCost = healthPoints(game.character.stats.maxHealth, rule.healthCostPercent || 0);
@@ -25,9 +31,10 @@ export function actionPreview(game, rule, stacks = 0, target = null) {
     preparationCost: stacks * (preparation?.cost || 0),
     spiritualityCost: (rule.cost || 0) + stacks * (preparation?.cost || 0),
     healthCost, healPercent: rule.healPercent || 0, healing,
+    baseDamagePercent, weaponBonusPercent, combinedDamagePercent, weapon, weakPoint, weakPointBonusPercent,
     damagePercent, effectivePercent, guarded: Boolean(guarded),
     damage: target ? Math.min(target.health, healthPoints(target.maxHealth, effectivePercent)) : null,
-    capped: rule.effect === "damage" && rule.damagePercent * (preparation?.multiplier || 1.2) ** stacks > damagePercent,
+    capped: rule.effect === "damage" && combinedDamagePercent * (preparation?.multiplier || 1.2) ** stacks + weakPointBonusPercent > damagePercent,
   };
 }
 

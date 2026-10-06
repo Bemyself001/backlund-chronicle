@@ -10,6 +10,8 @@ import { medicinePurchaseGate } from "./medicineAccess.js";
 import { grantOrganizationTalisman } from "./talismans.js";
 import { visitPerson } from "./visitablePeople.js";
 import { quickWaitGate, quickWaitPreview } from "./quickWait.js";
+import { normalizeInventoryItem } from "../system/items.js";
+import { describeWeapon } from "../system/weapons.js";
 
 export function specialState(game) {
   const raw = game.specialActions || {};
@@ -219,12 +221,14 @@ export function executeSpecialAction(game, request) {
       if (operation === "buy-medicine") pay(next, recipe.sale);
       else state.materials[recipe.id] -= 1;
       const instanceId = makeId("crafted");
-      next.inventory.push({ instanceId, itemId: `special-${recipe.id}`, name: recipe.name, description: recipe.description,
+      const product = normalizeInventoryItem({ instanceId, itemId: `special-${recipe.id}`, name: recipe.name, description: recipe.description,
         category: recipe.stat ? "消耗品" : "武器", quantity: 1, weight: recipe.weight, rarity: "普通", importance: "normal",
         tags: recipe.stat ? ["普通药剂", "消耗品"] : ["装备"], condition: "良好", equipped: false, properties: {}, source: operation === "buy-medicine" ? "购买药剂" : "特殊行动制作", acquiredAt: `第 ${next.turn + 1} 轮`, isNew: true });
+      next.inventory.push(product);
       state.products[instanceId] = recipe.id;
       action = `制作${recipe.name}`;
       narrative = `你消耗一份${recipe.material}，完成了${recipe.name}。${recipe.description}\n\n成品已放入行囊，可在特殊行动中自用或出售。`;
+      if (product.weapon) narrative += `\n\n${describeWeapon(product)}。伤害已固定，装备后生效。`;
       minutes = 30;
       if (operation === "buy-medicine") {
         action = `购买${recipe.name}`;

@@ -1,5 +1,7 @@
 export const BASIC_ATTACK_PERCENT = 12;
+export const BASIC_ATTACK_RULE = Object.freeze({ effect: "damage", damagePercent: BASIC_ATTACK_PERCENT, weaponAttack: true, cost: 0 });
 export const MAX_ATTACK_PERCENT = 60;
+export const WEAK_POINT_BONUS_PERCENT = 5;
 export const ENEMY_MOVES = Object.freeze({
   attack: { name: "普通攻击", damagePercent: 12 },
   windup: { name: "蓄力", damagePercent: 0 },
@@ -16,9 +18,10 @@ export function healthPoints(maxHealth, percent, rounding = "up") {
   return Math.max(1, rounding === "down" ? Math.floor(exact) : Math.ceil(exact));
 }
 
-export function attackPercent(basePercent, stacks = 0, multiplier = 1.2) {
+export function attackPercent(basePercent, stacks = 0, multiplier = 1.2, weakPointBonus = 0) {
   if (!Number.isFinite(basePercent) || basePercent < 0 || basePercent > 100 || !Number.isInteger(stacks) || stacks < 0 || stacks > 3) throw new Error("伤害比例或强化层数无效");
-  return Math.min(MAX_ATTACK_PERCENT, Math.round(basePercent * multiplier ** stacks * 1e6) / 1e6);
+  if (![0, WEAK_POINT_BONUS_PERCENT].includes(weakPointBonus)) throw new Error("弱点奖励必须来自本地固定规则");
+  return Math.min(MAX_ATTACK_PERCENT, Math.round((basePercent * multiplier ** stacks + weakPointBonus) * 1e6) / 1e6);
 }
 
 export const displayPercent = value => `${Number(value.toFixed(3))}%`;

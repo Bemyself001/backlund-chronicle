@@ -6,6 +6,7 @@ import { normalizeAIResponse, textFromContent } from "./protocol.js";
 import { CLOTHING_SLOTS } from "../system/loadout.js";
 import { MAX_ENEMY_HEALTH, MAX_ENEMY_ID_LENGTH, MAX_ENEMY_NAME_LENGTH, MAX_COMBAT_ENEMIES } from "../system/combat.js";
 import { ENEMY_MOVES } from "../system/healthRules.js";
+import { WEAPON_KINDS, WEAPON_QUALITIES } from "../system/weapons.js";
 import { QUEST_INPUT_SCHEMA, QUEST_RESOLVE_PROPERTIES } from "./questSchema.js";
 import { normalizeTokenUsage } from "./apiUsage.js";
 
@@ -123,6 +124,12 @@ export async function testApiConnection(settings, signal) {
   return `连接成功：发现 ${models.length} 个模型，${selected}。`;
 }
 
+const WEAK_POINT_SCHEMA = {
+  type: "object", additionalProperties: false, required: ["name", "evidence"],
+  description: "仅当玩家明确攻击具体部位且AI确认目标确有可利用弱点时提供；本地固定奖励5个百分点，不得自填伤害",
+  properties: { name: { type: "string", maxLength: 40 }, evidence: { type: "string", minLength: 6, maxLength: 300, description: "说明目标的真实生理结构、弱点暴露情况及本次攻击如何利用它" } },
+};
+
 const TOOL_PARAMETER_SCHEMAS = {
   "context.lookup": {
     type: "object",
@@ -157,6 +164,9 @@ const TOOL_PARAMETER_SCHEMAS = {
           importance: { type: "string", enum: ["normal", "important"], description: "仅任务、关键证据、身份、非凡能力或后续剧情入口相关物品使用 important；普通物品与货币使用 normal" },
           tags: { type: "array", items: { type: "string" } },
           properties: { type: "object" },
+          weapon: { type: "object", additionalProperties: false, required: ["kind", "quality"],
+            description: "只在创建武器时填写种类与有剧情依据的品质，伤害值由本地生成并永久固定",
+            properties: { kind: { type: "string", enum: Object.keys(WEAPON_KINDS) }, quality: { type: "string", enum: Object.keys(WEAPON_QUALITIES) } } },
           potion: {
             type: "object",
             additionalProperties: false,
@@ -231,7 +241,7 @@ const TOOL_PARAMETER_SCHEMAS = {
   },
   "ability.use": {
     type: "object", additionalProperties: false, required: ["abilityId", "reason"],
-    properties: { abilityId: { type: "string", description: "当前角色unlockedAbilities中的稳定ID" }, targetId: { type: "string", description: "能力目标：当前敌人或已知线索ID；自身能力省略" }, boostStacks: { type: "integer", minimum: 0, maximum: 3, description: "玩家明确选择的本回合强化次数；每层1点灵性，仅已解锁狼人强化的伤害行动可用" }, reason: { type: "string" } },
+    properties: { abilityId: { type: "string", description: "当前角色unlockedAbilities中的稳定ID" }, targetId: { type: "string", description: "能力目标：当前敌人或已知线索ID；自身能力省略" }, boostStacks: { type: "integer", minimum: 0, maximum: 3, description: "玩家明确选择的本回合强化次数；每层1点灵性，仅已解锁狼人强化的伤害行动可用" }, weakPoint: WEAK_POINT_SCHEMA, reason: { type: "string" } },
   },
   "enemy.encounter": {
     type: "object", additionalProperties: false, required: ["enemies", "reason"],
@@ -250,7 +260,7 @@ const TOOL_PARAMETER_SCHEMAS = {
   },
   "combat.action": {
     type: "object", additionalProperties: false, required: ["actionId", "reason"],
-    properties: { actionId: { type: "string", enum: ["attack", "defend", "wait"] }, enemyId: { type: "string", description: "普通攻击的目标敌人ID" }, boostStacks: { type: "integer", minimum: 0, maximum: 3 }, reason: { type: "string" } },
+    properties: { actionId: { type: "string", enum: ["attack", "defend", "wait"] }, enemyId: { type: "string", description: "普通攻击的目标敌人ID" }, boostStacks: { type: "integer", minimum: 0, maximum: 3 }, weakPoint: WEAK_POINT_SCHEMA, reason: { type: "string" } },
   },
   "enemy.act": {
     type: "object", additionalProperties: false, required: ["enemyId", "moveId", "reason"],

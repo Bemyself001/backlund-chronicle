@@ -2,7 +2,7 @@ import { getAdvancement } from "../system/character.js";
 import { formatMoney, moneyFromPence, moneyToPence } from "../system/money.js";
 import { isImportantNonMoneyItem, normalizeItemImportance, playerVisibleItem } from "../system/items.js";
 
-const ITEM_FIELDS = ["name", "category", "description", "weight", "rarity", "condition", "equipped", "tags", "properties", "discoveredInfo", "potion"];
+const ITEM_FIELDS = ["name", "category", "description", "weight", "rarity", "condition", "equipped", "tags", "properties", "discoveredInfo", "potion", "weapon"];
 
 function equalValue(left, right) {
   return JSON.stringify(left) === JSON.stringify(right);
@@ -19,6 +19,7 @@ function itemRecord(item, quantity) {
     equipped: Boolean(item.equipped),
     source: item.source,
     category: item.category,
+    ...(item.weapon ? { weapon: structuredClone(item.weapon) } : {}),
     importance: normalizeItemImportance(item),
   };
 }

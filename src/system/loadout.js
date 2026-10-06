@@ -1,5 +1,6 @@
 import { makeId } from "../utils/id.js";
 import { getTalent } from "../content/index.js";
+import { normalizeWeaponItem, weaponProfile } from "./weapons.js";
 
 export const DEFAULT_CLOTHING = "旧呢外套、白衬衫、黑长裤、磨损的皮靴";
 export const CLOTHING_SLOTS = ["外套", "上装", "下装", "鞋履", "头饰", "手套", "围饰"];
@@ -11,6 +12,7 @@ const clothingPatterns = [
 ];
 
 export function equipmentSlot(item) {
+  if (weaponProfile(item)) return "武器";
   return item.category === "服装" && CLOTHING_SLOTS.includes(item.slot) ? `服装:${item.slot}` : item.category;
 }
 
@@ -73,7 +75,7 @@ export function localLoadout(character) {
 }
 
 export function loadoutInventory(loadout) {
-  const createItem = (entry, index, clothing) => ({
+  const createItem = (entry, index, clothing) => normalizeWeaponItem({
     instanceId: makeId("item"), itemId: `starting-${clothing ? "clothing" : "personal"}-${index}`,
     name: entry.name, description: entry.description, weight: entry.weight, quantity: 1,
     category: clothing ? "服装" : "随身物品", ...(clothing ? { slot: entry.slot } : {}),

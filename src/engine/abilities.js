@@ -4,6 +4,7 @@ import { applyStatDelta } from "./statChanges.js";
 import { actionPreview, mainActionGate, markMainAction, preparationGate } from "../system/combatActions.js";
 import { addHealthOverTime, damageEnemy, healCharacter, stealLife } from "./healthEffects.js";
 import { displayPercent } from "../system/healthRules.js";
+import { weakPointAssessment } from "../system/weakPoints.js";
 
 const findAbility = (game, id) => getAdvancement(game.character).unlockedAbilities.find(entry => entry.id === id);
 export function passiveAbilityModifier(game, abilityId, checkKind) {
@@ -33,7 +34,7 @@ export function abilityAvailability(game, abilityId, targetId, turn = Number(gam
   return "";
 }
 
-export function resolveAbilityUse(game, args = {}, { turn = Number(game.turn || 0) + 1 } = {}) {
+export function resolveAbilityUse(game, args = {}, { turn = Number(game.turn || 0) + 1, playerAction = "" } = {}) {
   const targetId = args.targetId || args.enemyId || args.clueId;
   const stacks = args.boostStacks ?? 0;
   const reason = abilityAvailability(game, args.abilityId, targetId, turn, stacks);
@@ -41,9 +42,13 @@ export function resolveAbilityUse(game, args = {}, { turn = Number(game.turn || 
   if (!Number.isSafeInteger(turn) || turn < 0) return { name: "ability.use", ok: false, reason: "能力回合无效" };
   const ability = findAbility(game, args.abilityId);
   const { effect, amount, duration, healPercent } = ability.rule;
-  const preview = actionPreview(game, ability.rule, stacks);
+  const assessment = weakPointAssessment(args.weakPoint, { playerAction, damage: effect === "damage" });
+  if (assessment.reason) return { name: "ability.use", ok: false, reason: assessment.reason };
+  const preview = actionPreview(game, ability.rule, stacks, null, assessment.bonus);
   const cost = preview.spiritualityCost;
-  const abilityEffect = { abilityId: ability.id, name: ability.name, effect, targetId, spiritualityCost: cost, boostStacks: stacks, multiplier: preview.multiplier, healthCost: preview.healthCost };
+  const abilityEffect = { abilityId: ability.id, name: ability.name, effect, targetId, spiritualityCost: cost, boostStacks: stacks, multiplier: preview.multiplier, healthCost: preview.healthCost,
+    baseDamagePercent: preview.baseDamagePercent, weaponBonusPercent: preview.weaponBonusPercent, weapon: preview.weapon,
+    weakPoint: preview.weakPoint, weakPointBonusPercent: preview.weakPointBonusPercent };
   const statChanges = [];
   if (ability.target.kind === "enemy") {
     const combat = normalizeCombatState(game.combat);
@@ -51,7 +56,7 @@ export function resolveAbilityUse(game, args = {}, { turn = Number(game.turn || 
     if (!enemy) return { name: "ability.use", ok: false, reason: "敌人数据无效" };
     abilityEffect.before = enemy.health;
     if (effect === "damage") {
-      Object.assign(abilityEffect, damageEnemy(enemy, ability.rule.damagePercent, stacks, turn));
+      Object.assign(abilityEffect, damageEnemy(enemy, preview.combinedDamagePercent, stacks, turn, preview.weakPointBonusPercent));
       if (ability.rule.healthOverTime) addHealthOverTime(enemy.statusEffects, ability, turn);
     } else if (effect === "control") {
       const progress = Math.max(0, Math.min(2, Number(game.character.abilityControl?.[targetId]) || 0)) + 1;
@@ -99,7 +104,7 @@ export function resolveAbilityUse(game, args = {}, { turn = Number(game.turn || 
   game.character.abilityLastUsedTurn = turn;
   markMainAction(game, turn, stacks);
   const summary = effect === "damage"
-    ? `按目标最大生命值的${displayPercent(abilityEffect.effectivePercent)}结算（向上取整）：${abilityEffect.enemyName}受到${abilityEffect.damage}点伤害，生命值${abilityEffect.before}→${abilityEffect.after} / ${abilityEffect.maxHealth}${abilityEffect.after === 0 ? "，已被击败" : ""}。`
+    ? `${preview.weapon ? `使用${preview.weapon.name}，武器附加${displayPercent(preview.weaponBonusPercent)}。` : ""}按目标最大生命值的${displayPercent(abilityEffect.effectivePercent)}结算（向上取整）：${abilityEffect.enemyName}受到${abilityEffect.damage}点伤害，生命值${abilityEffect.before}→${abilityEffect.after} / ${abilityEffect.maxHealth}${abilityEffect.after === 0 ? "，已被击败" : ""}。`
     : effect === "health" ? `按自身最大生命值${healPercent}%治疗，实际恢复${abilityEffect.healing}点生命。` : ability.description;
-  return { name: "ability.use", ok: true, log: `使用「${ability.name}」，消耗${cost}点灵性。${summary}`, data: { abilityEffect, statChanges } };
+  return { name: "ability.use", ok: true, log: `使用「${ability.name}」，消耗${cost}点灵性。${preview.weakPoint ? `弱点「${preview.weakPoint.name}」奖励5%：${preview.weakPoint.evidence}。` : ""}${summary}`, data: { abilityEffect, statChanges } };
 }

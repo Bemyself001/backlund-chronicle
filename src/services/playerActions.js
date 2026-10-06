@@ -4,6 +4,7 @@ import { identificationGate } from "../engine/potionIdentification.js";
 import { abilityAvailability } from "../engine/abilities.js";
 import { combatActionAvailability, executeCombatTool } from "../engine/combat.js";
 import { activeEnemies } from "../system/combat.js";
+import { weaponProfile } from "../system/weapons.js";
 
 // Resolve unambiguous prose to the same immutable IDs carried by UI buttons.
 export function inferPotionRequest(game, action, supplied) {
@@ -68,7 +69,15 @@ export function ensurePlayerActionTools(calls, requests, game, playerAction = ""
     const ability = abilityRequest && getAdvancement(game.character).unlockedAbilities.find(entry => entry.id === abilityRequest.abilityId);
     const encounters = calls.filter(call => call.name === "enemy.encounter");
     const reactions = calls.filter(call => ["enemy.act", "enemy.leave"].includes(call.name));
-    return completeEnemyReactions([...encounters, { id: `main:${game.turn + 1}`, name: abilityRequest ? "ability.use" : "combat.action", args: { ...request, boostStacks }, reason: `玩家执行${ability?.name || "战斗行动"}` }, ...reactions], game);
+    const name = abilityRequest ? "ability.use" : "combat.action";
+    const sameAction = calls.find(call => call.name === name
+      && (abilityRequest ? call.args?.abilityId === request.abilityId : call.args?.actionId === request.actionId)
+      && (call.args?.targetId || call.args?.enemyId) === (request.targetId || request.enemyId));
+    const weakPoint = sameAction?.args?.weakPoint;
+    const equipment = requestedMain ? [] : calls.filter(call => ["item.equip", "item.unequip"].includes(call.name)
+      && game.inventory.some(item => item.instanceId === call.args?.instanceId && weaponProfile(item)));
+    return completeEnemyReactions([...encounters, ...equipment, { id: `main:${game.turn + 1}`, name,
+      args: { ...request, boostStacks, weakPoint }, reason: `玩家执行${ability?.name || "战斗行动"}` }, ...reactions], game);
   }
   return calls.some(call => call.name === "item.use") ? completeEnemyReactions(calls, game) : calls;
 }
