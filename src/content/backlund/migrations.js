@@ -1,6 +1,15 @@
 import { WATCH_NOTE_DETAIL } from "./watchNote.js";
 
 export const CONTENT_MIGRATIONS = [
+  { id: "backlund.south-bank-districts", fromVersion: "2026.10.06.2", toVersion: "2026.10.06.3" },
+  {
+    id: "backlund.next-day-renard-auction", fromVersion: "2026.10.06.1", toVersion: "2026.10.06.2",
+    definitionRefreshes: [{ definitionId: "side.queens.renard-fall", toDefinitionVersion: 8 }],
+  },
+  {
+    id: "backlund.immediate-renard-auction", fromVersion: "2026.10.06", toVersion: "2026.10.06.1",
+    definitionRefreshes: [{ definitionId: "side.queens.renard-fall", toDefinitionVersion: 7 }],
+  },
   {
     id: "backlund.city-geography", fromVersion: "2026.10.05.1", toVersion: "2026.10.06",
     textReplacementFields: ["choices", "clues", "relationships", "locationKnowledge", "discoveredLocations", "memoryNotes", "longTermSummary", "memoryState"],

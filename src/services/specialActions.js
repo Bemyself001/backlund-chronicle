@@ -21,10 +21,10 @@ export function resolveSpecialAction(game, request) {
   const visitedPerson = request.operation === "visit-person" ? visitablePerson(request.id) : null;
   const choices = visitedPerson ? visitedPerson.topics.map(topic => ({ label: topic.action, intent: "social", risk: "low" })) : game.choices;
   return markNarrativeEventsDelivered({ ...next, ...memory.updates,
-    choices: injectOccultEntryChoice(choices, trigger),
+    choices: next.questFocus?.id ? choices : injectOccultEntryChoice(choices, trigger),
     worldEvents: [...game.worldEvents, ...(progress.newTrigger ? [{ id: makeId("event"), turn: next.turn, text: `特殊事件出现：${progress.newTrigger.presentation.title}` }] : [])].slice(-40),
     changeLog: [...game.changeLog, { id: makeId("log"), turn: next.turn, text: action, tone: "success" },
       ...logs.map((text) => ({ id: makeId("log"), turn: next.turn, text, tone: "neutral" })), ...progress.statusTickLogs].slice(-100),
     lastTurnBaseline: baseline, lastTurnAudit: audit, lastTurnMetrics: null,
-  }, resolution.derivedEffects.narrativeEvents);
+  }, resolution.derivedEffects.narrativeEvents, { action });
 }

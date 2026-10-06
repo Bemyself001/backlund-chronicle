@@ -24,6 +24,8 @@ import { BASIC_ATTACK_PERCENT, BASIC_ATTACK_RULE, ENEMY_MOVES, MAX_ATTACK_PERCEN
 import { equippedWeapon, WEAPON_QUALITIES } from "../system/weapons.js";
 import { actionPreview, attackPreparation } from "../system/combatActions.js";
 import { getAdvancement } from "../system/character.js";
+import { questFocusContext, QUEST_FOCUS_RULE } from "../engine/questFocus.js";
+import { questRecoveryHistory, QUEST_RECOVERY_RULE } from "../engine/questRecovery.js";
 
 const SHARED_AUTHORITY_RULES = LOCAL_STATE_AUTHORITY_RULES + "【地图调查与公共常识】玩家未揭开地图迷雾只表示其个人尚未确认地点，不表示当地居民不知道该地点。圣赛缪尔教堂是黑夜女神教会的公开教堂，永恒烈阳教堂也是公开宗教场所；正常描写居民指路、公开礼拜与日常活动，不因地图未发现就编造集体不知情、避讳或秘密据点。其他公共地点同理，按身份与当地知识差异自然回应。明确的地图调查在本轮正常完成后由本地规则确认所选地点，只揭开该地点，不自动到访、加入组织或解锁内部秘密；不要把本次调查写成仍无法确认地址。快速模式草稿先写核实过程，具体确认结果留给本地结算后的叙事。";
 
@@ -39,6 +41,8 @@ function fixedContext(systemPrompt) {
   return [
     { role: "system", content: systemPrompt },
     ...fixedNarrativeMessages(),
+    { role: "system", content: QUEST_FOCUS_RULE },
+    { role: "system", content: QUEST_RECOVERY_RULE },
     { role: "system", content: SCENARIO_RULES },
   ];
 }
@@ -52,6 +56,9 @@ const TERMINAL_TASKS = new Set(["completed", "failed", "abandoned", "expired"]);
 
 export function promptGameState(game, action = "", phase = "planning", context = relevantContext(game, action)) {
   const state = visibleGameState(game);
+  state.currentQuestFocus = questFocusContext(game, action);
+  if (phase === "rendering" && game.questFocus?.id) state.currentQuestFocus = state.taskJournal.find(entry => entry.id === game.questFocus.id) || null;
+  if (/任务|委托|报酬|酬金|交差|结算|领奖/.test(action)) state.questRecoveryHistory = questRecoveryHistory(game, action);
   const ids = new Set(context.entries.flatMap(entry => [entry.id, ...entry.entityIds]));
   const referenced = entry => [entry.id, entry.instanceId, entry.title, entry.name].some(value => value && (action.includes(value) || ids.has(value) || ids.has(`quest:${value}`)));
   state.taskJournal = state.taskJournal.filter(entry => !TERMINAL_TASKS.has(entry.status) || referenced(entry));
@@ -414,6 +421,7 @@ export function buildToolRepairContext(game, action, call, validationError, syst
     playerAction: action,
     invalidToolCall: { name: call.name, args: call.args, rawArguments: call.rawArguments || call.arguments || call.function?.arguments || "", reason: call.reason },
     validationError,
+    ...(call.name.startsWith("quest.") ? { questRecoveryHistory: questRecoveryHistory(game, call.args?.instanceId || action) } : {}),
     mapDiscoveryCandidates: call.name === "location.discover" ? privateMapCandidates(game) : undefined,
     mapGrowthAnchors: call.name === "location.grow" ? mapGrowthAnchors(game) : undefined,
     progressiveContext: progressiveContext(game, action),

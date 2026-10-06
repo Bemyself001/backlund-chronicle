@@ -3,10 +3,13 @@ import { questAssistance, syncQuestJournal } from "./questRuntime.js";
 import { inspectQuestRoutes, selectedQuestRoute } from "./questRoutes.js";
 import { getMapLocation, normalizeLocationKnowledge } from "../system/map.js";
 import { travelToLocation } from "../system/hexworld.js";
-import { acceptOrdinaryQuest, resolveOrdinaryQuest } from "./questLifecycle.js";
+import { acceptOrdinaryQuest, resolveOrdinaryQuest, isRewardClaimAction } from "./questLifecycle.js";
 import { getInstanceTriggerDefinition } from "./triggerDefinitions.js";
 import { allConditionsMatch } from "./triggerConditions.js";
 import { terminalTrigger } from "./triggerState.js";
+import { findQuestReference } from "./questIdentity.js";
+import { recoverMissingQuest } from "./questRecovery.js";
+import { reconcileFixedQuestReward } from "./questRewards.js";
 
 export function resolveSelectedQuestRoute(game, action, turn, expectedId) {
   const selected = selectedQuestRoute(game, syncQuestJournal(game).entries, action);
@@ -32,8 +35,18 @@ export function resolveSelectedQuestRoute(game, action, turn, expectedId) {
 
 export function resolveQuestAction(game, args, action, turn) {
   const draft = structuredClone(game);
-  const journal = syncQuestJournal(draft);
-  const id = String(args.instanceId || "");
+  let journal = syncQuestJournal(draft);
+  let reference = findQuestReference(draft, args.instanceId);
+  let recovered = false;
+  if (!reference.ok && args.recovery) {
+    const restored = recoverMissingQuest(draft, args.recovery, args.instanceId, turn);
+    if (!restored.ok) return restored;
+    journal = syncQuestJournal(draft);
+    reference = findQuestReference(draft, restored.id);
+    recovered = true;
+  }
+  if (!reference.ok) return reference;
+  const id = reference.id;
   const entry = journal.entries[id];
   const quote = String(args.actionQuote || "").trim();
   let evidence = String(args.evidence || "").trim();
@@ -41,15 +54,29 @@ export function resolveQuestAction(game, args, action, turn) {
   if (entry.source === "quest" && draft.quests.find(item => item.id === entry.questId)?.source === "特殊行动") return { ok: false, reason: "此委托由特殊行动引擎结算，请在特殊行动内选择处理方式" };
   if (quote.length < 2 || !String(action || "").includes(quote)) return { ok: false, reason: "任务判断必须引用玩家本轮真实行动" };
   if (evidence.length < 4) return { ok: false, reason: "必须提供当前行动的具体结果或受阻原因" };
-  if (!["progress", "blocked", "failed", "recover"].includes(args.outcome)) return { ok: false, reason: "无效的任务行动结果" };
-  if (entry.source === "quest" && ["progress", "recover"].includes(args.outcome) && /不要|不想|不愿|不再|拒绝|取消|放弃|暂不|先不|是否|能否|如果|假如/.test(quote)) return { ok: false, reason: "否定、取消、假设或询问意图不能当作普通任务行动已经完成" };
+  if (!["progress", "blocked", "failed", "recover", "claim"].includes(args.outcome)) return { ok: false, reason: "无效的任务行动结果" };
+  if (entry.source === "quest" && ["progress", "recover", "claim"].includes(args.outcome) && /不要|不想|不愿|不再|拒绝|取消|放弃|暂不|先不|是否|能否|如果|假如/.test(action)) return { ok: false, reason: "否定、取消、假设或询问意图不能当作普通任务行动已经完成" };
+  if (args.outcome === "claim" && !isRewardClaimAction(action)) return { ok: false, reason: "领取报酬须由玩家实际交差或领奖触发" };
+  if (recovered && args.outcome === "progress" && !args.steps?.length) {
+    Object.assign(game, draft);
+    return { ok: true, outcome: "planned", completedSteps: [], taskMinutes: 5, questAttempt: { id, stage: entry.stage, outcome: "planned", evidence: "已根据原始记录恢复委托，保留已核验进度与约定报酬" } };
+  }
+  if (args.outcome === "claim" && entry.source === "trigger") {
+    if (entry.status === "completed") {
+      const result = reconcileFixedQuestReward(draft, reference.instance, turn);
+      if (result.ok) Object.assign(game, draft);
+      return result;
+    }
+    return { ok: false, reason: "预设支线须完成任务簿中的交付或收尾目标；奖励随该目标自动结算，请使用progress和当前objectiveId" };
+  }
   if (entry.status === "available") {
     if (!args.start || /不要|不想|不愿|不再|拒绝|是否|能否|如果|假如|路过|休息|睡觉/.test(quote)) return { ok: false, reason: "尚未明确开始追查，不能自动接取任务" };
     const engagement = entry.source === "quest" ? acceptOrdinaryQuest(draft, draft.quests.find(quest => quest.id === entry.questId), turn) : engageTrigger(draft, id, turn, quote);
     if (!engagement.ok) return engagement;
-  } else if (entry.status !== "engaged") return { ok: false, reason: "任务已经结束，不能重复推进或重新发奖" };
+  } else if (entry.status !== "engaged" && !(args.outcome === "claim" && entry.status === "completed")) return { ok: false, reason: "任务已经结束，不能重复推进或重新发奖" };
   let outcome = args.outcome;
   let taskMinutes;
+  let rewardSettlement;
   const completedSteps = [];
   const inventoryChanges = [];
   let blockedReason = "";
@@ -82,7 +109,7 @@ export function resolveQuestAction(game, args, action, turn) {
     taskMinutes = recovery.taskMinutes;
     evidence = recovery.questAttempt.evidence;
     outcome = "progress";
-  } else if (outcome === "progress") {
+  } else if (["progress", "claim"].includes(outcome)) {
     if (entry.source === "quest") {
       const quest = draft.quests.find(item => item.id === entry.questId);
       const result = resolveOrdinaryQuest(draft, quest, args, action, turn);
@@ -90,6 +117,7 @@ export function resolveQuestAction(game, args, action, turn) {
       completedSteps.push(...result.completedSteps);
       taskMinutes = result.taskMinutes;
       outcome = result.outcome;
+      rewardSettlement = result.rewardSettlement;
       inventoryChanges.push(...(result.inventoryChanges || []));
     } else {
       if (!Array.isArray(args.steps) || !args.steps.length || args.steps.length > 3) return { ok: false, reason: "每次必须提交一至三个实际完成的连续目标" };
@@ -106,6 +134,7 @@ export function resolveQuestAction(game, args, action, turn) {
   syncQuestJournal(draft);
   Object.assign(game, draft);
   return { ok: true, outcome, completedSteps, blockedReason, taskMinutes: taskMinutes || undefined,
+    ...(rewardSettlement ? { rewardSettlement } : {}),
     ...(inventoryChanges.length ? { inventoryChanges, inventoryChange: inventoryChanges[0] } : {}),
     questAttempt: { id, stage: entry.stage, outcome, localProgress: completedSteps.some(step => step.questAttempt?.localProgress), evidence: blockedReason || evidence },
   };

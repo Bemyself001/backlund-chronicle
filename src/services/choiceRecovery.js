@@ -2,6 +2,7 @@ import { requestAI } from "./api.js";
 import { abortable, throwIfAborted } from "./cancellation.js";
 import { buildChoiceRegenerationContext } from "./memory.js";
 import { choiceResult, choiceValidationError, hasValidModelChoices, mergeChoiceResponses, modelChoices } from "./choices.js";
+import { markNarrativeEventsDelivered } from "./narrativeEvents.js";
 
 // A bounded, choice-only recovery. Errors must not undo an already settled turn.
 export async function recoverChoices({ game, action, narrative, prompt, settings, signal, initialResponse,
@@ -48,5 +49,6 @@ export async function recoverChoices({ game, action, narrative, prompt, settings
 // Apply a delayed response only to the turn it belongs to, preserving later metadata changes.
 export function applyChoiceRecovery(current, target, response) {
   if (!current || current.id !== target.id || current.turn !== target.turn) return current;
-  return { ...current, choices: response.choices, choiceMeta: response.choiceMeta };
+  const next = { ...current, choices: response.choices, choiceMeta: response.choiceMeta };
+  return current.questFocus?.id ? markNarrativeEventsDelivered(next, [], { action: "" }) : next;
 }

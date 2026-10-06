@@ -3,8 +3,10 @@ import { processTriggers } from "./triggerEngine.js";
 import { timedAction } from "./restTime.js";
 import { advanceWorldTime } from "./worldTime.js";
 import { settleInnRest } from "./recovery.js";
-import { resolveSelectedQuestRoute } from "./questActions.js";
+import { resolveSelectedQuestRoute, resolveQuestAction } from "./questActions.js";
+import { isRewardClaimAction } from "./questLifecycle.js";
 import { settleHealthEffects } from "./healthEffects.js";
+import { chooseQuestFocus } from "./questFocus.js";
 
 export { advanceWorldTime } from "./worldTime.js";
 
@@ -66,6 +68,13 @@ export function occultEntryForTurn(game, nextTurn) {
 
 export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], toolResults = [], options = {}) {
   const timing = timedAction(action, game.worldTime);
+  const focus = chooseQuestFocus(game, action, toolCalls, toolResults);
+  let rewardClaimed = false;
+  const pending = game.quests?.find(quest => `quest:${quest.id}` === focus?.id && quest.stage === "awaiting-reward");
+  if (pending && isRewardClaimAction(action)) {
+    const payment = resolveQuestAction(game, { instanceId: focus.id, actionQuote: action, evidence: "玩家向委托人领取已登记的约定报酬", outcome: "claim" }, action, Number(game.turn || 0) + 1);
+    if (payment.ok) { toolResults = [...toolResults, { ok: true, data: payment }]; rewardClaimed = true; }
+  }
   // Execute the player's exact local route even when the AI omitted quest.resolve.
   const recovery = resolveSelectedQuestRoute(game, action, Number(game.turn || 0) + 1);
   if (recovery) toolResults = [...toolResults, { ok: recovery.ok, data: recovery }];
@@ -83,6 +92,7 @@ export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], 
   const worldTime = advanceWorldTime(game.worldTime, elapsedMinutes);
   game.worldTime = worldTime;
   const triggerProgress = processTriggers(game, { action, toolCalls, toolResults, turn: nextTurn, travelOnly: Boolean(options.travelOnly) });
+  game.questFocus = chooseQuestFocus(game, action, toolCalls, toolResults) || (rewardClaimed ? focus : null);
   // Promotion recovery is the final stat settlement of this turn; ongoing effects remain.
   const advancementRecovery = successfulTool(toolCalls, toolResults, call => call.name === "advancement.promote")
     ? ["health", "sanity"].map(stat => {
@@ -95,6 +105,8 @@ export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], 
   }
   const occultEntry = triggerProgress.occultEntry ? { id: triggerProgress.occultEntry.instanceId, turn: triggerProgress.occultEntry.createdTurn, ...triggerProgress.occultEntry.presentation } : null;
   return {
+    playerAction: action,
+    questRewardSettlements: toolResults.filter(result => result.ok && result.data?.rewardSettlement).map(result => result.data.rewardSettlement),
     elapsedMinutes,
     timedAction: timing ? {
       ...timing,

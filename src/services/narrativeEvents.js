@@ -1,6 +1,9 @@
 import { triggerGuidance } from "../engine/triggerGuidance.js";
-import { questJournalEvents } from "../engine/questRuntime.js";
+import { questJournalEvents, visibleQuestJournal } from "../engine/questRuntime.js";
+import { normalizeChoices } from "./choices.js";
+import { questNameAliases } from "../engine/questIdentity.js";
 import { RENARD_TREATMENT_SCENES } from "../content/index.js";
+import { appointmentAttendanceAction, triggerAppointment } from "../engine/triggerAppointments.js";
 
 export function appendFixedRenardTreatmentScene(narrative, progress) {
   const completed = progress?.triggerEvents?.completed?.find(event => event.definitionId === "side.queens.renard-fall"
@@ -17,9 +20,25 @@ export function pendingWatchNarration(game) {
   return narrativeEventsForTurn([{ kind: 'fact.discovered', factId: 'watch.note-recovered' }]);
 }
 
-export function pendingQuestNarration(game, terminalEvents = []) {
+export function pendingQuestNarration(game, terminalEvents = [], options = {}) {
   if (!game) return [];
   const events = pendingWatchNarration(game);
+  for (const instance of game.triggerState?.active || []) {
+    if (instance.definitionId !== "side.queens.renard-fall" || instance.status !== "engaged" || instance.stage !== "secure-treatment") continue;
+    const appointment = triggerAppointment(game, instance);
+    if (!appointment) continue;
+    const id = `renard-auction-ready:${instance.instanceId}:8`;
+    if (game.narrativeEventsDelivered?.[id]) continue;
+    events.push({ id, instanceId: instance.instanceId, triggerDefinitionId: instance.definitionId, title: "高窗之下 · 拍卖会通知",
+      direction: `雷纳德子爵的引荐通知已经交给玩家，无须再等来信。${appointment.text}`,
+      narrativeCue: `在剧情正文自然交代通知内容，明确拍卖会在收到通知的第二天举行，写出固定日期及20:00的开场时间：${appointment.startsAt}；不要写成收到通知就马上开场，也不要把旧通知日期推迟。玩家可以等待赴会，也可以选择其他救治办法，不替玩家入场或购买。`,
+      choices: [
+        { label: appointmentAttendanceAction(appointment, "高窗之下"), intent: "investigate", risk: "low" },
+        { label: "向雷纳德子爵询问拍卖会中寻求药师合作的办法", intent: "talk", risk: "low" },
+        { label: "暂时不参加拍卖会，考虑其他救治办法", intent: "redirect", risk: "low" },
+      ],
+    });
+  }
   const instances = [
     ...(game.triggerState?.active || []).filter(entry => ['available', 'engaged'].includes(entry.status)),
     ...terminalEvents,
@@ -48,13 +67,30 @@ export function pendingQuestNarration(game, terminalEvents = []) {
       if (journalEvent.direction && journalEvent.direction !== existing.direction) existing.direction = [existing.direction || existing.routes?.map(route => `${route.name}：${route.purpose}`).join('；'), journalEvent.direction].filter(Boolean).join('\n');
     }
   }
-  return events;
+  if (options.action === undefined) return events;
+  const changed = new Set(options.changedIds || []);
+  return events.filter(event => (event.questId || event.instanceId) === game.questFocus?.id
+    || changed.has(event.questId || event.instanceId)
+    || event.timers?.some(timer => timer.remaining <= 3)
+    || event.id === "watch.investigation-routes" && /怀表|纸条/.test(options.action));
 }
 
-export function markNarrativeEventsDelivered(game, events) {
-  const choices = events.find(event => event.choices?.length === 3)?.choices;
+export function markNarrativeEventsDelivered(game, events, options = {}) {
+  const scoped = options.action !== undefined;
+  const focusId = game.questFocus?.id;
+  const focused = focusId && (events.find(event => (event.questId || event.instanceId) === focusId && event.choices?.length === 3)
+    || questJournalEvents({ ...game, narrativeEventsDelivered: {} }).find(event => event.questId === focusId));
+  const eventChoices = (scoped ? focused : events.find(event => event.choices?.length === 3))?.choices;
+  let choices = eventChoices;
+  if (scoped && eventChoices) {
+    const otherTitles = visibleQuestJournal(game).filter(entry => entry.id !== focusId).flatMap(entry => questNameAliases(entry.title));
+    const current = normalizeChoices(game.choices).filter(choice => !otherTitles.some(title => choice.label.includes(title)));
+    // Keep scene-specific model actions, but reserve one executable continuation
+    // for the task the player just handled. Background events cannot take over.
+    choices = normalizeChoices([eventChoices[0], ...current, ...eventChoices.slice(1)]);
+  }
   return { ...game,
-    ...(choices ? { choices: structuredClone(choices), choiceMeta: { source: "story-event", fallback: false, reason: "", attempts: [] } } : {}),
+    ...(choices ? { choices: structuredClone(choices), choiceMeta: { source: "story-event", questId: focusId || null, fallback: false, reason: "", attempts: [] } } : {}),
     narrativeEventsDelivered: { ...game.narrativeEventsDelivered, ...Object.fromEntries(events.flatMap(event => [event.id, ...(event.deliveryIds || [])].map(id => [id, true]))) },
   };
 }

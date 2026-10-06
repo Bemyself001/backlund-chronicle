@@ -40,6 +40,7 @@ import { exploreHex } from "./system/hexworld.js";
 import { ensureRequestedAdvancementToolCall } from "./services/advancement.js";
 import { finalizeFastPresentation, launchFastModeTasks, throwIfFastTaskAborted } from "./services/fastMode.js";
 import { repairToolCallsConcurrently } from "./services/toolRepair.js";
+import { chooseQuestFocus } from "./engine/questFocus.js";
 import { prayerAvailability, settlePrayer } from "./engine/prayer.js";
 import { generatePrayer } from "./services/prayer.js";
 import { actionRequest, retryRequest } from "./services/actionRequest.js";
@@ -450,7 +451,7 @@ export default function App() {
       const availableTrigger = progress.newTrigger?.presentation
         || progress.triggerState?.active?.filter((item) => item.status === "available").sort((left, right) => right.createdTurn - left.createdTurn)[0]?.presentation
         || (progress.occult?.entryAvailable ? progress.occult.currentEntry : null);
-      const nextChoices = choices.length === 3
+      const nextChoices = choices.length === 3 && !resolvedGame.questFocus?.id
         ? injectOccultEntryChoice(choices, availableTrigger)
         : choices;
       const memoryPlan = computeMemoryUpdate(execution.game, action, occultNarrative, resolution, { settledGame: resolvedGame });
@@ -463,7 +464,7 @@ export default function App() {
         lastTurnBaseline: auditBaseline,
         lastTurnAudit: automaticAudit,
         lastTurnMetrics: finishTurnMetrics(metrics),
-      }, resolution.derivedEffects.narrativeEvents);
+      }, resolution.derivedEffects.narrativeEvents, { action });
       if (controller.signal.aborted) throw new DOMException("请求已中止", "AbortError");
       resetStreamPreview(); commitGame(next);
       // Narrative and settlement are durable before any optional suggestion request.
@@ -514,7 +515,7 @@ export default function App() {
         choices: injectOccultEntryChoice(game.choices, trigger),
         changeLog: [...game.changeLog, ...progress.statusTickLogs, { id: makeId("log"), turn: next.turn, text: `向${available.church.deity}祷告：理智恢复 ${sanityRecovered} 点，灵性恢复 ${recovered} 点。`, tone: "success" }].slice(-100),
         lastTurnBaseline: baseline, lastTurnAudit: auditTurnChanges(baseline, next), lastTurnMetrics: null,
-      }, resolution.derivedEffects.narrativeEvents));
+      }, resolution.derivedEffects.narrativeEvents, { action }));
       prayerRetryRef.current = null;
       return true;
     } catch (err) {
@@ -585,7 +586,8 @@ export default function App() {
       commitGame({ ...settled, ...memory.updates });
       return;
     }
-    const events = pendingQuestNarration(next);
+    const focusedInspection = { ...settled, questFocus: chooseQuestFocus(next, reason) };
+    const events = pendingQuestNarration(focusedInspection, [], { action: reason });
     busyRef.current = true; setLoading(true); setTurnPhase("finalizing"); setError(""); resetStreamPreview();
     const controller = new AbortController(); controllerRef.current = controller;
     const timer = setTimeout(() => controller.abort(), 150000);
@@ -595,7 +597,7 @@ export default function App() {
       if (controller.signal.aborted) throw new DOMException("已取消", "AbortError");
       if (!response.hasNarrative) throw new Error("模型没有返回剧情正文");
       const memory = computeMemoryUpdate({ ...settled, turn: settled.turn - 1 }, reason, response.narrative, resolution, { settledGame: settled });
-      commitGame({ ...markNarrativeEventsDelivered(settled, events), ...memory.updates });
+      commitGame({ ...markNarrativeEventsDelivered(focusedInspection, events, { action: reason }), ...memory.updates });
     } catch (err) {
       const fallback = computeMemoryUpdate({ ...settled, turn: settled.turn - 1 }, reason, inspection.observation, resolution, { settledGame: settled });
       commitGame({ ...settled, ...fallback.updates });

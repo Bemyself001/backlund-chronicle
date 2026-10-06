@@ -12,7 +12,7 @@ export const QUEST_INPUT_SCHEMA = { type: "object", required: ["id", "title", "s
   status: { type: "string", enum: ["available", "engaged"] }, kind: { type: "string", enum: ["random", "side", "main"] },
   locationId: { type: "string" }, deadlineTurns: { type: "integer", minimum: 1 }, finale: { type: "boolean" }, dangerous: { type: "boolean" }, majorDecision: { type: "boolean" },
   contract: { type: "object", properties: {
-    coreGoal: { type: "string" }, nodes: { type: "array", maxItems: 5, items: { type: "object", required: ["id", "objective", "conditions"], properties: {
+    coreGoal: { type: "string" }, rewardClaim: { type: "object", required: ["objective", "locationId"], properties: { objective: { type: "string" }, locationId: { type: "string" } }, description: "仅在原约定要求返回交差时填写；目标完成后保留待领奖，玩家领取后再归档。不填则完成时自动发放。" }, nodes: { type: "array", maxItems: 5, items: { type: "object", required: ["id", "objective", "conditions"], properties: {
       id: { type: "string" }, objective: { type: "string" }, conditions, minutes: { type: "integer", minimum: 5 },
       dangerous: { type: "boolean" }, majorDecision: { type: "boolean" }, obstacle: { type: "boolean" }, errandDepth: { type: "integer", minimum: 0, maximum: 1 },
       cost: { type: "object", properties: { amountPence: { type: "integer", minimum: 0 }, itemId: { type: "string" }, quantity: { type: "integer", minimum: 1 } }, description: "本步骤实际支付/交付，原子扣除并记录永久任务凭证；不要再另调money.remove或inventory.remove重复扣除" },
@@ -21,8 +21,14 @@ export const QUEST_INPUT_SCHEMA = { type: "object", required: ["id", "title", "s
   } },
 } };
 export const QUEST_RESOLVE_PROPERTIES = {
-  instanceId: { type: "string" }, actionQuote: { type: "string" }, evidence: { type: "string" }, start: { type: "boolean" },
-  outcome: { type: "string", enum: ["progress", "blocked", "failed", "recover"] },
+  recovery: { type: "object", required: ["quest", "agreement", "acceptance"], properties: {
+    quest: QUEST_INPUT_SCHEMA,
+    agreement: { type: "object", required: ["turn", "quote"], properties: { turn: { type: "integer" }, quote: { type: "string" } }, description: "原始assistant委托原话，包含逐字核心目标与约定报酬" },
+    acceptance: { type: "object", required: ["turn", "quote"], properties: { turn: { type: "integer" }, quote: { type: "string" } }, description: "历史user明确接取原话" },
+    completedSteps: { type: "array", maxItems: 5, items: { type: "object", required: ["objectiveId", "turn", "actionQuote", "resultQuote"], properties: { objectiveId: { type: "string" }, turn: { type: "integer" }, actionQuote: { type: "string" }, resultQuote: { type: "string" } } } },
+  }, description: "仅恢复漏登记的历史普通委托。原文逐字核验，已完成步骤须有历史行动、结果和当前本地条件；不能用来绕过固定支线或重复领取。" },
+  instanceId: { type: "string", description: "复制taskJournal.id；普通任务是quest:原ID，固定任务使用实例ID。不要自行编造或用阶段ID。" }, actionQuote: { type: "string" }, evidence: { type: "string" }, start: { type: "boolean" },
+  outcome: { type: "string", enum: ["progress", "blocked", "failed", "recover", "claim"] },
   steps: { type: "array", maxItems: 3, items: { type: "object", required: ["objectiveId"], properties: {
     objectiveId: { type: "string" }, actionQuote: { type: "string" }, evidence: { type: "string" },
   } } },

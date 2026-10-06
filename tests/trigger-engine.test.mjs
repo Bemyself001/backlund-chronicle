@@ -217,7 +217,7 @@ test("Renard's daughter supports apothecary, shared-fee, and healing-draught out
     const before = moneyToPence(game.money);
 
     if (scenario.objective === "shared") {
-      for (const [turn, objectiveId, action] of [[4, "attend-renard-auction", "参加拍卖会"], [5, "meet-edmund", "与药师交谈"], [6, "recruit-apothecary", "与药师合作"]]) {
+      for (const [turn, objectiveId, action] of [[4, "attend-renard-auction", "等待至约定开场后参加拍卖会"], [5, "meet-edmund", "与药师交谈"], [6, "recruit-apothecary", "与药师合作"]]) {
         ({ game } = processTurn(game, turn, action, [{ id: `renard-${objectiveId}`, name: "trigger.progress", args: { instanceId: quest.instanceId, objectiveId, evidence: "实际完成现场交谈和下一步安排" }, reason: "推进求医" }]));
       }
       ({ game } = processTurn(game, 7, scenario.action, [{ id: "renard-shared", name: "trigger.progress", args: { instanceId: quest.instanceId, objectiveId: "complete-shared-treatment", evidence: "两人合作稳定伤势并完成治疗" }, reason: "治疗完成" }]));

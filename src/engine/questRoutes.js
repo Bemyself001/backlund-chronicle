@@ -4,6 +4,7 @@ import { renderContentData } from "./contentTemplates.js";
 import { getMapLocation } from "../system/map.js";
 import { travelToLocation } from "../system/hexworld.js";
 import { ordinaryQuestInspection } from "./questLifecycle.js";
+import { appointmentAttendanceAction, triggerAppointment } from "./triggerAppointments.js";
 
 const locationConditions = (conditions, context) => conditions.flatMap(condition => condition.not || conditionMatches(condition, context) ? [] : condition.type === "location" ? [condition] : locationConditions(condition.conditions || [], context));
 
@@ -12,6 +13,13 @@ export function inspectQuestRoutes(game, entry) {
   if (entry.source === "quest" && entry.status === "engaged") {
     const quest = game.quests?.find(item => item.id === entry.questId);
     if (!quest || quest.source === "特殊行动") return { routes: [], blockers: [] };
+    if (quest.stage === "awaiting-reward") {
+      const destination = quest.lifecycle?.contract?.rewardClaim?.locationId;
+      if (!destination || conditionMatches({ type: "location", locationId: destination, includeChildren: true }, { game })) return { routes: [{ objectiveId: "claim-reward", label: `领取「${entry.title}」的约定报酬`, description: entry.objective, automatic: true, costMinutes: 5 }], blockers: [] };
+      const location = getMapLocation(destination, game);
+      const travel = location && game.discoveredLocations?.some(item => item.id === destination) && travelToLocation(structuredClone(game), destination);
+      return { routes: travel ? [{ locationId: destination, label: `返回${location.name}，向「${entry.title}」的委托人交差`, description: entry.objective, automatic: true, costMinutes: Math.max(1, travel.minutes) }] : [], blockers: ["目标已完成，报酬已保留，请返回约定交差地点领取"] };
+    }
     const current = ordinaryQuestInspection(game, quest);
     if (!current.node) return { routes: [], blockers: ["这条旧任务尚未登记可本地验证的完成契约"] };
     if (current.requiresInvestigation) return { routes: [], blockers: current.blockers };
@@ -38,9 +46,10 @@ export function inspectQuestRoutes(game, entry) {
   const routes = [], blockers = [];
   for (const transition of stage?.transitions || []) {
     if (!transition.objectiveId) continue;
+    const appointment = transition.appointmentId ? triggerAppointment(game, instance) : null;
     const description = renderContentData(entry.policy.isolated ? entry.objective : transition.description || stage.guidance || entry.objective, { game });
     const label = `处理「${entry.title}」：${description}`;
-    const routeAction = transition.actionTerms?.length ? `${label}（${transition.actionTerms[0]}）` : label;
+    const routeAction = appointment ? appointmentAttendanceAction(appointment, entry.title) : transition.actionTerms?.length ? `${label}（${transition.actionTerms[0]}）` : label;
     const context = { game, state: game.triggerState, instance, action: routeAction, signals: [], turn: Number(game.turn || 0) + 1 };
     if (!allConditionsMatch([...(transition.when || []), ...(transition.requirements || [])], context)) {
       blockers.push(transition.requirementMessage || "这条分支的必要条件尚未满足，请先按当前目标取得条件");
@@ -61,7 +70,7 @@ export function inspectQuestRoutes(game, entry) {
     routes.push({ objectiveId: transition.objectiveId, label: routeAction, description,
       action: routeAction, failure: Boolean(transition.fail),
       automatic: entry.policy.canRecover && !transition.fail,
-      costMinutes: Math.max(20, Number(transition.elapsedMinutes || 0)),
+      costMinutes: appointment ? appointment.remainingMinutes + Number(transition.elapsedMinutes || 0) : Math.max(20, Number(transition.elapsedMinutes || 0)),
     });
   }
   return { routes, blockers: routes.some(route => route.objectiveId && !route.failure) ? [] : [...new Set(blockers)] };

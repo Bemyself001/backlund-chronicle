@@ -42,6 +42,79 @@ test("the river is a continuous west-to-east chain with bends and never randomiz
   }
 });
 
+test("southwest belongs to South Bridge and southeast St George faces the docks across the river", () => {
+  const warehouse = getMapLocation("bridge-docks"), church = getMapLocation("machinery-heart");
+  assert.ok(warehouse.x < 50 && warehouse.y > 50);
+  assert.ok(church.x > 50 && church.y > 50);
+  assert.equal(districtAt({ q: 0, r: 4 }), "大桥南区", "the south bridge landing remains in South Bridge");
+  for (const [q, r] of CITY_GEOGRAPHY.river.cells.filter(([q]) => q >= 3 && q <= 9)) {
+    assert.equal(districtAt({ q, r: r - 1 }), "码头区");
+    assert.equal(districtAt({ q, r: r + 1 }), "圣乔治区");
+  }
+  const route = findTravelRoute("dock-workers-square", church.id, [church.id]);
+  assert.deepEqual(route.crossings, ["贝克兰德大桥"]);
+  assert.ok(route.grids > hexDistance(getMapLocation("dock-workers-square"), church));
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "南岸方位", startingDistrict: "圣乔治区" });
+  assert.deepEqual(game.world.player, { q: church.q, r: church.r });
+  assert.match(hexContext(game), /大桥南区位于西南侧，圣乔治区位于东南侧，与北岸码头区隔塔索克河相望/);
+});
+
+test("version-two south-bank saves relocate registered sites and interiors without moving northern sites or replaying progress", () => {
+  const oldHexes = { "bridge-docks": { q: 3, r: 5 }, "machinery-heart": { q: -3, r: 7 } };
+  for (const currentId of ["bridge-docks", "machinery-heart", "old-south-store", "old-church-office"]) {
+    const raw = createInitialGame({ ...EMPTY_CHARACTER, name: "旧南岸" });
+    raw.turn = 12; raw.content.contentVersion = "2026.10.06.2";
+    raw.world.geographyVersion = 2;
+    raw.mapExtensions = { geographyVersion: 2, locations: [
+      { id: "old-south-store", name: "大桥南区·旧商店", district: "大桥南区", scope: "landmark", anchorId: "bridge-docks", q: 4, r: 5 },
+      { id: "old-church-office", name: "圣乔治区·教堂办公室", district: "圣乔治区", scope: "interior", anchorId: "machinery-heart", q: -3, r: 7 },
+      { id: "north-bookshop", name: "乔伍德区·旧书店", district: "乔伍德区", scope: "landmark", anchorId: "queen-library", q: 2, r: -1 },
+      { id: "east-workshop", name: "东区·跨区工坊", district: "东区", scope: "landmark", anchorId: "machinery-heart", q: 5, r: -3 },
+    ], routes: [{ from: "bridge-docks", to: "old-south-store", minutes: 7 }, { from: "machinery-heart", to: "old-church-office", minutes: 3 }, { from: "machinery-heart", to: "east-workshop", minutes: 40 }] };
+    for (const [id, hex] of Object.entries(oldHexes)) {
+      raw.world.tiles[cellKey(hex)] = { terrain: "plain", locationId: id, name: getMapLocation(id).name, discovered: true };
+    }
+    const current = raw.mapExtensions.locations.find(location => location.id === currentId) || { ...getMapLocation(currentId), ...oldHexes[currentId] };
+    raw.location = { id: currentId, name: current.name, district: current.district, q: current.q, r: current.r };
+    raw.world.player = { q: current.q, r: current.r };
+    raw.locationKnowledge["old-south-store"] = { status: "visited", note: "已经核对店铺门牌" };
+    raw.triggerState.active.push({ instanceId: "ongoing-renard", definitionId: "side.queens.renard-fall", status: "engaged", stage: "auction-conversation", createdTurn: 3, engagedTurn: 4, stageHistory: [] });
+    const before = structuredClone(raw);
+    const loaded = migrateSave(raw);
+    const destination = getMapLocation(currentId, loaded);
+    assert.deepEqual(loaded.world.player, { q: destination.q, r: destination.r });
+    assert.equal(districtAt(loaded.world.player), destination.district);
+    assert.equal(cellKey(getMapLocation("old-church-office", loaded)), cellKey(getMapLocation("machinery-heart")));
+    assert.equal(cellKey(getMapLocation("north-bookshop", loaded)), "2,-1");
+    assert.equal(cellKey(getMapLocation("east-workshop", loaded)), "5,-3");
+    assert.equal(getMapLocation("east-workshop", loaded).district, "东区");
+    assert.equal(loaded.locationKnowledge["old-south-store"].status, "visited");
+    assert.equal(loaded.triggerState.active.find(entry => entry.instanceId === "ongoing-renard").stage, "auction-conversation");
+    for (const id of Object.keys(oldHexes)) {
+      assert.equal(Object.values(loaded.world.tiles).filter(tile => tile.locationId === id).length, 1);
+      assert.equal(loaded.world.tiles[cellKey(getMapLocation(id))].locationId, id);
+    }
+    for (const field of ["turn", "worldTime", "money", "inventory", "storyHistory"]) assert.deepEqual(loaded[field], before[field], field);
+    assert.deepEqual(raw, before, "migration never mutates the source save");
+    const again = migrateSave(structuredClone(loaded));
+    assert.deepEqual(again.world, loaded.world); assert.deepEqual(again.mapExtensions, loaded.mapExtensions);
+  }
+});
+
+test("ordinary explored south-bank streets retain their coordinates and refresh their district", () => {
+  for (const [hex, previousDistrict, district] of [[{ q: -4, r: 8 }, "圣乔治区", "大桥南区"], [{ q: 4, r: 5 }, "大桥南区", "圣乔治区"]]) {
+    const raw = createInitialGame({ ...EMPTY_CHARACTER, name: "旧街道" });
+    raw.content.contentVersion = "2026.10.06.2"; raw.world.geographyVersion = 2;
+    raw.location = { id: `hex:${cellKey(hex)}`, name: "未登记的街区", district: `贝克兰德${previousDistrict}`, ...hex };
+    raw.world.player = hex;
+    const loaded = migrateSave(raw);
+    assert.deepEqual(loaded.world.player, hex);
+    assert.equal(loaded.location.district, `贝克兰德${district}`);
+    assert.equal(loaded.world.tiles[cellKey(hex)].district, district);
+    assert.deepEqual(migrateSave(loaded).world, loaded.world);
+  }
+});
+
 test("cross-river preview and settlement use the same bridge route without water shortcuts", () => {
   const game = createInitialGame({ ...EMPTY_CHARACTER, name: "过桥", startingDistrict: "码头区" });
   const target = getMapLocation("bridge-docks");

@@ -18,6 +18,7 @@ import { questStagePolicy, settleQuestAttempts, syncQuestJournal } from "./quest
 import { getMapLocation, normalizeLocationKnowledge } from "../system/map.js";
 import { RENARD_AUCTION_MEDICINE } from "../content/index.js";
 import { migrateQuestLifecycle } from "./questLifecycle.js";
+import { appointmentTransitionTiming, ensureTriggerAppointments } from "./triggerAppointments.js";
 
 function definitionEligible(definition, context) {
   if (!allConditionsMatch(definition.eligibility || [], context)) return false;
@@ -331,6 +332,7 @@ export function processTriggers(game, { action = "", toolCalls = [], toolResults
     events.available.push(structuredClone(instance));
   }
   syncLegacyOccult(game, state);
+  ensureTriggerAppointments(game);
   settleQuestAttempts(game, toolCalls, toolResults, turn, action);
   return { state, signals, events, newTrigger: events.available[0] || null, occultEntry: events.available.find((entry) => entry.category === "occult-entry") || null };
 }
@@ -387,15 +389,18 @@ export function progressTrigger(game, instanceId, objectiveId, turn, action = ""
   if (String(evidence || "").trim().length < 4) return { ok: false, reason: "任务推进必须说明本轮已经确认的证据或结果" };
   const context = { game, state, signals: [], action, turn, instance };
   if (!allConditionsMatch([...(transition.when || []), ...(transition.requirements || [])], context)) return { ok: false, reason: transition.requirementMessage || "本地状态尚不满足这条任务分支" };
+  if (transition.appointmentId) ensureTriggerAppointments(game);
+  const appointmentTiming = appointmentTransitionTiming(game, instance, transition, action);
+  if (appointmentTiming && !appointmentTiming.ok) return appointmentTiming;
   instance.progressTurn = turn;
   return {
     ok: true,
     instance,
     transition,
-    elapsedMinutes: transition.elapsedMinutes || (transition.untilHour != null ? Math.max(5, Number(transition.untilHour) * 60 - (() => {
+    elapsedMinutes: appointmentTiming?.elapsedMinutes ?? (transition.elapsedMinutes || (transition.untilHour != null ? Math.max(5, Number(transition.untilHour) * 60 - (() => {
       const match = String(game.worldTime || "").match(/·\s*(\d{1,2}):(\d{2})\s*$/);
       return match ? Number(match[1]) * 60 + Number(match[2]) : Number(transition.untilHour) * 60;
-    })()) : undefined),
+    })()) : undefined)),
     signal: {
       id: `signal:${turn}:trigger-progress:${instanceId}:${objectiveId}`,
       kind: "trigger.progress",

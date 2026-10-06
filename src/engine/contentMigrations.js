@@ -3,6 +3,7 @@ import { getTriggerDefinition, hydrateActiveTriggerDefinitions } from "./trigger
 import { allConditionsMatch } from "./triggerConditions.js";
 import { renderContentData } from "./contentTemplates.js";
 import { getMapLocation, normalizeLocationKnowledge } from "../system/map.js";
+import { ensureTriggerAppointments } from "./triggerAppointments.js";
 
 function refreshDefinitions(game, step) {
   const state = game.triggerState;
@@ -136,6 +137,7 @@ export function migrateContentState(game) {
   }
   for (const step of path) applyMigrationStep(game, step);
   hydrateActiveTriggerDefinitions(game.triggerState);
+  ensureTriggerAppointments(game);
   game.content = { packId: ACTIVE_CONTENT.id, schemaVersion: CONTENT_SCHEMA_VERSION, contentVersion: CONTENT_VERSION };
   return { migrated: path.length > 0, reason: path.length ? "migrated" : "current", content: game.content };
 }

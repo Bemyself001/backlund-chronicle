@@ -1,6 +1,6 @@
 import { allConditionsMatch, conditionMatches } from "./triggerConditions.js";
 import { moneyFromPence, moneyToPence } from "../system/money.js";
-import { getTriggerDefinition } from "./triggerDefinitions.js";
+import { getTriggerDefinition, TRIGGER_DEFINITIONS } from "./triggerDefinitions.js";
 import { playerVisibleItem } from "../system/items.js";
 
 export const QUEST_LIFECYCLE_VERSION = 1;
@@ -66,7 +66,31 @@ function freezeContract(quest) {
     conditions: [{ type: "action", terms: [coreGoal] }, ...(quest.locationId || quest.destinationId ? [{ type: "location", locationId: quest.locationId || quest.destinationId }] : [])], minutes: 10 }];
   return { version: 1, kind, coreGoal, requiresInvestigation,
     nodes, completionConditions: structuredClone(supplied.completionConditions || []), failureConditions: structuredClone(supplied.failureConditions || []),
-    rewards: structuredClone(supplied.rewards || []), maxNodes: limits[kind].nodes, maxObstacles: limits[kind].obstacles, maxErrandDepth: 1 };
+    rewards: structuredClone(supplied.rewards || []), rewardClaim: supplied.rewardClaim ? structuredClone(supplied.rewardClaim) : null,
+    maxNodes: limits[kind].nodes, maxObstacles: limits[kind].obstacles, maxErrandDepth: 1 };
+}
+
+export const isRewardClaimAction = action => /领取|领奖|报酬|酬金|结算|交差/.test(action) && !/不要|不想|不愿|拒绝|暂不|不再|不领取|是否|能否|如果|假如/.test(action);
+
+export function settleQuestReward(game, quest, action, turn) {
+  const lifecycle = quest.lifecycle, contract = lifecycle?.contract;
+  if (lifecycle?.rewardsClaimed) return { ok: true, outcome: "claimed", completedSteps: [], taskMinutes: 5,
+    rewardSettlement: { questId: `quest:${quest.id}`, alreadyClaimed: true, amountPence: lifecycle.rewardReceipt?.amountPence || 0 } };
+  if (Number(game.character?.stats?.health) <= 0) return { ok: false, reason: "生命归零，不能领取任务报酬" };
+  if (!contract?.nodes.length || !contract.nodes.every(node => lifecycle.completedNodeIds.includes(node.id)) || !Number.isInteger(lifecycle.objectivesCompletedTurn)) return { ok: false, reason: "任务尚未完成约定目标，不能直接领取报酬" };
+  const claim = contract.rewardClaim;
+  if (claim?.locationId && !conditionMatches({ type: "location", locationId: claim.locationId, includeChildren: true }, { game })) return { ok: false, reason: "报酬已保留，请返回约定交差地点领取" };
+  if (claim && !isRewardClaimAction(action)) return { ok: false, reason: "目标已完成，报酬待领取；可向委托人交差或领取酬金" };
+  const amountPence = contract.rewards.reduce((sum, reward) => sum + reward.amountPence, 0);
+  game.money = moneyFromPence(moneyToPence(game.money || {}) + amountPence);
+  lifecycle.rewardsClaimed = true;
+  lifecycle.rewardReceipt = { turn, amountPence };
+  lifecycle.endedTurn = turn;
+  quest.status = "completed";
+  quest.stage = "completed";
+  quest.objective = "任务已完成，约定报酬已结算";
+  return { ok: true, outcome: "claimed", completedSteps: [], taskMinutes: 5,
+    rewardSettlement: { questId: `quest:${quest.id}`, alreadyClaimed: false, amountPence } };
 }
 
 export function migrateQuestLifecycle(game, turn = Number(game.turn || 0)) {
@@ -96,6 +120,7 @@ export function migrateQuestLifecycle(game, turn = Number(game.turn || 0)) {
       }
     }
     const lifecycle = quest.lifecycle;
+    if (quest.status === "completed" && lifecycle.contract?.nodes.length && lifecycle.contract.nodes.every(node => lifecycle.completedNodeIds?.includes(node.id))) lifecycle.objectivesCompletedTurn ??= lifecycle.endedTurn ?? quest.lastProgressTurn ?? turn;
     if (quest.kind === "random" && quest.status === "available") {
       lifecycle.offerExpiresTurn ??= lifecycle.createdTurn + 10;
       if (turn >= lifecycle.offerExpiresTurn) { quest.status = "expired"; lifecycle.endedTurn = turn; }
@@ -115,6 +140,7 @@ export function migrateQuestLifecycle(game, turn = Number(game.turn || 0)) {
 export function registerQuest(game, input, turn = Number(game.turn || 0) + 1, playerAction = "") {
   if (!clean(input?.id) || !clean(input?.title)) return { ok: false, reason: "任务必须包含 id 与 title" };
   if (game.quests?.some(quest => quest.id === input.id)) return { ok: false, reason: "任务已存在，不能重新接取或领取奖励" };
+  if (TRIGGER_DEFINITIONS.some(definition => definition.id === input.id || definition.presentation?.title === clean(input.title))) return { ok: false, reason: "这是预设任务，请使用任务簿中的原任务编号推进，不能重复登记为普通委托" };
   if (input.source === "特殊行动") return { ok: false, reason: "特殊委托只能由特殊行动引擎登记" };
   const status = input.status ? normalizeQuestStatus(input.status) : "available";
   if (!["available", "engaged"].includes(status)) return { ok: false, reason: "新任务只能登记为待接取或进行中" };
@@ -124,6 +150,7 @@ export function registerQuest(game, input, turn = Number(game.turn || 0) + 1, pl
     finale: Boolean(input.finale), dangerous: Boolean(input.dangerous), majorDecision: Boolean(input.majorDecision),
     contract: structuredClone(input.contract || {}), deadlineTurns: input.deadlineTurns, locationId: clean(input.locationId) };
   const contract = freezeContract(quest);
+  if (contract.rewardClaim && (!clean(contract.rewardClaim.objective) || !clean(contract.rewardClaim.locationId))) return { ok: false, reason: "待领奖约定须登记交差目标和地点" };
   if (contract.requiresInvestigation) return { ok: false, reason: "复杂或危险任务必须登记有限、可核验的contract.nodes，不能把重述目标当作自动结案" };
   if (contract.nodes.length > contract.maxNodes || new Set(contract.nodes.map(node => node.id)).size !== contract.nodes.length || contract.nodes.some(node => !clean(node.id) || !clean(node.objective) || !Array.isArray(node.conditions) || !node.conditions.length || !node.conditions.every(validCondition) || Number(node.errandDepth || 0) > 1 || !validCost(node.cost))
     || contract.nodes.filter(node => node.obstacle).length > contract.maxObstacles
@@ -189,9 +216,12 @@ export function resolveOrdinaryQuest(game, quest, args, action, turn) {
 
 function settleOrdinaryQuest(game, quest, args, action, turn) {
   migrateQuestLifecycle(game, turn);
+  if (quest.status === "completed" && args.outcome === "claim" && isRewardClaimAction(action)) return settleQuestReward(game, quest, action, turn);
   if (quest.status !== "engaged") return { ok: false, reason: "任务已经结束或尚未接取" };
   if (["progress", "recover"].includes(args.outcome) && /不要|不想|不愿|不再|拒绝|取消|放弃|暂不|先不|是否|能否|如果|假如/.test(action)) return { ok: false, reason: "取消、否定或假设不是实际执行，任务状态与资源保持不变" };
   const lifecycle = quest.lifecycle, contract = lifecycle.contract;
+  if (args.outcome === "claim" && !isRewardClaimAction(action)) return { ok: false, reason: "请在实际交差或领取报酬时结算，询问和拒绝不会触发领取" };
+  if (quest.stage === "awaiting-reward" || args.outcome === "claim") return settleQuestReward(game, quest, action, turn);
   if (args.legacyPlan) {
     if (args.outcome !== "progress") return { ok: false, reason: "旧任务补录必须来自真实调查，不能以失败或受阻替代登记" };
     const registration = registerLegacyPlan(game, quest, args.legacyPlan, action, turn);
@@ -233,11 +263,14 @@ function settleOrdinaryQuest(game, quest, args, action, turn) {
   quest.stage = next?.id || "completed";
   quest.lastProgressTurn = turn;
   if (!next) {
-    quest.status = "completed"; lifecycle.endedTurn = turn;
-    if (!lifecycle.rewardsClaimed) {
-      game.money = moneyFromPence(moneyToPence(game.money || {}) + contract.rewards.reduce((sum, reward) => sum + reward.amountPence, 0));
-      lifecycle.rewardsClaimed = true;
+    lifecycle.objectivesCompletedTurn = turn;
+    if (contract.rewardClaim) {
+      quest.stage = "awaiting-reward";
+      quest.objective = contract.rewardClaim.objective;
+      return { ok: true, outcome: "progress", completedSteps, taskMinutes: Math.max(5, requested.reduce((sum, step) => sum + Math.max(5, Number(contract.nodes.find(node => node.id === step.objectiveId)?.minutes || 5)), 0)), rewardSettlement: { questId: `quest:${quest.id}`, pending: true } };
     }
+    const payment = settleQuestReward(game, quest, action, turn);
+    return { ...payment, outcome: "progress", completedSteps, taskMinutes: Math.max(5, requested.reduce((sum, step) => sum + Math.max(5, Number(contract.nodes.find(node => node.id === step.objectiveId)?.minutes || 5)), 0)) };
   }
   return { ok: true, outcome: "progress", completedSteps, taskMinutes: Math.max(5, requested.reduce((sum, step) => sum + Math.max(5, Number(contract.nodes.find(node => node.id === step.objectiveId)?.minutes || 5)), 0)) };
 }

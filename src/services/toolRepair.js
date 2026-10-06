@@ -7,7 +7,13 @@ function repairLimit(value) {
 }
 
 export async function repairToolCallsConcurrently(game, calls = [], repairToolCall, options = {}) {
-  const checkedCalls = normalizeToolCalls(calls, game).map((call) => validateToolCall(game, call));
+  const normalized = normalizeToolCalls(calls, game);
+  const createdIds = new Set(normalized.filter(call => call.name === "quest.add").flatMap(call => [call.args?.quest?.id, `quest:${call.args?.quest?.id}`]));
+  const checkedCalls = normalized.map(call => {
+    const checked = validateToolCall(game, call);
+    if (call.name === "quest.resolve" && createdIds.has(call.args?.instanceId) && checked.error.startsWith("任务标识参数需要修复")) checked.error = "";
+    return checked;
+  });
   const candidateIndexes = checkedCalls
     .map((checked, index) => ({ checked, index }))
     .filter(({ checked }) => checked.error && isRepairableToolError(checked.call, checked.error))

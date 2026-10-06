@@ -104,10 +104,12 @@ export function normalizeMapExtensions(value = {}) {
       anchor = placed.get(anchor.parentId);
     }
     const migrating = source.geographyVersion !== CITY_GEOGRAPHY.version;
+    const beforeDistrictCorrection = Number(source.geographyVersion || 0) < 2;
     const oldDistrict = location.district;
-    if (location.scope === "interior" || (migrating && oldDistrict === (formerDistricts[anchor.id] || originalDistricts.get(anchor.id)))) location.district = anchor.district;
+    if (location.scope === "interior" || (migrating && (beforeDistrictCorrection && oldDistrict === formerDistricts[anchor.id] || oldDistrict === originalDistricts.get(anchor.id)))) location.district = anchor.district;
     if (oldDistrict !== location.district) location.name = location.name.replace(`${oldDistrict}·`, `${location.district}·`);
-    const origin = migrating && location.district === anchor.district ? anchor : hexForLocation(location);
+    const relocatedDistrict = beforeDistrictCorrection || ["大桥南区", "圣乔治区"].includes(location.district);
+    const origin = migrating && relocatedDistrict && location.district === anchor.district ? anchor : hexForLocation(location);
     let hex = location.scope === "interior" ? hexForLocation(anchor) : nearestCityHex(origin, { district: location.district, occupied: location.lifecycle === "archived" ? new Set() : occupied });
     // 老地图允许无限挤在一处；迁移拥挤旧档时保留地点 ID 和进度，
     // 以同区锚点内部区域承接溢出地标，不能静默丢弃玩家已有地点。

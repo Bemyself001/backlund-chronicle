@@ -15,6 +15,7 @@ import { normalizeTriggerState } from "./triggerState.js";
 import { executeItemContentAction, hasItemContentAction } from "./itemActions.js";
 import { lookupContext } from "./contextLookup.js";
 import { resolveQuestAction } from "./questActions.js";
+import { findQuestReference } from "./questIdentity.js";
 import { syncQuestJournal } from "./questRuntime.js";
 import { identifyPotion } from "./potionIdentification.js";
 import { passiveAbilityModifier, resolveAbilityUse } from "./abilities.js";
@@ -389,6 +390,10 @@ function validateCall(game, call) {
   if (missing.length) return `缺少参数（模型未提供）：${missing.join("、")}`;
   if (!call.reason || String(call.reason).trim().length < 2) return "缺少与本轮叙事对应的变更理由";
   if (!game.character || !Array.isArray(game.inventory)) return "游戏状态结构不完整";
+  if (call.name === "quest.resolve" && !call.args.recovery) {
+    const reference = findQuestReference(game, call.args.instanceId);
+    if (!reference.ok) return `任务标识参数需要修复：${reference.reason}`;
+  }
   if (call.name === "item.use") {
     const definition = getChurchTalisman(game.inventory.find(item => item.instanceId === call.args.instanceId));
     if (definition?.effect === "clue") return validateTalismanClue(game, call.args.clue);
@@ -862,6 +867,11 @@ export function executeToolCalls(currentGame, calls = [], options = {}) {
     }
     const validationError = validateCall(game, call);
     if (validationError) { results.push(fail(call.name, validationError)); continue; }
+    if (call.name === "money.add" && /任务.*(?:报酬|酬金|奖励)|报酬|酬金|领奖|交差/.test(call.reason) && calls.some(item => item.name?.replace("__", ".") === "quest.resolve")) {
+      results.push(succeed(call.name, "任务报酬由原任务统一结算，本次不重复增加资金。", { handledByQuest: true }));
+      processed.add(callId);
+      continue;
+    }
     const combatItem = call.name === "item.use" && (activeEnemies(game).length > 0 || game.character?.mainActionLastUsedTurn === game.turn + 1);
     if (combatItem) {
       const gate = mainActionGate(game);

@@ -27,8 +27,9 @@ export function createTurnResolution(toolCalls = [], results = [], progress = {}
       narrativeEvents: game ? pendingQuestNarration(game, [
         ...(progress.triggerEvents?.completed || []), ...(progress.triggerEvents?.failed || []),
         ...(progress.triggerEvents?.expired || []), ...(progress.triggerEvents?.abandoned || []),
-      ]) : narrativeEventsForTurn(progress.triggerSignals),
+      ], { action: progress.playerAction, changedIds: Object.values(progress.triggerEvents || {}).flat().map(event => event.instanceId) }) : narrativeEventsForTurn(progress.triggerSignals),
       elapsedMinutes: progress.elapsedMinutes || 0,
+      questRewardSettlements: progress.questRewardSettlements || [],
       timedAction: progress.timedAction || null,
       restRecovery: progress.restRecovery || [],
       advancementRecovery: progress.advancementRecovery || [],

@@ -93,7 +93,7 @@ export function configureSideQuests(quests) {
     ] }];
   }
   renard.eligibility = [];
-  renard.version = 5;
+  renard.version = 7;
   renard.availableRewards = [{ id: "side.renard.discover-estate", type: "location-discover", locationId: "queen-renard-estate", note: "求医号外印着雷纳德子爵在皇后区百合街的宅邸地址。" }];
   renard.autoEngageWhen = [{ type: "location", locationId: "queen-renard-estate", includeChildren: true }];
   renard.presentation.text = "报童高喊号外：雷纳德子爵之女从高窗坠落，普通医生只能暂时维持伤势，子爵悬赏二十镑求助。报纸印着皇后区百合街宅邸的地址；回应后才算接受。";
@@ -101,8 +101,9 @@ export function configureSideQuests(quests) {
   const secure = renard.stages.find(stage => stage.id === "secure-treatment");
   const recruit = secure.transitions.find(entry => entry.objectiveId === "recruit-apothecary");
   secure.transitions = secure.transitions.filter(entry => entry !== recruit);
-  secure.guidance = "药师直接救治；有适用药剂也可治疗，否则由子爵引荐今晚拍卖会。药剂可选购买，合作路线无需先付钱。";
-  secure.transitions.push(step("attend-renard-auction", "由子爵引荐并参加当晚拍卖会；药剂起拍3镑，本场成交4镑，固定药师埃德蒙·维尔主动交谈", ["拍卖", "引荐", "非凡者圈子", "晚会"], "auction-conversation", { rewards: [award("side.renard.auction-invited")] }));
+  secure.appointment = { id: "renard-auction", title: "拍卖会", nextDayHour: 20 };
+  secure.guidance = "子爵当场交给你引荐通知，说明拍卖会安排在收到通知的第二天晚上20点；等到约定开场时间后才可参加。药师可直接救治；药剂可选购买，合作路线无需先付钱。";
+  secure.transitions.push(step("attend-renard-auction", "凭子爵的引荐通知，在收到通知的次日20点开场后参加拍卖会；药剂起拍3镑，本场成交4镑，固定药师埃德蒙·维尔主动交谈", ["拍卖", "引荐", "非凡者圈子", "晚会"], "auction-conversation", { appointmentId: "renard-auction", elapsedMinutes: 10, rewards: [award("side.renard.auction-invited")] }));
   const medicine = itemReward(RENARD_AUCTION_MEDICINE.itemId, RENARD_AUCTION_MEDICINE.name, RENARD_AUCTION_MEDICINE.description, RENARD_AUCTION_MEDICINE.category);
   medicine.item.tags = [...RENARD_AUCTION_MEDICINE.tags];
   const estate = { type: "location", locationId: "queen-renard-estate", includeChildren: true };
@@ -139,7 +140,7 @@ export function configureSideQuests(quests) {
     { id: "auction-conversation", guidance: "固定药师埃德蒙·维尔主动询问求医目的，并谈及深度控制难以逆转。可买药，也可直接交谈。", transitions: [purchase("auction-conversation"), step("meet-edmund", "与埃德蒙交谈后，侍者邀请两人进入子爵包厢", ["交谈", "药师", "埃德蒙", "询问", "包厢"], "auction-box", { rewards: [award("side.renard.apothecary-met"), warning] })] },
     { id: "auction-box", guidance: "子爵请两人合作救治，明确平分二十镑。可以接受，也可用已买到的药剂独立救治。", transitions: [purchase("auction-box"), { ...recruit, description: "在包厢与埃德蒙明确约定合作并返回宅邸", actionTerms: ["合作", "同意", "接受", "药师"], rewards: [award("side.renard.cooperation-agreed")] }, healing, handoff] },
   );
-  secure.transitions.find(entry => entry.objectiveId === "attend-renard-auction").untilHour = 20;
+  renard.stages[0].transitions[0].rewards = [...(renard.stages[0].transitions[0].rewards || []), award("side.renard.auction-invited")];
   renard.stages[0].transitions[0].description = "在百合街宅邸与雷纳德子爵交谈，确认普通医术只能暂时维持伤势，救治必须借助非凡力量";
   renard.stages[0].transitions[0].actionTerms = ["交谈", "询问", "伤势", "女儿", "求医", "普通医生", "非凡力量"];
   renard.stages[0].transitions[0].requirements = [{ type: "location", locationId: "queen-renard-estate", includeChildren: true }];

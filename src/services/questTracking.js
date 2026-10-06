@@ -39,7 +39,8 @@ export function inspectQuestTracking(game, request) {
   }
   let targets = [];
   if (quest) {
-    targets = locationIds(ordinaryQuestInspection(game, quest).conditions);
+    targets = quest.stage === "awaiting-reward" && quest.lifecycle?.contract?.rewardClaim?.locationId
+      ? [quest.lifecycle.contract.rewardClaim.locationId] : locationIds(ordinaryQuestInspection(game, quest).conditions);
   } else {
     const instance = game.triggerState?.active?.find(item => item.instanceId === entry.id);
     const definition = getInstanceTriggerDefinition(instance, game);

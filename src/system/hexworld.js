@@ -70,8 +70,8 @@ export function reconcileWorld(world, game) {
   let currentHex = hexForLocation(registeredCurrentLocation || game.location) || world.player;
   if (!isPassableCityHex(currentHex)) {
     currentHex = nearestCityHex(currentHex);
-    if (!registeredCurrentLocation && game.location?.id?.startsWith("hex:")) game.location = { ...game.location, id: `hex:${currentHex.q},${currentHex.r}`, ...currentHex, district: `贝克兰德${districtAt(currentHex)}` };
   }
+  if (!registeredCurrentLocation && currentHex && game.location?.id?.startsWith("hex:")) game.location = { ...game.location, id: `hex:${currentHex.q},${currentHex.r}`, ...currentHex, district: `贝克兰德${districtAt(currentHex)}` };
   if (currentHex) {
     world.player = { q: currentHex.q, r: currentHex.r };
     const here = world.tiles[hexKey(currentHex.q, currentHex.r)];
@@ -170,6 +170,7 @@ export function hexContext(game) {
     `【城市地理】北上南下、西左东右；${CITY_GEOGRAPHY.river.name}${CITY_GEOGRAPHY.river.flow}。过河必须经贝克兰德大桥，禁止把水面当作道路。`,
     `城区：${CITY_GEOGRAPHY.districts.map(district => `${district.name}（${district.bank === "south" ? "南岸" : "北岸"}）`).join("、")}。边界与格距是游戏示意；以地点登记的城区和本地可通行路线为准，不自行改写。`,
     "公共图书馆与圣风大教堂在乔伍德区，铁门街在桥区，王国博物馆在西区，圣希尔兰大教堂在圣乔治区。原创地点不冒充原著地标。",
+    "南岸的大桥南区位于西南侧，圣乔治区位于东南侧，与北岸码头区隔塔索克河相望。此方位关系优先于旧剧情中相反的描述。",
     `【当前位置】${cityTerrainLabel(here.terrain)}${here.name ? `「${here.name}」` : ""}`,
     "【周围】",
     ...around,

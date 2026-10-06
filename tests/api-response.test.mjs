@@ -472,7 +472,7 @@ test("task engine is exposed through native tool transport with bounded step evi
   assert.equal(definition.name, "quest__resolve");
   assert.equal(definition.parameters.properties.steps.maxItems, 3);
   assert.ok(definition.parameters.required.includes("actionQuote"));
-  assert.deepEqual(definition.parameters.properties.outcome.enum, ["progress", "blocked", "failed", "recover"]);
+  assert.deepEqual(definition.parameters.properties.outcome.enum, ["progress", "blocked", "failed", "recover", "claim"]);
 });
 
 test("map state tools expose strict growth, discovery, movement and archive parameters", async (context) => {

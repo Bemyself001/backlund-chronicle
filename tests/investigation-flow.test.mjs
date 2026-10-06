@@ -135,7 +135,7 @@ test('whistle and ledger require a real search, and dead player cannot collect o
 test('auction supports poor cooperation and optional paid medicine without duplicate charges', () => {
   let game = fresh(RENARD, 'secure-treatment');
   game.money = moneyFromPence(0);
-  const attended = act(game, 'attend-renard-auction', '由子爵引荐参加拍卖会');
+  const attended = act(game, 'attend-renard-auction', '等待至约定开场后，由子爵引荐参加拍卖会');
   game = attended.game;
   assert.ok(minutesForTurn('参加拍卖会', attended.calls, attended.results, game.worldTime) >= 5);
   assert.equal(act(game, 'buy-renard-medicine', '买药剂').results[0].ok, false);

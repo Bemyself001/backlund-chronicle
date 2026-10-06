@@ -107,7 +107,7 @@ export function questAssistance(game, entry) {
 export function settleQuestAttempts(game, calls, results, turn, action = "") {
   syncQuestJournal(game);
   const attempts = new Map();
-  const priority = { unconfirmed: -1, planned: -1, blocked: 0, failed: 1, recover: 2, progress: 3 };
+  const priority = { unconfirmed: -1, planned: -1, blocked: 0, failed: 1, recover: 2, progress: 3, claimed: 3 };
   for (const [index, call] of calls.entries()) {
     const result = results[index];
     let attempt = result?.data?.questAttempt;
@@ -155,7 +155,7 @@ export function questJournalEvents(game) {
     return [{ id, title: entry.title, questId: entry.id, reason: "任务状态与当前方向已由本地引擎确认",
       direction: assistance?.text || entry.objective, narrativeCue: "承接刚取得的结果，只描写当前已知目标，不重复开局或提前揭露后续。",
       choices: engaged ? [
-        { label: assistance?.recoverable ? assistance.recoveryAction : assistance?.level >= 2 && assistance.availableActions[0] ? assistance.availableActions[0].label : assistance?.level >= 2 && assistance.blockers[0] ? `先解决「${entry.title}」的条件：${assistance.blockers[0]}` : `继续调查「${entry.title}」：${entry.objective}`, intent: "investigate", risk: entry.policy.isolated ? "medium" : "low" },
+        { label: entry.stage === "awaiting-reward" ? `向「${entry.title}」的委托人交差，领取约定报酬` : assistance?.recoverable ? assistance.recoveryAction : assistance?.level >= 2 && assistance.availableActions[0] ? assistance.availableActions[0].label : assistance?.level >= 2 && assistance.blockers[0] ? `先解决「${entry.title}」的条件：${assistance.blockers[0]}` : `继续调查「${entry.title}」：${entry.objective}`, intent: "investigate", risk: entry.policy.isolated ? "medium" : "low" },
         { label: assistance?.routes?.[1] ? `花${assistance.routes[1].costMinutes}分钟${assistance.routes[1].label}` : `梳理「${entry.title}」的已有线索，确认仍缺少的条件`, intent: "investigate", risk: "low" },
         { label: `暂时搁置「${entry.title}」，处理其他事情`, intent: "redirect", risk: "low" },
       ] : [

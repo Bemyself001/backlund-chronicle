@@ -1,7 +1,7 @@
 // 原著可核对的是城区归属和相邻关系；边界、格距及河湾是游戏示意布局。
 // 统一采用北上南下、西左东右。几何算法放在 system/mapGeometry.js。
 export const CITY_GEOGRAPHY = {
-  version: 2,
+  version: 3,
   bounds: { minQ: -9, maxQ: 9, minY: 5, maxY: 95 },
   origin: 50,
   step: 5,
@@ -25,8 +25,8 @@ export const CITY_GEOGRAPHY = {
     { name: "工厂区", prefix: "F", bank: "north", minX: 82, maxX: 101, minY: 0, maxY: 53, label: [91, 28], description: "城市东部的工厂群，合并为一片游戏区域" },
     { name: "码头区", prefix: "D", bank: "north", minX: 64, maxX: 101, minY: 53, maxY: 100, label: [80, 56], description: "沿河北岸的货运与装卸街区" },
     { name: "桥区", prefix: "B", bank: "north", minX: 35, maxX: 64, minY: 56, maxY: 100, label: [54, 54], description: "大桥北侧，铁门街与旅店相连" },
-    { name: "圣乔治区", prefix: "G", bank: "south", minX: 0, maxX: 50, minY: 0, maxY: 100, label: [24, 70], description: "南岸的工业、住宅与圣希尔兰大教堂" },
-    { name: "大桥南区", prefix: "S", bank: "south", minX: 50, maxX: 101, minY: 0, maxY: 100, label: [75, 82], description: "大桥以南的居民街区与沿岸货栈" },
+    { name: "圣乔治区", prefix: "G", bank: "south", minX: 55, maxX: 101, minY: 0, maxY: 100, label: [75, 82], description: "东南侧的工业、住宅与圣希尔兰大教堂，与北岸码头区隔河相望" },
+    { name: "大桥南区", prefix: "S", bank: "south", minX: 0, maxX: 55, minY: 0, maxY: 100, label: [24, 70], description: "西南侧的居民街区与沿岸货栈，接入大桥南端" },
   ],
   note: "城区归属依据原著整理；边界、河湾与距离为游戏示意。",
 };

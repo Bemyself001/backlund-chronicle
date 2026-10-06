@@ -48,7 +48,18 @@ try {
     assert.equal(await modal.getByRole("heading", { name: "乔伍德区·公共图书馆" }).count(), 1);
     assert.equal(await modal.getByRole("button", { name: /皇后区·公共图书馆/ }).count(), 0);
     assert.equal(await modal.getByRole("button", { name: /市政档案馆/ }).count(), 0, "unknown landmark name must remain hidden");
+    const atlas = modal.getByRole("group", { name: "贝克兰德区划与塔索克河", exact: true });
+    const southLabel = await atlas.locator("text").filter({ hasText: /^大桥南区$/ }).boundingBox();
+    const georgeLabel = await atlas.locator("text").filter({ hasText: /^圣乔治区$/ }).boundingBox();
+    const dockLabel = await atlas.locator("text").filter({ hasText: /^码头区$/ }).boundingBox();
+    assert.ok(southLabel.x < georgeLabel.x && georgeLabel.y > dockLabel.y);
+    const warehousePin = await atlas.getByRole("button", { name: "大桥南区·南岸货栈", exact: true }).boundingBox();
+    const churchPin = await atlas.getByRole("button", { name: "圣乔治区·圣希尔兰大教堂", exact: true }).boundingBox();
+    assert.ok(warehousePin.x < churchPin.x);
     const districts = modal.getByRole("combobox", { name: "选择城区" });
+    await districts.selectOption("圣乔治区");
+    await modal.getByRole("combobox", { name: "选择地图地点" }).selectOption("machinery-heart");
+    assert.match(await modal.innerText(), /东南侧，与北岸码头区隔塔索克河相望/);
     await districts.selectOption("西区");
     await modal.getByRole("combobox", { name: "选择地图地点" }).selectOption("west-museum");
     assert.equal(await modal.getByRole("heading", { name: "西区·王国博物馆" }).count(), 1);
@@ -76,7 +87,7 @@ try {
     assert.deepEqual(saved.world.player, { q: getMapLocation("bridge-docks").q, r: getMapLocation("bridge-docks").r });
     assert.equal(Object.values(saved.world.tiles).filter(tile => tile.locationId === "queen-library").length, 1);
     assert.deepEqual(errors, []);
-    results.push({ width, height, legacyMigration: true, keyboardSelection: true, riverCrossingMinutes: expectedRoute.minutes, zoom: true, overflow: false, errors });
+    results.push({ width, height, legacyMigration: true, southBankPositions: true, keyboardSelection: true, riverCrossingMinutes: expectedRoute.minutes, zoom: true, overflow: false, errors });
     await page.close();
   }
   await writeFile(resolve(output, "verification.json"), JSON.stringify(results, null, 2));
