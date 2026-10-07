@@ -389,6 +389,15 @@ private fun InventoryPanel(state: GameUiState, model: GameViewModel) {
             CardBlock("${item.text("name")} ×${item.optInt("quantity", 1)}", item.text("discoveredInfo", item.text("description"))) {
                 Text("${item.text("category")} · ${item.text("condition")} · ${if (item.optBoolean("equipped")) "已装备" else "未装备"}", fontSize = 13.sp)
                 val args = JSONObject().put("instanceId", item.text("instanceId"))
+                var enemyId by rememberSaveable(item.text("instanceId")) { mutableStateOf("") }
+                val talisman = game.array("churchTalismans").objects().find { it.text("itemId") == item.text("itemId") }
+                val enemies = game.obj("combat").array("enemies").objects().filter { it.optInt("health") > 0 && it.text("status") == "active" }
+                if (talisman != null && talisman.text("effect") != "clue") {
+                    val effective = if (enemies.size == 1) enemies.first().text("id") else enemyId
+                    Text("选择符咒目标", fontSize = 13.sp)
+                    Chips(enemies.map { it.text("id") to it.text("name") }, effective) { enemyId = it }
+                    if (effective.isNotBlank()) args.put("enemyId", effective)
+                }
                 TextButton(onClick = { model.tool("item.inspect", args, "检查${item.text("name")}") }, enabled = !state.busy) { Text("检查物品") }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedButton(onClick = { model.tool(if (item.optBoolean("equipped")) "item.unequip" else "item.equip", args, if (item.optBoolean("equipped")) "卸下${item.text("name")}" else "装备${item.text("name")}") }, enabled = !state.busy) { Text(if (item.optBoolean("equipped")) "卸下" else "装备") }
@@ -462,6 +471,9 @@ private fun SpecialPanel(state: GameUiState, model: GameViewModel) {
                     if (card.text("id") == "sherlock-moriarty") {
                         OutlinedTextField(inquiry, { inquiry = it }, label = { Text("希望委托夏洛克调查什么？") }, modifier = Modifier.fillMaxWidth())
                         Button(onClick = { model.action("我想委托夏洛克调查：$inquiry", JSONObject().put("personConversation", card.text("id"))) }, enabled = !state.busy && inquiry.isNotBlank() && card.text("conversationReason").isBlank()) { Text("商议调查委托") }
+                        game.array("inventory").objects().filter { it.text("potionStatus") == "unidentified" }.forEach { bottle ->
+                            OutlinedButton(onClick = { model.action("请夏洛克·莫里亚蒂鉴定一瓶${bottle.text("name")}，同意支付一镑鉴定费", JSONObject().put("identificationRequest", JSONObject().put("instanceId", bottle.text("instanceId")).put("feePence", 240))) }, enabled = !state.busy && card.text("conversationReason").isBlank()) { Text("鉴定${bottle.text("name")} · 确认支付1镑") }
+                        }
                     }
                 }
             }

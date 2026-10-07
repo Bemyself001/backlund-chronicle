@@ -169,9 +169,13 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun reportError(message: String) { mutable.update { it.copy(error = message) } }
     override fun onCleared() {
-        turnJob?.cancel()
-        executor.execute { runtime?.close() }
-        // Closing the executor accepts already queued cleanup; no cross-thread QuickJS calls.
-        dispatcher.close()
+        val active = turnJob
+        active?.cancel()
+        val close = {
+            executor.execute { runtime?.close() }
+            dispatcher.close()
+        }
+        // Cancellation cleanup must finish on the rules thread before it is closed.
+        if (active == null) close() else active.invokeOnCompletion { close() }
     }
 }
