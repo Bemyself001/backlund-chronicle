@@ -177,11 +177,11 @@ const RELEASE_NATIVE_180_UPDATE = {
 };
 
 export const LATEST_UPDATE = {
-  pending: true,
+  pending: false,
   channel: "web",
   version: RELEASE_VERSION,
   date: "2026-10-07", dateLabel: "2026.10.07",
-  title: `开发中 · ${RELEASE_VERSION} Web APK与雾都UI`,
+  title: `${RELEASE_VERSION} · 雾都书卷与午夜档案Web APK`,
   summary: "继续使用React网页界面与Capacitor打包，内置雾都书卷和午夜档案背景，保留三色状态条、特殊行动及完整24小时等待圆钟。",
   changes: [
     "统一深绿、黄铜与暖纸的日读外观，以及墨蓝、暖白与冷金的夜读外观，细化正文、章节、选项和资料面板的字号、留白与描边；地图与档案弹窗跟随阅读主题。",
@@ -192,7 +192,7 @@ export const LATEST_UPDATE = {
     "等待预览由本地历法规则计算，浏览和取消面板不消耗回合；确认仍校验回合、时钟及版本，防止重复推进。",
     "手机顶部和行动区重新分配空间，长选项与风险标签有清楚层次，资料和等待面板保持可滚动。",
     "Web APK沿用原包名、正式签名与存档结构，递增Android构建号，继续支持覆盖升级、JSON存档导入导出及网页资源热更新。",
-    "Web APK构建可单独生成带校验文件的签名安装包；公开发布独立控制，APK与网页更新资源来自同一次生产构建。",
+    "发布1.8.0正式签名Web APK与匹配的网页热更新资源，APK与网页更新包使用同一次生产构建，并提供SHA-256校验文件。",
   ],
 };
 
