@@ -110,7 +110,8 @@ def validate_asset_url(repository: str, url: str) -> None:
 def check_tag(repository: str, mirrors: tuple[str, ...], timeout: float) -> None:
     tag = required_env("ACCELERATOR_TAG")
     encoded_tag = urllib.parse.quote(tag, safe="")
-    url = f"https://api.github.com/repos/{repository}/git/refs/tags/{encoded_tag}"
+    # The legacy plural endpoint returns prefix matches when the exact tag is absent.
+    url = f"https://api.github.com/repos/{repository}/git/ref/tags/{encoded_tag}"
     payload, source = fetch_json(url, mirrors, timeout, allow_official_not_found=True)
     if payload is None:
         write_output("exists", "false")
@@ -118,6 +119,8 @@ def check_tag(repository: str, mirrors: tuple[str, ...], timeout: float) -> None
         write_output("source", source)
         print(f"Tag {tag} is available for a new release.")
         return
+    if payload.get("ref") != f"refs/tags/{tag}":
+        raise AcceleratorError(f"tag lookup returned a different reference for {tag}")
     target = str((payload.get("object") or {}).get("sha") or "")
     if not target:
         raise AcceleratorError(f"tag {tag} response is missing object.sha")

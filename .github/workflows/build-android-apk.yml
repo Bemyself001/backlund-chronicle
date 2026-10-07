@@ -28,6 +28,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check release helper
+        run: python3 -m unittest discover -s .github/actions/github-cn-accelerator -p 'test_*.py'
+
       - name: Guard against stale product version
         if: github.event_name == 'push' || inputs.publish_release
         uses: ./.github/actions/github-cn-accelerator

@@ -1,9 +1,11 @@
 import json
+import io
 import os
 import tempfile
 import unittest
 from pathlib import Path
 from unittest.mock import patch
+from urllib.error import HTTPError
 
 import github_accelerator as accelerator
 import workflow_action as action
@@ -39,6 +41,42 @@ class AcceleratorCoreTests(unittest.TestCase):
 
 
 class WorkflowAdapterTests(unittest.TestCase):
+    def test_native_preview_prefix_does_not_block_a_new_stable_tag(self):
+        exact_url = "https://api.github.com/repos/acme/project/git/ref/tags/v1.8.0"
+
+        def response(request, timeout):
+            if request.full_url == exact_url:
+                raise HTTPError(request.full_url, 404, "Not Found", None, None)
+            return io.BytesIO(json.dumps([{
+                "ref": "refs/tags/v1.8.0-native.1",
+                "object": {"sha": "native-preview-commit"},
+            }]).encode("utf-8"))
+
+        with tempfile.TemporaryDirectory() as temp:
+            output = Path(temp) / "outputs.txt"
+            with patch.dict(os.environ, {
+                "ACCELERATOR_TAG": "v1.8.0", "ACCELERATOR_EXPECTED_SHA": "web-release-commit",
+                "GITHUB_OUTPUT": str(output),
+            }), patch.object(action.urllib.request, "urlopen", side_effect=response):
+                action.check_tag("acme/project", (), 1)
+            self.assertIn("exists=false", output.read_text(encoding="utf-8"))
+
+    def test_exact_existing_tag_still_rejects_a_different_commit(self):
+        payload = {"ref": "refs/tags/v1.8.0", "object": {"sha": "published-commit"}}
+        with patch.dict(os.environ, {
+            "ACCELERATOR_TAG": "v1.8.0", "ACCELERATOR_EXPECTED_SHA": "new-commit",
+        }), patch.object(action, "fetch_json", return_value=(payload, "github-direct")):
+            with self.assertRaisesRegex(accelerator.AcceleratorError, "already points to"):
+                action.check_tag("acme/project", (), 1)
+
+    def test_lookup_cannot_accept_another_reference_with_the_same_commit(self):
+        payload = {"ref": "refs/tags/v1.8.0-native.1", "object": {"sha": "same-commit"}}
+        with patch.dict(os.environ, {
+            "ACCELERATOR_TAG": "v1.8.0", "ACCELERATOR_EXPECTED_SHA": "same-commit",
+        }), patch.object(action, "fetch_json", return_value=(payload, "github-direct")):
+            with self.assertRaisesRegex(accelerator.AcceleratorError, "different reference"):
+                action.check_tag("acme/project", (), 1)
+
     def test_release_assets_are_scoped_to_the_requested_repository(self):
         action.validate_asset_url(
             "acme/project",
