@@ -11,3 +11,6 @@ scripts/bench-settings.json
 *.apk.sha256
 .shots/
 webbridge-*.json
+android/native-app/src/main/assets/engine.js
+android/native-app/src/main/assets/engine-manifest.json
+.native-toolchain/

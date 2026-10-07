@@ -1,0 +1,11 @@
+<resources>
+    <color name="ic_launcher_background">#173E35</color>
+    <style name="NativeTheme" parent="android:style/Theme.Material.Light.NoActionBar">
+        <item name="android:fontFamily">sans</item>
+        <item name="android:windowLightStatusBar">false</item>
+        <item name="android:statusBarColor">#173E35</item>
+        <item name="android:navigationBarColor">#173E35</item>
+        <item name="android:windowActionModeOverlay">true</item>
+        <item name="android:windowBackground">#F4EEDF</item>
+    </style>
+</resources>

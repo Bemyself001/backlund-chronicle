@@ -1,0 +1,157 @@
+import { ACTIVE_CONTENT, CONTENT_SCHEMA_VERSION, getOrganization } from "../content/index.js";
+import { GAME_SYSTEM_VERSION, SAVE_VERSION } from "../system/version.js";
+import { isMoneyItem, normalizeInventoryItem } from "../system/items.js";
+import { normalizeWeaponEquipment } from "../system/weapons.js";
+import { withAdvancement } from "../system/character.js";
+import { moneyFromPence } from "../system/money.js";
+import { getMapLocations, normalizeLocationKnowledge, normalizeMapExtensions } from "../system/map.js";
+import { buildWorld, reconcileWorld } from "../system/hexworld.js";
+import { normalizeMemoryState } from "./memoryState.js";
+import { normalizeTriggerState, syncLegacyOccult } from "../engine/triggerState.js";
+import { syncQuestJournal } from "../engine/questRuntime.js";
+import { migrateContentState } from "../engine/contentMigrations.js";
+import { normalizeWorldTime } from "../engine/worldTime.js";
+import { applyTalent } from "../system/talents.js";
+import { specialState } from "../engine/specialActions.js";
+import { syncKnownPeople } from "../engine/people.js";
+import { normalizeCombatState } from "../system/combat.js";
+import { grantOrganizationTalisman } from "../engine/talismans.js";
+import { migrateCharacterStatRules } from "./statMigrations.js";
+import { migrateHealthEffects } from "../engine/healthEffects.js";
+import { validateCommissionRecords } from "../engine/commissions.js";
+
+export function cleanGame(game) {
+  const cloned = structuredClone(game);
+  delete cloned.apiKey;
+  delete cloned.apiSettings;
+  syncKnownPeople(cloned);
+  return cloned;
+}
+
+export function migrateSave(raw) {
+  if (!raw || typeof raw !== "object" || !raw.character || !Array.isArray(raw.inventory)) throw new Error("存档缺少角色或物品数据，无法读取。");
+  const version = Number(raw.version || 0);
+  if (version > SAVE_VERSION) throw new Error("该存档来自更高版本，请升级游戏后再试。");
+  const migrateStoryValue = (value) => {
+    if (typeof value === "string") {
+      return value
+        .replaceAll("灰檐港旧钟区", "贝克兰德桥区·旧钟街")
+        .replaceAll("灰檐港市档案馆", "贝克兰德市政档案分馆")
+        .replaceAll("灰檐港", "贝克兰德")
+        .replaceAll("原创港城贝克兰德", "鲁恩王国首都贝克兰德")
+        .replaceAll("旧钟区", "旧钟街");
+    }
+    if (Array.isArray(value)) return value.map(migrateStoryValue);
+    if (value && typeof value === "object") return Object.fromEntries(Object.entries(value).map(([key, entry]) => [key, migrateStoryValue(entry)]));
+    return value;
+  };
+  const migrated = version < 2 ? migrateStoryValue(raw) : raw;
+  const legacyCoin = (migrated.inventory || []).find((item) => isMoneyItem(item));
+  const inventory = (migrated.inventory || []).filter((item) => !isMoneyItem(item)).map(normalizeInventoryItem);
+  const money = migrated.money || moneyFromPence(legacyCoin?.quantity || 0);
+  const advancement = withAdvancement(migrated.character).advancement;
+  const legacyContact = advancement?.type === "extraordinary" || migrated.character?.extraordinary === "low" ? 1 : 0;
+  const contact = migrated.occult?.contact === 1 || legacyContact === 1 ? 1 : 0;
+  const mapExtensions = normalizeMapExtensions(migrated.mapExtensions);
+  const registeredLocations = new Map(getMapLocations({ mapExtensions }, { includeArchived: true }).map(location => [location.id, location]));
+  const currentLocation = registeredLocations.get(migrated.location?.id);
+  const discoveredLocations = Array.isArray(migrated.discoveredLocations) ? migrated.discoveredLocations.filter(location => registeredLocations.has(location?.id)).map(location => ({ ...location, name: registeredLocations.get(location.id).name })) : [];
+  const locationKnowledge = normalizeLocationKnowledge(migrated.locationKnowledge, discoveredLocations, migrated.location?.id, { mapExtensions });
+  const occult = {
+    contact,
+    revealLevel: Math.max(0, Number(migrated.occult?.revealLevel || 0)),
+    entryAvailable: Boolean(migrated.occult?.entryAvailable) && contact !== 1,
+    currentEntry: migrated.occult?.currentEntry || null,
+    lastEntryTurn: migrated.occult?.lastEntryTurn ?? null,
+    entryHistory: Array.isArray(migrated.occult?.entryHistory) ? migrated.occult.entryHistory : [],
+  };
+  const previousMembership = migrated.organizationState?.membership;
+  const registeredOrganization = getOrganization(previousMembership?.organizationId);
+  const organizationState = previousMembership ? { ...migrated.organizationState, membership: {
+    status: "active",
+    ...previousMembership,
+    name: registeredOrganization?.name || previousMembership.name,
+    tags: registeredOrganization?.tags ? [...registeredOrganization.tags] : (previousMembership.tags || [previousMembership.kind].filter(Boolean)),
+  } } : { membership: null };
+  const result = {
+    ...migrated,
+    worldTime: normalizeWorldTime(migrated.worldTime),
+    version: SAVE_VERSION,
+    systemVersion: Number(migrated.systemVersion) || GAME_SYSTEM_VERSION,
+    content: migrated.content || { packId: ACTIVE_CONTENT.id, schemaVersion: CONTENT_SCHEMA_VERSION, contentVersion: "legacy" },
+    character: { ...withAdvancement(migrated.character), advancement },
+    inventory,
+    money,
+    mapExtensions,
+    location: currentLocation ? { ...migrated.location, name: currentLocation.name, district: `贝克兰德${currentLocation.district}`, q: currentLocation.q, r: currentLocation.r } : { ...migrated.location },
+    world: migrated.world ? structuredClone(migrated.world) : undefined,
+    discoveredLocations,
+    locationKnowledge,
+    occult,
+    organizationState,
+    combat: normalizeCombatState(migrated.combat),
+    processedToolCalls: migrated.processedToolCalls || [],
+    memoryNotes: migrated.memoryNotes || [],
+    storyHistory: Array.isArray(migrated.storyHistory) ? migrated.storyHistory : (migrated.recentDialogues || []),
+    lastTurnBaseline: migrated.lastTurnBaseline ? { ...migrated.lastTurnBaseline, inventory: (migrated.lastTurnBaseline.inventory || []).filter((item) => !isMoneyItem(item)).map(normalizeInventoryItem) } : null,
+    lastTurnAudit: migrated.lastTurnAudit || null,
+  };
+  for (const key of ["statusEffects", "clues", "relationships", "quests", "changeLog", "worldEvents", "choices", "recentDialogues"]) {
+    if (result[key] == null) result[key] = [];
+  }
+  // 只修复尚未行动、完整属性恰好匹配旧开局模板的档案。
+  if (!raw.initialStatsVersion && raw.turn === 0 && !raw.lastTurnBaseline && !raw.lastTurnAudit
+    && !(raw.processedToolCalls || []).length && !(raw.statusEffects || []).length
+    && !(raw.storyHistory || raw.recentDialogues || []).some((message) => message.role === "user")) {
+    const maxSpirituality = raw.character.extraordinary === "low" ? 8 : 5;
+    const legacy = applyTalent({ health: 10, maxHealth: 10, sanity: 9, maxSanity: 10, spirituality: maxSpirituality - 1, maxSpirituality }, raw.character.talent);
+    if (Object.entries(legacy).every(([key, value]) => raw.character.stats?.[key] === value)) {
+      result.character.stats = { ...raw.character.stats, sanity: legacy.maxSanity, spirituality: legacy.maxSpirituality };
+    }
+  }
+  migrateCharacterStatRules(result);
+  migrateHealthEffects(result);
+  normalizeWeaponEquipment(result);
+  grantOrganizationTalisman(result);
+  result.specialActions = specialState(result);
+  result.triggerState = normalizeTriggerState(result);
+  validateCommissionRecords(result);
+  migrateContentState(result);
+  syncLegacyOccult(result, result.triggerState);
+  syncQuestJournal(result);
+  result.memoryState = normalizeMemoryState(result);
+  // 六边形世界：旧存档保留已有迷雾进度，再以注册表对齐；无 world 字段时现场重建
+  if (result.world && typeof result.world.seed === "number" && result.world.tiles) {
+    reconcileWorld(result.world, result);
+  } else {
+    result.world = buildWorld(result);
+  }
+  return result;
+}
+
+// Validate before replacing a playable archive. Migration alone also accepts partial legacy data.
+export function validatePlayableSave(game) {
+  validateCommissionRecords(game);
+  const fail = (field) => { throw new Error(`存档中的「${field}」数据不完整或格式错误，原存档未被覆盖。`); };
+  if (typeof game.id !== "string" || !game.id) fail("档案编号");
+  if (!Number.isInteger(game.turn) || game.turn < 0) fail("回合");
+  if (typeof game.character?.name !== "string" || !game.character.name.trim()) fail("角色姓名");
+  for (const key of ["health", "maxHealth", "sanity", "maxSanity", "spirituality", "maxSpirituality"]) {
+    if (!Number.isFinite(game.character.stats?.[key])) fail("角色属性");
+  }
+  if (!Number.isFinite(game.chapter?.number) || typeof game.chapter?.title !== "string") fail("章节");
+  if (typeof game.location?.id !== "string" || typeof game.location?.name !== "string") fail("地点");
+  if (typeof game.worldTime !== "string") fail("时间");
+  if (!Number.isFinite(game.capacity?.maxWeight) || game.capacity.maxWeight <= 0) fail("负重");
+  for (const key of ["statusEffects", "clues", "relationships", "quests", "worldEvents", "choices", "recentDialogues", "storyHistory", "memoryNotes", "processedToolCalls", "changeLog"]) {
+    if (!Array.isArray(game[key])) fail(key);
+    if (game[key].some((entry) => entry == null)) fail(key);
+  }
+  for (const key of ["recentDialogues", "storyHistory"]) {
+    if (game[key].some((entry) => typeof entry.content !== "string" || !["user", "assistant"].includes(entry.role))) fail("剧情记录");
+  }
+  if (game.statusEffects.some((entry) => typeof entry !== "object" || typeof entry.name !== "string")) fail("状态效果");
+  if (game.choices.some((entry) => typeof entry.label !== "string")) fail("行动建议");
+  return game;
+}
+

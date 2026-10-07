@@ -1,0 +1,94 @@
+name: Build Native Android
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/native-android]
+  pull_request:
+    paths: ['android/native-app/**', 'src/native/**', 'src/services/saveCodec.js', 'scripts/build-native-engine.mjs', '.github/workflows/build-native-android.yml']
+
+permissions:
+  contents: read
+
+jobs:
+  native-checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with: {fetch-depth: 0}
+      - uses: pnpm/action-setup@v4
+        with: {version: 11.19.0}
+      - uses: actions/setup-node@v5
+        with: {node-version: 22, cache: pnpm}
+      - uses: actions/setup-java@v5
+        with: {distribution: temurin, java-version: 21, cache: gradle}
+      - run: pnpm install --frozen-lockfile
+      - name: Verify shared game rules
+        run: |
+          pnpm run lint
+          pnpm test
+          node scripts/build-native-engine.mjs
+      - name: Build and test native APK
+        working-directory: android
+        run: |
+          chmod +x gradlew
+          ./gradlew :native-app:testPreviewDebugUnitTest :native-app:assemblePreviewDebug :native-app:assemblePreviewRelease
+      - name: Sign preview with the established release key
+        if: github.event_name != 'pull_request'
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
+        run: |
+          test -n "$ANDROID_KEYSTORE_BASE64"
+          echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/native-release.p12"
+          BUILD_TOOLS=$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -1)
+          "$BUILD_TOOLS/zipalign" -P 16 -f -v 4 android/native-app/build/outputs/apk/preview/release/native-app-preview-release-unsigned.apk "$RUNNER_TEMP/native-aligned.apk"
+          "$BUILD_TOOLS/apksigner" sign --ks "$RUNNER_TEMP/native-release.p12" --ks-type PKCS12 --ks-pass env:ANDROID_KEYSTORE_PASSWORD --ks-key-alias "$ANDROID_KEY_ALIAS" --key-pass env:ANDROID_KEY_PASSWORD --out backlund-native-preview.apk "$RUNNER_TEMP/native-aligned.apk"
+          "$BUILD_TOOLS/apksigner" verify --verbose --print-certs backlund-native-preview.apk > native-apk-verification.txt
+          "$BUILD_TOOLS/aapt" dump badging backlund-native-preview.apk > native-apk-badging.txt
+          sha256sum backlund-native-preview.apk > backlund-native-preview.apk.sha256
+          rm "$RUNNER_TEMP/native-release.p12"
+      - name: Upload native APK and test evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: backlund-native-preview
+          path: |
+            backlund-native-preview.apk
+            backlund-native-preview.apk.sha256
+            native-apk-verification.txt
+            native-apk-badging.txt
+            android/native-app/build/outputs/apk/preview/debug/*.apk
+            android/native-app/build/reports/tests/
+          retention-days: 14
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Run native UI on Android
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          profile: pixel_2
+          working-directory: android
+          script: ./gradlew :native-app:connectedPreviewDebugAndroidTest
+      - name: Collect native screenshots
+        if: always()
+        run: |
+          mkdir -p native-evidence
+          adb pull /sdcard/Android/data/io.github.bemyself001.backlundchronicle.native/files/native-evidence native-evidence || true
+      - name: Upload Android UI verification
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-ui-verification
+          path: |
+            android/native-app/build/reports/androidTests/
+            android/native-app/build/outputs/androidTest-results/
+            native-evidence/
+          retention-days: 14

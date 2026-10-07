@@ -149,6 +149,19 @@ const RELEASE_149_UPDATE = {
 };
 
 export const LATEST_UPDATE = {
+  pending: true,
+  date: "2026-10-07", dateLabel: "2026.10.07",
+  title: "开发中 · 原生Android界面迁移",
+  summary: "新增Kotlin与Jetpack Compose原生界面，使用独立QuickJS复用现有游戏规则；原生构建单独测试，正式版仍为1.7.5。",
+  changes: [
+    "原生界面接入剧情阅读、行动选项、地图、任务与玩家发布的委托、角色、行囊、特殊行动和存档柜。",
+    "浏览器与原生界面共享纯数据存档校验及AI工具协议；原生API密钥与游戏进度分开存放，可选择使用Android Keystore加密。",
+    "原生预览构建可以与稳定版同时安装，通过JSON导出和导入迁移进度；网页资源热更新不用于原生界面。",
+    "增加原生规则、回合取消和存档校验回归测试，并在Android模拟器验证原生组件。",
+  ],
+};
+
+const RELEASE_175_UPDATE = {
   pending: false,
   date: "2026-10-07", dateLabel: "2026.10.07",
   title: "1.7.5 · 行动结算与玩家调查委托",
@@ -757,6 +770,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_175_UPDATE,
   RELEASE_174_UPDATE,
   RELEASE_173_UPDATE,
   RELEASE_172_UPDATE,

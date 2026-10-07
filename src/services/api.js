@@ -726,7 +726,7 @@ function emptyResponseError(finishReason, hasReasoning = false, metadata = {}) {
   return error;
 }
 
-function normalizeChatCompletion(data, requestMaxTokens = 0, options = {}) {
+export function normalizeChatCompletion(data, requestMaxTokens = 0, options = {}) {
   const choice = data?.choices?.[0] || {};
   const message = choice.message || {};
   const nativeCalls = nativeCallsFromMessage(message, { finishReason: choice.finish_reason, streamed: false });
@@ -949,7 +949,9 @@ async function readStreamResponse(response, onChunk, onReasoningChunk, telemetry
   }
 }
 
-async function performAIRequest(settings, messages, signal, onChunk, options, telemetry) {
+// Shared wire format for browser fetch and the native Android HTTP transport.
+// Credentials are deliberately handled by each transport, outside game state.
+export function buildAIRequestBody(settings, messages, options = {}) {
   const maxTokens = requestMaxTokens(settings, options, messages);
   const body = {
     model: settings.model,
@@ -970,6 +972,12 @@ async function performAIRequest(settings, messages, signal, onChunk, options, te
       body.tool_choice = { type: "function", function: { name: "ui__present_choices" } };
     }
   }
+  return body;
+}
+
+async function performAIRequest(settings, messages, signal, onChunk, options, telemetry) {
+  const body = buildAIRequestBody(settings, messages, options);
+  const maxTokens = body.max_tokens ?? body.max_completion_tokens;
   const headers = requestHeaders(settings, true);
   const serializedBody = JSON.stringify(body);
   telemetry.started = true;
