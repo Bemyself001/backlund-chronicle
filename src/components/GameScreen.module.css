@@ -7,6 +7,8 @@
   --game-line: #d4c9b3;
   --game-green: #35614e;
   --game-danger: #8c3930;
+  --archive-art: url("../../assets/ui-archive-day.png");
+  --manuscript-surface: #f4eedff0;
   display: flex;
   flex-direction: column;
   height: 100svh;
@@ -17,6 +19,7 @@
   color: var(--frame-text);
 }
 .shell[data-theme="night"] { --game-paper: #1b2833; --game-raised: #22323e; --game-ink: #e8e2d3; --game-muted: #adb8b8; --game-line: #3d4d58; --game-green: #c8b58a; --game-danger: #f0a49a; --frame: #111b24; --frame-raised: #1b2833; --frame-text: #e8e2d3; --frame-muted: #b3bdbe; --brass: #b6a277; --brass-light: #b6a277; --panel-bg: #1b2833; --panel-raised: #22323e; --panel-line: #3d4d58; --panel-text: #e8e2d3; --panel-muted: #adb8b8; --panel-accent: #c8b58a; --panel-health: #efa29a; --panel-sanity: #99c5f0; --panel-spirituality: #e6c56f; --clock-face: #22323e; --clock-track: #45555f; --clock-hand: #d4bf94; --clock-mark: #b6a277; }
+.shell[data-theme="night"] { --archive-art: url("../../assets/ui-archive-night.png"); --manuscript-surface: #1b2833f2; }
 .topbar { flex: 0 0 auto; display: flex; align-items: center; gap: 1.5rem; padding: .65rem 1.4rem; min-height: 3.8rem; border-bottom: 1px solid #baa16a38; background: var(--frame); }
 
 :global(.no-flex-gap) .topbar { gap: 0; }
@@ -87,7 +90,8 @@
 :global(.no-flex-gap) .effectStrip > :not(:last-child) { margin-right: .8rem; margin-bottom: 0; }
 .effectStrip span { flex-shrink: 0; }
 .workspace { position: relative; flex: 1; display: grid; grid-template-columns: 5rem minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); min-height: 0; }
-.navigation { grid-column: 1; grid-row: 1; z-index: 6; display: flex; flex-direction: column; gap: .35rem; padding: 1.2rem .4rem; border-right: 1px solid #a18a573d; background: var(--frame); }
+.navigation { position: relative; isolation: isolate; grid-column: 1; grid-row: 1; z-index: 6; display: flex; flex-direction: column; gap: .35rem; padding: 1.2rem .4rem; border-right: 1px solid #a18a573d; background: var(--frame); }
+.navigation::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background-image: linear-gradient(var(--frame) 30%, transparent 78%), var(--archive-art); background-size: 100% 100%, auto 100%; background-position: center, left bottom; background-repeat: no-repeat; opacity: .2; }
 
 :global(.no-flex-gap) .navigation { gap: 0; }
 :global(.no-flex-gap) .navigation > :not(:last-child) { margin-right: 0; margin-bottom: .35rem; }
@@ -100,9 +104,10 @@
 .navigation button[data-navigation="special"] { color: var(--brass-light); }
 .navigation svg { flex-shrink: 0; width: 1.25rem; height: 1.25rem; }
 .story { position: relative; grid-column: 2; grid-row: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--game-paper); color: var(--game-ink); }
-.storyViewport { position: relative; flex: 1; min-height: 0; }
+.storyViewport { position: relative; isolation: isolate; flex: 1; min-height: 0; }
+.storyViewport::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: var(--archive-art) center bottom / cover no-repeat; opacity: .85; }
 .storyScroll { position: relative; height: 100%; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--game-line) transparent; overflow-anchor: none; }
-.manuscript { max-width: var(--reading-width); margin: 0 auto; padding: 2.7rem 2.8rem 3.5rem; }
+.manuscript { max-width: var(--reading-width); margin: 0 auto; padding: 2.7rem 2.8rem 3.5rem; background: var(--manuscript-surface); }
 .sceneHeading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: 2rem; padding-bottom: .8rem; border-bottom: 1px solid var(--game-line); color: var(--game-muted); font-size: .75rem; }
 
 :global(.no-flex-gap) .sceneHeading { gap: 0; }
@@ -258,6 +263,8 @@
   .workspace { grid-template-columns: minmax(0, 1fr); grid-template-rows: minmax(0, 1fr) auto; }
   .story { grid-column: 1; grid-row: 1; }
   .navigation { grid-column: 1; grid-row: 2; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; padding: 0; padding-bottom: env(safe-area-inset-bottom); border: 0; border-top: 1px solid #a18a5759; }
+  .navigation::before { display: none; }
+  .storyViewport::before { opacity: .45; }
 
 :global(.no-flex-gap) .navigation { gap: 0 0; }
 :global(.no-flex-gap) .navigation > :not(:last-child) { margin-right: 0; margin-bottom: 0; }

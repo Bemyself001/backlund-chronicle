@@ -109,50 +109,55 @@ fun NativeGameApp(model: GameViewModel, onImport: () -> Unit = {}, onExport: () 
             val game = state.game ?: return
             model.special(JSONObject().put("operation", "wait").put("hours", hours).put("revision", game.obj("special").optInt("revision")).put("expectedTurn", game.optInt("turn")).put("expectedWorldTime", game.text("worldTime")))
         }
-        Scaffold(
-            modifier = Modifier.testTag(if (dark) "native-night" else "native-day"),
-            containerColor = MaterialTheme.colorScheme.background,
-            topBar = { ChronicleHeader(state.game) { model.panel("character") } },
-            bottomBar = { if (state.game != null) Column(Modifier.background(MaterialTheme.colorScheme.surface).navigationBarsPadding().imePadding()) {
-                ChronicleShortcuts(!state.busy, { model.panel("special") }, { showWait = true })
-                if (state.panel == "story") {
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                        OutlinedTextField(draft, { draft = it }, Modifier.weight(1f), label = { Text("自由行动") }, maxLines = 3,
-                            enabled = !state.busy, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { if (draft.isNotBlank() && !state.busy) { model.action(draft); draft = "" } }))
-                        Spacer(Modifier.width(8.dp))
-                        ChronicleButton(onClick = { model.action(draft); draft = "" }, enabled = !state.busy && draft.isNotBlank()) { Text("行动") }
+        Box(Modifier.fillMaxSize()) {
+            Scaffold(
+                modifier = Modifier.testTag(if (dark) "native-night" else "native-day"),
+                containerColor = MaterialTheme.colorScheme.background,
+                topBar = { ChronicleHeader(state.game) { model.panel("character") } },
+                bottomBar = { if (state.game != null) Column(Modifier.background(MaterialTheme.colorScheme.surface).navigationBarsPadding().imePadding()) {
+                    ChronicleShortcuts(!state.busy, { model.panel("special") }, { showWait = true })
+                    if (state.panel == "story") {
+                        Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                            OutlinedTextField(draft, { draft = it }, Modifier.weight(1f), label = { Text("自由行动") }, maxLines = 3,
+                                enabled = !state.busy, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { if (draft.isNotBlank() && !state.busy) { model.action(draft); draft = "" } }))
+                            Spacer(Modifier.width(8.dp))
+                            ChronicleButton(onClick = { model.action(draft); draft = "" }, enabled = !state.busy && draft.isNotBlank()) { Text("行动") }
+                        }
                     }
-                }
-                ChronicleNavigation(state.panel, model::panel)
-            } },
-        ) { padding ->
-            Column(Modifier.fillMaxSize().padding(padding)) {
-                if (state.busy) {
-                    LinearProgressIndicator(Modifier.fillMaxWidth())
-                    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                        Text(state.phase.ifBlank { "处理中" }, Modifier.weight(1f), fontSize = 13.sp)
-                        TextButton(onClick = model::cancel) { Text("取消") }
-                    }
-                }
-                if (state.error.isNotBlank()) Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.errorContainer).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(state.error, Modifier.weight(1f), color = MaterialTheme.colorScheme.onErrorContainer, fontSize = 13.sp)
-                    if (state.game != null && !state.busy) TextButton(onClick = model::retry) { Text("重试") }
-                }
-                if (state.notice.isNotBlank()) Text(state.notice, Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant).padding(horizontal = 18.dp, vertical = 8.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
-                holder.SaveableStateProvider(state.panel) {
-                    when (state.panel) {
-                        "create" -> CreateCharacter(state, model)
-                        "settings" -> SettingsPanel(state, model)
-                        "saves" -> SavePanel(state, model, onImport, onExport)
-                        "story" -> StoryPanel(state, model)
-                        "map" -> MapPanel(state, model)
-                        "quests" -> QuestPanel(state, model)
-                        "inventory" -> InventoryPanel(state, model)
-                        "character" -> CharacterPanel(state, model)
-                        "special" -> SpecialPanel(state, model)
-                        "notes" -> NotesPanel(state)
-                        "menu" -> MenuPanel(state, model, onImport, onExport)
-                        else -> WelcomePanel(state, model, onImport)
+                    ChronicleNavigation(state.panel, model::panel)
+                } },
+            ) { padding ->
+                Box(Modifier.fillMaxSize().padding(padding)) {
+                    NativeBackdrop(dark)
+                    Column(Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background.copy(alpha = if (dark) .88f else .86f))) {
+                        if (state.busy) {
+                            LinearProgressIndicator(Modifier.fillMaxWidth())
+                            Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                                Text(state.phase.ifBlank { "处理中" }, Modifier.weight(1f), fontSize = 13.sp)
+                                TextButton(onClick = model::cancel) { Text("取消") }
+                            }
+                        }
+                        if (state.error.isNotBlank()) Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.errorContainer).padding(horizontal = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(state.error, Modifier.weight(1f), color = MaterialTheme.colorScheme.onErrorContainer, fontSize = 13.sp)
+                            if (state.game != null && !state.busy) TextButton(onClick = model::retry) { Text("重试") }
+                        }
+                        if (state.notice.isNotBlank()) Text(state.notice, Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant).padding(horizontal = 18.dp, vertical = 8.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        holder.SaveableStateProvider(state.panel) {
+                            when (state.panel) {
+                                "create" -> CreateCharacter(state, model)
+                                "settings" -> SettingsPanel(state, model)
+                                "saves" -> SavePanel(state, model, onImport, onExport)
+                                "story" -> StoryPanel(state, model)
+                                "map" -> MapPanel(state, model)
+                                "quests" -> QuestPanel(state, model)
+                                "inventory" -> InventoryPanel(state, model)
+                                "character" -> CharacterPanel(state, model)
+                                "special" -> SpecialPanel(state, model)
+                                "notes" -> NotesPanel(state)
+                                "menu" -> MenuPanel(state, model, onImport, onExport)
+                                else -> WelcomePanel(state, model, onImport)
+                            }
+                        }
                     }
                 }
             }

@@ -13,7 +13,7 @@ android {
         applicationId 'io.github.bemyself001.backlundchronicle'
         minSdk 24
         targetSdk 36
-        versionCode = (System.getenv('APP_VERSION_CODE') ?: '30172').toInteger()
+        versionCode = (System.getenv('APP_VERSION_CODE') ?: '30173').toInteger()
         versionName = (System.getenv('NATIVE_VERSION_NAME') ?: '1.8.0-native.2')
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
