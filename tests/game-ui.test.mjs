@@ -54,7 +54,13 @@ test("release metadata remains aligned across UI, package, changelog and APK wor
   assert.equal(GAME_SYSTEM_VERSION, 2);
   assert.equal(SAVE_VERSION, 14);
   const publishedUpdate = [LATEST_UPDATE, ...PREVIOUS_UPDATES].find(update => !update.pending && update.channel !== "native");
-  assert.ok(publishedUpdate.title.startsWith(`${RELEASE_VERSION} ·`));
+  if (LATEST_UPDATE.pending && LATEST_UPDATE.channel === "web") {
+    assert.equal(LATEST_UPDATE.version, RELEASE_VERSION);
+    assert.ok(LATEST_UPDATE.title.includes(`${RELEASE_VERSION} Web APK`));
+    assert.ok(publishedUpdate, "待发布的Web版本仍保留上一版公开更新记录");
+  } else {
+    assert.ok(publishedUpdate.title.startsWith(`${RELEASE_VERSION} ·`));
+  }
   if (LATEST_UPDATE.pending) assert.match(LATEST_UPDATE.title, /^开发中 ·/);
   if (LATEST_UPDATE.channel === "native") {
     assert.ok(LATEST_UPDATE.title.startsWith(`${NATIVE_RELEASE_VERSION} ·`));

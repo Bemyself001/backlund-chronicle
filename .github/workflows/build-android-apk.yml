@@ -2,6 +2,11 @@ name: Build Android APK
 
 on:
   workflow_dispatch:
+    inputs:
+      publish_release:
+        description: "公开发布APK与网页更新资源（关闭时仅生成签名构建产物）"
+        type: boolean
+        default: false
   push:
     branches: [main]
 
@@ -9,7 +14,7 @@ permissions:
   contents: write
 
 env:
-  PRODUCT_VERSION: "1.7.5"
+  PRODUCT_VERSION: "1.8.0"
 
 jobs:
   build-release-apk:
@@ -24,6 +29,7 @@ jobs:
           fetch-depth: 0
 
       - name: Guard against stale product version
+        if: github.event_name == 'push' || inputs.publish_release
         uses: ./.github/actions/github-cn-accelerator
         with:
           operation: check-tag
@@ -52,20 +58,30 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Check web app
+        run: |
+          pnpm run lint
+          pnpm test
+
       - name: Prepare release version and signing key
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
-          test -n "$ANDROID_KEYSTORE_BASE64" || { echo "Missing ANDROID_KEYSTORE_BASE64 repository secret"; exit 1; }
+          for NAME in ANDROID_KEYSTORE_BASE64 ANDROID_KEYSTORE_PASSWORD ANDROID_KEY_ALIAS ANDROID_KEY_PASSWORD; do
+            test -n "${!NAME}" || { echo "Missing $NAME repository secret"; exit 1; }
+          done
           echo "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$RUNNER_TEMP/backlund-release.jks"
           COMMIT_COUNT=$(git rev-list --count HEAD)
           echo "APP_VERSION_NAME=$PRODUCT_VERSION" >> "$GITHUB_ENV"
           echo "APP_VERSION_CODE=$((30000 + COMMIT_COUNT))" >> "$GITHUB_ENV"
           echo "VITE_APP_VERSION=$PRODUCT_VERSION" >> "$GITHUB_ENV"
           echo "ANDROID_KEYSTORE_PATH=$RUNNER_TEMP/backlund-release.jks" >> "$GITHUB_ENV"
-          echo "ANDROID_KEYSTORE_PASSWORD=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}" >> "$GITHUB_ENV"
-          echo "ANDROID_KEY_ALIAS=${{ secrets.ANDROID_KEY_ALIAS }}" >> "$GITHUB_ENV"
-          echo "ANDROID_KEY_PASSWORD=${{ secrets.ANDROID_KEY_PASSWORD }}" >> "$GITHUB_ENV"
+          echo "ANDROID_KEYSTORE_PASSWORD=$ANDROID_KEYSTORE_PASSWORD" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_ALIAS=$ANDROID_KEY_ALIAS" >> "$GITHUB_ENV"
+          echo "ANDROID_KEY_PASSWORD=$ANDROID_KEY_PASSWORD" >> "$GITHUB_ENV"
 
       - name: Build web app and sync Android
         env:
@@ -76,7 +92,7 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew testDebugUnitTest assembleRelease
+          ./gradlew :app:testDebugUnitTest :app:assembleRelease
 
       - name: Prepare public APK
         run: |
@@ -99,15 +115,23 @@ jobs:
           cd dist/client && zip -qr ../../web-bundle-v2.zip . && cd ../..
           sha256sum web-bundle-v2.zip > web-bundle-v2.zip.sha256
 
-      - name: Upload APK
+      - name: Upload signed Web APK and verification evidence
         uses: actions/upload-artifact@v4
         with:
           name: backlund-chronicle-${{ env.APP_VERSION_NAME }}-apk
-          path: android/app/build/outputs/apk/release/app-release.apk
+          path: |
+            backlund-chronicle.apk
+            backlund-chronicle.apk.sha256
+            apk-verification.txt
+            apk-badging.txt
+            web-bundle-v2.zip
+            web-bundle-v2.zip.sha256
+            android/app/build/test-results/testDebugUnitTest/
           if-no-files-found: error
           retention-days: 14
 
       - name: Publish public APK release
+        if: github.event_name == 'push' || inputs.publish_release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
