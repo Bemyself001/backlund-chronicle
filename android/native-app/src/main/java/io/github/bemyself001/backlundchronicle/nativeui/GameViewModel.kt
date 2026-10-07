@@ -49,7 +49,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
                 preferences.settings().keys().forEach { key -> settings.put(key, preferences.settings().get(key)) }
                 apiKey = preferences.savedKey()
                 val prompt = preferences.prompt() ?: catalog.getString("defaultPrompt")
-                mutable.update { it.copy(ready = true, catalog = catalog, settings = settings, prompt = prompt, saves = vault.labels()) }
+                val labels = withContext(dispatcher) { vault.labels() }
+                mutable.update { it.copy(ready = true, catalog = catalog, settings = settings, prompt = prompt, saves = labels) }
             } catch (error: Exception) { mutable.update { it.copy(error = "原生引擎启动失败：${error.message}") } }
         }
     }
@@ -64,7 +65,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             withContext(dispatcher) { vault.read(0)?.let { runtime!!.objectCall("load", JSONObject().put("payload", it)) } }
             throw error
         }
-        mutable.update { it.copy(game = view, panel = panel, saves = vault.labels()) }
+        val labels = withContext(dispatcher) { vault.labels() }
+        mutable.update { it.copy(game = view, panel = panel, saves = labels) }
     }
     private fun work(block: suspend () -> Unit) {
         if (!state.value.ready || state.value.busy) return
@@ -83,8 +85,8 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         mutate("load", JSONObject().put("payload", JSONObject(text)))
         mutable.update { it.copy(notice = "存档已导入并保存，API密钥需单独设置。") }
     }
-    fun save(slot: Int) = work { val payload = engine("export"); withContext(dispatcher) { vault.write(slot, payload) }; mutable.update { it.copy(saves = vault.labels(), notice = "存档已保存。") } }
-    fun delete(slot: Int) = work { withContext(dispatcher) { vault.delete(slot) }; mutable.update { it.copy(saves = vault.labels(), notice = "存档已删除。") } }
+    fun save(slot: Int) = work { val payload = engine("export"); val labels = withContext(dispatcher) { vault.write(slot, payload); vault.labels() }; mutable.update { it.copy(saves = labels, notice = "存档已保存。") } }
+    fun delete(slot: Int) = work { val labels = withContext(dispatcher) { vault.delete(slot); vault.labels() }; mutable.update { it.copy(saves = labels, notice = "存档已删除。") } }
     suspend fun exportSave(): String = engine("export").toString(2)
     fun saveSettings(settings: JSONObject, key: String, prompt: String) = work {
         JSONObject(settings.optString("customHeaders", "{}"))

@@ -87,13 +87,7 @@ jobs:
           working-directory: android
           script: |
             ./gradlew -PNATIVE_ONLY=true :native-app:connectedPreviewDebugAndroidTest
-            mkdir -p ../native-evidence
-            adb pull /sdcard/Android/data/io.github.bemyself001.backlundchronicle.native/files/native-evidence ../native-evidence
-      - name: Collect native screenshots
-        if: always()
-        run: |
-          mkdir -p native-evidence
-          adb pull /sdcard/Android/data/io.github.bemyself001.backlundchronicle.native/files/native-evidence native-evidence || true
+            test $(find native-app/build/outputs/connected_android_test_additional_output -name '*.png' | wc -l) -ge 4
       - name: Upload Android UI verification
         if: always()
         uses: actions/upload-artifact@v4
@@ -102,5 +96,5 @@ jobs:
           path: |
             android/native-app/build/reports/androidTests/
             android/native-app/build/outputs/androidTest-results/
-            native-evidence/
+            android/native-app/build/outputs/connected_android_test_additional_output/
           retention-days: 14

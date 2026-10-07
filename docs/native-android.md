@@ -1,6 +1,6 @@
 # 原生 Android 客户端
 
-原生客户端位于 `android/native-app`，界面使用 Kotlin 和 Jetpack Compose。APK 中没有 WebView、Capacitor、React 或 HTML 页面。现有 JavaScript 游戏规则编译为独立脚本，由 QuickJS 执行；仅本仓库的固定规则代码可以执行，玩家输入与 AI 响应仅作为 JSON 数据传入。
+原生客户端位于 `android/native-app`，界面使用 Kotlin 和 Jetpack Compose，不使用 WebView。原生模块不依赖 Capacitor 或 React，APK 不打包 HTML 页面。现有 JavaScript 游戏规则编译为独立脚本，由 QuickJS 执行；仅本仓库的固定规则代码可以执行，玩家输入与 AI 响应仅作为 JSON 数据传入。
 
 `src/native/session.js` 负责规划、工具验证、玩家确认、结算和剧情提交。Android 负责组件、网络、流式读取、文件选择与存储。网络取消或规则失败时未提交的回合被丢弃；剧情提交后，行动建议补全和记忆整理不会重放回合。API 密钥不进入规则状态、存档或导出文件，选择持久化时使用 Android Keystore 加密并保存在不参与备份的目录。
 

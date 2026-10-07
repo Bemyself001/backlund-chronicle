@@ -4,13 +4,15 @@ import android.graphics.Bitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
-import java.io.File
+import androidx.test.platform.io.PlatformTestStorageRegistry
 import java.util.concurrent.TimeUnit
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNotEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Rule
 import org.junit.Test
 
@@ -18,9 +20,9 @@ class NativeUiTest {
     @get:Rule val compose = createAndroidComposeRule<NativeActivity>()
     private fun screenshot(name: String) {
         val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val file = File(instrumentation.targetContext.getExternalFilesDir(null), "native-evidence/$name.png")
-        file.parentFile!!.mkdirs()
-        instrumentation.uiAutomation.takeScreenshot()?.let { bitmap -> file.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }; bitmap.recycle() }
+        val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot()) { "Android did not provide a screenshot" }
+        try { PlatformTestStorageRegistry.getInstance().openOutputFile("native-evidence/$name.png").use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) } }
+        finally { bitmap.recycle() }
     }
     @Test fun createReadNavigateWaitAndSaveWithNativeWidgets() {
         compose.waitUntil(30_000) { compose.activity.model.state.value.ready }
@@ -55,6 +57,7 @@ class NativeUiTest {
             compose.waitUntil(15_000) { !model.state.value.busy }
             model.action("跳过时间2小时")
             compose.waitUntil(15_000) { model.state.value.phase == "规划行动" }
+            assertNotNull("The native HTTP request must reach the server before cancellation", server.takeRequest(10, TimeUnit.SECONDS))
             model.cancel()
             compose.waitUntil(15_000) { !model.state.value.busy }
             assertEquals(before.getInt("turn"), model.state.value.game!!.getInt("turn"))
@@ -64,6 +67,26 @@ class NativeUiTest {
             compose.waitUntil(15_000) { !model.state.value.busy }
             assertEquals(before.getInt("turn") + 1, model.state.value.game!!.getInt("turn"))
             assertFalse(model.state.value.error, model.state.value.error.isNotBlank())
+            model.load(1)
+            compose.waitUntil(15_000) { !model.state.value.busy }
+            assertEquals(before.getInt("turn"), model.state.value.game!!.getInt("turn"))
+            assertEquals(before.getString("worldTime"), model.state.value.game!!.getString("worldTime"))
+            // Exercise native HTTP -> QuickJS planning -> durable narrative settlement.
+            val planning = JSONObject().put("choices", org.json.JSONArray().put(JSONObject().put("message", JSONObject().put("content", "{\"toolCalls\":[]}"))))
+            val narrative = JSONObject().put("narrative", "你完成了等候，钟声已过去两小时。")
+                .put("choices", org.json.JSONArray().put(JSONObject().put("label", "继续观察街边的人群").put("risk", "low"))
+                    .put(JSONObject().put("label", "向店主询问工作").put("risk", "low"))
+                    .put(JSONObject().put("label", "沿街道寻找旅店").put("risk", "medium")))
+            val rendering = JSONObject().put("choices", org.json.JSONArray().put(JSONObject().put("message", JSONObject().put("content", narrative.toString()))))
+            server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody(planning.toString()))
+            server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody(rendering.toString()))
+            model.action("跳过时间2小时")
+            compose.waitUntil(20_000) { !model.state.value.busy }
+            assertFalse(model.state.value.error, model.state.value.error.isNotBlank())
+            assertEquals(before.getInt("turn") + 1, model.state.value.game!!.getInt("turn"))
+            assertNotEquals(before.getString("worldTime"), model.state.value.game!!.getString("worldTime"))
+            assertEquals(3, model.state.value.game!!.getJSONArray("choices").length())
+            screenshot("settled-story")
         }
     }
 }
