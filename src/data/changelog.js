@@ -1,3 +1,5 @@
+import { NATIVE_RELEASE_VERSION } from "./release.js";
+
 const RELEASE_13_UPDATE = {
   date: "2026-09-13",
   dateLabel: "2026.09.13",
@@ -149,11 +151,13 @@ const RELEASE_149_UPDATE = {
 };
 
 export const LATEST_UPDATE = {
-  pending: true,
+  pending: false,
+  channel: "native",
   date: "2026-10-07", dateLabel: "2026.10.07",
-  title: "开发中 · 原生Android预览与存档迁移",
-  summary: "新增Kotlin与Jetpack Compose原生界面，使用独立QuickJS复用现有游戏规则；原生构建单独测试，正式版仍为1.7.5。",
+  title: `${NATIVE_RELEASE_VERSION} · 原生Android公开预览`,
+  summary: "发布Kotlin与Jetpack Compose原生界面，使用独立QuickJS复用现有游戏规则；可与1.7.5同时安装，通过JSON迁移存档。",
   changes: [
+    "原生APK通过独立发布标签构建，完整规则、原生运行时及Android模拟器验证通过后，公开发布安装包、SHA-256校验文件与签名信息。",
     "原生截图等待Compose完成绘制后捕获组件画面，并核验成功回合的剧情与时间已实际显示；深绿色顶栏采用浅色系统图标，保证状态栏可读。",
     "原生预览APK已通过编译、正式密钥签名、QuickJS运行和HTTP测试；Android界面验证补充实际请求取消、成功剧情提交与手动存档恢复，截图交由Android测试框架收集，避免测试卸载后丢失证据。",
     "原生取消测试等待实际HTTP请求到达后再中止，使用挂起连接验证取消，避免模拟服务的计时清理影响结果；连续推送自动取消过时的预览构建。",

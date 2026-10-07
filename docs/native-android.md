@@ -20,6 +20,14 @@ cd android
 
 ## 存档与更新
 
+公开预览版：[1.8.0-native.1 发布页](https://github.com/Bemyself001/backlund-chronicle/releases/tag/v1.8.0-native.1)。安装该页的 `backlund-native-preview.apk`，最低支持 Android 7.0。
+
 在现有 APK 或网页版存档柜导出 JSON，再在原生版首页导入。存档结构与版本保持兼容，不要求重新创建角色。原生版使用自动存档与三个手动存档位，保存采用原子文件写入。旧版 WebView 的本地数据不会自动被原生文件存储读取，预览版独立安装提供导出和核对时间。
 
 Compose 界面随完整 APK 更新，现有网页 OTA 包不加载到原生客户端。AI 叙事仍通过玩家配置的 API 在线生成；等待、探索、固定工作等本地行动可以离线进行。
+
+## 发布
+
+原生版本由 `src/data/release.js` 的 `NATIVE_RELEASE_VERSION` 提供。更新日志及 `.github/native-release-notes.md` 后，将对应的 `v<版本>-native.<序号>` 标签推送到 GitHub。工作流核对标签、版本、签名、包名及构建号，完成共享规则、JVM 与模拟器测试后，再公开发布 APK 和校验信息。
+
+原生预览发布标记为 prerelease，不替换稳定版的 APK 或网页 OTA。仅发布原生预览时，主分支提交使用 `[skip release]`，避免触发稳定版 Capacitor 发布；GitHub Pages 仍正常更新。

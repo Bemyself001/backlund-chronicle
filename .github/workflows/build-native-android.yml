@@ -4,6 +4,7 @@ on:
   workflow_dispatch:
   push:
     branches: [codex/native-android]
+    tags: ['v*-native.*']
   pull_request:
     paths: ['android/native-app/**', 'src/native/**', 'src/services/saveCodec.js', 'scripts/build-native-engine.mjs', '.github/workflows/build-native-android.yml']
 
@@ -27,6 +28,11 @@ jobs:
         with: {node-version: 22, cache: pnpm}
       - uses: actions/setup-java@v5
         with: {distribution: temurin, java-version: 21, cache: gradle}
+      - name: Resolve native release version
+        run: |
+          NATIVE_VERSION_NAME=$(node --input-type=module -e 'import { NATIVE_RELEASE_VERSION } from "./src/data/release.js"; process.stdout.write(NATIVE_RELEASE_VERSION)')
+          if [[ "$GITHUB_REF" == refs/tags/* ]]; then test "$GITHUB_REF_NAME" = "v$NATIVE_VERSION_NAME"; fi
+          echo "NATIVE_VERSION_NAME=$NATIVE_VERSION_NAME" >> "$GITHUB_ENV"
       - run: pnpm install --frozen-lockfile
       - name: Verify shared game rules
         run: |
@@ -60,6 +66,7 @@ jobs:
           grep -E "^(Signer #[0-9]+|V[0-9.]+ Signer:) certificate SHA-256 digest: $EXPECTED_SIGNER$" native-apk-verification.txt
           "$BUILD_TOOLS/aapt" dump badging backlund-native-preview.apk > native-apk-badging.txt
           grep -F "package: name='io.github.bemyself001.backlundchronicle.native' versionCode='$APP_VERSION_CODE'" native-apk-badging.txt
+          grep -F "versionName='$NATIVE_VERSION_NAME'" native-apk-badging.txt
           unzip -l backlund-native-preview.apk | grep -F 'libquickjs.so'
           if unzip -l backlund-native-preview.apk | grep -E 'assets/public/|capacitor|\.html$'; then exit 1; fi
           sha256sum backlund-native-preview.apk > backlund-native-preview.apk.sha256
@@ -77,6 +84,7 @@ jobs:
             android/native-app/build/outputs/apk/preview/debug/*.apk
             android/native-app/build/reports/tests/
           retention-days: 14
+
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
@@ -102,3 +110,26 @@ jobs:
             android/native-app/build/outputs/androidTest-results/
             android/native-app/build/outputs/connected_android_test_additional_output/
           retention-days: 14
+
+  publish-native:
+    needs: native-checks
+    if: startsWith(github.ref, 'refs/tags/v') && contains(github.ref_name, '-native.')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/download-artifact@v5
+        with:
+          name: backlund-native-preview
+      - name: Publish verified native preview
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha256sum --check backlund-native-preview.apk.sha256
+          gh release create "$GITHUB_REF_NAME" \
+            backlund-native-preview.apk backlund-native-preview.apk.sha256 \
+            native-apk-verification.txt native-apk-badging.txt \
+            --verify-tag --target "$GITHUB_SHA" --prerelease --latest=false \
+            --title "贝克兰德纪事 $GITHUB_REF_NAME · 原生Android公开预览" \
+            --notes-file .github/native-release-notes.md

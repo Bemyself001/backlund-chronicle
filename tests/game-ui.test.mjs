@@ -5,7 +5,7 @@ import { normalizeReadingPreferences, shouldSubmitAction, getAuditRows, RISK_LAB
 import { createInitialGame, EMPTY_CHARACTER } from "../src/data/defaults.js";
 import { createAuditBaseline, auditTurnChanges } from "../src/engine/audit.js";
 import { moneyFromPence } from "../src/system/money.js";
-import { RELEASE_NAME, RELEASE_VERSION } from "../src/data/release.js";
+import { NATIVE_RELEASE_VERSION, RELEASE_NAME, RELEASE_VERSION } from "../src/data/release.js";
 import { GAME_SYSTEM_VERSION, SAVE_VERSION } from "../src/system/version.js";
 import { LATEST_UPDATE, PREVIOUS_UPDATES } from "../src/data/changelog.js";
 
@@ -53,9 +53,13 @@ test("release metadata remains aligned across UI, package, changelog and APK wor
   assert.equal(pkg.version, RELEASE_VERSION);
   assert.equal(GAME_SYSTEM_VERSION, 2);
   assert.equal(SAVE_VERSION, 14);
-  const publishedUpdate = LATEST_UPDATE.pending ? PREVIOUS_UPDATES[0] : LATEST_UPDATE;
+  const publishedUpdate = [LATEST_UPDATE, ...PREVIOUS_UPDATES].find(update => !update.pending && update.channel !== "native");
   assert.ok(publishedUpdate.title.startsWith(`${RELEASE_VERSION} ·`));
   if (LATEST_UPDATE.pending) assert.match(LATEST_UPDATE.title, /^开发中 ·/);
+  if (LATEST_UPDATE.channel === "native") {
+    assert.ok(LATEST_UPDATE.title.startsWith(`${NATIVE_RELEASE_VERSION} ·`));
+    assert.match(NATIVE_RELEASE_VERSION, /^\d+\.\d+\.\d+-native\.\d+$/);
+  }
   assert.ok(PREVIOUS_UPDATES.some(update => update.title.startsWith("1.4.9 ·")));
   assert.ok(PREVIOUS_UPDATES.some(update => update.title.startsWith("1.4.7 ·")));
   assert.ok(PREVIOUS_UPDATES.some(update => update.title.startsWith("1.4.6 ·")));
