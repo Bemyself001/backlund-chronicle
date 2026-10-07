@@ -30,6 +30,7 @@ export function createTurnResolution(toolCalls = [], results = [], progress = {}
       ], { action: progress.playerAction, changedIds: Object.values(progress.triggerEvents || {}).flat().map(event => event.instanceId) }) : narrativeEventsForTurn(progress.triggerSignals),
       elapsedMinutes: progress.elapsedMinutes || 0,
       questRewardSettlements: progress.questRewardSettlements || [],
+      commissionUpdates: progress.commissionUpdates || [],
       timedAction: progress.timedAction || null,
       restRecovery: progress.restRecovery || [],
       advancementRecovery: progress.advancementRecovery || [],

@@ -26,6 +26,8 @@ import { actionPreview, attackPreparation } from "../system/combatActions.js";
 import { getAdvancement } from "../system/character.js";
 import { questFocusContext, QUEST_FOCUS_RULE } from "../engine/questFocus.js";
 import { questRecoveryHistory, QUEST_RECOVERY_RULE } from "../engine/questRecovery.js";
+import { inferMapDestination } from "./mapTravel.js";
+import { publicCommissionQuest } from "../engine/commissions.js";
 
 const SHARED_AUTHORITY_RULES = LOCAL_STATE_AUTHORITY_RULES + "【地图调查与公共常识】玩家未揭开地图迷雾只表示其个人尚未确认地点，不表示当地居民不知道该地点。圣赛缪尔教堂是黑夜女神教会的公开教堂，永恒烈阳教堂也是公开宗教场所；正常描写居民指路、公开礼拜与日常活动，不因地图未发现就编造集体不知情、避讳或秘密据点。其他公共地点同理，按身份与当地知识差异自然回应。明确的地图调查在本轮正常完成后由本地规则确认所选地点，只揭开该地点，不自动到访、加入组织或解锁内部秘密；不要把本次调查写成仍无法确认地址。快速模式草稿先写核实过程，具体确认结果留给本地结算后的叙事。";
 
@@ -179,7 +181,7 @@ export function visibleGameState(game) {
     occult: game.occult,
     inventory: visibleInventory(game),
     knownClues: game.clues,
-    activeQuests: game.quests,
+    activeQuests: (game.quests || []).map(quest => publicCommissionQuest(game, quest)),
     taskJournal: visibleQuestJournal(game).map(entry => ({ ...entry, assistance: questAssistance(game, entry) })),
     specialEvents: playerVisibleTriggers(game.triggerState || { active: [] }),
     taskGuidance: (game.triggerState?.active || []).filter(entry => ["available", "engaged"].includes(entry.status)).map(entry => triggerGuidance(game, entry)),
@@ -250,6 +252,7 @@ function privatePlanningState(game, options = {}) {
     triggerObjectives,
     mapDiscoveryCandidates: shouldExposeMapCandidates(game, options) ? privateMapCandidates(game) : undefined,
     requestedMapInvestigation: options.mapInvestigation || null,
+    requestedMapDestination: options.mapDestination ? { id: options.mapDestination.id, name: options.mapDestination.name } : null,
     requestedTalisman: options.talismanRequest || null,
     requestedAbility: options.abilityRequest || null,
     requestedCombatAction: options.combatRequest || null,
@@ -262,6 +265,7 @@ function privatePlanningState(game, options = {}) {
     })(),
     requestedIdentification: options.identificationRequest || null,
     requestedQuestTracking: options.questTrackingPlan || null,
+    requestedCommissionInquiry: options.commissionInquiry || null,
     mapGrowthAnchors: shouldExposeMapCandidates(game, options) ? mapGrowthAnchors(game) : undefined,
     potionFacts: (game.inventory || []).filter((item) => item.potion).map(playerVisibleItem).map((item) => ({
       instanceId: item.instanceId,
@@ -305,12 +309,13 @@ function renderingProtocol(nativeTools) {
 export function buildPlanningContext(game, action, systemPrompt, options = {}) {
   const nativeTools = options.nativeTools !== false;
   const timing = timedAction(action, game.worldTime);
+  const mapDestination = inferMapDestination(game, action, options.mapDestination);
   const context = relevantContext(game, action);
   const data = {
     plannedTimedAction: timing ? { ...timing, worldTime: advanceWorldTime(game.worldTime, timing.elapsedMinutes) } : null,
-    plannedRestTime: timing && timing.kind !== "wait" ? { elapsedMinutes: timing.elapsedMinutes, worldTime: advanceWorldTime(game.worldTime, timing.elapsedMinutes) } : null,
+    plannedRestTime: timing && ["sleep", "rest"].includes(timing.kind) ? { elapsedMinutes: timing.elapsedMinutes, worldTime: advanceWorldTime(game.worldTime, timing.elapsedMinutes) } : null,
     playerVisibleState: promptGameState(game, action, "planning", context),
-    privateSimulationState: privatePlanningState(game, { ...options, playerAction: action }),
+    privateSimulationState: privatePlanningState(game, { ...options, mapDestination, playerAction: action }),
     playerAction: action,
     progressiveContext: progressiveContext(game, action),
     relevantContext: context,

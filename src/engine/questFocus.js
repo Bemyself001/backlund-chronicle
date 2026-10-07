@@ -7,6 +7,13 @@ const continuation = /继续|然后|接着|交谈|询问|他|她|他们|委托�
 export function chooseQuestFocus(game, action = "", calls = [], results = []) {
   const entries = visibleQuestJournal(game);
   if (unrelated.test(action)) return null;
+  const issued = calls.flatMap((call, index) => {
+    if (!results[index]?.ok) return [];
+    const quest = call.name === "commission.offer" ? results[index].data?.quest
+      : call.name === "quest.track" ? game.quests?.find(item => `quest:${item.id}` === call.args?.id) : null;
+    return quest?.commission ? [`quest:${quest.id}`] : [];
+  });
+  if (new Set(issued).size === 1) return { id: issued[0], turn: Number(game.turn || 0) + 1 };
   if (/怀表|纸条/.test(action)) {
     const watch = game.triggerState?.active?.find(instance => instance.definitionId === "watch.heirloom.hidden-note" && ["available", "engaged"].includes(instance.status));
     if (watch) return { id: watch.instanceId, turn: Number(game.turn || 0) + 1 };

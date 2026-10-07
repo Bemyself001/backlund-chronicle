@@ -27,6 +27,7 @@ import { activeEnemies, MAX_COMBAT_ENEMIES } from "../system/combat.js";
 import { mainActionGate, markMainAction } from "../system/combatActions.js";
 import { getChurchTalisman } from "../system/talismans.js";
 import { grantOrganizationTalisman, executeTalismanUse, validateTalismanClue } from "./talismans.js";
+import { offerCommission } from "./commissions.js";
 
 export const TOOL_SCHEMAS = {
   "inventory.add": { required: ["item"], description: "新增或合并一个结构化物品实例" },
@@ -63,6 +64,7 @@ export const TOOL_SCHEMAS = {
   "location.archive": { required: ["locationId", "evidence"], description: "归档不再使用且无关联档案的临时动态地点" },
   "clue.add": { required: ["clue"], description: "添加一条新线索" },
   "quest.add": { required: ["quest"], description: "添加任务" },
+  "commission.offer": { required: ["npcId", "objective", "feePence", "durationMinutes"], description: "登记玩家向侦探发布的调查委托范围和报价，确认前不扣费" },
   "quest.track": { required: ["id", "revision"], description: "执行玩家从任务簿选定并核验的追踪行动" },
   "quest.resolve": { required: ["instanceId", "actionQuote", "outcome", "evidence"], description: "任务引擎：登记自然语言行动结果、连续普通步骤、受阻或付出时间后的新线索；本地核验阶段与条件" },
   "quest.update": { required: ["questId", "patch"], description: "更新任务进度" },
@@ -783,7 +785,7 @@ function executeOne(game, call, options = {}) {
       game.location = { id: location.id, name: location.name, district: mappedDistrict || args.district || location.district || "贝克兰德" };
       game.locationKnowledge = normalizeLocationKnowledge(game.locationKnowledge, game.discoveredLocations, game.location.id, game);
       game.locationKnowledge[location.id] = { ...game.locationKnowledge[location.id], status: "visited", visitedAt: turnLabel };
-      return succeed(call.name, `${turnLabel}：前往「${location.name}」——${call.reason}。`, { travelMinutes: travel?.minutes || 35, travelGrids: travel?.grids ?? null, path: travel?.path || [location.id] });
+      return succeed(call.name, `${turnLabel}：前往「${location.name}」——${call.reason}。`, { locationId: location.id, travelMinutes: travel?.minutes || 35, travelGrids: travel?.grids ?? null, path: travel?.path || [location.id] });
     }
     case "location.archive": {
       const location = getMapLocation(args.locationId, game, { includeArchived: true });
@@ -817,6 +819,10 @@ function executeOne(game, call, options = {}) {
       if (!result.ok) return fail(call.name, result.reason);
       return succeed(call.name, `${turnLabel}：新增任务「${result.quest.title}」。`, { quest: result.quest });
     }
+    case "commission.offer": {
+      const result = offerCommission(game, args, options.playerAction || call.reason, game.turn + 1);
+      return result.ok ? succeed(call.name, `${turnLabel}：${result.reused ? "沿用" : "登记"}「${result.quest.title}」的委托记录，${result.quest.commission.label}。`, result) : fail(call.name, result.reason);
+    }
     case "quest.update": {
       const quest = game.quests.find(entry => entry.id === args.questId);
       if (!quest) return fail(call.name, "任务不存在");
@@ -834,7 +840,7 @@ function executeOne(game, call, options = {}) {
       const request = options.questTrackingRequest;
       if (!request || request.id !== args.id || request.revision !== args.revision || request.routeId !== args.routeId) return fail(call.name, "请通过任务簿选择当前任务与路线");
       const result = resolveQuestTrackingRequest(game, request, game.turn + 1);
-      if (!result.ok || !["travel", "progress"].includes(result.kind)) return fail(call.name, result.reason || "请先选择任务的具体行动");
+      if (!result.ok || !["travel", "progress", "commission"].includes(result.kind)) return fail(call.name, result.reason || "请先选择任务的具体行动");
       return succeed(call.name, `${turnLabel}：${result.action}`, result);
     }
     case "dice.check": {

@@ -8,6 +8,7 @@ import { getMapLocation, normalizeLocationKnowledge } from "../system/map.js";
 import { travelToLocation } from "../system/hexworld.js";
 import { SPECIAL_ACTIONS } from "../content/index.js";
 import { specialState } from "../engine/specialActions.js";
+import { commissionView, isIssuedCommission, settleCommission } from "../engine/commissions.js";
 
 const locationIds = conditions => (conditions || []).flatMap(condition => condition.not ? [] : condition.type === "location" ? [condition.locationId].filter(Boolean) : locationIds(condition.conditions));
 const knownLocation = (game, id) => game.location?.id === id || game.discoveredLocations?.some(location => location.id === id) || ["discovered", "visited"].includes(game.locationKnowledge?.[id]?.status);
@@ -17,10 +18,26 @@ const knownLocation = (game, id) => game.location?.id === id || game.discoveredL
 export function inspectQuestTracking(game, request) {
   game = migrateQuestLifecycle(structuredClone(game));
   let entry = visibleQuestJournal(game).find(item => item.id === request?.id);
-  if (!entry || !["engaged", "available"].includes(entry.status)) return { ok: false, kind: "stale", reason: "这项任务已结束、过期或不存在，请刷新任务列表" };
+  if (!entry) return { ok: false, kind: "stale", reason: "这项任务已结束、过期或不存在，请刷新任务列表" };
   if (entry.revision !== request.revision) return { ok: false, kind: "stale", reason: "任务阶段已改变，请按最新目标继续" };
-  if (Number(game.character?.stats?.health) <= 0) return { ok: false, kind: "blocked", reason: "生命归零，当前无法继续执行任务行动" };
   const quest = entry.source === "quest" ? game.quests?.find(item => item.id === entry.questId) : null;
+  if (isIssuedCommission(quest)) {
+    const view = commissionView(game, quest);
+    const operation = request.routeId?.startsWith("commission:") ? request.routeId.slice(11) : "status";
+    if (operation === "status") return { ok: true, kind: "commission-status", entry,
+      reason: `${view.executorName} · ${view.label}${view.dueAt ? ` · 约定交付：${view.dueAt}` : " · 确认费用后开始调查"}`, action: `查看「${entry.title}」的委托进度` };
+    if (!["accept", "check", "collect", "cancel"].includes(operation)) return { ok: false, kind: "stale", reason: "无效的委托行动" };
+    if (!["engaged", "available"].includes(entry.status)) return { ok: false, kind: "stale", reason: "委托已结束，可在详情中回顾报告与记录" };
+    if (operation === "accept" && view.phase !== "offered" || operation === "collect" && view.phase !== "ready"
+      || operation === "check" && !["investigating", "ready"].includes(view.phase)) return { ok: false, kind: "stale", reason: "委托阶段已改变，请按最新进度操作" };
+    if (Number(game.character?.stats?.health) <= 0) return { ok: false, kind: "blocked", reason: "生命归零，当前无法继续执行任务行动" };
+    if (game.location?.id !== quest.locationId) return travelPlan(game, entry, quest.locationId);
+    const action = operation === "accept" ? `确认「${entry.title}」的报价并支付调查费用`
+      : operation === "collect" ? `领取「${entry.title}」的调查报告` : operation === "cancel" ? `取消「${entry.title}」的调查委托` : `向${view.executorName}询问「${entry.title}」的调查进度`;
+    return { ok: true, kind: "commission", entry, action, operation, questId: quest.id, independentTurn: true };
+  }
+  if (!["engaged", "available"].includes(entry.status)) return { ok: false, kind: "stale", reason: "这项任务已结束、过期或不存在，请刷新任务列表" };
+  if (Number(game.character?.stats?.health) <= 0) return { ok: false, kind: "blocked", reason: "生命归零，当前无法继续执行任务行动" };
   if (quest?.source === "特殊行动") {
     const special = specialState(game);
     const commission = special.active;
@@ -87,7 +104,7 @@ function travelPlan(game, entry, locationId) {
 export function resolveQuestTrackingRequest(game, request, turn = Number(game.turn || 0) + 1) {
   const plan = inspectQuestTracking(game, request);
   if (!plan.ok) return plan;
-  if (!["travel", "progress"].includes(plan.kind)) return plan;
+  if (!["travel", "progress", "commission"].includes(plan.kind)) return plan;
   const draft = structuredClone(game);
   const result = settleTrackingPlan(draft, plan, turn);
   if (result.ok) Object.assign(game, draft);
@@ -95,6 +112,11 @@ export function resolveQuestTrackingRequest(game, request, turn = Number(game.tu
 }
 
 function settleTrackingPlan(game, plan, turn) {
+  if (plan.kind === "commission") {
+    const result = settleCommission(game, plan.questId, plan.operation, turn);
+    if (result.ok) game.trackedQuestId = plan.entry.id;
+    return { ...plan, ...result };
+  }
   if (plan.kind === "travel") {
     if (plan.entry.status === "available") {
       const accepted = plan.entry.source === "quest" ? acceptOrdinaryQuest(game, game.quests.find(quest => quest.id === plan.entry.questId), turn) : engageTrigger(game, plan.entry.id, turn, plan.action);

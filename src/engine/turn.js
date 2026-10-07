@@ -7,6 +7,7 @@ import { resolveSelectedQuestRoute, resolveQuestAction } from "./questActions.js
 import { isRewardClaimAction } from "./questLifecycle.js";
 import { settleHealthEffects } from "./healthEffects.js";
 import { chooseQuestFocus } from "./questFocus.js";
+import { syncIssuedCommissions } from "./commissions.js";
 
 export { advanceWorldTime } from "./worldTime.js";
 
@@ -38,13 +39,17 @@ function successfulTool(toolCalls, toolResults, predicate) {
 
 export function minutesForTurn(action, toolCalls = [], toolResults = [], worldTime = "") {
   const text = String(action || "");
-  const taskMinutes = toolResults.filter(result => result?.ok).map(result => result.data?.taskMinutes).filter(value => Number.isInteger(value) && value > 0);
-  if (taskMinutes.length) return Math.max(...taskMinutes);
   const timing = timedAction(text, worldTime);
-  if (timing) return timing.elapsedMinutes;
-  if (TRAVEL_ACTION.test(text)) return 75;
   const movementIndex = toolCalls.findIndex((call, index) => call.name === "location.move" && toolResults[index]?.ok);
-  if (movementIndex >= 0) return Math.max(1, Number(toolResults[movementIndex]?.data?.travelMinutes) || 35);
+  const travelMinutes = movementIndex >= 0 ? Math.max(1, Number(toolResults[movementIndex]?.data?.travelMinutes) || 35) : 0;
+  // Even an on-site task cannot make a confirmed trip shorter than its route.
+  // Completing an unrelated task cannot shorten an explicit calendar/time skip.
+  if (timing?.kind === "skip" && timing.source !== "unresolvedEnd") return Math.max(travelMinutes, timing.elapsedMinutes);
+  const taskMinutes = toolResults.filter(result => result?.ok).map(result => result.data?.taskMinutes).filter(value => Number.isInteger(value) && value > 0);
+  if (taskMinutes.length) return Math.max(travelMinutes, ...taskMinutes);
+  if (timing) return Math.max(travelMinutes, timing.elapsedMinutes);
+  if (travelMinutes) return travelMinutes;
+  if (TRAVEL_ACTION.test(text)) return 75;
   if (INVESTIGATE_ACTION.test(text)) return 25;
   if (SOCIAL_ACTION.test(text)) return 10;
   if (QUICK_ACTION.test(text)) return 5;
@@ -71,12 +76,12 @@ export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], 
   const focus = chooseQuestFocus(game, action, toolCalls, toolResults);
   let rewardClaimed = false;
   const pending = game.quests?.find(quest => `quest:${quest.id}` === focus?.id && quest.stage === "awaiting-reward");
-  if (pending && isRewardClaimAction(action)) {
+  if (!options.commissionOnly && pending && isRewardClaimAction(action)) {
     const payment = resolveQuestAction(game, { instanceId: focus.id, actionQuote: action, evidence: "玩家向委托人领取已登记的约定报酬", outcome: "claim" }, action, Number(game.turn || 0) + 1);
     if (payment.ok) { toolResults = [...toolResults, { ok: true, data: payment }]; rewardClaimed = true; }
   }
   // Execute the player's exact local route even when the AI omitted quest.resolve.
-  const recovery = resolveSelectedQuestRoute(game, action, Number(game.turn || 0) + 1);
+  const recovery = options.commissionOnly ? null : resolveSelectedQuestRoute(game, action, Number(game.turn || 0) + 1);
   if (recovery) toolResults = [...toolResults, { ok: recovery.ok, data: recovery }];
   const elapsedMinutes = Number.isInteger(options.elapsedMinutes) && options.elapsedMinutes > 0
     ? options.elapsedMinutes : minutesForTurn(action, toolCalls, toolResults, game.worldTime);
@@ -91,7 +96,8 @@ export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], 
   statusTickLogs.push(...restRecovery.map(change => `旅馆休息：${change.label} ${change.before}→${change.after}`));
   const worldTime = advanceWorldTime(game.worldTime, elapsedMinutes);
   game.worldTime = worldTime;
-  const triggerProgress = processTriggers(game, { action, toolCalls, toolResults, turn: nextTurn, travelOnly: Boolean(options.travelOnly) });
+  const commissionUpdates = syncIssuedCommissions(game);
+  const triggerProgress = processTriggers(game, { action: options.commissionOnly ? "处理玩家发布的调查委托" : action, toolCalls, toolResults, turn: nextTurn, travelOnly: Boolean(options.travelOnly || options.commissionOnly) });
   game.questFocus = chooseQuestFocus(game, action, toolCalls, toolResults) || (rewardClaimed ? focus : null);
   // Promotion recovery is the final stat settlement of this turn; ongoing effects remain.
   const advancementRecovery = successfulTool(toolCalls, toolResults, call => call.name === "advancement.promote")
@@ -108,6 +114,7 @@ export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], 
     playerAction: action,
     questRewardSettlements: toolResults.filter(result => result.ok && result.data?.rewardSettlement).map(result => result.data.rewardSettlement),
     elapsedMinutes,
+    commissionUpdates,
     timedAction: timing ? {
       ...timing,
       requestedMinutes: timing.elapsedMinutes,

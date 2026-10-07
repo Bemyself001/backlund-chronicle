@@ -1,5 +1,6 @@
 import { BACKLUND_CONTENT } from "./backlund/manifest.js";
 import { describeAbilityRule } from "./backlund/abilityRules.js";
+export { commissionReportLeads } from "./backlund/commissionReports.js";
 
 function freezeContent(value) {
   if (!value || typeof value !== "object" || Object.isFrozen(value)) return value;

@@ -11,9 +11,12 @@ import { WEAK_POINT_RULES } from "./weakPoints.js";
 import { ADVANCEMENT_STAT_RULE } from "./characterStats.js";
 import { VISITABLE_PERSON_RULE } from "../content/backlund/visitablePeople.js";
 import { PLAYER_ACTION_RULES } from "../services/playerActions.js";
+import { COMMISSION_RULE } from "../engine/commissions.js";
 
 export function fixedNarrativeMessages() {
   return [
+    { role: "system", content: COMMISSION_RULE },
+    { role: "system", content: "【移动与跳时行动】玩家点击行动建议即提交该选项的真实行动，不是仅讨论或计划。requestedMapDestination 是本地从本轮明确移动中解析的已知目的地，location.move 必须使用其精确 ID；本地会补齐漏掉的调用并清除冲突的移动提议。最终地点以 visibleStateAfter.location 和已成功的 location.move 为准，成功到达后直接叙述到达与当地反馈，后续选项从新地点开始；不得继续写成尚未出发或要求再确认同一次移动。询问路线、否定、假设、未来计划和不明确的目的地不自动移动。plannedTimedAction.kind=skip 表示玩家要求跳过时间或快进，按本地计算的明确时长或目标时刻结算；它不等于休息，不自动恢复属性。最终 timedAction.status=completed 时直接完成本次跳时，不要求玩家继续同一次等待；status=pending 时目标仍未确认，只能叙述本地实际经过的时间。" },
     { role: "system", content: PLAYER_ACTION_RULES },
     { role: "system", content: QUEST_ENGINE_RULE },
     { role: "system", content: COMBAT_RULES },

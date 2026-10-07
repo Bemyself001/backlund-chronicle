@@ -3,6 +3,7 @@ import { inspectQuestRoutes } from "./questRoutes.js";
 import { triggerGuidance } from "./triggerGuidance.js";
 import { syncKnownPeople } from "./people.js";
 import { migrateQuestLifecycle, normalizeQuestStatus } from "./questLifecycle.js";
+import { commissionView, isIssuedCommission, issuedCommissionObjective } from "./commissions.js";
 
 export const QUEST_ENGINE_RULE = "【最高优先级：任务引擎契约】开始任务必须通过工具登记名称、摘要、当前目标；固定调查使用quest.resolve，source=特殊行动的委托必须通过特殊行动引擎处理。普通任务用quest.add登记有限contract：coreGoal、nodes[{id,objective,conditions,minutes}]、completionConditions、failureConditions、rewards；conditions只引用当前可验证的地点、物品、事实、线索或行动，不能自造已满足事实。接取时冻结核心目标、条件与奖励。随机小任务2—3必要节点、最多1主要阻碍；支线3—5节点、最多2阻碍；主线每章3—5节点，跑腿最多1层。真实到达、交付、治疗、谈话、战斗及既有证据均可推进，不要求每回合新增线索或新目标。普通步骤最多串行3个，危险、重大选择、倒计时、终章独立结算。引用真实actionQuote并提交冻结目标的steps，不能把意图、否定、假设当作完成。blocked/failed必须有本地现存状态验证；技术工具失败不能改写成NPC阻碍或消耗时间。第一次无进展说明具体原因，第二次展示本地验证的执行路线，玩家选后才执行。语义改名、重复线索不重置停滞；证据和许可持续有效，除非有真实事件改变。完成则按冻结条件结算并归档；后续钩子只能是可选的新任务。quest.update不得改变状态、目标、条件或奖励。未接随机机会10回合到期，接取后只受自身期限约束，固定主支线保留。叙事必须服从本地状态，不提前揭露未知目的地或后续真相。旧复杂任务requiresInvestigation时，玩家调查原任务后通过quest.resolve.legacyPlan一次性补录：coreGoal须逐字不变，evidenceIds引用已登记线索/事实，nodes限定1—3个真实可验证阶段，completionConditions至少包含具体事实、物品或状态；不得改奖励。补录只固定计划，不算完成或进展，后续执行steps才能结案。有契约后不得再次补录。付款/交付可用节点cost{amountPence,itemId,quantity}原子扣除；后续用quest-proof{nodeId,minPaidPence,itemId,quantity}核验永久凭证，不能要求已交付物品仍留在背包。不要再重复调用扣款/移除物品工具。";
 
@@ -47,6 +48,14 @@ export function syncQuestJournal(game) {
   for (const quest of game.quests || []) {
     const status = normalizeQuestStatus(quest.status);
     const id = `quest:${quest.id}`;
+    if (isIssuedCommission(quest)) {
+      const commission = commissionView(game, quest);
+      entries[id] = { id, source: "quest", questId: quest.id, title: quest.title, summary: quest.summary,
+        objective: issuedCommissionObjective(game, quest), status: quest.status, kind: "side", stage: commission.phase,
+        revision: `commission:${commission.phase}:${quest.commission.revision}`, locationId: quest.locationId, commission,
+        policy: { finale: false, isolated: true, canChain: false, canRecover: false }, startedTurn: quest.createdTurn, updatedTurn: game.turn };
+      continue;
+    }
     const summary = text(quest.summary) || `你已开始调查「${quest.title || "未命名任务"}」。`;
     const currentNode = quest.lifecycle?.contract?.nodes?.find(node => !quest.lifecycle.completedNodeIds.includes(node.id));
     const objective = status === "engaged" ? text(quest.objective) || quest.objectives?.find(item => !item.completed)?.text || summary : ({ completed: "任务已完成", failed: "任务失败，后果已保留", abandoned: "已主动放弃" }[status]) || summary;
@@ -71,13 +80,14 @@ export function projectQuestJournal(game) {
   const byTracked = (a, b) => Number(b.id === game.trackedQuestId) - Number(a.id === game.trackedQuestId);
   return { active: entries.filter(entry => entry.status === "engaged").sort(byTracked),
     opportunities: entries.filter(entry => entry.status === "available").sort(byTracked),
-    archive: entries.filter(entry => !["available", "engaged"].includes(entry.status)) };
+    archive: entries.filter(entry => !["available", "engaged"].includes(entry.status)),
+    issued: entries.filter(entry => entry.commission).sort(byTracked) };
 }
 
 export function recordQuestAttempt(game, id, { outcome, evidence = "", stage, turn }) {
   const journal = syncQuestJournal(game);
   const entry = journal.entries[id];
-  if (!entry || entry.status !== "engaged") return;
+  if (!entry || entry.commission || entry.status !== "engaged") return;
   const previous = journal.attempts[id] || {};
   if (previous.lastTurn === turn) return;
   const progressed = outcome === "progress";
@@ -91,6 +101,7 @@ export function recordQuestAttempt(game, id, { outcome, evidence = "", stage, tu
 }
 
 export function questAssistance(game, entry) {
+  if (entry.commission) return null;
   const attempt = game.questJournal?.attempts?.[entry.id];
   if (!attempt || attempt.stage !== entry.stage || entry.status !== "engaged") return null;
   const level = attempt.hintLevel || 0;
@@ -124,7 +135,7 @@ export function settleQuestAttempts(game, calls, results, turn, action = "") {
   // Recover focused attempts even when the model omits or rejects its tool call.
   if (!/暂时搁置|放弃|休息|睡觉|闲逛|不要|不想|不愿|是否|如果/.test(action)) {
     for (const entry of Object.values(game.questJournal.entries)) {
-      if (entry.status !== "engaged" || attempts.has(entry.id)) continue;
+      if (entry.commission || entry.status !== "engaged" || attempts.has(entry.id)) continue;
       const instance = game.triggerState?.active?.find(item => item.instanceId === entry.id);
       const definition = instance && getInstanceTriggerDefinition(instance, game);
       const stage = definition?.stages?.find(item => item.id === instance.stage);
@@ -154,7 +165,11 @@ export function questJournalEvents(game) {
     const engaged = entry.status === "engaged";
     return [{ id, title: entry.title, questId: entry.id, reason: "任务状态与当前方向已由本地引擎确认",
       direction: assistance?.text || entry.objective, narrativeCue: "承接刚取得的结果，只描写当前已知目标，不重复开局或提前揭露后续。",
-      choices: engaged ? [
+      choices: entry.commission && engaged ? [
+        { label: `查看「${entry.title}」的委托进度`, intent: "commission", risk: "low" },
+        { label: entry.commission.phase === "offered" ? `确认「${entry.title}」的报价并支付${entry.commission.feePence}便士调查费用` : entry.commission.phase === "ready" ? `领取「${entry.title}」的调查报告` : `向${entry.commission.executorName}询问「${entry.title}」的委托进度`, intent: "commission", risk: "low" },
+        { label: "等待调查期间处理自己的其他事情", intent: "redirect", risk: "low" },
+      ] : engaged ? [
         { label: entry.stage === "awaiting-reward" ? `向「${entry.title}」的委托人交差，领取约定报酬` : assistance?.recoverable ? assistance.recoveryAction : assistance?.level >= 2 && assistance.availableActions[0] ? assistance.availableActions[0].label : assistance?.level >= 2 && assistance.blockers[0] ? `先解决「${entry.title}」的条件：${assistance.blockers[0]}` : `继续调查「${entry.title}」：${entry.objective}`, intent: "investigate", risk: entry.policy.isolated ? "medium" : "low" },
         { label: assistance?.routes?.[1] ? `花${assistance.routes[1].costMinutes}分钟${assistance.routes[1].label}` : `梳理「${entry.title}」的已有线索，确认仍缺少的条件`, intent: "investigate", risk: "low" },
         { label: `暂时搁置「${entry.title}」，处理其他事情`, intent: "redirect", risk: "low" },

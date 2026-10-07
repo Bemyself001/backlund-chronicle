@@ -26,7 +26,7 @@ import { buildFastNarrativeContinuationContext, buildFastPresentationContext, bu
 import { applyMemorySummary, createMemorySummaryJob, parseMemoryDigestPayload, mergeLatestMemory } from "./services/memoryState.js";
 import { deleteSave, exportSave, importSave, listSaves, loadGame, saveGame } from "./services/storage.js";
 import { extractNarrativePreview } from "./services/streamPreview.js";
-import { ensureMapMoveToolCall, ensureMapDiscoveryToolCall } from "./services/mapTravel.js";
+import { ensureMapMoveToolCall, ensureMapDiscoveryToolCall, inferMapDestination } from "./services/mapTravel.js";
 import { choiceResult, choiceValidationError, hasValidModelChoices, modelChoices, injectOccultEntryChoice } from "./services/choices.js";
 import { applyChoiceRecovery, recoverChoices } from "./services/choiceRecovery.js";
 import { createTurnResolution } from "./services/turnResolution.js";
@@ -53,6 +53,7 @@ import { activeEnemies } from "./system/combat.js";
 import { requestedPersonVisit, visitPersonGate } from "./engine/visitablePeople.js";
 import { validatePlayerActions, ensurePlayerActionTools } from "./services/playerActions.js";
 import { inspectQuestTracking } from "./services/questTracking.js";
+import { inferCommissionInquiry, ensureCommissionOfferTool, inferCommissionTrackingRequest, restoreCommissionRecord, appendCommissionReport } from "./services/commissions.js";
 import { prepareContextIndex } from "./services/contextIndex.js";
 
 export default function App() {
@@ -213,13 +214,21 @@ export default function App() {
     let questTrackingPlan = null;
     let playerRequests;
     try {
+      if (options.commissionRestoreRequest) {
+        const restored = restoreCommissionRecord(game, options.commissionRestoreRequest);
+        if (!restored.ok) throw new Error(restored.reason);
+        commitGame(restored.game); resetAction(); return true;
+      }
+      options = { ...options, questTrackingRequest: options.questTrackingRequest || inferCommissionTrackingRequest(game, action) };
       if (options.questTrackingRequest) {
         questTrackingPlan = inspectQuestTracking(game, options.questTrackingRequest);
         if (!questTrackingPlan.ok) throw new Error(questTrackingPlan.reason);
+        if (questTrackingPlan.kind === "commission-status") { commitGame({ ...game, trackedQuestId: questTrackingPlan.entry.id }); setError(""); return true; }
         if (questTrackingPlan.kind === "special-action") { commitGame({ ...game, trackedQuestId: questTrackingPlan.entry.id }); setModal("special"); return false; }
         if (questTrackingPlan.kind === "choice") throw new Error(questTrackingPlan.reason || "请在任务簿选择具体行动。");
         action = questTrackingPlan.action;
       }
+      options = { ...options, mapDestination: inferMapDestination(game, action, options.mapDestination) };
       playerRequests = validatePlayerActions(game, action, options);
     } catch (err) { setError(err.message); return false; }
     const requestedVisit = requestedPersonVisit(game, action);
@@ -267,9 +276,10 @@ export default function App() {
         const reason = visitPersonGate(game, options.personConversation, { conversation: true });
         if (reason) throw new Error(reason);
       }
-      // All sleep, rest and waiting narration must use the settled clock.
-      const fastMode = Boolean(settings.fastMode) && !questTrackingPlan && !playerRequests.abilityRequest && !playerRequests.combatRequest && !playerRequests.identificationRequest && !playerRequests.advancementRequest && !options.personConversation && !advancementIntent && !talismanRequest && !activeEnemies(game).length && !/符咒/.test(action) && timedAction(action, game.worldTime) === null;
-      const planningOptions = { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation, talismanRequest, ...playerRequests, questTrackingPlan };
+      const commissionInquiry = questTrackingPlan ? null : inferCommissionInquiry(game, action);
+      // Explicit travel and timed actions narrate from the settled location and clock.
+      const fastMode = Boolean(settings.fastMode) && !options.mapDestination && !questTrackingPlan && !commissionInquiry && !playerRequests.abilityRequest && !playerRequests.combatRequest && !playerRequests.identificationRequest && !playerRequests.advancementRequest && !options.personConversation && !advancementIntent && !talismanRequest && !activeEnemies(game).length && !/符咒|委托|雇佣|聘请/.test(action) && timedAction(action, game.worldTime) === null;
+      const planningOptions = { nativeTools: settings.nativeTools, mapInvestigation: options.mapInvestigation, mapDestination: options.mapDestination, talismanRequest, ...playerRequests, questTrackingPlan, commissionInquiry };
       let planningResponse;
       let fastPresentationTask = null;
       if (fastMode) {
@@ -304,10 +314,11 @@ export default function App() {
       }
       const discoveryAdjustedCalls = ensureMapDiscoveryToolCall(normalizeToolCalls(planningResponse.toolCalls, game), options.mapInvestigation, game.turn + 1, game);
       const advancementAdjustedCalls = ensureRequestedAdvancementToolCall(discoveryAdjustedCalls, playerRequests.advancementRequest, game.turn + 1, game);
-      let proposedToolCalls = dedupeToolCalls(normalizeToolCalls(ensureMapMoveToolCall(advancementAdjustedCalls, options.mapDestination, game.turn + 1), game));
+      let proposedToolCalls = dedupeToolCalls(normalizeToolCalls(advancementAdjustedCalls, game));
       const enforceRequests = calls => {
-        if (questTrackingPlan && ["travel", "progress"].includes(questTrackingPlan.kind)) return [{ id: `track:${game.turn + 1}:${options.questTrackingRequest.id}`, name: "quest.track", args: { ...options.questTrackingRequest }, reason: action }];
-        return ensurePlayerActionTools(ensureRequestedAdvancementToolCall(ensureTalismanToolCall(calls, talismanRequest, game), playerRequests.advancementRequest, game.turn + 1, game), { ...playerRequests, talismanRequest }, game, action);
+        if (questTrackingPlan && ["travel", "progress", "commission"].includes(questTrackingPlan.kind)) return [{ id: `track:${game.turn + 1}:${options.questTrackingRequest.id}`, name: "quest.track", args: { ...options.questTrackingRequest }, reason: action }];
+        if (commissionInquiry) return ensureCommissionOfferTool(calls, commissionInquiry, game);
+        return ensureMapMoveToolCall(ensurePlayerActionTools(ensureRequestedAdvancementToolCall(ensureTalismanToolCall(calls, talismanRequest, game), playerRequests.advancementRequest, game.turn + 1, game), { ...playerRequests, talismanRequest }, game, action), options.mapDestination, game.turn + 1, game);
       };
       proposedToolCalls = enforceRequests(proposedToolCalls);
 
@@ -342,7 +353,8 @@ export default function App() {
         if (!execution.results[index]?.ok) throw new Error(`${execution.results[index]?.reason || "符咒效果未能完成"}。符咒与回合均未消耗，可重试。`);
       }
       if (rejected.length) throw new Error(`本轮规则核验未完成：${rejected[0].reason}。游戏进度与物品未改变，可重试。`);
-      let progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results, { travelOnly: questTrackingPlan?.kind === "travel" });
+      const progressOptions = { travelOnly: questTrackingPlan?.kind === "travel", commissionOnly: Boolean(commissionInquiry || questTrackingPlan?.entry.commission || proposedToolCalls.some(call => call.name === "commission.offer")) };
+      let progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results, progressOptions);
       let resolvedGame = {
         ...execution.game,
         turn: game.turn + 1,
@@ -379,7 +391,7 @@ export default function App() {
         };
         if (blockedCallIndexes.length) {
           execution = executeToolCalls(game, proposedToolCalls, { blockedCallIndexes, playerAction: action, questTrackingRequest: options.questTrackingRequest });
-          progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results, { travelOnly: questTrackingPlan?.kind === "travel" });
+          progress = resolveTurnProgress(execution.game, action, selectedRisk, proposedToolCalls, execution.results, progressOptions);
           resolvedGame = {
             ...execution.game,
             turn: game.turn + 1,
@@ -440,7 +452,7 @@ export default function App() {
         if (!response.hasNarrative) throw new Error("模型没有返回最终剧情正文，请重试本轮。");
       }
 
-      response = { ...response, narrative: appendFixedRenardTreatmentScene(response.narrative, progress) };
+      response = { ...response, narrative: appendCommissionReport(appendFixedRenardTreatmentScene(response.narrative, progress), resolution) };
       const { choices, choiceMeta } = choiceResult(modelChoices(response), choiceValidationError(response));
 
       const appearedTrigger = progress.newTrigger ? { id: progress.newTrigger.instanceId, ...progress.newTrigger.presentation } : null;

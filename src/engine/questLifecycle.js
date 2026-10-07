@@ -2,6 +2,7 @@ import { allConditionsMatch, conditionMatches } from "./triggerConditions.js";
 import { moneyFromPence, moneyToPence } from "../system/money.js";
 import { getTriggerDefinition, TRIGGER_DEFINITIONS } from "./triggerDefinitions.js";
 import { playerVisibleItem } from "../system/items.js";
+import { isIssuedCommission, syncIssuedCommissions } from "./commissions.js";
 
 export const QUEST_LIFECYCLE_VERSION = 1;
 export const normalizeQuestStatus = status => ({ active: "engaged", "进行中": "engaged", "已完成": "completed", "失败": "failed", "已失败": "failed", "已放弃": "abandoned", "已过期": "expired" })[status] || status || "engaged";
@@ -108,6 +109,7 @@ export function migrateQuestLifecycle(game, turn = Number(game.turn || 0)) {
     }
   }
   for (const quest of game.quests || []) {
+    if (isIssuedCommission(quest)) continue;
     quest.status = normalizeQuestStatus(quest.status);
     if (!quest.lifecycle) {
       const kind = kinds.has(quest.kind) ? quest.kind : ["random", "random-opportunity"].includes(quest.source) ? "random" : "legacy";
@@ -129,6 +131,7 @@ export function migrateQuestLifecycle(game, turn = Number(game.turn || 0)) {
       quest.status = "expired"; lifecycle.endedTurn = turn;
     }
   }
+  syncIssuedCommissions(game);
   if (game.trackedQuestId) {
     const quest = game.quests?.find(entry => `quest:${entry.id}` === game.trackedQuestId);
     const trigger = game.triggerState?.history?.find(entry => entry.instanceId === game.trackedQuestId);
@@ -142,6 +145,7 @@ export function registerQuest(game, input, turn = Number(game.turn || 0) + 1, pl
   if (game.quests?.some(quest => quest.id === input.id)) return { ok: false, reason: "任务已存在，不能重新接取或领取奖励" };
   if (TRIGGER_DEFINITIONS.some(definition => definition.id === input.id || definition.presentation?.title === clean(input.title))) return { ok: false, reason: "这是预设任务，请使用任务簿中的原任务编号推进，不能重复登记为普通委托" };
   if (input.source === "特殊行动") return { ok: false, reason: "特殊委托只能由特殊行动引擎登记" };
+  if (input.source === "玩家委托" || input.commission) return { ok: false, reason: "玩家发布的调查委托请使用commission.offer登记" };
   const status = input.status ? normalizeQuestStatus(input.status) : "available";
   if (!["available", "engaged"].includes(status)) return { ok: false, reason: "新任务只能登记为待接取或进行中" };
   if (status === "engaged" && (!/接受|接取|答应|承接|同意|帮忙|帮他|帮她|帮你|我来|委托/.test(playerAction) || /不要|不愿|不想|拒绝|是否|能否|如果|假如/.test(playerAction))) return { ok: false, reason: "进行中任务须有玩家本轮明确接受；新钩子请登记为可选机会" };
@@ -175,6 +179,7 @@ export function acceptOrdinaryQuest(game, quest, turn) {
 }
 
 export function validateQuestPatch(quest, patch = {}) {
+  if (isIssuedCommission(quest)) return { ok: false, reason: "玩家委托由登记、进度与报告领取流程管理，不能用普通任务更新改写" };
   if (quest.source === "特殊行动") return { ok: false, reason: "此委托由特殊行动引擎独立结算" };
   if (terminalQuestStatus(quest.status)) return { ok: false, reason: "已结束任务保留最终记录" };
   if (Object.keys(patch).some(key => key !== "summary")) return { ok: false, reason: "quest.update只能修正摘要；状态、核心目标、条件和奖励必须由本地任务结算确认" };

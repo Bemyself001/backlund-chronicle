@@ -6,6 +6,7 @@ import { getMapLocation } from "../system/map.js";
 import { formatMoney, moneyToPence } from "../system/money.js";
 import PotionIdentification from "./PotionIdentification.jsx";
 import QuickWait from "./QuickWait.jsx";
+import InvestigationCommission from "./InvestigationCommission.jsx";
 import styles from "./SpecialActions.module.css";
 import { medicinePurchaseGate } from "../engine/medicineAccess.js";
 import { hasMetPerson, visitPersonGate } from "../engine/visitablePeople.js";
@@ -57,6 +58,7 @@ export default function SpecialActions({ game, loading, onExecute, onOpenMap, on
             onClick={() => onAction(topic.action, { personConversation: person.id })}>{topic.label}</button>)}</div>
           <p className={styles.hint}>{conversationReason || "也可在剧情中自由输入交谈内容；正式委托与费用另行商定。"}</p>
           {person.locationId === "minsk-street-15" && <PotionIdentification game={game} disabled={loading} onAction={onAction} />}
+          {person.id === "sherlock-moriarty" && <InvestigationCommission game={game} person={person} disabled={loading} onAction={onAction} />}
         </article>;
       })}
     </section>}

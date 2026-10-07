@@ -565,6 +565,12 @@ const TOOL_PARAMETER_SCHEMAS = {
       reason: { type: "string" },
     },
   },
+  "commission.offer": {
+    type: "object", additionalProperties: false, required: ["npcId", "objective", "feePence", "durationMinutes", "reason"],
+    properties: { npcId: { type: "string", enum: ["sherlock-moriarty"] }, objective: { type: "string", description: "玩家明确委托的有限调查范围，交付成果是报告，不能替玩家完成主线" },
+      feePence: { type: "integer", minimum: 0, maximum: 240000 }, durationMinutes: { type: "integer", minimum: 60, maximum: 10080 },
+      relatedQuestId: { type: "string", description: "可选，已可见的原调查任务ID" }, sourceClueIds: { type: "array", maxItems: 2, items: { type: "string" } }, reason: { type: "string" } },
+  },
   "quest.update": {
     type: "object",
     additionalProperties: false,
@@ -595,7 +601,7 @@ const TOOL_PARAMETER_SCHEMAS = {
   },
 };
 
-const STATE_TOOL_NAMES = ["context.lookup", "inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "potion.identify", "ability.use", "enemy.encounter", "combat.action", "enemy.act", "enemy.leave", "item.equip", "item.unequip", "occult.contact", "trigger.engage", "trigger.progress", "trigger.abandon", "organization.join", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.grow", "location.discover", "location.move", "location.archive", "clue.add", "quest.add", "quest.update", "quest.resolve", "dice.check"];
+const STATE_TOOL_NAMES = ["context.lookup", "inventory.add", "inventory.remove", "inventory.update", "money.add", "money.remove", "money.inspect", "item.inspect", "item.use", "potion.identify", "ability.use", "enemy.encounter", "combat.action", "enemy.act", "enemy.leave", "item.equip", "item.unequip", "occult.contact", "trigger.engage", "trigger.progress", "trigger.abandon", "organization.join", "occult.reveal", "advancement.promote", "character.update", "status.add", "status.remove", "relationship.update", "location.grow", "location.discover", "location.move", "location.archive", "clue.add", "quest.add", "commission.offer", "quest.update", "quest.resolve", "dice.check"];
 
 const CHOICE_TOOL_SCHEMA = {
   type: "object",

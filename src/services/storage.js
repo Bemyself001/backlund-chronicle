@@ -20,6 +20,7 @@ import { normalizeCombatState } from "../system/combat.js";
 import { grantOrganizationTalisman } from "../engine/talismans.js";
 import { migrateCharacterStatRules } from "./statMigrations.js";
 import { migrateHealthEffects } from "../engine/healthEffects.js";
+import { validateCommissionRecords } from "../engine/commissions.js";
 
 const SAVES_KEY = "mist-chronicle-saves-v1";
 const AUTOSAVE_ID = "autosave";
@@ -155,6 +156,7 @@ export function migrateSave(raw) {
   grantOrganizationTalisman(result);
   result.specialActions = specialState(result);
   result.triggerState = normalizeTriggerState(result);
+  validateCommissionRecords(result);
   migrateContentState(result);
   syncLegacyOccult(result, result.triggerState);
   syncQuestJournal(result);
@@ -183,6 +185,7 @@ export async function importSave(file) {
 
 // Validate before replacing a playable archive. Migration alone also accepts partial legacy data.
 export function validatePlayableSave(game) {
+  validateCommissionRecords(game);
   const fail = (field) => { throw new Error(`存档中的「${field}」数据不完整或格式错误，原存档未被覆盖。`); };
   if (typeof game.id !== "string" || !game.id) fail("档案编号");
   if (!Number.isInteger(game.turn) || game.turn < 0) fail("回合");

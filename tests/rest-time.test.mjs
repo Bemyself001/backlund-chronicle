@@ -107,3 +107,42 @@ test("timed action completion and local interruption are explicit in final settl
   assert.equal(arrived.timedAction.status, "completed");
   assert.equal(resolveTurnProgress(structuredClone(game), "睡到自然醒", "low").timedAction.status, "completed");
 });
+
+test("time-skip choices settle explicit durations and calendar targets without being treated as rest", () => {
+  for (const [action, expected] of [
+    ["跳过时间到明天早上六点", 400], ["快进到明早", 400], ["直接跳到次日上午九点", 580],
+    ["时间推进至第二天中午", 760], ["把时间快进到后天晚上八点半", 2710],
+    ["跳过时间到明天", 400], ["跳转到翌日早晨", 400], ["快进2小时", 120],
+    ["推进时间半小时", 30], ["跳过三个半小时", 210], ["跳过时间，直到明早七点半", 490],
+  ]) {
+    const timing = timedAction(action, late);
+    assert.equal(timing?.kind, "skip", action);
+    assert.equal(timing.elapsedMinutes, expected, action);
+    assert.equal(minutesForTurn(action, [], [], late), expected, action);
+    assert.equal(restMinutes(action, late), null, action);
+  }
+  const game = createInitialGame({ ...EMPTY_CHARACTER, name: "跳时回归" });
+  game.worldTime = late;
+  game.location = { id: "soot-lamp", name: "桥区·雾鸦旅店" };
+  game.character.stats.health -= 2;
+  game.character.stats.sanity -= 2;
+  const progress = resolveTurnProgress(structuredClone(game), "跳过时间到明天早上六点", "low");
+  assert.equal(progress.elapsedMinutes, 400);
+  assert.equal(progress.worldTime, "1350年 1月1日 · 周一 · 06:00");
+  assert.equal(progress.timedAction.status, "completed");
+  assert.deepEqual(progress.restRecovery, []);
+  const taskResult = { ok: true, data: { taskMinutes: 20 }, log: "普通调查已完成" };
+  const withTask = resolveTurnProgress(structuredClone(game), "跳过时间到明天早上六点", "low", [], [taskResult]);
+  assert.equal(withTask.worldTime, progress.worldTime);
+  assert.equal(withTask.timedAction.status, "completed");
+  const planning = buildPlanningContext(game, "跳过时间到明天早上六点", "");
+  const data = JSON.parse(planning.at(-1).content.split("\n")[1]);
+  assert.equal(data.plannedTimedAction.worldTime, progress.worldTime);
+  assert.equal(data.plannedRestTime, null);
+});
+
+test("negated, historical, hypothetical or non-temporal skip text does not jump time", () => {
+  for (const action of ["不要快进到明天", "不想现在快进到明天", "不跳过时间", "询问是否跳过两小时", "如果跳到明早", "昨天快进到晚上", "跳过这个话题", "跳过前往旅店的步骤", "考虑跳过时间到明天"]) {
+    assert.equal(timedAction(action, late), null, action);
+  }
+});

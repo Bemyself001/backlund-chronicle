@@ -10,6 +10,7 @@ const locationConditions = (conditions, context) => conditions.flatMap(condition
 
 // Routes describe existing transitions, never invent facts or waive prerequisites.
 export function inspectQuestRoutes(game, entry) {
+  if (entry.commission) return { routes: [], blockers: [] };
   if (entry.source === "quest" && entry.status === "engaged") {
     const quest = game.quests?.find(item => item.id === entry.questId);
     if (!quest || quest.source === "特殊行动") return { routes: [], blockers: [] };

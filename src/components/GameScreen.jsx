@@ -171,12 +171,17 @@ function GameSession({ game, loading, turnPhase, streamText, error, onAction, on
   const performAction = async (action, options, clearDraft = false) => {
     if (loading || busyRef.current || !action.trim()) return false;
     busyRef.current = true;
-    followRef.current = true;
-    setFollowingLatest(true);
-    setPendingAction(action);
-    setPanel(null);
-    setEditing(false);
-    inputRef.current?.blur();
+    const request = options?.questTrackingRequest;
+    const localReview = options?.commissionRestoreRequest || request && (!request.routeId || request.routeId === "commission:status")
+      && game.quests.some(quest => `quest:${quest.id}` === request.id && quest.commission?.version === 1);
+    if (!localReview) {
+      followRef.current = true;
+      setFollowingLatest(true);
+      setPendingAction(action);
+      setPanel(null);
+      setEditing(false);
+      inputRef.current?.blur();
+    }
     try {
       const completed = await onAction(action, options);
       if (completed && clearDraft) setInput("");

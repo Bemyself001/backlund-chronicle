@@ -10,6 +10,7 @@ import { terminalTrigger } from "./triggerState.js";
 import { findQuestReference } from "./questIdentity.js";
 import { recoverMissingQuest } from "./questRecovery.js";
 import { reconcileFixedQuestReward } from "./questRewards.js";
+import { isIssuedCommission } from "./commissions.js";
 
 export function resolveSelectedQuestRoute(game, action, turn, expectedId) {
   const selected = selectedQuestRoute(game, syncQuestJournal(game).entries, action);
@@ -51,6 +52,7 @@ export function resolveQuestAction(game, args, action, turn) {
   const quote = String(args.actionQuote || "").trim();
   let evidence = String(args.evidence || "").trim();
   if (!entry) return { ok: false, reason: "任务必须已经可见或通过quest.add登记" };
+  if (entry.commission || draft.quests.some(quest => `quest:${quest.id}` === id && isIssuedCommission(quest))) return { ok: false, reason: "玩家发布的委托由受托人执行，请通过任务簿跟进或领取报告" };
   if (entry.source === "quest" && draft.quests.find(item => item.id === entry.questId)?.source === "特殊行动") return { ok: false, reason: "此委托由特殊行动引擎结算，请在特殊行动内选择处理方式" };
   if (quote.length < 2 || !String(action || "").includes(quote)) return { ok: false, reason: "任务判断必须引用玩家本轮真实行动" };
   if (evidence.length < 4) return { ok: false, reason: "必须提供当前行动的具体结果或受阻原因" };
