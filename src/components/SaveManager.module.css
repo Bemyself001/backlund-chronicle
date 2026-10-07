@@ -1,13 +1,14 @@
 /* Flex spacing fallbacks are activated only by the startup layout probe. */
-.toolbar { display: flex; align-items: flex-end; align-items: end; gap: .6rem; padding-bottom: 1rem; border-bottom: 1px solid #89765455; }
+.toolbar { display: flex; align-items: flex-end; align-items: end; gap: .6rem; padding-bottom: 1rem; border-bottom: 1px solid var(--panel-line); }
 
 :global(.no-flex-gap) .toolbar { gap: 0; }
 :global(.no-flex-gap) .toolbar > :not(:last-child) { margin-right: .6rem; margin-bottom: 0; }
 .toolbar label { display: grid; flex: 1; gap: .35rem; color: var(--ink-soft); font: 700 .66rem var(--font-sans); letter-spacing: .1em; text-transform: uppercase; }
-.toolbar input { min-width: 0; width: 100%; min-height: 2.65rem; padding: .6rem .7rem; border: 1px solid #76684f; border-radius: 0; background: #f2e7d1; color: var(--ink); }
+.toolbar input { min-width: 0; width: 100%; min-height: 2.65rem; padding: .6rem .7rem; border: 1px solid var(--panel-line); border-radius: 0; background: var(--panel-bg); color: var(--ink); }
+.toolbar input::placeholder { color: var(--ink-soft); opacity: 1; }
 .list { display: grid; gap: .55rem; margin-top: 1rem; }
 .slots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: .8rem; margin-top: 1rem; }
-.slot { display: flex; flex-direction: column; min-width: 0; gap: 1rem; padding: 1rem; border: 1px solid #89765466; border-top: 3px solid var(--brass); background: #c4ab7a18; }
+.slot { display: flex; flex-direction: column; min-width: 0; gap: 1rem; padding: 1rem; border: 1px solid var(--panel-line); border-top: 3px solid var(--brass); background: var(--panel-raised); }
 
 :global(.no-flex-gap) .slot { gap: 0; }
 :global(.no-flex-gap) .slot > :not(:last-child) { margin-right: 0; margin-bottom: 1rem; }
@@ -21,12 +22,12 @@
 .sectionIntro { margin: 1.2rem 0 0; color: var(--ink); font: 700 .85rem var(--font-sans); }
 .sectionIntro span { display: block; margin-top: .4rem; color: var(--ink-soft); font: .75rem/1.6 var(--font-sans); }
 .emptySlot { border-style: dashed; background: transparent; }
-.autoSection { display: grid; gap: .8rem; margin-top: 1rem; padding: 1rem; border-left: 3px solid var(--verdigris); background: #275f4d0c; }
+.autoSection { display: grid; gap: .8rem; margin-top: 1rem; padding: 1rem; border-left: 3px solid var(--verdigris); background: var(--panel-raised); }
 .autoSection h3 { margin: 0 0 .4rem; font: 600 .85rem var(--font-sans); }
 .autoSection p, .legacySection > p { margin: 0; color: var(--ink-soft); font: .75rem/1.6 var(--font-sans); }
-.legacySection { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid #89765455; }
+.legacySection { margin-top: 1rem; padding-top: 1rem; border-top: 1px solid var(--panel-line); }
 .legacySection summary { cursor: pointer; margin-bottom: .7rem; color: var(--ink); font: 700 .8rem var(--font-sans); }
-.legacySlot { padding: 1rem; border: 1px solid #89765455; }
+.legacySlot { padding: 1rem; border: 1px solid var(--panel-line); }
 .legacySlot h3 { font: 500 1rem var(--font-serif); margin: 0 0 .4rem; }
 .legacySlot p { color: var(--ink-soft); font: .72rem/1.5 var(--font-sans); }
 .slot span { color: var(--verdigris); font: 700 .62rem var(--font-mono); letter-spacing: .14em; }
@@ -37,16 +38,16 @@
 :global(.no-flex-gap) .slotActions { gap: 0; }
 :global(.no-flex-gap) .slotActions > :not(:last-child) { margin-right: .4rem; margin-bottom: .4rem; }
 .slot > .slotActions { margin-top: auto; }
-.slot .saveButton { flex-basis: 100%; background: #b59a6033; font-weight: 700; }
+.slot .saveButton { flex-basis: 100%; background: var(--panel-bg); font-weight: 700; }
 .slotActions button { flex: 1; }
-.slotActions button { min-height: 2.4rem; padding: .45rem .7rem; border: 1px solid #76684f; background: transparent; color: var(--ink); font: 700 .7rem var(--font-sans); }
-.slotActions button:hover:not(:disabled) { background: #241f19; color: var(--paper-pale); }
+.slotActions button { min-height: 2.4rem; padding: .45rem .7rem; border: 1px solid var(--panel-line); background: transparent; color: var(--ink); font: 700 .7rem var(--font-sans); }
+.slotActions button:hover:not(:disabled) { background: var(--panel-accent); color: var(--panel-bg); }
 .slotActions button:disabled { opacity: .45; cursor: not-allowed; }
-.slotActions .delete { color: #7d2822; }
+.slotActions .delete { color: var(--danger); }
 .empty { padding: 1rem 0; color: var(--ink-soft); }
-.error { padding: .7rem; background: #7d282217; color: #72241e; }
-.notice { padding: .7rem; border-left: 3px solid var(--verdigris); background: #275f4d14; color: #285548; font: .78rem var(--font-sans); }
-.exportNotice { margin-top: 1rem; padding: 1rem; border: 1px solid #527866; border-left: 3px solid var(--verdigris); background: #275f4d14; color: #285548; font: .82rem/1.65 var(--font-sans); }
+.error { padding: .7rem; background: var(--panel-raised); color: var(--danger); }
+.notice { padding: .7rem; border-left: 3px solid var(--verdigris); background: var(--panel-raised); color: var(--verdigris); font: .78rem var(--font-sans); }
+.exportNotice { margin-top: 1rem; padding: 1rem; border: 1px solid var(--panel-line); border-left: 3px solid var(--verdigris); background: var(--panel-raised); color: var(--verdigris); font: .82rem/1.65 var(--font-sans); }
 .exportNotice > strong { font-size: .95rem; }
 .exportNotice dl { margin: .7rem 0; }
 .exportNotice dl > div { margin: .6rem 0; }

@@ -71,7 +71,7 @@ export default function QuickWait({ game, loading, onWait }) {
   };
 
   return <section className={styles.wait} aria-label="快速等待">
-    <div className={styles.heading}><h3>快速等待</h3><span>一圈 · 24小时</span></div>
+    <div className={styles.heading}><h3>跳过时间</h3><span>一圈 · 24小时</span></div>
     <p className={styles.intro}>拨动时针，选择想抵达的时刻。</p>
     <div className={styles.dial} role="slider" tabIndex={disabled ? -1 : 0} aria-label="等待时长"
       aria-valuemin={MIN_WAIT_HOURS} aria-valuemax={MAX_WAIT_HOURS} aria-valuenow={hours}
@@ -80,6 +80,7 @@ export default function QuickWait({ game, loading, onWait }) {
       onPointerDown={startDrag} onPointerMove={moveDrag} onPointerUp={endDrag}
       onPointerCancel={event => endDrag(event, true)} onLostPointerCapture={() => { drag.current = null; }} onKeyDown={changeWithKeys}>
       <svg viewBox="0 0 320 320" width="320" height="320" aria-hidden="true">
+        <circle className={styles.bezel} cx="160" cy="160" r="143" />
         <circle className={styles.face} cx="160" cy="160" r="96" />
         <circle className={styles.track} cx="160" cy="160" r={RADIUS} />
         <circle className={styles.arc} cx="160" cy="160" r={RADIUS}

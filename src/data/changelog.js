@@ -150,11 +150,11 @@ const RELEASE_149_UPDATE = {
   ],
 };
 
-export const LATEST_UPDATE = {
+const RELEASE_NATIVE_180_UPDATE = {
   pending: false,
   channel: "native",
   date: "2026-10-07", dateLabel: "2026.10.07",
-  title: `${NATIVE_RELEASE_VERSION} · 原生Android公开预览`,
+  title: "1.8.0-native.1 · 原生Android公开预览",
   summary: "发布Kotlin与Jetpack Compose原生界面，使用独立QuickJS复用现有游戏规则；可与1.7.5同时安装，通过JSON迁移存档。",
   changes: [
     "原生APK通过独立发布标签构建，完整规则、原生运行时及Android模拟器验证通过后，公开发布安装包、SHA-256校验文件与签名信息。",
@@ -173,6 +173,23 @@ export const LATEST_UPDATE = {
     "原生行囊增加符咒敌人目标选择，夏洛克人物服务接入每瓶一镑的魔药鉴定确认。",
     "退出原生活动时先完成取消清理，再在同一规则线程关闭QuickJS，避免跨线程释放运行时。",
     "Compose依赖固定为与Android 36及现有Gradle工具链兼容的稳定版本。",
+  ],
+};
+
+export const LATEST_UPDATE = {
+  pending: true,
+  date: "2026-10-07", dateLabel: "2026.10.07",
+  title: "开发中 · 雾都书卷与午夜档案UI",
+  summary: `网页版与原生${NATIVE_RELEASE_VERSION}同步采用暖纸书卷和午夜墨蓝外观，保留三色状态条、特殊行动与完整24小时等待时钟。`,
+  changes: [
+    "统一深绿、黄铜与暖纸的日读外观，以及墨蓝、暖白与冷金的夜读外观，细化正文、章节、选项和资料面板的字号、留白与描边；地图与档案弹窗跟随阅读主题。",
+    "生命、理智和灵性继续使用红、蓝、金三色，常驻显示当前值、上限与进度条；原生版补回可视状态条、低值提示和点入角色档案的操作。",
+    "剧情行动区增加具名的特殊行动和跳过时间快捷入口，保留原有主导航、特殊行动分类、任务、人物、配方与组织操作。",
+    "原生版加入可拖动的24小时等待圆钟，保留1、6、12、24小时预设、加减调整、当前与抵达时间，以及明确确认和禁用原因。",
+    "等待预览由两版共用的本地历法规则计算，浏览和取消面板不消耗回合；确认仍校验回合、时钟及版本，防止重复推进。",
+    "手机顶部和行动区重新分配空间，长选项与风险标签有清楚层次，资料和等待面板保持可滚动。",
+    "原生主题与组件独立组织，存档、角色、任务和行囊共享视觉规范；六边形地图与存档结构保持兼容。",
+    "补充原生等待跨日预览、只读投影和战斗禁用回归验证，并在浏览器与Android模拟器核验关键入口和日夜外观。",
   ],
 };
 
@@ -785,6 +802,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_NATIVE_180_UPDATE,
   RELEASE_175_UPDATE,
   RELEASE_174_UPDATE,
   RELEASE_173_UPDATE,

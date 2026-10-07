@@ -18,9 +18,9 @@ button, input, textarea, select { border-radius: 1px; }
 .button--large { min-height: 3.25rem; padding-inline: 1.4rem; }
 .button--primary { border-color: var(--brass-light); background: var(--brass-light); color: #15130f; }
 .button--primary:hover:not(:disabled) { border-color: #dac080; background: #dac080; }
-.button--secondary { border-color: #8d7955; background: transparent; color: var(--paper-pale); }
+.button--secondary { border-color: #8d7955; background: transparent; color: var(--frame-text); }
 .button--secondary:hover:not(:disabled) { border-color: var(--brass-light); background: #c3a36314; }
 .button--ghost { border-color: #77684e; background: transparent; color: var(--ink); }
-.button--ghost:hover:not(:disabled) { background: #2d2922; color: var(--paper-pale); }
+.button--ghost:hover:not(:disabled) { background: #2d2922; color: var(--frame-text); }
 .button:disabled { opacity: .42; }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; } }

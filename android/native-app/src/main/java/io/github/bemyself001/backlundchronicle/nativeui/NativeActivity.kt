@@ -10,14 +10,15 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.detectTransformGestures
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardActions
@@ -36,7 +37,9 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.heading
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -94,53 +97,33 @@ class NativeActivity : ComponentActivity() {
     }
 }
 
-private val Green = Color(0xFF173E35)
-private val Brass = Color(0xFFAD8650)
-private val Paper = Color(0xFFF4EEDF)
-private val Ink = Color(0xFF29372F)
-
 @Composable
 fun NativeGameApp(model: GameViewModel, onImport: () -> Unit = {}, onExport: () -> Unit = {}) {
     val state by model.state.collectAsStateWithLifecycle()
     val dark = state.settings.optBoolean("readingDark")
-    val colors = if (dark) darkColorScheme(primary = Color(0xFFCBA877), secondary = Color(0xFFB0CBB8), background = Color(0xFF15241E), surface = Color(0xFF20362C))
-        else lightColorScheme(primary = Green, secondary = Brass, background = Paper, surface = Color(0xFFFAF6EC), onSurface = Ink)
-    MaterialTheme(colorScheme = colors) {
+    NativeTheme(dark) {
         val holder = rememberSaveableStateHolder()
         var draft by rememberSaveable { mutableStateOf("") }
+        var showWait by rememberSaveable { mutableStateOf(false) }
+        fun wait(hours: Int) {
+            val game = state.game ?: return
+            model.special(JSONObject().put("operation", "wait").put("hours", hours).put("revision", game.obj("special").optInt("revision")).put("expectedTurn", game.optInt("turn")).put("expectedWorldTime", game.text("worldTime")))
+        }
         Scaffold(
-            topBar = { Column(Modifier.background(Green).statusBarsPadding().padding(horizontal = 18.dp, vertical = 12.dp)) {
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    Text("贝克兰德纪事", color = Paper, fontFamily = FontFamily.Serif, fontSize = 23.sp, modifier = Modifier.weight(1f))
-                    Text("原生版", color = Color(0xFFD2B17C), fontSize = 12.sp)
-                }
-                state.game?.let { game ->
-                    Text("${game.obj("location").text("name")} · 第${game.optInt("turn")}轮", color = Paper, fontSize = 13.sp)
-                    Text(game.text("worldTime"), color = Color(0xFFCDCFB8), fontSize = 12.sp)
-                    Spacer(Modifier.height(8.dp))
-                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        val stats = game.obj("character").obj("stats")
-                        listOf(Triple("生命", "health", "maxHealth"), Triple("理智", "sanity", "maxSanity"), Triple("灵性", "spirituality", "maxSpirituality")).forEach { (label, value, max) ->
-                            Text("$label ${stats.optInt(value)}/${stats.optInt(max)}", color = Paper, fontSize = 13.sp)
-                        }
-                    }
-                    Text(game.text("moneyLabel"), color = Color(0xFFD2B17C), fontSize = 12.sp)
-                }
-            } },
-            bottomBar = { if (state.game != null) Column(Modifier.navigationBarsPadding().imePadding()) {
-                if (state.panel == "story") Row(Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                    OutlinedTextField(draft, { draft = it }, Modifier.weight(1f), label = { Text("自由行动") }, maxLines = 3,
-                        enabled = !state.busy, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { if (draft.isNotBlank() && !state.busy) { model.action(draft); draft = "" } }))
-                    Spacer(Modifier.width(8.dp))
-                    Button(onClick = { model.action(draft); draft = "" }, enabled = !state.busy && draft.isNotBlank()) { Text("行动") }
-                }
-                Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surface)) {
-                    listOf("story" to "剧情", "map" to "地图", "quests" to "任务", "inventory" to "行囊", "character" to "角色", "menu" to "菜单").forEach { (id, label) ->
-                        TextButton(onClick = { model.panel(id) }, modifier = Modifier.weight(1f), contentPadding = PaddingValues(vertical = 10.dp, horizontal = 0.dp)) {
-                            Text(label, fontSize = 13.sp, fontWeight = if (state.panel == id) FontWeight.Bold else FontWeight.Normal)
-                        }
+            modifier = Modifier.testTag(if (dark) "native-night" else "native-day"),
+            containerColor = MaterialTheme.colorScheme.background,
+            topBar = { ChronicleHeader(state.game) { model.panel("character") } },
+            bottomBar = { if (state.game != null) Column(Modifier.background(MaterialTheme.colorScheme.surface).navigationBarsPadding().imePadding()) {
+                ChronicleShortcuts(!state.busy, { model.panel("special") }, { showWait = true })
+                if (state.panel == "story") {
+                    Row(Modifier.fillMaxWidth().padding(horizontal = 14.dp, vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                        OutlinedTextField(draft, { draft = it }, Modifier.weight(1f), label = { Text("自由行动") }, maxLines = 3,
+                            enabled = !state.busy, keyboardOptions = KeyboardOptions(imeAction = ImeAction.Send), keyboardActions = KeyboardActions(onSend = { if (draft.isNotBlank() && !state.busy) { model.action(draft); draft = "" } }))
+                        Spacer(Modifier.width(8.dp))
+                        ChronicleButton(onClick = { model.action(draft); draft = "" }, enabled = !state.busy && draft.isNotBlank()) { Text("行动") }
                     }
                 }
+                ChronicleNavigation(state.panel, model::panel)
             } },
         ) { padding ->
             Column(Modifier.fillMaxSize().padding(padding)) {
@@ -155,7 +138,7 @@ fun NativeGameApp(model: GameViewModel, onImport: () -> Unit = {}, onExport: () 
                     Text(state.error, Modifier.weight(1f), color = MaterialTheme.colorScheme.onErrorContainer, fontSize = 13.sp)
                     if (state.game != null && !state.busy) TextButton(onClick = model::retry) { Text("重试") }
                 }
-                if (state.notice.isNotBlank()) Text(state.notice, Modifier.padding(14.dp), fontSize = 13.sp)
+                if (state.notice.isNotBlank()) Text(state.notice, Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceVariant).padding(horizontal = 18.dp, vertical = 8.dp), style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 holder.SaveableStateProvider(state.panel) {
                     when (state.panel) {
                         "create" -> CreateCharacter(state, model)
@@ -174,6 +157,7 @@ fun NativeGameApp(model: GameViewModel, onImport: () -> Unit = {}, onExport: () 
                 }
             }
         }
+        if (showWait && state.game != null) NativeWaitSheet(state.game!!, state.busy, { hours -> wait(hours); showWait = false }, { showWait = false })
         state.confirmations?.let { changes ->
             var approved by remember(changes) { mutableStateOf(changes.objects().map { it.text("key") }.toSet()) }
             AlertDialog(onDismissRequest = model::cancel, title = { Text("确认本轮重要变化") },
@@ -183,7 +167,7 @@ fun NativeGameApp(model: GameViewModel, onImport: () -> Unit = {}, onExport: () 
                         Column { Text("${if (change.text("direction") == "gain") "获得" else "失去"} ${change.text("name", "物品或晋升变化")} ×${change.optInt("quantity", 1)}", fontWeight = FontWeight.Bold); Text(change.text("reason"), fontSize = 13.sp) }
                     }
                 } } },
-                confirmButton = { Button(onClick = { model.confirm(JSONArray(approved.toList())) }) { Text("确认选择") } },
+                confirmButton = { ChronicleButton(onClick = { model.confirm(JSONArray(approved.toList())) }) { Text("确认选择") } },
                 dismissButton = { TextButton(onClick = model::cancel) { Text("取消本轮") } })
         }
     }
@@ -192,16 +176,17 @@ fun NativeGameApp(model: GameViewModel, onImport: () -> Unit = {}, onExport: () 
 @Composable
 private fun Page(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Text(title, fontSize = 25.sp, fontFamily = FontFamily.Serif, color = MaterialTheme.colorScheme.primary)
+        Text(title, style = MaterialTheme.typography.headlineMedium, color = MaterialTheme.colorScheme.primary, modifier = Modifier.semantics { heading() })
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         content()
         Spacer(Modifier.height(20.dp))
     }
 }
 @Composable
 private fun CardBlock(title: String, description: String = "", content: @Composable ColumnScope.() -> Unit = {}) {
-    Card(Modifier.fillMaxWidth(), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            Text(title, fontSize = 18.sp, fontWeight = FontWeight.SemiBold)
+    Card(Modifier.fillMaxWidth(), shape = MaterialTheme.shapes.medium, border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant), colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface)) {
+        Column(Modifier.padding(14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(title, style = MaterialTheme.typography.titleMedium)
             if (description.isNotBlank()) Text(description, fontSize = 14.sp, lineHeight = 22.sp)
             content()
         }
@@ -210,16 +195,16 @@ private fun CardBlock(title: String, description: String = "", content: @Composa
 @Composable
 private fun Chips(values: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit) {
     Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        values.forEach { (id, label) -> FilterChip(selected == id, { onSelect(id) }, label = { Text(label) }) }
+        values.forEach { (id, label) -> FilterChip(selected == id, { onSelect(id) }, label = { Text(label) }, shape = MaterialTheme.shapes.small) }
     }
 }
 @Composable
 private fun WelcomePanel(state: GameUiState, model: GameViewModel, onImport: () -> Unit) = Page("雾都，等待你的故事") {
     Text("在鲁恩王国首都贝克兰德，选择你的身份、生活与调查方向。", lineHeight = 26.sp)
     if (!state.ready) CircularProgressIndicator()
-    Button(onClick = { model.panel("create") }, enabled = state.ready && !state.busy, modifier = Modifier.fillMaxWidth()) { Text("创建角色") }
-    Button(onClick = { model.load(0) }, enabled = state.ready && !state.busy && state.saves.getOrNull(0) != "空存档", modifier = Modifier.fillMaxWidth()) { Text("继续自动存档") }
-    OutlinedButton(onClick = onImport, enabled = state.ready && !state.busy, modifier = Modifier.fillMaxWidth()) { Text("导入已有存档") }
+    ChronicleButton(onClick = { model.panel("create") }, enabled = state.ready && !state.busy, modifier = Modifier.fillMaxWidth()) { Text("创建角色") }
+    ChronicleButton(onClick = { model.load(0) }, enabled = state.ready && !state.busy && state.saves.getOrNull(0) != "空存档", modifier = Modifier.fillMaxWidth()) { Text("继续自动存档") }
+    ChronicleOutlinedButton(onClick = onImport, enabled = state.ready && !state.busy, modifier = Modifier.fillMaxWidth()) { Text("导入已有存档") }
     Text("从旧版或网页版的存档柜导出JSON，再在这里导入，即可继续故事。原生预览版与正式版可同时安装。", fontSize = 13.sp)
     TextButton(onClick = { model.panel("settings") }) { Text("设置API与阅读偏好") }
     TextButton(onClick = { model.panel("saves") }) { Text("打开存档柜") }
@@ -247,7 +232,7 @@ private fun CreateCharacter(state: GameUiState, model: GameViewModel) {
             OutlinedTextField(character.text(id), { update(id, it) }, label = { Text(label) }, modifier = Modifier.fillMaxWidth(), minLines = if (id == "background") 3 else 1)
         }
         OutlinedTextField(character.text("startingMoneyPence"), { update("startingMoneyPence", it.toIntOrNull() ?: 0) }, label = { Text("起始资金（便士）") }, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number), modifier = Modifier.fillMaxWidth())
-        Button(onClick = { model.create(character) }, enabled = !state.busy && character.text("name").isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("进入贝克兰德") }
+        ChronicleButton(onClick = { model.create(character) }, enabled = !state.busy && character.text("name").isNotBlank(), modifier = Modifier.fillMaxWidth()) { Text("进入贝克兰德") }
         TextButton(onClick = { model.panel("home") }) { Text("返回首页") }
     }
 }
@@ -259,15 +244,23 @@ private fun StoryPanel(state: GameUiState, model: GameViewModel) {
     val listState = rememberLazyListState()
     val fontSize = state.settings.optInt("readingFontSize", 18).coerceIn(16, 22)
     LaunchedEffect(game.optInt("turn")) { if (history.isNotEmpty()) listState.scrollToItem(history.lastIndex) }
-    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 18.dp), state = listState, verticalArrangement = Arrangement.spacedBy(16.dp), contentPadding = PaddingValues(vertical = 20.dp)) {
+    LazyColumn(Modifier.fillMaxSize().padding(horizontal = 20.dp), state = listState, verticalArrangement = Arrangement.spacedBy(18.dp), contentPadding = PaddingValues(vertical = 20.dp)) {
         items(history, key = { it.text("id", "${it.optInt("turn")}-${it.text("role")}-${it.text("content").hashCode()}") }) { message ->
-            if (message.text("role") == "user") Text("第${message.optInt("turn")}轮 · ${message.text("content")}", color = MaterialTheme.colorScheme.secondary, fontSize = 13.sp)
-            else SelectionContainer { Text(message.text("content"), fontSize = fontSize.sp, lineHeight = (fontSize * 1.8f).sp, fontFamily = FontFamily.Serif) }
+            if (message.text("role") == "user") Text("第${message.optInt("turn")}轮 · ${message.text("content")}", color = MaterialTheme.colorScheme.secondary, style = MaterialTheme.typography.bodySmall)
+            else Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Text(if (message.optInt("turn") == 0) "序章 · 初抵雾都" else "第${message.optInt("turn")}轮 · 故事续页", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.secondary, modifier = Modifier.semantics { heading() })
+                if (message === history.last()) Text(game.obj("location").text("name").substringAfter('·'), style = MaterialTheme.typography.headlineSmall, color = MaterialTheme.colorScheme.primary)
+                SelectionContainer { Text(message.text("content"), fontSize = fontSize.sp, lineHeight = (fontSize * 1.7f).sp, fontFamily = FontFamily.Serif, color = MaterialTheme.colorScheme.onBackground) }
+            }
         }
-        if (state.preview.isNotBlank()) item { Text(state.preview, fontSize = fontSize.sp, lineHeight = (fontSize * 1.8f).sp) }
-        item { HorizontalDivider(color = MaterialTheme.colorScheme.secondary.copy(alpha = .3f)); Text("接下来，你打算怎么做？", Modifier.padding(top = 18.dp), fontWeight = FontWeight.SemiBold) }
-        items(game.array("choices").objects()) { choice ->
-            OutlinedButton(onClick = { model.action(choice.text("label")) }, enabled = !state.busy, modifier = Modifier.fillMaxWidth(), contentPadding = PaddingValues(14.dp)) { Text(choice.text("label"), Modifier.fillMaxWidth(), lineHeight = 23.sp) }
+        if (state.preview.isNotBlank()) item { Text(state.preview, fontSize = fontSize.sp, lineHeight = (fontSize * 1.7f).sp, fontFamily = FontFamily.Serif) }
+        item {
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            Text("下一步行动", Modifier.padding(top = 16.dp).semantics { heading() }, style = MaterialTheme.typography.titleMedium)
+            Text("接下来，你打算怎么做？", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+        }
+        itemsIndexed(game.array("choices").objects()) { index, choice ->
+            ChronicleChoice(index, choice, !state.busy) { model.action(choice.text("label")) }
         }
         if (game.array("choices").length() != 3) item { TextButton(onClick = model::choices, enabled = !state.busy) { Text("重新生成行动建议") } }
     }
@@ -292,17 +285,17 @@ private fun MapPanel(state: GameUiState, model: GameViewModel) {
             val status = location.obj("knowledge").text("status")
             CardBlock(location.text("name"), location.text("description")) {
                 Text("${location.text("district")} · ${if (status == "rumored") "尚待核实的传闻" else "已知地点"}", fontSize = 13.sp)
-                if (status == "rumored") Button(onClick = { model.action("根据地图上的传闻，调查${location.obj("knowledge").text("note", location.text("rumor"))}。", JSONObject().put("mapInvestigation", JSONObject().put("locationId", location.text("id")).put("currentStatus", status).put("rumor", location.text("rumor")))) }, enabled = !state.busy) { Text("调查传闻") }
-                else Button(onClick = { model.action("前往${location.text("name")}", JSONObject().put("mapDestination", location)) }, enabled = !state.busy && location.text("id") != game.obj("location").text("id")) { Text("前往此地") }
+                if (status == "rumored") ChronicleButton(onClick = { model.action("根据地图上的传闻，调查${location.obj("knowledge").text("note", location.text("rumor"))}。", JSONObject().put("mapInvestigation", JSONObject().put("locationId", location.text("id")).put("currentStatus", status).put("rumor", location.text("rumor")))) }, enabled = !state.busy) { Text("调查传闻") }
+                else ChronicleButton(onClick = { model.action("前往${location.text("name")}", JSONObject().put("mapDestination", location)) }, enabled = !state.busy && location.text("id") != game.obj("location").text("id")) { Text("前往此地") }
             }
         }
-        if (chosen == null && cell?.optBoolean("explorable") == true) Button(onClick = { cell?.let { model.explore(it.optInt("q"), it.optInt("r")) } }, enabled = !state.busy) { Text("探索相邻街区 · 约13分钟") }
-        if (game.obj("prayer").optBoolean("ok")) Button(onClick = model::pray, enabled = !state.busy) { Text("在这里祷告 · 恢复理智与灵性") }
+        if (chosen == null && cell?.optBoolean("explorable") == true) ChronicleButton(onClick = { cell?.let { model.explore(it.optInt("q"), it.optInt("r")) } }, enabled = !state.busy) { Text("探索相邻街区 · 约13分钟") }
+        if (game.obj("prayer").optBoolean("ok")) ChronicleButton(onClick = model::pray, enabled = !state.busy) { Text("在这里祷告 · 恢复理智与灵性") }
         OutlinedTextField(query, { query = it }, label = { Text("查找已知地点") }, modifier = Modifier.fillMaxWidth())
         locations.filter { query.isBlank() || it.text("name").contains(query) || it.text("district").contains(query) }.forEach { location ->
             TextButton(onClick = { selected = location.text("id") }, modifier = Modifier.fillMaxWidth()) { Text("${location.text("name")} · ${if (location.obj("knowledge").text("status") == "rumored") "传闻" else "已知"}", Modifier.fillMaxWidth()) }
         }
-        OutlinedButton(onClick = { model.panel("special") }) { Text("打开特殊行动") }
+        ChronicleOutlinedButton(onClick = { model.panel("special") }) { Text("打开特殊行动") }
     }
 }
 
@@ -321,7 +314,7 @@ private fun HexMap(map: JSONObject, currentId: String, selected: String, onCell:
         val r = cell.optInt("r") - (rMin + rMax) / 2f
         return Offset(width / 2 + radius * sqrt(3f) * (q + r / 2), height / 2 + radius * 1.5f * r) + pan
     }
-    Canvas(Modifier.fillMaxWidth().height(360.dp).background(Color(0xFF253F34)).semantics { contentDescription = "贝克兰德六边形地图，支持缩放和点选" }
+    Canvas(Modifier.fillMaxWidth().height(320.dp).background(Color(0xFF253F34)).semantics { contentDescription = "贝克兰德六边形地图，支持缩放和点选" }
         .pointerInput(map) { detectTransformGestures { _, move, scale, _ -> zoom = (zoom * scale).coerceIn(.6f, 4f); pan += move } }
         .pointerInput(map, zoom, pan) { detectTapGestures { touch -> cells.minByOrNull { (point(it, size.width.toFloat(), size.height.toFloat()) - touch).getDistance() }?.let(onCell) } }) {
         val radius = minOf(size.width / ((qMax - qMin + 2) * 1.75f), size.height / ((rMax - rMin + 2) * 1.5f)) * zoom
@@ -364,15 +357,15 @@ private fun QuestPanel(state: GameUiState, model: GameViewModel) {
                     }
                     commission.array("history").objects().takeLast(6).forEach { Text("${it.text("worldTime")} · ${it.text("note")}", fontSize = 12.sp) }
                     val operations = when (commission.text("phase")) { "offered" -> listOf("accept" to "确认报价并付款", "cancel" to "取消委托"); "investigating" -> listOf("check" to "当面询问", "cancel" to "取消委托（不退款）"); "ready" -> listOf("collect" to "领取调查报告"); else -> emptyList() }
-                    operations.forEach { (operation, label) -> OutlinedButton(onClick = { model.action(label, JSONObject().put("questTrackingRequest", JSONObject().put("id", task.text("id")).put("revision", task.get("revision")).put("routeId", "commission:$operation"))) }, enabled = !state.busy) { Text(label) } }
+                    operations.forEach { (operation, label) -> ChronicleOutlinedButton(onClick = { model.action(label, JSONObject().put("questTrackingRequest", JSONObject().put("id", task.text("id")).put("revision", task.get("revision")).put("routeId", "commission:$operation"))) }, enabled = !state.busy) { Text(label) } }
                 }
                 TextButton(onClick = { model.focus(task.text("id")) }, enabled = !state.busy) { Text(if (task.text("id") == game.text("trackedQuestId")) "正在追踪" else "设为追踪任务") }
                 if (commission == null && filter != "archive") {
                     val assistance = task.obj("assistance")
                     if (assistance.text("reason").isNotBlank()) Text(assistance.text("reason"), fontSize = 13.sp)
                     val routes = assistance.array("routes").objects()
-                    routes.forEach { route -> OutlinedButton(onClick = { model.action(route.text("label", "继续任务"), JSONObject().put("questTrackingRequest", JSONObject().put("id", task.text("id")).put("revision", task.get("revision")).put("routeId", route.text("id")))) }, enabled = !state.busy) { Text(route.text("label", route.text("description"))) } }
-                    if (routes.isEmpty()) Button(onClick = { model.action("继续追踪任务「${task.text("title")}」", JSONObject().put("questTrackingRequest", JSONObject().put("id", task.text("id")).put("revision", task.get("revision")))) }, enabled = !state.busy) { Text("继续任务") }
+                    routes.forEach { route -> ChronicleOutlinedButton(onClick = { model.action(route.text("label", "继续任务"), JSONObject().put("questTrackingRequest", JSONObject().put("id", task.text("id")).put("revision", task.get("revision")).put("routeId", route.text("id")))) }, enabled = !state.busy) { Text(route.text("label", route.text("description"))) } }
+                    if (routes.isEmpty()) ChronicleButton(onClick = { model.action("继续追踪任务「${task.text("title")}」", JSONObject().put("questTrackingRequest", JSONObject().put("id", task.text("id")).put("revision", task.get("revision")))) }, enabled = !state.busy) { Text("继续任务") }
                 }
             }
         }
@@ -401,8 +394,8 @@ private fun InventoryPanel(state: GameUiState, model: GameViewModel) {
                 }
                 TextButton(onClick = { model.tool("item.inspect", args, "检查${item.text("name")}") }, enabled = !state.busy) { Text("检查物品") }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    OutlinedButton(onClick = { model.tool(if (item.optBoolean("equipped")) "item.unequip" else "item.equip", args, if (item.optBoolean("equipped")) "卸下${item.text("name")}" else "装备${item.text("name")}") }, enabled = !state.busy) { Text(if (item.optBoolean("equipped")) "卸下" else "装备") }
-                    OutlinedButton(onClick = { model.tool("item.use", args, "使用${item.text("name")}") }, enabled = !state.busy) { Text("使用") }
+                    ChronicleOutlinedButton(onClick = { model.tool(if (item.optBoolean("equipped")) "item.unequip" else "item.equip", args, if (item.optBoolean("equipped")) "卸下${item.text("name")}" else "装备${item.text("name")}") }, enabled = !state.busy) { Text(if (item.optBoolean("equipped")) "卸下" else "装备") }
+                    ChronicleOutlinedButton(onClick = { model.tool("item.use", args, "使用${item.text("name")}") }, enabled = !state.busy) { Text("使用") }
                 }
             }
         }
@@ -425,7 +418,7 @@ private fun CharacterPanel(state: GameUiState, model: GameViewModel) {
             Text("当前战斗")
             Chips(targets, target) { target = it }
             enemies.forEach { Text("${it.text("name")} · 生命${it.optInt("health")}/${it.optInt("maxHealth")}") }
-            listOf("attack" to "普通攻击", "defend" to "防御", "wait" to "观察敌人").forEach { (id, label) -> Button(onClick = { model.action(label, JSONObject().put("combatRequest", JSONObject().put("actionId", id).put("enemyId", target.ifBlank { enemies.first().text("id") }).put("boostStacks", if (id == "attack") stacks else 0))) }, enabled = !state.busy) { Text(label) } }
+            listOf("attack" to "普通攻击", "defend" to "防御", "wait" to "观察敌人").forEach { (id, label) -> ChronicleButton(onClick = { model.action(label, JSONObject().put("combatRequest", JSONObject().put("actionId", id).put("enemyId", target.ifBlank { enemies.first().text("id") }).put("boostStacks", if (id == "attack") stacks else 0))) }, enabled = !state.busy) { Text(label) } }
         }
         val abilities = character.obj("advancement").array("unlockedAbilities").objects()
         if (abilities.any { it.obj("rule").has("preparation") }) {
@@ -441,7 +434,7 @@ private fun CharacterPanel(state: GameUiState, model: GameViewModel) {
             Text(if (passive) "被动生效 · 相关检定自动核验" else "灵性消耗 ${ability.optInt("spiritualityCost")} · 1回合", fontSize = 13.sp)
             if (!passive) {
                 if (possible.isNotEmpty()) Chips(possible, effectiveTarget) { chosenTarget = it }
-                Button(onClick = { model.action("使用${ability.text("name")}${if (effectiveTarget.isNotBlank()) "，目标是${possible.find { it.first == effectiveTarget }?.second}" else ""}", JSONObject().put("abilityRequest", JSONObject().put("abilityId", ability.text("id")).put("boostStacks", stacks).apply { if (effectiveTarget.isNotBlank()) put("targetId", effectiveTarget) })) }, enabled = !state.busy) { Text("使用能力") }
+                ChronicleButton(onClick = { model.action("使用${ability.text("name")}${if (effectiveTarget.isNotBlank()) "，目标是${possible.find { it.first == effectiveTarget }?.second}" else ""}", JSONObject().put("abilityRequest", JSONObject().put("abilityId", ability.text("id")).put("boostStacks", stacks).apply { if (effectiveTarget.isNotBlank()) put("targetId", effectiveTarget) })) }, enabled = !state.busy) { Text("使用能力") }
             }
         } }
     }
@@ -451,29 +444,25 @@ private fun CharacterPanel(state: GameUiState, model: GameViewModel) {
 private fun SpecialPanel(state: GameUiState, model: GameViewModel) {
     val game = state.game ?: return
     var tab by rememberSaveable { mutableStateOf("work") }
-    var hours by rememberSaveable { mutableIntStateOf(1) }
     var inquiry by rememberSaveable { mutableStateOf("") }
     val special = game.obj("special")
     Page("日常与非凡") {
         Chips(listOf("work" to "委托", "people" to "人物", "supplies" to "补给", "craft" to "制作", "organization" to "组织", "wait" to "等待"), tab) { tab = it }
         if (tab == "wait") {
-            Text("等待 ${hours} 小时")
-            Slider(hours.toFloat(), { hours = it.toInt() }, valueRange = 1f..24f, steps = 22, enabled = !state.busy)
-            Text("等待会推进游戏时间，委托、持续状态和世界事件照常结算。", fontSize = 13.sp)
-            Button(onClick = { model.special(JSONObject().put("operation", "wait").put("hours", hours).put("revision", special.optInt("revision")).put("expectedTurn", game.optInt("turn")).put("expectedWorldTime", game.text("worldTime"))) }, enabled = !state.busy) { Text("确认等待${hours}小时") }
+            NativeWaitSelector(game, state.busy, { selected -> model.special(JSONObject().put("operation", "wait").put("hours", selected).put("revision", special.optInt("revision")).put("expectedTurn", game.optInt("turn")).put("expectedWorldTime", game.text("worldTime"))) }, { tab = "work" })
         } else special.array(tab).objects().forEach { card ->
             CardBlock(card.text("title", card.text("name")), card.text("description")) {
                 card.array("actions").objects().forEach { action ->
-                    Button(onClick = { model.special(action.obj("request")) }, enabled = !state.busy && action.text("disabledReason").isBlank()) { Text(action.text("label")) }
+                    ChronicleButton(onClick = { model.special(action.obj("request")) }, enabled = !state.busy && action.text("disabledReason").isBlank()) { Text(action.text("label")) }
                     if (action.text("disabledReason").isNotBlank()) Text(action.text("disabledReason"), fontSize = 12.sp)
                 }
                 if (tab == "people") {
-                    card.array("topics").objects().forEach { topic -> OutlinedButton(onClick = { model.action(topic.text("action"), JSONObject().put("personConversation", card.text("id"))) }, enabled = !state.busy && card.text("conversationReason").isBlank()) { Text(topic.text("label")) } }
+                    card.array("topics").objects().forEach { topic -> ChronicleOutlinedButton(onClick = { model.action(topic.text("action"), JSONObject().put("personConversation", card.text("id"))) }, enabled = !state.busy && card.text("conversationReason").isBlank()) { Text(topic.text("label")) } }
                     if (card.text("id") == "sherlock-moriarty") {
                         OutlinedTextField(inquiry, { inquiry = it }, label = { Text("希望委托夏洛克调查什么？") }, modifier = Modifier.fillMaxWidth())
-                        Button(onClick = { model.action("我想委托夏洛克调查：$inquiry", JSONObject().put("personConversation", card.text("id"))) }, enabled = !state.busy && inquiry.isNotBlank() && card.text("conversationReason").isBlank()) { Text("商议调查委托") }
+                        ChronicleButton(onClick = { model.action("我想委托夏洛克调查：$inquiry", JSONObject().put("personConversation", card.text("id"))) }, enabled = !state.busy && inquiry.isNotBlank() && card.text("conversationReason").isBlank()) { Text("商议调查委托") }
                         game.array("inventory").objects().filter { it.text("potionStatus") == "unidentified" }.forEach { bottle ->
-                            OutlinedButton(onClick = { model.action("请夏洛克·莫里亚蒂鉴定一瓶${bottle.text("name")}，同意支付一镑鉴定费", JSONObject().put("identificationRequest", JSONObject().put("instanceId", bottle.text("instanceId")).put("feePence", 240))) }, enabled = !state.busy && card.text("conversationReason").isBlank()) { Text("鉴定${bottle.text("name")} · 确认支付1镑") }
+                            ChronicleOutlinedButton(onClick = { model.action("请夏洛克·莫里亚蒂鉴定一瓶${bottle.text("name")}，同意支付一镑鉴定费", JSONObject().put("identificationRequest", JSONObject().put("instanceId", bottle.text("instanceId")).put("feePence", 240))) }, enabled = !state.busy && card.text("conversationReason").isBlank()) { Text("鉴定${bottle.text("name")} · 确认支付1镑") }
                         }
                     }
                 }
@@ -520,7 +509,7 @@ private fun SettingsPanel(state: GameUiState, model: GameViewModel) {
         Slider(settings.optInt("readingFontSize", 18).toFloat(), { update("readingFontSize", it.toInt()) }, valueRange = 16f..22f, steps = 5)
         OutlinedTextField(prompt, { prompt = it }, label = { Text("叙事提示词") }, modifier = Modifier.fillMaxWidth().heightIn(min = 180.dp), minLines = 5, maxLines = 12)
         TextButton(onClick = { prompt = state.catalog.text("defaultPrompt") }) { Text("恢复默认提示词") }
-        Button(onClick = { model.saveSettings(settings, key, prompt) }, enabled = !state.busy) { Text("保存设置") }
+        ChronicleButton(onClick = { model.saveSettings(settings, key, prompt) }, enabled = !state.busy) { Text("保存设置") }
         TextButton(onClick = { model.panel(if (state.game == null) "home" else "menu") }) { Text("返回") }
     }
 }
@@ -529,13 +518,13 @@ private fun SettingsPanel(state: GameUiState, model: GameViewModel) {
 private fun SavePanel(state: GameUiState, model: GameViewModel, onImport: () -> Unit, onExport: () -> Unit) = Page("存档柜") {
     state.saves.forEachIndexed { slot, label -> CardBlock(if (slot == 0) "自动存档" else "手动存档 $slot", label) {
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedButton(onClick = { model.load(slot) }, enabled = !state.busy && label != "空存档") { Text("载入") }
-            if (slot != 0) OutlinedButton(onClick = { model.save(slot) }, enabled = !state.busy && state.game != null) { Text(if (label == "空存档") "保存" else "覆盖保存") }
+            ChronicleOutlinedButton(onClick = { model.load(slot) }, enabled = !state.busy && label != "空存档") { Text("载入") }
+            if (slot != 0) ChronicleOutlinedButton(onClick = { model.save(slot) }, modifier = Modifier.testTag("save-slot-$slot"), enabled = !state.busy && state.game != null) { Text(if (label == "空存档") "保存" else "覆盖保存") }
             if (slot != 0 && label != "空存档") TextButton(onClick = { model.delete(slot) }, enabled = !state.busy) { Text("删除") }
         }
     } }
-    Button(onClick = onImport, enabled = !state.busy) { Text("导入JSON存档") }
-    OutlinedButton(onClick = onExport, enabled = !state.busy && state.game != null) { Text("导出当前进度") }
+    ChronicleButton(onClick = onImport, enabled = !state.busy) { Text("导入JSON存档") }
+    ChronicleOutlinedButton(onClick = onExport, enabled = !state.busy && state.game != null) { Text("导出当前进度") }
     Text("存档可在网页版和原生版之间迁移，API设置与密钥不会写入导出文件。", fontSize = 13.sp)
     TextButton(onClick = { model.panel(if (state.game == null) "home" else "menu") }) { Text("返回") }
 }
@@ -544,10 +533,10 @@ private fun SavePanel(state: GameUiState, model: GameViewModel, onImport: () -> 
 private fun MenuPanel(state: GameUiState, model: GameViewModel, onImport: () -> Unit, onExport: () -> Unit) {
     val context = LocalContext.current
     Page("游戏菜单") {
-        listOf("special" to "特殊行动与人物拜访", "notes" to "调查手记与回合摘要", "saves" to "存档柜", "settings" to "API与阅读设置").forEach { (id, label) -> OutlinedButton(onClick = { model.panel(id) }, modifier = Modifier.fillMaxWidth()) { Text(label) } }
-        OutlinedButton(onClick = onImport, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("导入已有存档") }
-        OutlinedButton(onClick = onExport, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("导出当前存档") }
-        OutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Bemyself001/backlund-chronicle/releases"))) }, modifier = Modifier.fillMaxWidth()) { Text("检查APK更新") }
+        listOf("special" to "特殊行动与人物拜访", "notes" to "调查手记与回合摘要", "saves" to "存档柜", "settings" to "API与阅读设置").forEach { (id, label) -> ChronicleOutlinedButton(onClick = { model.panel(id) }, modifier = Modifier.fillMaxWidth()) { Text(label) } }
+        ChronicleOutlinedButton(onClick = onImport, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("导入已有存档") }
+        ChronicleOutlinedButton(onClick = onExport, enabled = !state.busy, modifier = Modifier.fillMaxWidth()) { Text("导出当前存档") }
+        ChronicleOutlinedButton(onClick = { context.startActivity(Intent(Intent.ACTION_VIEW, Uri.parse("https://github.com/Bemyself001/backlund-chronicle/releases"))) }, modifier = Modifier.fillMaxWidth()) { Text("检查APK更新") }
         Text("原生界面随APK更新；网页资源热更新不适用于原生版。", fontSize = 12.sp)
         TextButton(onClick = { model.panel("home") }, enabled = !state.busy) { Text("返回首页") }
         Text("${BuildConfig.VERSION_NAME} · 故事进度已自动保存", fontSize = 12.sp)

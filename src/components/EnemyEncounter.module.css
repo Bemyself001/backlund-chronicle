@@ -31,7 +31,7 @@
 .quickActions summary > span { margin-left: .5rem; color: var(--game-muted); font-size: .75rem; }
 .charms { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 15rem), 1fr)); gap: .7rem; margin-top: .5rem; }
 .talisman { --charm-bg: var(--game-paper); --charm-ink: var(--game-ink); --charm-muted: var(--game-muted); --charm-line: var(--game-line); --charm-accent: var(--game-green); min-width: 0; padding: .8rem; border: 1px solid var(--charm-line); background: var(--charm-bg); color: var(--charm-ink); font: .85rem/1.65 var(--font-sans); }
-.talisman[data-tone="panel"] { --charm-bg: #253429; --charm-ink: #e5deca; --charm-muted: #bdbeaa; --charm-line: #748267; --charm-accent: #e2c994; margin-top: 1rem; }
+.talisman[data-tone="panel"] { --charm-bg: var(--panel-raised); --charm-ink: var(--panel-text); --charm-muted: var(--panel-muted); --charm-line: var(--panel-line); --charm-accent: var(--panel-accent); margin-top: 1rem; }
 .talismanHeading strong { font: 500 .95rem/1.5 var(--font-serif); }
 .talismanHeading > span { color: var(--charm-muted); font-size: .75rem; }
 .talisman p { margin: .5rem 0; overflow-wrap: anywhere; }

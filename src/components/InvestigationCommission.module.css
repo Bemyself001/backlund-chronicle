@@ -1,10 +1,10 @@
-.service { display: grid; gap: .75rem; padding-top: 1rem; border-top: 1px solid #8f896e55; min-width: 0; }
+.service { display: grid; gap: .75rem; padding-top: 1rem; border-top: 1px solid var(--panel-line); min-width: 0; }
 .service p { font-size: .83rem; line-height: 1.7; }
 .service details { display: grid; gap: .7rem; }
 .service details > :not(summary) { margin-top: .7rem; }
 .field { display: grid; gap: .4rem; font-size: .85rem; }
-.field input { width: 100%; min-width: 0; min-height: 44px; padding: .65rem; border: 1px solid #8f896e; border-radius: .3rem; color: inherit; background: transparent; font: inherit; }
-.field small { opacity: .8; line-height: 1.5; }
+.field input { width: 100%; min-width: 0; min-height: 44px; padding: .65rem; border: 1px solid var(--panel-line); border-radius: var(--radius-control); color: inherit; background: var(--panel-bg); font: inherit; }
+.field small { color: var(--panel-muted); line-height: 1.5; }
 .fields { display: grid; gap: .8rem; align-items: start; }
 .confirm { display: grid; grid-template-columns: 1.2rem 1fr; gap: .65rem; align-items: start; padding: .7rem 0; font-size: .85rem; line-height: 1.7; cursor: pointer; }
 .confirm input { width: 1.1rem; height: 1.1rem; margin: .2rem 0 0; accent-color: #b89552; }

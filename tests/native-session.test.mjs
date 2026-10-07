@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { createNativeSession } from "../src/native/session.js";
 import { createInitialGame } from "../src/system/game.js";
+import { quickWaitPreview } from "../src/engine/quickWait.js";
 
 const completion = (content, toolCalls = []) => ({ choices: [{ message: { content, tool_calls: toolCalls.map((call, index) => ({ id: `call-${index}`, type: "function", function: { name: call.name.replace(".", "__"), arguments: JSON.stringify(call.args) } })) } }] });
 const narrative = completion(JSON.stringify({ narrative: "你完成行动，记下了眼前已确认的变化。", choices: [{ label: "继续观察街边的人群", risk: "low" }, { label: "向店主询问工作", risk: "low" }, { label: "沿街道寻找旅店", risk: "medium" }] }));
@@ -56,6 +57,37 @@ test("native offline waiting and save roundtrip preserve commission state", () =
   const restored = createNativeSession(); restored.load({ payload: s.export() });
   assert.equal(restored.view().worldTime, next.worldTime);
   assert.deepEqual(restored.view().journal.issued, next.journal.issued);
+});
+
+test("native clock projects all durations across midnight without changing or exporting UI state", () => {
+  const s = session();
+  const payload = s.export();
+  payload.game.worldTime = "1349年 10月17日 · 周二 · 19:20";
+  s.load({ payload });
+  const before = s.export();
+  const wait = s.view().quickWait;
+  assert.equal(wait.disabledReason, "");
+  assert.equal(wait.minHours, 1);
+  assert.equal(wait.maxHours, 24);
+  assert.equal(wait.previews.length, 24);
+  assert.deepEqual(wait.previews[5], quickWaitPreview(before.game, 6));
+  assert.equal(wait.previews[5].endClock, "01:20");
+  assert.equal(wait.previews[5].dayLabel, "次日");
+  assert.equal(wait.previews[23].endClock, "19:20");
+  assert.equal(wait.previews[23].dayLabel, "次日");
+  assert.deepEqual(s.export().game, before.game);
+  assert.equal("quickWait" in s.export().game, false);
+});
+
+test("native clock exposes combat restrictions and preserves local confirmation gating", () => {
+  const s = session();
+  const payload = s.export();
+  payload.game.combat = { enemies: [{ id: "clock-foe", name: "时钟测试敌人", maxHealth: 1, status: "active", health: 1, stunnedThroughTurn: 99 }] };
+  s.load({ payload });
+  const before = s.export();
+  assert.match(s.view().quickWait.disabledReason, /战斗中无法快速等待/);
+  assert.throws(() => s.special({ operation: "wait", hours: 1, revision: s.view().special.revision, expectedTurn: s.view().turn, expectedWorldTime: s.view().worldTime }), /战斗中无法快速等待/);
+  assert.deepEqual(s.export().game, before.game);
 });
 test("native JSON codec removes credentials from imported web saves", () => {
   const game = createInitialGame({ ...session().catalog().character, name: "已有角色" });

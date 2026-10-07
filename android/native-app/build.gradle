@@ -13,8 +13,8 @@ android {
         applicationId 'io.github.bemyself001.backlundchronicle'
         minSdk 24
         targetSdk 36
-        versionCode = (System.getenv('APP_VERSION_CODE') ?: '30163').toInteger()
-        versionName = (System.getenv('NATIVE_VERSION_NAME') ?: '1.8.0-native.1')
+        versionCode = (System.getenv('APP_VERSION_CODE') ?: '30172').toInteger()
+        versionName = (System.getenv('NATIVE_VERSION_NAME') ?: '1.8.0-native.2')
         testInstrumentationRunner 'androidx.test.runner.AndroidJUnitRunner'
     }
     // The preview can coexist with the released game during save migration testing.

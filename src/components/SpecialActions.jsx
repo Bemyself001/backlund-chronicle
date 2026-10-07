@@ -11,8 +11,8 @@ import styles from "./SpecialActions.module.css";
 import { medicinePurchaseGate } from "../engine/medicineAccess.js";
 import { hasMetPerson, visitPersonGate } from "../engine/visitablePeople.js";
 
-export default function SpecialActions({ game, loading, onExecute, onOpenMap, onAction }) {
-  const [tab, setTab] = useState("work");
+export default function SpecialActions({ game, loading, onExecute, onOpenMap, onAction, initialTab = "work" }) {
+  const [tab, setTab] = useState(initialTab === "wait" ? "wait" : "work");
   const [showLockedWork, setShowLockedWork] = useState(false);
   const [notice, setNotice] = useState("");
   const [confirmJoin, setConfirmJoin] = useState(null);

@@ -1,34 +1,34 @@
 .board { min-width: 0; }
 .heading { display: grid; gap: .6rem; margin: .3rem 0 1rem; }
-.heading p { margin: 0; color: #cbb17b; font-size: .72rem; letter-spacing: .15em; }
+.heading p { margin: 0; color: var(--panel-accent); font-size: .72rem; letter-spacing: .15em; }
 .heading h3 { margin: .3rem 0; font-size: 1.25rem; }
-.heading > span, .hint { color: #b9c1ab; font-size: .8rem; }
-.filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: .2rem; border: 1px solid #58624b; border-radius: .45rem; }
+.heading > span, .hint { color: var(--panel-muted); font-size: .8rem; }
+.filters { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: .2rem; border: 1px solid var(--panel-line); border-radius: var(--radius-control); }
 .filters button { display: block; min-width: 0; padding: .65rem .1rem; border: 0; background: transparent; font-size: .8rem; white-space: nowrap; }
-.filters button[aria-pressed="true"] { color: #efdaaa; background: #3c452f; box-shadow: inset 0 -2px #ccb17a; }
+.filters button[aria-pressed="true"] { color: var(--panel-accent); background: var(--panel-raised); box-shadow: inset 0 -2px var(--panel-accent); }
 .filters span { display: inline-block; margin-left: .35rem; opacity: .65; font-size: .72rem; }
-.card { margin: .85rem 0; padding: 1rem; background: #22362b; border: 1px solid #51614b; border-radius: .55rem; }
-.card[data-tracked] { border-color: #c5a96b; border-top-width: 3px; background: #2a392b; }
-.card h4 { font-size: 1.06rem; margin: .5rem 0; color: #eee1c0; }
-.meta { display: grid; grid-template-columns: 1fr auto; gap: .5rem; font-size: .7rem; color: #c8b887; }
+.card { margin: .85rem 0; padding: 1rem; background: var(--panel-raised); border: 1px solid var(--panel-line); border-radius: var(--radius-panel); }
+.card[data-tracked] { border-color: var(--panel-accent); border-top-width: 3px; background: var(--panel-raised); }
+.card h4 { font-size: 1.06rem; margin: .5rem 0; color: var(--panel-text); }
+.meta { display: grid; grid-template-columns: 1fr auto; gap: .5rem; font-size: .7rem; color: var(--panel-accent); }
 .objective { font-size: .88rem; line-height: 1.7; }
-.timer { color: #e8c193; font-size: .8rem; }
+.timer { color: var(--panel-accent); font-size: .8rem; }
 .card details { margin: .2rem 0 .8rem; border-bottom: 0; padding: 0; }
-.card details p { font-size: .8rem; color: #bec7b5; }
+.card details p { font-size: .8rem; color: var(--panel-muted); }
 .card summary { min-height: 40px; font-size: .8rem; }
-.card .track, .card .primary { width: 100%; border-radius: .35rem; text-align: center; }
-.card .primary { background: #ddc18a; color: #19281e; border-color: #ddc18a; font-weight: 700; }
-.empty { border: 1px dashed #5c694d; border-radius: .5rem; margin: 1rem 0; padding: 1.5rem 1rem; font-size: .85rem; color: #c4cbb5; }
+.card .track, .card .primary { width: 100%; border-radius: var(--radius-control); text-align: center; }
+.card .primary { background: var(--brass-light); color: #19281e; border-color: var(--brass-light); font-weight: 700; }
+.empty { border: 1px dashed var(--panel-line); border-radius: var(--radius-panel); margin: 1rem 0; padding: 1.5rem 1rem; font-size: .85rem; color: var(--panel-muted); }
 .routes { display: grid; gap: .5rem; margin-top: .75rem; }
-.board button:focus, .card:focus { outline: 2px solid #ddc18a; outline-offset: 3px; }
+.board button:focus, .card:focus { outline: 2px solid var(--brass-light); outline-offset: 3px; }
 .commission { display: grid; gap: .55rem; overflow-wrap: anywhere; }
 .commission p { margin: 0; }
 .terms { display: grid; gap: .4rem; font-size: .8rem; line-height: 1.6; }
-.progress { display: grid; gap: .5rem; font-size: .8rem; color: #ddc18a; }
-.progress progress { width: 100%; height: .5rem; accent-color: #ddc18a; }
+.progress { display: grid; gap: .5rem; font-size: .8rem; color: var(--panel-accent); }
+.progress progress { width: 100%; height: .5rem; accent-color: var(--brass-light); }
 .history { display: grid; gap: .65rem; padding-left: 1.2rem; margin: .7rem 0; font-size: .8rem; line-height: 1.65; }
 .history li { padding-left: .1rem; }
-.history small { display: block; color: #b9c1ab; }
+.history small { display: block; color: var(--panel-muted); }
 .report ol { padding-left: 1.3rem; font-size: .85rem; }
 .report li { margin: .7rem 0; line-height: 1.7; }
-.report strong { color: #efdaaa; }
+.report strong { color: var(--panel-accent); }

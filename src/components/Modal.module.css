@@ -1,15 +1,16 @@
 /* Flex spacing fallbacks are activated only by the startup layout probe. */
-.dialog { width: min(92vw, 42rem); max-height: 88vh; max-height: min(calc(var(--modal-viewport-height, 100vh) * .88), 54rem); margin: auto; padding: 0; overflow: hidden; border: 1px solid var(--brass); border-radius: 2px; background: var(--paper); color: var(--ink); box-shadow: 0 30px 90px #000c; }
+.dialog { width: min(92vw, 42rem); max-height: 88vh; max-height: min(calc(var(--modal-viewport-height, 100vh) * .88), 54rem); margin: auto; padding: 0; overflow: hidden; border: 1px solid var(--brass); border-radius: var(--radius-panel); background: var(--paper); color: var(--ink); box-shadow: 0 30px 90px #000c; }
+.dialog[data-theme="night"] { --frame: #111b24; --frame-raised: #1b2833; --frame-text: #e8e2d3; --frame-muted: #b3bdbe; --frame-line: #3d4d58; --paper: #1b2833; --paper-pale: #22323e; --ink: #e8e2d3; --ink-soft: #adb8b8; --brass: #b6a277; --brass-light: #b6a277; --verdigris: #b2c8bc; --danger: #f0a49a; --panel-bg: #1b2833; --panel-raised: #22323e; --panel-line: #3d4d58; --panel-text: #e8e2d3; --panel-muted: #adb8b8; --panel-accent: #c8b58a; --panel-health: #efa29a; --panel-sanity: #99c5f0; --panel-spirituality: #e6c56f; --clock-face: #22323e; --clock-track: #45555f; --clock-hand: #d4bf94; --clock-mark: #b6a277; color-scheme: dark; }
 .dialog[open] { display: flex; flex-direction: column; }
 .dialog::backdrop { background: rgb(4 6 7 / 82%); backdrop-filter: blur(2px); }
 .wide { width: min(94vw, 64rem); }
-.heading { display: flex; flex-shrink: 0; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.4rem 1rem; border-bottom: 1px solid #b99a5c6b; border-bottom: 1px solid color-mix(in srgb, var(--brass), transparent 58%); background: linear-gradient(90deg, #201d18, #111517); color: var(--paper-pale); }
+.heading { display: flex; flex-shrink: 0; align-items: flex-start; justify-content: space-between; gap: 1rem; padding: 1.25rem 1.4rem 1rem; border-bottom: 1px solid #b99a5c6b; border-bottom: 1px solid color-mix(in srgb, var(--brass), transparent 58%); background: var(--frame); color: var(--frame-text); }
 
 :global(.no-flex-gap) .heading { gap: 0; }
 :global(.no-flex-gap) .heading > :not(:last-child) { margin-right: 1rem; margin-bottom: 0; }
 .heading p { margin: 0 0 .2rem; color: var(--brass-light); font: 700 .66rem/1.2 var(--font-sans); letter-spacing: .16em; text-transform: uppercase; }
 .heading h2 { margin: 0; font: 500 1.4rem/1.2 var(--font-serif); letter-spacing: .08em; }
-.close { width: 2.5rem; min-height: 2.5rem; border: 1px solid #a991674d; background: transparent; color: inherit; font-size: 1.45rem; }
+.close { width: 2.75rem; min-height: 2.75rem; flex-shrink: 0; border: 1px solid #a991674d; border-radius: var(--radius-control); background: transparent; color: inherit; font-size: 1.45rem; }
 .close:hover { border-color: var(--brass-light); background: #c6a15a1a; }
 .body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 1.35rem; }
-@media (max-width: 600px) { .dialog { width: 100%; max-width: none; max-height: 94vh; max-height: calc(var(--modal-viewport-height, 100vh) * .94); margin: auto 0 0; border-width: 1px 0 0; } .body { padding: 1rem; } }
+@media (max-width: 600px) { .dialog { width: 100%; max-width: none; max-height: 94vh; max-height: calc(var(--modal-viewport-height, 100vh) * .94); margin: auto 0 0; border-width: 1px 0 0; border-radius: 10px 10px 0 0; } .heading { padding: 1rem; } .heading h2 { font-size: 1.25rem; } .body { padding: 1rem; } }

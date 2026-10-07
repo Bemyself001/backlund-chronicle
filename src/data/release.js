@@ -3,4 +3,4 @@ export const RELEASE_NAME = "1.7.5";
 export const RELEASE_VERSION = "1.7.5";
 
 // Native previews have their own APK and release channel.
-export const NATIVE_RELEASE_VERSION = "1.8.0-native.1";
+export const NATIVE_RELEASE_VERSION = "1.8.0-native.2";

@@ -31,6 +31,7 @@ import { appendStoryMessages } from "../services/storyHistory.js";
 import { moneyToPence, formatMoney } from "../system/money.js";
 import { getAdvancement } from "../system/character.js";
 import { prayerAvailability, settlePrayer } from "../engine/prayer.js";
+import { MIN_WAIT_HOURS, MAX_WAIT_HOURS, quickWaitGate, quickWaitPreview } from "../engine/quickWait.js";
 import { makeId } from "../utils/id.js";
 
 // A session is local to one QuickJS instance. No browser globals, UI, or credentials.
@@ -79,6 +80,8 @@ export function createNativeSession() {
     return { ...visibleGameState(game), id: game.id, moneyLabel: formatMoney(game.money), choices: game.choices, choiceMeta: game.choiceMeta, prayer: prayerAvailability(game),
       storyHistory: game.storyHistory, changeLog: game.changeLog, worldEvents: game.worldEvents, longTermSummary: game.longTermSummary,
       capacity: game.capacity, equipment: game.equipment, journal, trackedQuestId: game.trackedQuestId,
+      quickWait: { minHours: MIN_WAIT_HOURS, maxHours: MAX_WAIT_HOURS, disabledReason: quickWaitGate(game, MIN_WAIT_HOURS),
+        previews: Array.from({ length: MAX_WAIT_HOURS }, (_, index) => quickWaitPreview(game, index + MIN_WAIT_HOURS)) },
       map: { cells: visibleHexes(game).map(cell => ({ ...cell, explorable: canExploreHex(game, cell.q, cell.r).ok })), locations: getMapLocations(game).filter(location => knowledge[location.id]?.status !== "unknown").map(location => ({
         ...location, ...hexForLocation(location), knowledge: knowledge[location.id], travel: estimateTravelByHex({ id: game.location.id, ...game.world.player }, location),
       })) },

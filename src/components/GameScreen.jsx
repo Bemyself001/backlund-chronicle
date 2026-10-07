@@ -64,6 +64,7 @@ export default function GameScreen(props) {
 function GameSession({ game, loading, turnPhase, streamText, error, onAction, onAbort, onRetry, onRegenerateChoices, onLocalTool, onOpenMap, onOpenApi, onOpenPrompt, onOpenSaves, onHome, onSpecialAction }) {
   const [input, setInput] = useState("");
   const [panel, setPanel] = useState(null);
+  const [specialEntry, setSpecialEntry] = useState({ tab: "work", revision: 0 });
   const [journalRequest, setJournalRequest] = useState(0);
   const [reading, setReading] = useState(loadReading);
   const [followingLatest, setFollowingLatest] = useState(game.turn > 0);
@@ -136,7 +137,7 @@ function GameSession({ game, loading, turnPhase, streamText, error, onAction, on
     if (panelOpen) closeRef.current?.focus({ preventScroll: true });
   }, [panelOpen]);
 
-  const changePanel = (next, event, forceOpen = false) => {
+  const changePanel = (next, event, forceOpen = false, specialTab = "work") => {
     if (next === "map") { onOpenMap(); return; }
     if (next === "story" || (next === panel && !forceOpen)) {
       setPanel(null);
@@ -145,6 +146,7 @@ function GameSession({ game, loading, turnPhase, streamText, error, onAction, on
     }
     rememberPosition();
     triggerRef.current = event?.currentTarget || document.activeElement;
+    if (next === "special") setSpecialEntry(current => ({ tab: specialTab, revision: current.revision + 1 }));
     setPanel(next);
     requestAnimationFrame(() => { if (paneRef.current) paneRef.current.scrollTop = 0; });
   };
@@ -213,17 +215,18 @@ function GameSession({ game, loading, turnPhase, streamText, error, onAction, on
           const value = game.character.stats[key];
           return <button type="button" key={key} className={styles.vital} data-stat={key} data-low={value <= max * .25 || undefined} onClick={event => changePanel("character", event)} aria-label={`${label} ${value}/${max}${value <= max * .25 ? "，偏低" : ""}，查看角色`}><span><span className={styles.vitalLabel}>{label}</span><strong>{value}<small>/{max}</small></strong></span><i aria-hidden="true"><b style={{ width: `${max > 0 ? Math.max(0, Math.min(100, value / max * 100)) : 0}%` }} /></i></button>;
         })}
-        <button type="button" className={styles.money} onClick={event => changePanel("inventory", event)} aria-label={`资金 ${formatMoney(money)}，查看行囊`}><span>资金</span><strong>£{money.pounds}<small> · {money.solers}苏 · {money.pence}便</small></strong></button>
       </div>
+      <button type="button" className={styles.money} onClick={event => changePanel("inventory", event)} aria-label={`资金 ${formatMoney(money)}，查看行囊`}><span>资金</span><strong>£{money.pounds}<small> · {money.solers}苏 · {money.pence}便</small></strong></button>
     </div>
     {activeEffects.length > 0 && <button className={styles.effectStrip} type="button" onClick={event => changePanel("character", event)}>{activeEffects.map(effect => effect.name).join(" · ")}<span>查看影响 →</span></button>}
     <div className={`${styles.workspace} ${panelOpen ? styles.hasPanel : ""}`}>
-      <nav className={styles.navigation} aria-label="游戏功能">{NAVIGATION.map(([id, label]) => <button type="button" key={id} aria-current={id === (panel || "story") ? "page" : undefined} onClick={event => changePanel(id, event)}><GameIcon name={id} /><span>{label}</span></button>)}</nav>
+      <nav className={styles.navigation} aria-label="游戏功能">{NAVIGATION.map(([id, label]) => <button type="button" key={id} data-navigation={id} aria-current={id === (panel || "story") ? "page" : undefined} onClick={event => changePanel(id, event)}><GameIcon name={id} /><span>{label}</span></button>)}</nav>
       <section className={styles.story} aria-label="剧情与行动" inert={panelOpen && !wide ? true : undefined}>
         <div className={styles.storyViewport}>
           <div className={styles.storyScroll} ref={storyRef} onScroll={handleScroll}>
             <div className={styles.manuscript}>
-              <div className={styles.sceneHeading}><span>BACKLUND CHRONICLE</span><span>{game.turn === 0 ? "故事从这里开始" : `已完成 ${game.turn} 轮`}</span></div>
+              <div className={styles.sceneHeading}><span>私人调查卷宗</span><span>{game.turn === 0 ? "故事从这里开始" : `已完成 ${game.turn} 轮`}</span></div>
+              <header className={styles.chapterHeading}><span>第 {String(game.chapter.number).padStart(2, "0")} 章</span><h2>{game.chapter.title}</h2></header>
               <StoryHistory messages={game.storyHistory?.length ? game.storyHistory : game.recentDialogues} />
               {loading && <div data-reader-entry="stream" className={styles.pending}><div className={styles.turnDivider}><span>{turnPhase === "choiceRetry" ? "行动建议" : `第 ${game.turn + 1} 轮`}</span><i /></div>{pendingAction && busyRef.current && turnPhase !== "choiceRetry" && <blockquote className={styles.playerLine}><span>你的行动</span>{pendingAction}</blockquote>}<TurnProgress phase={turnPhase} />{streamText && <article className={styles.narrative} aria-busy="true">{streamText.split("\n").filter(Boolean).map((paragraph, i) => <p key={i}>{paragraph}</p>)}<small className={styles.aiTag}>含 AI 生成内容 · 结果待确认</small></article>}</div>}
               {error && <div className={styles.error} role="alert"><strong>本轮未能完成</strong><p>{error}</p><button type="button" disabled={loading} onClick={retry}>重试本轮</button></div>}
@@ -241,6 +244,13 @@ function GameSession({ game, loading, turnPhase, streamText, error, onAction, on
           {!followingLatest && <button className={styles.jumpLatest} type="button" onClick={jumpToLatest}>{loading ? "跟随新剧情 ↓" : "回到最新 ↓"}</button>}
         </div>
         <form className={styles.composer} onFocus={event => { if (event.target === inputRef.current) setEditing(true); }} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setEditing(false); }} onSubmit={event => { event.preventDefault(); submit(); }}>
+          <div className={styles.composerTools} aria-label="常用行动">
+            <div className={styles.quickActions}>
+              <button type="button" onClick={event => changePanel("special", event, true)}><GameIcon name="special" /><span>特殊行动</span></button>
+              <button type="button" onClick={event => changePanel("special", event, true, "wait")}><GameIcon name="wait" /><span>跳过时间</span></button>
+            </div>
+            <span className={styles.archiveStatus}>{loading ? "本轮处理中" : "进度自动保存"}</span>
+          </div>
           <div className={styles.composerInner}><label className={styles.inputLabel}><span>自由行动</span><textarea aria-label="自由行动" ref={inputRef} rows="1" value={input} onChange={event => setInput(event.target.value)} onKeyDown={event => { if (shouldSubmitAction(event) && !window.matchMedia("(pointer: coarse)").matches) { event.preventDefault(); submit(); } }} placeholder="描述你的行动、问题或对话…" disabled={loading} /></label>{loading ? <button key="abort" type="button" className={styles.abort} onClick={event => { event.preventDefault(); onAbort(); }}>中止生成</button> : <button key="submit" type="submit" className={styles.submit} disabled={!input.trim()}>提交行动 <span aria-hidden="true">↗</span></button>}</div>
           <div className={styles.composerMeta}><span>Enter 发送 · Shift + Enter 换行</span><span>{turnPhase === "choiceRetry" ? "剧情已保存 · 正在补全建议" : loading ? "本轮尚未保存" : "进度自动保存"}</span></div>
         </form>
@@ -249,7 +259,7 @@ function GameSession({ game, loading, turnPhase, streamText, error, onAction, on
         <div hidden={panel !== "character"}><CharacterPanel game={game} onAction={performAction} disabled={loading} /></div>
         <div hidden={panel !== "inventory"}><InventoryPanel game={game} onLocalTool={(name, args, reason) => onLocalTool(name, args, reason, () => setPanel(null))} onAction={performAction} disabled={loading} /></div>
         <div hidden={panel !== "journal"}><JournalPanel key={journalRequest} game={game} onAction={performAction} disabled={loading} /></div>
-        {panel === "special" && <SpecialActions game={game} loading={loading} onExecute={onSpecialAction} onOpenMap={onOpenMap} onAction={performAction} />}
+        {panel === "special" && <SpecialActions key={specialEntry.revision} initialTab={specialEntry.tab} game={game} loading={loading} onExecute={onSpecialAction} onOpenMap={onOpenMap} onAction={performAction} />}
         <div hidden={panel !== "menu"}><MenuPanel loading={loading} reading={reading} onReadingChange={updateReading} onOpenApi={onOpenApi} onOpenPrompt={onOpenPrompt} onOpenSaves={onOpenSaves} onHome={onHome} version={`${RELEASE_NAME} · ${APP_VERSION}`} />{readingNotice && <p className={styles.readingNotice} role="status">{readingNotice}</p>}</div>
       </div></aside></>}
     </div>
