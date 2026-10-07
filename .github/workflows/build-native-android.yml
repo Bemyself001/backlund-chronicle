@@ -35,7 +35,7 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew -PNATIVE_ONLY=true :native-app:testPreviewDebugUnitTest :native-app:assemblePreviewDebug :native-app:assemblePreviewRelease
+          ./gradlew --stacktrace -PNATIVE_ONLY=true :native-app:testPreviewDebugUnitTest :native-app:assemblePreviewDebug :native-app:assemblePreviewRelease
       - name: Sign preview with the established release key
         if: github.event_name != 'pull_request'
         env:

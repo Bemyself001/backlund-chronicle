@@ -55,6 +55,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
     }
     fun panel(panel: String) { mutable.update { it.copy(panel = panel, notice = "") } }
     private suspend fun engine(operation: String, args: JSONObject = JSONObject()) = withContext(dispatcher) { runtime!!.objectCall(operation, args) }
+    private suspend fun mutate(operation: String, args: JSONObject, panel: String = "story") = withContext(NonCancellable) { publish(engine(operation, args), panel) }
     private suspend fun publish(view: JSONObject, panel: String = "story") {
         val payload = engine("export")
         try { withContext(dispatcher) { vault.write(0, payload) } }
@@ -70,16 +71,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         mutable.update { it.copy(busy = true, error = "", notice = "") }
         turnJob = viewModelScope.launch {
             try { block() }
-            catch (_: CancellationException) { engine("cancel"); mutable.update { it.copy(notice = "已取消，本轮未提交。") } }
+            catch (_: CancellationException) { withContext(NonCancellable) { engine("cancel") }; mutable.update { it.copy(notice = "已取消未完成的请求，已保存的进度保留。") } }
             catch (error: Exception) { engine("cancel"); mutable.update { it.copy(error = error.message ?: "操作失败，请重试。") } }
             finally { decision = null; mutable.update { it.copy(busy = false, phase = "", preview = "", confirmations = null) }; turnJob = null }
         }
     }
-    fun create(character: JSONObject) = work { publish(engine("create", JSONObject().put("character", character))) }
-    fun load(slot: Int) = work { val payload = withContext(dispatcher) { vault.read(slot) } ?: error("此存档位为空。") ; publish(engine("load", JSONObject().put("payload", payload))) }
+    fun create(character: JSONObject) = work { mutate("create", JSONObject().put("character", character)) }
+    fun load(slot: Int) = work { val payload = withContext(dispatcher) { vault.read(slot) } ?: error("此存档位为空。") ; mutate("load", JSONObject().put("payload", payload)) }
     fun importSave(text: String) = work {
         require(text.length <= 20 * 1024 * 1024) { "存档文件超过20MB。" }
-        publish(engine("load", JSONObject().put("payload", JSONObject(text))))
+        mutate("load", JSONObject().put("payload", JSONObject(text)))
         mutable.update { it.copy(notice = "存档已导入并保存，API密钥需单独设置。") }
     }
     fun save(slot: Int) = work { val payload = engine("export"); withContext(dispatcher) { vault.write(slot, payload) }; mutable.update { it.copy(saves = vault.labels(), notice = "存档已保存。") } }
@@ -98,8 +99,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         work { runAction(action, options) }
     }
     private suspend fun runAction(action: String, options: JSONObject) {
-        val initial = engine("begin", JSONObject().put("action", action).put("options", options).put("settings", state.value.settings).put("prompt", state.value.prompt))
-        if (initial.optBoolean("complete")) { publish(initial.getJSONObject("view"), initial.optString("panel", "story")); return }
+        val initial = withContext(NonCancellable) {
+            val result = engine("begin", JSONObject().put("action", action).put("options", options).put("settings", state.value.settings).put("prompt", state.value.prompt))
+            if (result.optBoolean("complete")) { publish(result.getJSONObject("view"), result.optString("panel", "story")); lastAction = null }
+            result
+        }
+        if (initial.optBoolean("complete")) return
         mutable.update { it.copy(phase = "规划行动", panel = "story") }
         var response = transport.complete(state.value.settings, apiKey, initial.getJSONObject("request"))
         var plan = engine("plan", JSONObject().put("response", response))
@@ -142,7 +147,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         mutable.update { it.copy(phase = "补全行动建议", preview = "") }
         val request = engine("choiceRequest", JSONObject().put("settings", state.value.settings).put("prompt", state.value.prompt))
         val response = transport.complete(state.value.settings, apiKey, request.getJSONObject("request"))
-        publish(engine("choices", JSONObject().put("response", response)))
+        mutate("choices", JSONObject().put("response", response))
     }
     fun choices() = work { recoverChoices() }
     fun pray() = work {
@@ -151,12 +156,16 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         val response = transport.complete(state.value.settings, apiKey, request.getJSONObject("request"))
         withContext(NonCancellable) { publish(engine("prayerFinish", JSONObject().put("response", response))) }
     }
-    fun special(request: JSONObject) = work { publish(engine("special", request)) }
-    fun explore(q: Int, r: Int) = work { publish(engine("explore", JSONObject().put("q", q).put("r", r))) }
-    fun focus(id: String) = work { publish(engine("focus", JSONObject().put("id", id)), "quests") }
+    fun special(request: JSONObject) = work { mutate("special", request) }
+    fun explore(q: Int, r: Int) = work { mutate("explore", JSONObject().put("q", q).put("r", r)) }
+    fun focus(id: String) = work { mutate("focus", JSONObject().put("id", id), "quests") }
     fun tool(name: String, args: JSONObject, reason: String) = work {
-        val result = engine("tool", JSONObject().put("name", name).put("args", args).put("reason", reason))
-        if (result.has("action")) runAction(result.getString("action"), result.getJSONObject("options")) else publish(result.getJSONObject("view"), "inventory")
+        val result = withContext(NonCancellable) {
+            val next = engine("tool", JSONObject().put("name", name).put("args", args).put("reason", reason))
+            if (!next.has("action")) publish(next.getJSONObject("view"), "inventory")
+            next
+        }
+        if (result.has("action")) { lastAction = JSONObject().put("action", result.getString("action")).put("options", result.getJSONObject("options")); runAction(result.getString("action"), result.getJSONObject("options")) }
     }
     fun reportError(message: String) { mutable.update { it.copy(error = message) } }
     override fun onCleared() {

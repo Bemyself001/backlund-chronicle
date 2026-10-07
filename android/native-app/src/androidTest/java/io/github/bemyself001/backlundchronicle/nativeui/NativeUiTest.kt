@@ -5,6 +5,12 @@ import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
 import androidx.test.platform.app.InstrumentationRegistry
 import java.io.File
+import java.util.concurrent.TimeUnit
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
+import org.json.JSONObject
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Rule
 import org.junit.Test
 
@@ -39,5 +45,25 @@ class NativeUiTest {
         compose.onAllNodesWithText("保存")[0].performClick()
         compose.waitUntil(15_000) { compose.activity.model.state.value.saves.getOrNull(1)?.contains("第1轮") == true }
         screenshot("saves")
+        // A real native network cancellation must leave the runtime usable.
+        MockWebServer().use { server ->
+            server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody("""{"choices":[{"message":{"content":"这条响应不应提交"}}]}""").setBodyDelay(20, TimeUnit.SECONDS))
+            val model = compose.activity.model
+            val before = model.state.value.game!!
+            val settings = JSONObject(model.state.value.settings.toString()).put("baseUrl", server.url("/v1").toString()).put("persistKey", false)
+            model.saveSettings(settings, "test-only-key", model.state.value.prompt)
+            compose.waitUntil(15_000) { !model.state.value.busy }
+            model.action("跳过时间2小时")
+            compose.waitUntil(15_000) { model.state.value.phase == "规划行动" }
+            model.cancel()
+            compose.waitUntil(15_000) { !model.state.value.busy }
+            assertEquals(before.getInt("turn"), model.state.value.game!!.getInt("turn"))
+            assertEquals(before.getString("worldTime"), model.state.value.game!!.getString("worldTime"))
+            val game = model.state.value.game!!
+            model.special(JSONObject().put("operation", "wait").put("hours", 1).put("revision", game.getJSONObject("special").getInt("revision")).put("expectedTurn", game.getInt("turn")).put("expectedWorldTime", game.getString("worldTime")))
+            compose.waitUntil(15_000) { !model.state.value.busy }
+            assertEquals(before.getInt("turn") + 1, model.state.value.game!!.getInt("turn"))
+            assertFalse(model.state.value.error, model.state.value.error.isNotBlank())
+        }
     }
 }
