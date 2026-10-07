@@ -29,6 +29,8 @@ jobs:
           pnpm run lint
           pnpm test
           node scripts/build-native-engine.mjs
+      - name: Set upgrade-compatible build number
+        run: echo "APP_VERSION_CODE=$((30000 + $(git rev-list --count HEAD)))" >> "$GITHUB_ENV"
       - name: Build and test native APK
         working-directory: android
         run: |
@@ -48,7 +50,14 @@ jobs:
           "$BUILD_TOOLS/zipalign" -P 16 -f -v 4 android/native-app/build/outputs/apk/preview/release/native-app-preview-release-unsigned.apk "$RUNNER_TEMP/native-aligned.apk"
           "$BUILD_TOOLS/apksigner" sign --ks "$RUNNER_TEMP/native-release.p12" --ks-type PKCS12 --ks-pass env:ANDROID_KEYSTORE_PASSWORD --ks-key-alias "$ANDROID_KEY_ALIAS" --key-pass env:ANDROID_KEY_PASSWORD --out backlund-native-preview.apk "$RUNNER_TEMP/native-aligned.apk"
           "$BUILD_TOOLS/apksigner" verify --verbose --print-certs backlund-native-preview.apk > native-apk-verification.txt
+          keytool -exportcert -keystore "$RUNNER_TEMP/native-release.p12" -storetype PKCS12 -storepass:env ANDROID_KEYSTORE_PASSWORD -alias "$ANDROID_KEY_ALIAS" -file "$RUNNER_TEMP/native-cert.der"
+          EXPECTED_SIGNER=$(sha256sum "$RUNNER_TEMP/native-cert.der" | cut -d ' ' -f 1)
+          grep -Fx "Number of signers: 1" native-apk-verification.txt
+          grep -E "^(Signer #[0-9]+|V[0-9.]+ Signer:) certificate SHA-256 digest: $EXPECTED_SIGNER$" native-apk-verification.txt
           "$BUILD_TOOLS/aapt" dump badging backlund-native-preview.apk > native-apk-badging.txt
+          grep -F "package: name='io.github.bemyself001.backlundchronicle.native' versionCode='$APP_VERSION_CODE'" native-apk-badging.txt
+          unzip -l backlund-native-preview.apk | grep -F 'libquickjs.so'
+          if unzip -l backlund-native-preview.apk | grep -E 'assets/public/|capacitor|\.html$'; then exit 1; fi
           sha256sum backlund-native-preview.apk > backlund-native-preview.apk.sha256
           rm "$RUNNER_TEMP/native-release.p12"
       - name: Upload native APK and test evidence

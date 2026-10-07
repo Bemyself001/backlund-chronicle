@@ -31,7 +31,7 @@ class NativeUiTest {
         compose.onNodeWithText("我发布的委托").assertExists()
         compose.onNodeWithText("菜单", useUnmergedTree = true).performClick()
         compose.onNodeWithText("特殊行动与人物拜访").performClick()
-        compose.onNodeWithText("等待").performClick()
+        compose.onNodeWithText("等待").performScrollTo().performClick()
         compose.onNodeWithText("确认等待1小时").performClick()
         compose.waitUntil(15_000) { compose.activity.model.state.value.game?.optInt("turn") == 1 && !compose.activity.model.state.value.busy }
         compose.onNodeWithText("菜单", useUnmergedTree = true).performClick()

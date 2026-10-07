@@ -17,8 +17,9 @@ class GameRuntime(source: String) : AutoCloseable {
             override fun poll() = System.nanoTime() > deadline || Thread.currentThread().isInterrupted
         }
         deadline = System.nanoTime() + 15_000_000_000L
-        js.evaluate(source, "engine.js")
-        deadline = Long.MAX_VALUE
+        try { js.evaluate(source, "engine.js") }
+        catch (error: Throwable) { js.close(); throw error }
+        finally { deadline = Long.MAX_VALUE }
     }
     fun call(operation: String, args: JSONObject = JSONObject()): Any? {
         deadline = System.nanoTime() + 10_000_000_000L
