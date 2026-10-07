@@ -1,9 +1,9 @@
 package io.github.bemyself001.backlundchronicle.nativeui
 
 import android.graphics.Bitmap
+import androidx.compose.ui.graphics.asAndroidBitmap
 import androidx.compose.ui.test.*
 import androidx.compose.ui.test.junit4.createAndroidComposeRule
-import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.platform.io.PlatformTestStorageRegistry
 import java.util.concurrent.TimeUnit
 import okhttp3.mockwebserver.MockResponse
@@ -20,8 +20,8 @@ import org.junit.Test
 class NativeUiTest {
     @get:Rule val compose = createAndroidComposeRule<NativeActivity>()
     private fun screenshot(name: String) {
-        val instrumentation = InstrumentationRegistry.getInstrumentation()
-        val bitmap = checkNotNull(instrumentation.uiAutomation.takeScreenshot()) { "Android did not provide a screenshot" }
+        compose.waitForIdle()
+        val bitmap = compose.onRoot().captureToImage().asAndroidBitmap()
         try { PlatformTestStorageRegistry.getInstance().openOutputFile("native-evidence/$name.png").use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) } }
         finally { bitmap.recycle() }
     }
@@ -87,6 +87,8 @@ class NativeUiTest {
             assertEquals(before.getInt("turn") + 1, model.state.value.game!!.getInt("turn"))
             assertNotEquals(before.getString("worldTime"), model.state.value.game!!.getString("worldTime"))
             assertEquals(3, model.state.value.game!!.getJSONArray("choices").length())
+            compose.onNodeWithText("你完成了等候，钟声已过去两小时。").assertExists()
+            compose.onNodeWithText(model.state.value.game!!.getString("worldTime")).assertExists()
             screenshot("settled-story")
         }
     }
