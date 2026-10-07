@@ -10,6 +10,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: native-android-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   native-checks:
     runs-on: ubuntu-latest

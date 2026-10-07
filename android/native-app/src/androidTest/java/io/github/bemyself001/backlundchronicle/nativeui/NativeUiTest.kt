@@ -8,6 +8,7 @@ import androidx.test.platform.io.PlatformTestStorageRegistry
 import java.util.concurrent.TimeUnit
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
+import okhttp3.mockwebserver.SocketPolicy
 import org.json.JSONObject
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -49,7 +50,7 @@ class NativeUiTest {
         screenshot("saves")
         // A real native network cancellation must leave the runtime usable.
         MockWebServer().use { server ->
-            server.enqueue(MockResponse().setHeader("Content-Type", "application/json").setBody("""{"choices":[{"message":{"content":"这条响应不应提交"}}]}""").setBodyDelay(20, TimeUnit.SECONDS))
+            server.enqueue(MockResponse().setSocketPolicy(SocketPolicy.NO_RESPONSE))
             val model = compose.activity.model
             val before = model.state.value.game!!
             val settings = JSONObject(model.state.value.settings.toString()).put("baseUrl", server.url("/v1").toString()).put("persistKey", false)
