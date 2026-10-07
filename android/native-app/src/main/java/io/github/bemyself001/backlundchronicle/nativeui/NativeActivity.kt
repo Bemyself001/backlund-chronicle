@@ -179,7 +179,7 @@ fun NativeGameApp(model: GameViewModel, onImport: () -> Unit = {}, onExport: () 
                 text = { Column(Modifier.verticalScroll(rememberScrollState())) { changes.objects().forEach { change ->
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Checkbox(change.text("key") in approved, { checked -> approved = if (checked) approved + change.text("key") else approved - change.text("key") })
-                        Column { Text(change.text("name", change.text("title", "物品或晋升变化")), fontWeight = FontWeight.Bold); Text(change.text("description", change.text("reason", change.toString())), fontSize = 13.sp) }
+                        Column { Text("${if (change.text("direction") == "gain") "获得" else "失去"} ${change.text("name", "物品或晋升变化")} ×${change.optInt("quantity", 1)}", fontWeight = FontWeight.Bold); Text(change.text("reason"), fontSize = 13.sp) }
                     }
                 } } },
                 confirmButton = { Button(onClick = { model.confirm(JSONArray(approved.toList())) }) { Text("确认选择") } },
@@ -238,7 +238,7 @@ private fun CreateCharacter(state: GameUiState, model: GameViewModel) {
         Chips(state.catalog.array("openings").objects().map { it.text("district") to it.text("district") }, character.text("startingDistrict")) { update("startingDistrict", it) }
         Text(state.catalog.array("openings").objects().firstOrNull { it.text("district") == character.text("startingDistrict") }?.text("summary") ?: "", fontSize = 13.sp)
         Text("初始身份")
-        Chips(listOf("ordinary" to "普通人", "low" to "序列9非凡者"), character.text("extraordinary")) { update("extraordinary", it) }
+        Chips(listOf("ordinary" to "普通人", "low" to "序列9非凡者"), character.text("extraordinary")) { update("extraordinary", it); if (it == "low" && character.text("pathway") == "无") update("pathway", "${state.catalog.array("pathways").objects().first().text("name")}（序列9）") }
         if (character.text("extraordinary") == "low") Chips(state.catalog.array("pathways").objects().map { "${it.text("name")}（序列9）" to it.text("name") }, character.text("pathway")) { update("pathway", it) }
         Text("天赋")
         Chips(state.catalog.array("talents").objects().map { it.text("id") to it.text("name") }, character.text("talent")) { update("talent", it) }
@@ -296,6 +296,7 @@ private fun MapPanel(state: GameUiState, model: GameViewModel) {
             }
         }
         if (chosen == null && cell?.optBoolean("explorable") == true) Button(onClick = { cell?.let { model.explore(it.optInt("q"), it.optInt("r")) } }, enabled = !state.busy) { Text("探索相邻街区 · 约13分钟") }
+        if (game.obj("prayer").optBoolean("ok")) Button(onClick = model::pray, enabled = !state.busy) { Text("在这里祷告 · 恢复理智与灵性") }
         OutlinedTextField(query, { query = it }, label = { Text("查找已知地点") }, modifier = Modifier.fillMaxWidth())
         locations.filter { query.isBlank() || it.text("name").contains(query) || it.text("district").contains(query) }.forEach { location ->
             TextButton(onClick = { selected = location.text("id") }, modifier = Modifier.fillMaxWidth()) { Text("${location.text("name")} · ${if (location.obj("knowledge").text("status") == "rumored") "传闻" else "已知"}", Modifier.fillMaxWidth()) }
@@ -414,7 +415,7 @@ private fun CharacterPanel(state: GameUiState, model: GameViewModel) {
             Text("当前战斗")
             Chips(targets, target) { target = it }
             enemies.forEach { Text("${it.text("name")} · 生命${it.optInt("health")}/${it.optInt("maxHealth")}") }
-            listOf("attack" to "普通攻击", "defend" to "防御", "escape" to "尝试逃离").forEach { (id, label) -> Button(onClick = { model.action(label, JSONObject().put("combatRequest", JSONObject().put("actionId", id).put("targetId", target.ifBlank { enemies.first().text("id") }).put("boostStacks", stacks))) }, enabled = !state.busy) { Text(label) } }
+            listOf("attack" to "普通攻击", "defend" to "防御", "wait" to "观察敌人").forEach { (id, label) -> Button(onClick = { model.action(label, JSONObject().put("combatRequest", JSONObject().put("actionId", id).put("enemyId", target.ifBlank { enemies.first().text("id") }).put("boostStacks", if (id == "attack") stacks else 0))) }, enabled = !state.busy) { Text(label) } }
         }
         val abilities = character.obj("advancement").array("unlockedAbilities").objects()
         if (abilities.any { it.obj("rule").has("preparation") }) {
@@ -422,8 +423,16 @@ private fun CharacterPanel(state: GameUiState, model: GameViewModel) {
             Chips((0..3).map { it.toString() to "$it 层" }, stacks.toString()) { stacks = it.toInt() }
         }
         abilities.forEach { ability -> CardBlock(ability.text("name"), ability.text("description")) {
-            Text("${ability.text("type")} · ${ability.text("cost")}", fontSize = 13.sp)
-            Button(onClick = { model.action("使用${ability.text("name")}${if (target.isNotBlank()) "，目标是${targets.find { it.first == target }?.second}" else ""}", JSONObject().put("abilityRequest", JSONObject().put("abilityId", ability.text("id")).put("boostStacks", stacks).apply { if (target.isNotBlank()) put("targetId", target) })) }, enabled = !state.busy && ability.text("type") != "passive") { Text("使用能力") }
+            val passive = ability.text("kind") == "passive"
+            val kind = ability.obj("target").text("kind", ability.obj("rule").obj("target").text("kind"))
+            var chosenTarget by rememberSaveable(ability.text("id")) { mutableStateOf("") }
+            val possible = if (kind == "enemy") targets else if (kind == "clue") game.array("knownClues").objects().map { it.text("id") to it.text("title") } else emptyList()
+            val effectiveTarget = if (possible.size == 1) possible.first().first else chosenTarget
+            Text(if (passive) "被动生效 · 相关检定自动核验" else "灵性消耗 ${ability.optInt("spiritualityCost")} · 1回合", fontSize = 13.sp)
+            if (!passive) {
+                if (possible.isNotEmpty()) Chips(possible, effectiveTarget) { chosenTarget = it }
+                Button(onClick = { model.action("使用${ability.text("name")}${if (effectiveTarget.isNotBlank()) "，目标是${possible.find { it.first == effectiveTarget }?.second}" else ""}", JSONObject().put("abilityRequest", JSONObject().put("abilityId", ability.text("id")).put("boostStacks", stacks).apply { if (effectiveTarget.isNotBlank()) put("targetId", effectiveTarget) })) }, enabled = !state.busy) { Text("使用能力") }
+            }
         } }
     }
 }
@@ -475,7 +484,7 @@ private fun NotesPanel(state: GameUiState) {
 @Composable
 private fun SettingsPanel(state: GameUiState, model: GameViewModel) {
     var settingsJson by rememberSaveable(state.ready) { mutableStateOf(state.settings.toString()) }
-    var key by rememberSaveable { mutableStateOf(model.apiKey) }
+    var key by remember { mutableStateOf(model.apiKey) }
     var prompt by rememberSaveable(state.ready) { mutableStateOf(state.prompt) }
     val settings = JSONObject(settingsJson)
     fun update(id: String, value: Any) { settingsJson = JSONObject(settingsJson).put(id, value).toString() }

@@ -116,7 +116,7 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         } else JSONArray()
         mutable.update { it.copy(phase = "生成最终剧情", confirmations = null) }
         val render = engine("settle", JSONObject().put("approvedKeys", approved))
-        response = transport.complete(state.value.settings, apiKey, render.getJSONObject("request")) { text -> mutable.update { it.copy(preview = text) } }
+        response = transport.complete(state.value.settings, apiKey, render.getJSONObject("request")) { text -> if (state.value.settings.optBoolean("nativeTools")) mutable.update { it.copy(preview = text) } }
         withContext(NonCancellable) {
             val finished = engine("finish", JSONObject().put("response", response))
             publish(finished.getJSONObject("view"))
@@ -126,6 +126,14 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
             // Choice recovery occurs after durable narrative settlement, never replaying the turn.
             try { recoverChoices() } catch (_: Exception) { mutable.update { it.copy(notice = "剧情已保存，行动建议可单独重新生成。") } }
         }
+        try {
+            val request = engine("summaryRequest", JSONObject().put("settings", state.value.settings))
+            if (request.has("request")) {
+                mutable.update { it.copy(phase = "整理故事记忆") }
+                val summary = transport.complete(state.value.settings, apiKey, request.getJSONObject("request"))
+                publish(engine("summaryFinish", JSONObject().put("response", summary)))
+            }
+        } catch (_: Exception) { /* The saved story and pending memory episodes remain durable. */ }
     }
     fun confirm(keys: JSONArray) { decision?.complete(keys) }
     fun cancel() { turnJob?.cancel(); decision?.cancel() }
@@ -137,6 +145,12 @@ class GameViewModel(application: Application) : AndroidViewModel(application) {
         publish(engine("choices", JSONObject().put("response", response)))
     }
     fun choices() = work { recoverChoices() }
+    fun pray() = work {
+        val request = engine("prayerRequest", JSONObject().put("settings", state.value.settings))
+        mutable.update { it.copy(phase = "生成祷文") }
+        val response = transport.complete(state.value.settings, apiKey, request.getJSONObject("request"))
+        withContext(NonCancellable) { publish(engine("prayerFinish", JSONObject().put("response", response))) }
+    }
     fun special(request: JSONObject) = work { publish(engine("special", request)) }
     fun explore(q: Int, r: Int) = work { publish(engine("explore", JSONObject().put("q", q).put("r", r))) }
     fun focus(id: String) = work { publish(engine("focus", JSONObject().put("id", id)), "quests") }

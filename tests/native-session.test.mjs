@@ -63,3 +63,41 @@ test("native JSON codec removes credentials from imported web saves", () => {
   const s = createNativeSession(); s.load({ payload: { game } });
   assert.equal(JSON.stringify(s.export()).includes("secret-key"), false);
 });
+
+test("native issued commissions preserve string revisions and deliver one or two clues", () => {
+  const s = session();
+  const raw = createInitialGame({ ...s.catalog().character, name: "委托人", startingDistrict: "乔伍德区" });
+  raw.triggerState.facts["person.sherlock-moriarty.met"] = { value: true, firstTurn: 0 };
+  raw.money = { pounds: 5, solers: 0, pence: 0 };
+  s.load({ payload: raw });
+  function run(action, options = {}) {
+    const initial = s.begin({ action, options });
+    if (initial.complete) return;
+    s.plan({ response: completion('{"toolCalls":[]}') }); s.settle(); s.finish({ response: narrative });
+  }
+  run("委托夏洛克·莫里亚蒂调查舅舅失踪的线索，先商定费用与交付时间", { personConversation: "sherlock-moriarty" });
+  let task = s.view().journal.issued[0];
+  assert.equal(typeof task.revision, "string");
+  run("查看进度", { questTrackingRequest: { id: task.id, revision: task.revision } });
+  assert.equal(s.view().turn, 1);
+  run("确认委托", { questTrackingRequest: { id: task.id, revision: task.revision, routeId: "commission:accept" } });
+  assert.equal(s.view().journal.issued[0].commission.phase, "investigating");
+  s.special({ operation: "wait", hours: 24, revision: s.view().special.revision, expectedTurn: s.view().turn, expectedWorldTime: s.view().worldTime });
+  task = s.view().journal.issued[0];
+  run("领取报告", { questTrackingRequest: { id: task.id, revision: task.revision, routeId: "commission:collect" } });
+  const report = s.view().journal.issued[0].commission.report;
+  assert.ok(report.clues.length >= 1 && report.clues.length <= 2);
+  for (const clue of report.clues) assert.ok(s.view().storyHistory.at(-1).content.includes(clue.title));
+  assert.equal(s.view().turn, 4);
+  assert.equal(s.export().game.money.pounds, 4);
+});
+
+test("native explicit travel corrects a missing planner move", () => {
+  const s = session();
+  const destination = s.view().map.locations.find(location => ["discovered", "visited"].includes(location.knowledge.status) && location.id !== s.view().location.id);
+  assert.ok(destination);
+  s.begin({ action: `前往${destination.name}` });
+  s.plan({ response: completion('{"toolCalls":[]}') }); s.settle(); s.finish({ response: narrative });
+  assert.equal(s.view().location.id, destination.id);
+  assert.equal(s.view().turn, 1);
+});

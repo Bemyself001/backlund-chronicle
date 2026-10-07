@@ -33,7 +33,7 @@ jobs:
         working-directory: android
         run: |
           chmod +x gradlew
-          ./gradlew :native-app:testPreviewDebugUnitTest :native-app:assemblePreviewDebug :native-app:assemblePreviewRelease
+          ./gradlew -PNATIVE_ONLY=true :native-app:testPreviewDebugUnitTest :native-app:assemblePreviewDebug :native-app:assemblePreviewRelease
       - name: Sign preview with the established release key
         if: github.event_name != 'pull_request'
         env:
@@ -76,7 +76,10 @@ jobs:
           arch: x86_64
           profile: pixel_2
           working-directory: android
-          script: ./gradlew :native-app:connectedPreviewDebugAndroidTest
+          script: |
+            ./gradlew -PNATIVE_ONLY=true :native-app:connectedPreviewDebugAndroidTest
+            mkdir -p ../native-evidence
+            adb pull /sdcard/Android/data/io.github.bemyself001.backlundchronicle.native/files/native-evidence ../native-evidence
       - name: Collect native screenshots
         if: always()
         run: |

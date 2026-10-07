@@ -2,7 +2,9 @@ import { createInitialGame, EMPTY_CHARACTER, DEFAULT_API_SETTINGS, DEFAULT_SYSTE
 import { PATHWAYS, OPENINGS, TALENTS, VISITABLE_PEOPLE, SPECIAL_RECIPES, ORGANIZATIONS } from "../content/index.js";
 import { cleanGame, migrateSave, validatePlayableSave } from "../services/saveCodec.js";
 import { buildAIRequestBody, normalizeChatCompletion } from "../services/api.js";
-import { buildPlanningContext, buildRenderingContext, buildToolRepairContext, buildChoiceRegenerationContext, computeMemoryUpdate, visibleGameState } from "../services/memory.js";
+import { buildPlanningContext, buildRenderingContext, buildToolRepairContext, buildChoiceRegenerationContext, buildSummaryContext, computeMemoryUpdate, visibleGameState } from "../services/memory.js";
+import { createMemorySummaryJob, applyMemorySummary, parseMemoryDigestPayload } from "../services/memoryState.js";
+import { extractJson, textFromContent } from "../services/protocol.js";
 import { normalizeToolCalls, dedupeToolCalls, executeToolCalls, validateToolCall, isRepairableToolError } from "../engine/tools.js";
 import { resolveTurnProgress } from "../engine/turn.js";
 import { createTurnResolution } from "../services/turnResolution.js";
@@ -15,7 +17,7 @@ import { inspectQuestTracking } from "../services/questTracking.js";
 import { projectQuestJournal, questAssistance } from "../engine/questRuntime.js";
 import { collectImportantItemConfirmations, createAuditBaseline, auditTurnChanges } from "../engine/audit.js";
 import { choiceResult, modelChoices, choiceValidationError, injectOccultEntryChoice } from "../services/choices.js";
-import { appendFixedRenardTreatmentScene, markNarrativeEventsDelivered } from "../services/narrativeEvents.js";
+import { appendFixedRenardTreatmentScene, markNarrativeEventsDelivered, eventDirections } from "../services/narrativeEvents.js";
 import { resolveSpecialAction } from "../services/specialActions.js";
 import { specialState, availableSpecialActions, commissionOffer, actionGate, registrationGate } from "../engine/specialActions.js";
 import { visitPersonGate, requestedPersonVisit } from "../engine/visitablePeople.js";
@@ -28,6 +30,7 @@ import { visibleHexes, exploreHex, canExploreHex } from "../system/hexworld.js";
 import { appendStoryMessages } from "../services/storyHistory.js";
 import { moneyToPence, formatMoney } from "../system/money.js";
 import { getAdvancement } from "../system/character.js";
+import { prayerAvailability, settlePrayer } from "../engine/prayer.js";
 import { makeId } from "../utils/id.js";
 
 // A session is local to one QuickJS instance. No browser globals, UI, or credentials.
@@ -35,6 +38,7 @@ import { makeId } from "../utils/id.js";
 export function createNativeSession() {
   let game = null;
   let pending = null;
+  let summaryJob = null;
   const requireGame = () => { if (!game) throw new Error("请先创建角色或载入存档。"); };
   const requireIdle = () => { if (pending) throw new Error("本轮正在处理中，请先取消或完成。"); };
   const request = (messages, options = {}) => ({ request: buildAIRequestBody(pending.settings, messages, { disableJsonMode: pending.settings.nativeTools, ...options }) });
@@ -72,11 +76,11 @@ export function createNativeSession() {
         ...(recipe.stat ? [action("使用一份 · 1回合", "use", id)] : []), action(`出售一份 · ${recipe.sale}便士`, "sell", id, item.equipped ? "先卸下装备" : ""),
       ] }] : [];
     });
-    return { ...visibleGameState(game), id: game.id, moneyLabel: formatMoney(game.money), choices: game.choices, choiceMeta: game.choiceMeta,
+    return { ...visibleGameState(game), id: game.id, moneyLabel: formatMoney(game.money), choices: game.choices, choiceMeta: game.choiceMeta, prayer: prayerAvailability(game),
       storyHistory: game.storyHistory, changeLog: game.changeLog, worldEvents: game.worldEvents, longTermSummary: game.longTermSummary,
       capacity: game.capacity, equipment: game.equipment, journal, trackedQuestId: game.trackedQuestId,
       map: { cells: visibleHexes(game).map(cell => ({ ...cell, explorable: canExploreHex(game, cell.q, cell.r).ok })), locations: getMapLocations(game).filter(location => knowledge[location.id]?.status !== "unknown").map(location => ({
-        ...location, ...hexForLocation(location), knowledge: knowledge[location.id], travel: estimateTravelByHex(game.location, location),
+        ...location, ...hexForLocation(location), knowledge: knowledge[location.id], travel: estimateTravelByHex({ id: game.location.id, ...game.world.player }, location),
       })) },
       special: { work, craft: [...recipes, ...products], supplies: [
         { title: "雾鸦旅店", description: "睡眠恢复按本地规则结算。", actions: [action("睡觉8小时 · 1回合", "sleep", "soot-lamp", game.location.id !== "soot-lamp" ? "需要到达雾鸦旅店" : "")] },
@@ -199,13 +203,48 @@ export function createNativeSession() {
   return {
     catalog: () => ({ character: EMPTY_CHARACTER, pathways: PATHWAYS.map(({ id, name }) => ({ id, name })), openings: OPENINGS.map(({ district, title, summary }) => ({ district, title, summary })), talents: TALENTS, defaultSettings: { ...DEFAULT_API_SETTINGS, stream: true }, defaultPrompt: DEFAULT_SYSTEM_PROMPT }),
     create: ({ character, loadout }) => { requireIdle(); if (!character?.name?.trim()) throw new Error("请填写角色姓名。"); game = createInitialGame({ ...EMPTY_CHARACTER, ...character }, loadout); return view(); },
-    load: ({ payload }) => { requireIdle(); game = validatePlayableSave(migrateSave(structuredClone(payload?.game || payload))); return view(); },
+    load: ({ payload }) => { requireIdle(); const loaded = validatePlayableSave(migrateSave(structuredClone(payload?.game || payload))); game = loaded; summaryJob = null; return view(); },
     view, begin, plan, settle, finish, tool: localTool,
     cancel: () => { pending = null; return view(); },
     special: request => { requireGame(); requireIdle(); game = resolveSpecialAction(game, request); return view(); },
     focus: ({ id }) => { requireGame(); requireIdle(); game.trackedQuestId = id; return view(); },
     explore: ({ q, r }) => { requireGame(); requireIdle(); const next = structuredClone(game); const result = exploreHex(next, q, r); if (!result.ok) throw new Error(result.reason || "此处无法探索。"); Object.assign(next, appendStoryMessages(next, [{ id: makeId("msg"), role: "assistant", turn: game.turn, content: result.narrative, source: "fixed" }])); game = next; return view(); },
     export: () => { requireGame(); return { format: "backlund-chronicle-save", version: SAVE_VERSION, exportedAt: new Date().toISOString(), game: cleanGame(game) }; },
+    prayerRequest: ({ settings }) => {
+      requireGame(); requireIdle(); const available = prayerAvailability(game); if (!available.ok) throw new Error(available.reason);
+      pending = { kind: "prayer", locationId: game.location.id };
+      return { request: buildAIRequestBody(settings, [
+        { role: "system", content: "为文字游戏创作一段第一人称中文祷文，50至180字，绝不超过200字。只输出祷文正文，不要标题、JSON、环境描写、工具调用、属性变化或神明回应。严格围绕指定神明及信仰主题，不混用其他神明。" },
+        { role: "user", content: JSON.stringify(available.church) },
+      ], { disableTools: true, disableJsonMode: true, streamOverride: false, forceDisableReasoning: true, maxTokensModeOverride: "manual", maxTokensOverride: 800 }) };
+    },
+    prayerFinish: ({ response }) => {
+      if (pending?.kind !== "prayer") throw new Error("祷告已取消。");
+      const text = normalizeChatCompletion(response).narrative.trim();
+      if (!text || Array.from(text).length > 200) throw new Error("祷文为空或超过200字，请重试。");
+      const church = prayerAvailability(game).church;
+      const { next, action, progress, recovered, sanityRecovered } = settlePrayer(game, pending.locationId);
+      const resolution = createTurnResolution([], [], progress, next);
+      let narrative = `${text}\n\n${church.environment}`;
+      if (progress.newTrigger?.presentation) narrative += `\n\n【${progress.newTrigger.presentation.title}】${progress.newTrigger.presentation.text}`;
+      narrative += eventDirections(resolution.derivedEffects.narrativeEvents) ? `\n\n${eventDirections(resolution.derivedEffects.narrativeEvents)}` : "";
+      const memory = computeMemoryUpdate(game, action, narrative, resolution, { settledGame: next });
+      const baseline = createAuditBaseline(game, next.turn);
+      game = markNarrativeEventsDelivered({ ...next, ...memory.updates, choices: injectOccultEntryChoice(game.choices, progress.newTrigger?.presentation),
+        changeLog: [...game.changeLog, ...progress.statusTickLogs, { id: makeId("log"), turn: next.turn, text: `向${church.deity}祷告：理智恢复${sanityRecovered}点，灵性恢复${recovered}点。`, tone: "success" }].slice(-100),
+        lastTurnBaseline: baseline, lastTurnAudit: auditTurnChanges(baseline, next), lastTurnMetrics: null,
+      }, resolution.derivedEffects.narrativeEvents, { action });
+      pending = null; return view();
+    },
+    summaryRequest: ({ settings }) => { requireGame(); requireIdle(); summaryJob = createMemorySummaryJob(game); return summaryJob ? { request: buildAIRequestBody(settings, buildSummaryContext(summaryJob), { disableTools: true, disableJsonMode: false, streamOverride: false, maxTokensModeOverride: "manual", maxTokensOverride: 2400 }) } : {}; },
+    summaryFinish: ({ response }) => {
+      requireGame(); requireIdle(); if (!summaryJob) return view();
+      const normalized = normalizeChatCompletion(response);
+      const raw = normalized.protocolPayload?.memory || extractJson(textFromContent(response?.choices?.[0]?.message?.content));
+      const digest = parseMemoryDigestPayload(raw, summaryJob);
+      if (!digest) throw new Error("记忆摘要格式无效，旧摘要已保留。");
+      game = applyMemorySummary(game, summaryJob, digest); summaryJob = null; return view();
+    },
     choiceRequest: ({ settings, prompt = DEFAULT_SYSTEM_PROMPT }) => { requireGame(); requireIdle(); const narrative = game.storyHistory.filter(message => message.role === "assistant").at(-1)?.content || ""; return { request: buildAIRequestBody(settings, buildChoiceRegenerationContext(game, "继续当前场景", narrative, "missing_choices", prompt, { nativeTools: settings.nativeTools }), { toolSet: "choices", disableJsonMode: settings.nativeTools, requireChoiceTool: true }) }; },
     choices: ({ response }) => { requireGame(); requireIdle(); const normalized = normalizeChatCompletion(response); const result = choiceResult(modelChoices(normalized), choiceValidationError(normalized)); game = { ...game, ...result }; return view(); },
   };
