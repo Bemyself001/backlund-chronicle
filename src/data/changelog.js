@@ -180,7 +180,7 @@ export const LATEST_UPDATE = {
   pending: false,
   channel: "web",
   version: RELEASE_VERSION,
-  date: "2026-10-07", dateLabel: "2026.10.07",
+  date: "2026-10-09", dateLabel: "2026.10.09",
   title: `${RELEASE_VERSION} · 雾都书卷与午夜档案Web APK`,
   summary: "继续使用React网页界面与Capacitor打包，内置雾都书卷和午夜档案背景，保留三色状态条、特殊行动及完整24小时等待圆钟。",
   changes: [
