@@ -1,5 +1,6 @@
 import { access, copyFile, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
+import { rebaseInlineStylesheet } from "./inline-stylesheet.mjs";
 
 const projectRoot = resolve(import.meta.dirname, "..");
 const buildDirectory = resolve(projectRoot, "dist");
@@ -41,8 +42,7 @@ const standaloneScript = script.replace(/\bimport\.meta\.url\b/g,
 const standaloneEntry = clientEntry
   .replace(scriptMatch[0], () => `<script type="module">${standaloneScript.replace(/<\/script/gi, "<\\/script")}</script>`)
   .replace(/href=(["'])\/fonts\//gi, "href=$1./fonts/")
-  .replace(stylesheetMatch[0], () => `<style>${stylesheet
-    .replace(/url\((["']?)\/fonts\//gi, "url($1./fonts/")
+  .replace(stylesheetMatch[0], () => `<style>${rebaseInlineStylesheet(stylesheet, stylesheetMatch[1])
     .replace(/<\/style/gi, "<\\/style")}</style>`);
 
 if (/<script\b[^>]*\bsrc=/i.test(standaloneEntry) || /<link\b[^>]*\brel="stylesheet"/i.test(standaloneEntry)) {
