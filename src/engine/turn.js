@@ -8,6 +8,7 @@ import { isRewardClaimAction } from "./questLifecycle.js";
 import { settleHealthEffects } from "./healthEffects.js";
 import { chooseQuestFocus } from "./questFocus.js";
 import { syncIssuedCommissions } from "./commissions.js";
+import { advancementHealthTarget } from "../system/characterStats.js";
 
 export { advanceWorldTime } from "./worldTime.js";
 
@@ -99,15 +100,18 @@ export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], 
   const commissionUpdates = syncIssuedCommissions(game);
   const triggerProgress = processTriggers(game, { action: options.commissionOnly ? "处理玩家发布的调查委托" : action, toolCalls, toolResults, turn: nextTurn, travelOnly: Boolean(options.travelOnly || options.commissionOnly) });
   game.questFocus = chooseQuestFocus(game, action, toolCalls, toolResults) || (rewardClaimed ? focus : null);
-  // Promotion recovery is the final stat settlement of this turn; ongoing effects remain.
-  const advancementRecovery = successfulTool(toolCalls, toolResults, call => call.name === "advancement.promote")
+  // Use the accepted local result, never an AI-supplied method or an old save field.
+  const promotionIndex = toolCalls.findIndex((call, index) => call.name === "advancement.promote" && toolResults[index]?.ok);
+  const promotionMethod = promotionIndex >= 0 ? toolResults[promotionIndex].data?.advancement?.method : null;
+  const advancementRecovery = promotionIndex >= 0
     ? ["health", "sanity"].map(stat => {
       const maxKey = `max${stat[0].toUpperCase()}${stat.slice(1)}`;
-      return applyStatDelta(game, stat, game.character.stats[maxKey] - game.character.stats[stat]);
+      const target = stat === "health" ? advancementHealthTarget(game.character.stats, promotionMethod) : game.character.stats[maxKey];
+      return applyStatDelta(game, stat, target - game.character.stats[stat]);
     }).filter(Boolean) : [];
   if (advancementRecovery.length) {
     syncStatCollapseStatuses(game);
-    statusTickLogs.push(...advancementRecovery.map(change => `晋升恢复：${change.label} ${change.before}→${change.after}`));
+    statusTickLogs.push(...advancementRecovery.map(change => `${promotionMethod === "characteristic" ? "特性晋升结算（生命50%）" : "晋升恢复"}：${change.label} ${change.before}→${change.after}`));
   }
   const occultEntry = triggerProgress.occultEntry ? { id: triggerProgress.occultEntry.instanceId, turn: triggerProgress.occultEntry.createdTurn, ...triggerProgress.occultEntry.presentation } : null;
   return {

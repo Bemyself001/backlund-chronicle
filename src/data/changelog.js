@@ -181,7 +181,23 @@ export const LATEST_UPDATE = {
   channel: "web",
   version: RELEASE_VERSION,
   date: "2026-10-09", dateLabel: "2026.10.09",
-  title: `${RELEASE_VERSION} · 实景背景与阅读时钟`,
+  title: `${RELEASE_VERSION} · 序列四与特性晋升`,
+  summary: "补全22条途径的序列四魔药名称与能力，从序列四起允许消耗对应非凡特性直接晋升，生命降至新上限的一半。",
+  changes: [
+    "登记22种序列四魔药与半神职业特色，已鉴定的序列四魔药统一使用对应职业名称；角色档案与叙事上下文同步登记，每条途径新增两项可由本地规则结算的序列四能力。",
+    "非凡特性登记途径、序列和确认状态；目标序列4至0可沿当前途径逐级吸收晋升，低序列、错途径、跳级和未确认特性均不能直接使用。",
+    "特性晋升消耗一份特性，生命固定为新上限50%（向下取整），理智沿用晋升恢复，灵性保留原有消耗；最终回合结算不再把半血覆盖成满血。",
+    "行囊与晋升确认显示特性身份、消耗和半血代价；取消确认保留物品与角色数值，同一回合最多晋升一次。",
+    "发布1.8.3正式签名Web APK、网页与匹配的热更新包，沿用原包名和签名，递增构建号，提供SHA-256校验文件。",
+  ],
+};
+
+const RELEASE_182_UPDATE = {
+  pending: false,
+  channel: "web",
+  version: "1.8.2",
+  date: "2026-10-09", dateLabel: "2026.10.09",
+  title: "1.8.2 · 实景背景与阅读时钟",
   summary: "让日夜图片直接作为剧情背景，去掉整块纸面遮罩；增加半屏阅读留白，并重新排版日期与时钟。",
   changes: [
     "日读与夜读原图直接铺在阅读区底层，取消背景透明度与整块正文纸面覆盖；文字使用轻微阴影，行动选项和输入仍有清楚承托。",
@@ -837,6 +853,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_182_UPDATE,
   RELEASE_181_UPDATE,
   RELEASE_180_UPDATE,
   RELEASE_NATIVE_180_UPDATE,

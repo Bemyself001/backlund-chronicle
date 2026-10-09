@@ -9,7 +9,7 @@ import { playerVisibleTriggers } from "../engine/triggerState.js";
 import { getInstanceTriggerDefinition } from "../engine/triggerDefinitions.js";
 import { triggerGuidance } from "../engine/triggerGuidance.js";
 import { progressiveContext } from "../engine/contextLookup.js";
-import { SCENARIO_RULES, ORGANIZATIONS } from "../content/index.js";
+import { SCENARIO_RULES, ORGANIZATIONS, SEQUENCE_FOUR_PROFILES } from "../content/index.js";
 import { fixedNarrativeMessages, LOCAL_STATE_AUTHORITY_RULES } from "../system/narrativeContract.js";
 import { NARRATIVE_EVENT_RULE } from "./narrativeEvents.js";
 import { timedAction } from "../engine/restTime.js";
@@ -107,7 +107,10 @@ function visibleInventory(game) {
 function visibleAudit(game) {
   if (!game.lastTurnAudit) return null;
   const audit = structuredClone(game.lastTurnAudit);
-  const unknown = [...(game.inventory || []), ...(game.lastTurnBaseline?.inventory || [])].filter(item => playerVisibleItem(item).potionStatus === "unidentified");
+  const unknown = [...(game.inventory || []), ...(game.lastTurnBaseline?.inventory || [])].filter(item => {
+    const visible = playerVisibleItem(item);
+    return visible.potionStatus === "unidentified" || visible.characteristicStatus === "unidentified";
+  });
   for (const key of ["gained", "lost", "updated", "equipped", "unequipped"]) {
     if (!Array.isArray(audit.inventory?.[key])) continue;
     audit.inventory[key] = audit.inventory[key].map(entry => {
@@ -159,6 +162,8 @@ export function visibleGameState(game) {
     discoveredLocations: game.discoveredLocations,
     mapRumors: visibleMapRumors(game),
     character,
+    sequenceFourDossier: character.advancement.type === "extraordinary" && character.advancement.sequence <= 5
+      ? SEQUENCE_FOUR_PROFILES[character.advancement.pathwayId] || null : null,
     money: game.money,
     statusEffects: game.statusEffects,
     combat: normalizeCombatState(game.combat),
@@ -264,6 +269,7 @@ function privatePlanningState(game, options = {}) {
       return rule ? actionPreview(game, rule, request.boostStacks ?? 0, game.combat?.enemies?.find(enemy => enemy.id === (request.targetId || request.enemyId))) : null;
     })(),
     requestedIdentification: options.identificationRequest || null,
+    requestedAdvancement: options.advancementRequest || null,
     requestedQuestTracking: options.questTrackingPlan || null,
     requestedCommissionInquiry: options.commissionInquiry || null,
     mapGrowthAnchors: shouldExposeMapCandidates(game, options) ? mapGrowthAnchors(game) : undefined,
@@ -271,6 +277,9 @@ function privatePlanningState(game, options = {}) {
       instanceId: item.instanceId,
       name: item.name,
       potion: item.potion,
+    })),
+    characteristicFacts: (game.inventory || []).map(playerVisibleItem).filter(item => item.characteristic || item.characteristicStatus).map(item => ({
+      instanceId: item.instanceId, name: item.name, characteristic: item.characteristic, status: item.characteristicStatus,
     })),
   };
 }

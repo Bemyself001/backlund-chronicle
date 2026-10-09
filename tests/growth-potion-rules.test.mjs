@@ -38,7 +38,10 @@ test("all 22 pathways have stable 3/3/4/4/5 ability growth and named ranks", () 
     for (const [earlier, later] of [[0, 1], [2, 3]]) {
       assert.equal(ranks[earlier].filter((a, i) => JSON.stringify(a.rule) !== JSON.stringify(ranks[later][i].rule)).length, 1);
     }
-    for (let sequence = 4; sequence >= 0; sequence--) assert.deepEqual(getUnlockedAbilities(pathway.id, sequence), ranks[4]);
+    const demigodAbilities = getUnlockedAbilities(pathway.id, 4);
+    assert.ok(demigodAbilities.length > ranks[4].length);
+    assert.deepEqual(demigodAbilities.slice(0, ranks[4].length).map(ability => ability.id), ranks[4].map(ability => ability.id));
+    for (let sequence = 3; sequence >= 0; sequence--) assert.deepEqual(getUnlockedAbilities(pathway.id, sequence), demigodAbilities);
     for (let sequence = 0; sequence <= 9; sequence++) assert.equal(getSequenceName(pathway.id, sequence), pathway.sequences[9 - sequence]);
   }
 });

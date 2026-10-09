@@ -76,9 +76,10 @@ function currentRecords(game) {
   for (const item of (game.inventory || []).map(playerVisibleItem)) {
     if (!item.instanceId && !item.itemId) continue;
     records.push(makeRecord("item", item.instanceId || item.itemId, textOf([item.name, item.category, item.description,
-      `当前数量：${item.quantity ?? 1}`, ...(item.tags || []), item.potion?.identified && `已鉴定：${item.potion.pathwayName}序列${item.potion.sequence}`].filter(Boolean)), {
-      aliases: [item.name], entityIds: [item.itemId], sourceTurns: [item.acquiredAt], status: item.potionStatus,
-      compactText: textOf([item.name, `当前数量：${item.quantity ?? 1}`, item.potionStatus]),
+      `当前数量：${item.quantity ?? 1}`, ...(item.tags || []), item.potion?.identified && `已鉴定：${item.potion.pathwayName}序列${item.potion.sequence}`,
+      item.characteristic?.identified && `已确认特性：${item.characteristic.pathwayName}序列${item.characteristic.sequence}`].filter(Boolean)), {
+      aliases: [item.name], entityIds: [item.itemId], sourceTurns: [item.acquiredAt], status: item.potionStatus || item.characteristicStatus,
+      compactText: textOf([item.name, `当前数量：${item.quantity ?? 1}`, item.potionStatus || item.characteristicStatus]),
     }));
   }
   for (const quest of visibleQuestJournal(game)) {

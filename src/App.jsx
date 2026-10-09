@@ -49,6 +49,7 @@ import { IS_STARTUP_TEST, openStartupDiagnostics, startupStage } from "./service
 import { loadOnboarding, saveOnboarding } from "./services/onboarding.js";
 import { ensureTalismanToolCall, validateTalismanRequest } from "./services/talismans.js";
 import { getChurchTalisman } from "./system/talismans.js";
+import { normalizeCharacteristic } from "./system/characteristics.js";
 import { activeEnemies } from "./system/combat.js";
 import { requestedPersonVisit, visitPersonGate } from "./engine/visitablePeople.js";
 import { validatePlayerActions, ensurePlayerActionTools } from "./services/playerActions.js";
@@ -270,7 +271,7 @@ export default function App() {
         return response;
       };
 
-      const advancementIntent = isExplicitAdvancementIntent(action) && game.inventory.some((item) => item.potion);
+      const advancementIntent = isExplicitAdvancementIntent(action) && game.inventory.some((item) => item.potion || normalizeCharacteristic(item));
       const talismanRequest = validateTalismanRequest(game, options.talismanRequest);
       if (options.personConversation) {
         const reason = visitPersonGate(game, options.personConversation, { conversation: true });
@@ -386,6 +387,7 @@ export default function App() {
           rejected: rejectedChanges,
           advancement: advancementChange ? {
             status: blockedCallIndexes.includes(advancementChange.callIndex) ? "declined" : "confirmed",
+            method: advancementChange.advancement.method,
             target: advancementChange.advancement.after,
           } : null,
         };
@@ -570,6 +572,11 @@ export default function App() {
       showStory?.();
       const bottle = game.inventory.find(item => item.instanceId === args.instanceId);
       return runTurn(`服用${bottle.name}魔药并尝试逐级晋升`, { advancementRequest: { potionInstanceId: args.instanceId } });
+    }
+    if (name === "item.use" && normalizeCharacteristic(game.inventory.find(item => item.instanceId === args.instanceId) || {})) {
+      showStory?.();
+      const characteristic = game.inventory.find(item => item.instanceId === args.instanceId);
+      return runTurn(`吸收${characteristic.name}并正式晋升`, { advancementRequest: { characteristicInstanceId: args.instanceId } });
     }
     if (name === "item.use" && getChurchTalisman(game.inventory.find(item => item.instanceId === args.instanceId))) {
       showStory?.();

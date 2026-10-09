@@ -6,6 +6,9 @@ export default function ImportantItemConfirmation({ changes, onConfirm, onCancel
   const [approvedKeys, setApprovedKeys] = useState(() => new Set(changes.map((change) => change.key)));
   const promotion = changes.find((change) => change.confirmationKind === "advancement");
   const ordinaryPromotion = promotion?.advancement?.before?.type === "ordinary";
+  const characteristicPromotion = promotion?.advancement?.method === "characteristic";
+  const verb = characteristicPromotion ? "吸收" : "服用";
+  const resourceName = characteristicPromotion ? "非凡特性" : "魔药";
   const otherChanges = promotion ? changes.filter((change) => change.key !== promotion.key) : changes;
   const toggle = (key) => {
     setApprovedKeys((current) => {
@@ -21,8 +24,8 @@ export default function ImportantItemConfirmation({ changes, onConfirm, onCancel
   return <Modal title={promotion ? ordinaryPromotion ? "确认成为非凡者" : "确认序列晋升" : "确认重要物品变更"} eyebrow={promotion ? "PERMANENT ADVANCEMENT · 永久变更" : "LOCAL AUDIT · 本地审计"} onClose={onCancel}>
     {promotion ? <>
       <div className={`${styles.intro} ${styles.advancementIntro}`}>
-        <strong>魔药尚未消耗，晋升也尚未写入存档</strong>
-        <p>本地规则已验证魔药身份、途径与目标序列。确认后生成晋升剧情；剧情完成后消耗一瓶魔药，更新人物类型与能力，增加三项上限并回满生命和理智。</p>
+        <strong>{resourceName}尚未消耗，晋升也尚未写入存档</strong>
+        <p>本地规则已验证{resourceName}身份、途径与目标序列。确认后生成晋升剧情；剧情完成后消耗{characteristicPromotion ? "一份非凡特性" : "一瓶魔药"}，更新人物类型与能力，增加三项上限。{characteristicPromotion ? "生命降至晋升后上限的50%（向下取整），理智回满；灵性保留已消耗部分。" : "生命和理智回满，灵性保留已消耗部分。"}</p>
       </div>
       <section className={styles.advancement} aria-label="晋升结果预览">
         <div className={styles.advancementRoute}>
@@ -33,7 +36,7 @@ export default function ImportantItemConfirmation({ changes, onConfirm, onCancel
           {[["maxHealth", "生命上限"], ["maxSanity", "理智上限"]].map(([key, label]) => promotion.advancement.statChanges[key] && <div key={key}><dt>{label}</dt><dd>{promotion.advancement.statChanges[key].before} → {promotion.advancement.statChanges[key].after}</dd></div>)}
           <div><dt>当前灵性</dt><dd>{promotion.advancement.statChanges.spirituality.before} → {promotion.advancement.statChanges.spirituality.after}</dd></div>
           <div><dt>灵性上限</dt><dd>{promotion.advancement.statChanges.maxSpirituality.before} → {promotion.advancement.statChanges.maxSpirituality.after}</dd></div>
-          {promotion.advancement.statChanges.health && <div><dt>生命回满</dt><dd>{promotion.advancement.statChanges.health.before} → {promotion.advancement.statChanges.health.after}</dd></div>}
+          {promotion.advancement.statChanges.health && <div><dt>{characteristicPromotion ? "生命 · 新上限50%" : "生命回满"}</dt><dd>{promotion.advancement.statChanges.health.before} → {promotion.advancement.statChanges.health.after}</dd></div>}
           {promotion.advancement.statChanges.sanity && <div><dt>理智回满</dt><dd>{promotion.advancement.statChanges.sanity.before} → {promotion.advancement.statChanges.sanity.after}</dd></div>}
         </dl>
         {promotion.advancement.newlyUnlockedAbilities.length > 0 && <div className={styles.abilities}><p>将解锁的非凡能力</p><ul>{promotion.advancement.newlyUnlockedAbilities.map((ability) => <li key={ability.id}><strong>{ability.name}</strong><span>{ability.description}</span></li>)}</ul></div>}
@@ -55,9 +58,9 @@ export default function ImportantItemConfirmation({ changes, onConfirm, onCancel
         <em>重要物品</em>
       </label>)}
     </fieldset>}
-    <p className={styles.note}>{promotion ? "选择“暂不服用”会保留魔药并继续本轮；关闭窗口则取消整个回合。" : "普通物品、装备变化与资金不会触发此确认，也不会显示在这里。"}</p>
+    <p className={styles.note}>{promotion ? `选择“暂不${verb}”会保留${resourceName}并继续本轮；关闭窗口则取消整个回合。` : "普通物品、装备变化与资金不会触发此确认，也不会显示在这里。"}</p>
     {promotion
-      ? <div className={styles.actions}><button type="button" className={styles.cancel} onClick={declinePromotion}>暂不服用</button><button type="button" className={styles.confirm} onClick={confirmPromotion}>{ordinaryPromotion ? "确认服用并成为非凡者" : `确认服用并晋升${promotion.advancement.after.sequenceLabel}`}</button></div>
+      ? <div className={styles.actions}><button type="button" className={styles.cancel} onClick={declinePromotion}>暂不{verb}</button><button type="button" className={styles.confirm} onClick={confirmPromotion}>{ordinaryPromotion ? "确认服用并成为非凡者" : `确认${verb}并晋升${promotion.advancement.after.sequenceLabel}`}</button></div>
       : <div className={styles.actions}><button type="button" className={styles.cancel} onClick={onCancel}>取消整个回合</button><button type="button" className={styles.confirm} onClick={() => onConfirm([...approvedKeys])}>{approvedCount ? `确认所选变更（${approvedCount}）` : "拒绝全部并继续"}</button></div>}
   </Modal>;
 }

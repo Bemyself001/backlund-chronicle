@@ -20,12 +20,14 @@ import { SPECIAL_QUEST_DEFINITIONS } from "./specialQuests/index.js";
 import { RENARD_AUCTION_MEDICINE, RENARD_TREATMENT_SCENES } from "./specialQuests/renardAuction.js";
 import { PATHWAY_QUEST_DEFINITIONS } from "./pathwayQuests/index.js";
 import { SPECIAL_ACTIONS, SPECIAL_RECIPES, SPECIAL_CONTACTS } from "./specialActions.js";
+import { SEQUENCE_FOUR_PROFILES, SEQUENCE_FOUR_POTIONS } from "./sequenceFour.js";
 
 export const BACKLUND_CONTENT = {
   id: "backlund-core",
   name: "贝克兰德核心内容",
   schemaVersion: 2,
-  contentVersion: "2026.10.06.3",
+  contentVersion: "2026.10.09.1",
+  sequenceFour: { profiles: SEQUENCE_FOUR_PROFILES, potions: SEQUENCE_FOUR_POTIONS },
   specialActions: SPECIAL_ACTIONS,
   specialRecipes: SPECIAL_RECIPES,
   specialContacts: SPECIAL_CONTACTS,

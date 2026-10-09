@@ -1,6 +1,7 @@
-import { PATHWAYS, getPathway, pathwayIdForName } from "../content/index.js";
+import { PATHWAYS, getPathway, getSequenceName, pathwayIdForName } from "../content/index.js";
 import { normalizeTalismanItem } from "./talismans.js";
 import { normalizeWeaponItem } from "./weapons.js";
+import { normalizeCharacteristic } from "./characteristics.js";
 
 export const ITEM_IMPORTANCE = {
   NORMAL: "normal",
@@ -15,7 +16,7 @@ export function isMoneyItem(item = {}) {
 
 export function normalizeItemImportance(item = {}) {
   if (isMoneyItem(item)) return ITEM_IMPORTANCE.NORMAL;
-  if (normalizePotion(item)) return ITEM_IMPORTANCE.IMPORTANT;
+  if (normalizePotion(item) || normalizeCharacteristic(item)) return ITEM_IMPORTANCE.IMPORTANT;
   const tags = Array.isArray(item.tags) ? item.tags : [];
   return item.importance === ITEM_IMPORTANCE.IMPORTANT || tags.some((tag) => IMPORTANT_ITEM_TAGS.has(tag))
     ? ITEM_IMPORTANCE.IMPORTANT
@@ -23,9 +24,13 @@ export function normalizeItemImportance(item = {}) {
 }
 
 export function normalizeInventoryItem(item = {}) {
-  const { potion: _discardedPotion, ...base } = item;
+  const { potion: _discardedPotion, characteristic: _discardedCharacteristic, ...base } = item;
   const potion = normalizePotion(item) || parseLegacyPotion(item);
-  return normalizeWeaponItem(normalizeTalismanItem({ ...base, ...(potion ? { potion, tags: [...new Set([...(Array.isArray(item.tags) ? item.tags : []), "魔药", "消耗品"])] } : {}), importance: normalizeItemImportance({ ...item, potion }) }));
+  const characteristic = normalizeCharacteristic(item);
+  const tags = [...new Set([...(Array.isArray(item.tags) ? item.tags : []), ...(potion ? ["魔药", "消耗品"] : []), ...(characteristic ? ["非凡特性", "非凡物品"] : [])])];
+  const normalized = { ...base, tags, ...(potion ? { potion } : {}), ...(characteristic ? { characteristic } : {}),
+    ...(potion?.identified && potion.sequence === 4 ? { name: `${getSequenceName(potion.pathwayId, 4)}魔药` } : {}) };
+  return normalizeWeaponItem(normalizeTalismanItem({ ...normalized, importance: normalizeItemImportance(normalized) }));
 }
 
 export function isImportantNonMoneyItem(item = {}) {
@@ -44,7 +49,7 @@ export function normalizePotion(item = {}) {
 }
 
 function excludedPotionName(name) {
-  return /配方|材料|原料|空瓶|药膏|药剂|笔记|书籍|残渣/.test(String(name || ""));
+  return /配方|材料|原料|空瓶|药膏|药剂|笔记|书籍|残渣|非凡特性/.test(String(name || ""));
 }
 
 export function parseLegacyPotion(item = {}) {
@@ -74,6 +79,14 @@ export function isConsumable(item = {}) {
 export function playerVisibleItem(item = {}) {
   const visible = { ...item };
   delete visible.hiddenInfo;
+  const characteristic = normalizeCharacteristic(item);
+  if (characteristic?.identified) visible.characteristic = characteristic;
+  else if (characteristic) return {
+    instanceId: item.instanceId, name: "未确认非凡特性", category: "非凡特性", quantity: item.quantity,
+    ...(Number.isFinite(item.delta) ? { delta: item.delta } : {}),
+    weight: item.weight, equipped: false, importance: "important", tags: ["非凡特性", "未确认"],
+    description: "尚未可靠确认途径与序列的非凡特性，不能用于直接晋升。", characteristicStatus: "unidentified",
+  };
   const potion = normalizePotion(item);
   if (potion?.identified) {
     visible.potion = potion;

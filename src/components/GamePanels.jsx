@@ -5,7 +5,7 @@ import { getAdvancement } from "../system/character.js";
 import { getTalent } from "../content/index.js";
 import { STAT_LABELS } from "../engine/statChanges.js";
 import { formatMoney } from "../system/money.js";
-import { getPotionUseGate } from "../services/advancement.js";
+import { getCharacteristicUseGate, getPotionUseGate } from "../services/advancement.js";
 import { getAuditRows } from "./gameUi.js";
 import { visibleQuestJournal } from "../engine/questRuntime.js";
 import styles from "./GamePanels.module.css";
@@ -16,6 +16,7 @@ import { TalismanControl } from "./EnemyEncounter.jsx";
 import { isConsumable, playerVisibleItem } from "../system/items.js";
 import { getChurchTalisman } from "../system/talismans.js";
 import { describeWeapon, weaponProfile } from "../system/weapons.js";
+import SequenceFourDossier from "./SequenceFourDossier.jsx";
 
 export const CharacterPanel = memo(function CharacterPanel({ game, onAction, disabled }) {
   const { character } = game;
@@ -28,7 +29,7 @@ export const CharacterPanel = memo(function CharacterPanel({ game, onAction, dis
     </div>
     <section><h3>角色状态</h3><dl className={styles.dataList}>{Object.entries(STAT_LABELS).map(([key, label]) => <div key={key} data-stat={key}><dt>{label}</dt><dd>{character.stats[key]} / {character.stats[`max${key[0].toUpperCase()}${key.slice(1)}`]}</dd></div>)}</dl></section>
     <section><h3>当前影响</h3>{game.statusEffects.length ? game.statusEffects.map(status => <article className={styles.record} key={status.id} data-tone={status.kind === "danger" ? "loss" : "neutral"}><h4>{status.name}</h4><p>{status.description}</p>{status.healthEffect && <small>每轮生命{status.healthEffect.percent > 0 ? "+" : ""}{Number(status.healthEffect.percent.toFixed(3))}%最大生命值 · {status.healthEffect.remainingTurns === null ? "至状态解除" : `剩余${status.healthEffect.remainingTurns}回合`}</small>}{status.tick && <small>每轮：{Object.entries(status.tick).map(([key, delta]) => `${STAT_LABELS[key] || key}${delta > 0 ? "+" : ""}${delta}`).join("，")}</small>}</article>) : <p className={styles.muted}>状态稳定。</p>}</section>
-    <section><h3>非凡档案</h3><p className={styles.highlight}>{advancement.sequenceName || advancement.pathwayName || "普通人"}{advancement.pathwayName && ` · ${advancement.sequenceLabel} · ${advancement.pathwayName}途径`}</p><p className={styles.muted}>状态：{({ stable: "稳定", none: "未接触", newly_promoted: "刚完成晋升" })[advancement.status] || advancement.status}</p><p className={styles.muted}>{game.occult?.contact === 1 ? "已接触非凡世界" : "尚未接触非凡世界"}{game.occult?.entryAvailable ? " · 有入口可选" : ""}</p><CharacterAbilities game={game} abilities={advancement.unlockedAbilities || []} onAction={onAction} disabled={disabled} /></section>
+    <section><h3>非凡档案</h3><p className={styles.highlight}>{advancement.sequenceName || advancement.pathwayName || "普通人"}{advancement.pathwayName && ` · ${advancement.sequenceLabel} · ${advancement.pathwayName}途径`}</p><p className={styles.muted}>状态：{({ stable: "稳定", none: "未接触", newly_promoted: "刚完成晋升" })[advancement.status] || advancement.status}</p><p className={styles.muted}>{game.occult?.contact === 1 ? "已接触非凡世界" : "尚未接触非凡世界"}{game.occult?.entryAvailable ? " · 有入口可选" : ""}</p><SequenceFourDossier advancement={advancement} /><CharacterAbilities game={game} abilities={advancement.unlockedAbilities || []} onAction={onAction} disabled={disabled} /></section>
     {game.organizationState?.membership?.status === "active" && <section><h3>组织身份</h3><p className={styles.highlight}>{game.organizationState.membership.name}</p><p className={styles.muted}>{game.organizationState.membership.kind === "official" ? "官方组织成员" : "非官方组织成员"} · 第 {game.organizationState.membership.joinedTurn} 轮登记</p></section>}
     {talent.id !== "none" && <section><h3>天赋 · {talent.name}</h3><p>{talent.description}</p></section>}
     <details><summary>个人背景与动机</summary>{[["出身", "origin"], ["外貌", "appearance"], ["性格", "personality"], ["欲望", "desire"], ["恐惧", "fear"], ["私人秘密", "secret"], ["背景", "background"]].filter(([, key]) => character[key]).map(([label, key]) => <div className={styles.biography} key={key}><h4>{label}</h4><p>{character[key]}</p></div>)}</details>
@@ -43,12 +44,16 @@ export const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, 
   const lastSelectedRef = useRef(null);
   const searchRef = useRef(null);
   const backRef = useRef(null);
-  const inventory = game.inventory.map(item => ({ ...item, ...playerVisibleItem(item), ...(item.potion && !item.potion.identified ? { potion: { identified: false } } : {}) }));
+  const inventory = game.inventory.map(item => {
+    const visible = playerVisibleItem(item);
+    return { ...visible, ...(visible.potionStatus === "unidentified" ? { potion: { identified: false } } : {}), ...(visible.characteristicStatus === "unidentified" ? { characteristic: { identified: false } } : {}) };
+  });
   const categories = ["全部", ...new Set(inventory.map(item => item.category))];
   const effectiveCategory = categories.includes(category) ? category : "全部";
   const items = inventory.filter(item => (effectiveCategory === "全部" || item.category === effectiveCategory) && item.name.includes(search.trim()));
   const selected = inventory.find(item => item.instanceId === selectedId);
   const potionGate = selected?.potion ? getPotionUseGate(game, selected.instanceId) : "";
+  const characteristicGate = selected?.characteristic ? getCharacteristicUseGate(game, selected.instanceId) : "";
   const talisman = selected && getChurchTalisman(selected);
   const weapon = selected && weaponProfile(selected);
   const weight = game.inventory.reduce((sum, item) => sum + item.weight * item.quantity, 0);
@@ -64,12 +69,14 @@ export const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, 
       <p className={styles.muted}>{selected.rarity} · {selected.category}{selected.potion ? " · 魔药" : ""}</p><h3>{selected.name}</h3><p>{selected.discoveredInfo || selected.description}</p>
       {weapon && <div className={styles.record} aria-label="武器伤害"><h4>{describeWeapon(selected)}</h4><p>伤害在获得时固定。{selected.equipped ? "当前已装备。" : "装备后生效。"}只对普通攻击和武器类技能附加；每次只使用一件武器。</p><small>先加武器伤害，再计算强化；RP弱点成立时额外加5个百分点，总比例最高60%。</small></div>}
       {selected.potion && <div className={styles.record}><h4>{selected.potion.identified ? `${selected.potion.pathwayName}途径 · 序列${selected.potion.sequence}魔药` : "性质未明的魔药"}</h4><p>{selected.potion.identified ? potionGate || "已鉴定的成品魔药可直接服用。确认后生成晋升剧情并更新非凡档案。" : "可拜访明斯克街15号的夏洛克·莫里亚蒂，每瓶1镑鉴定；鉴定前不能服用。"}</p></div>}
+      {selected.characteristic && <div className={styles.record} data-tone="loss"><h4>{selected.characteristic.identified ? `${selected.characteristic.pathwayName}途径 · 序列${selected.characteristic.sequence}非凡特性` : "身份尚未确认的非凡特性"}</h4><p>{characteristicGate || "可消耗一份特性直接晋升，无需另外调制魔药。生命降至晋升后上限的50%（向下取整），理智回满，灵性保留已消耗部分。"}</p></div>}
       <dl className={styles.dataList}><div><dt>重量</dt><dd>{selected.weight} kg</dd></div><div><dt>状态</dt><dd>{selected.condition}</dd></div><div><dt>数量</dt><dd>{selected.quantity}</dd></div><div><dt>来源</dt><dd>{selected.source}</dd></div></dl>
       {talisman && <TalismanControl key={selected.instanceId} game={game} item={selected} onAction={onAction} disabled={disabled} tone="panel" />}
       <div className={styles.itemActions}>
         {selected.potion && <button className={styles.primary} type="button" disabled={disabled || Boolean(potionGate)} title={potionGate || undefined} onClick={() => onAction(`服用${selected.name}并正式晋升至${selected.potion.pathwayName}序列${selected.potion.sequence}`, { advancementRequest: { potionInstanceId: selected.instanceId } })}>使用 · 服用魔药</button>}
+        {selected.characteristic && <button className={styles.primary} type="button" disabled={disabled || Boolean(characteristicGate)} title={characteristicGate || undefined} onClick={() => onAction(`吸收${selected.name}并正式晋升至${selected.characteristic.pathwayName}序列${selected.characteristic.sequence}，接受生命降至新上限50%`, { advancementRequest: { characteristicInstanceId: selected.instanceId } })}>吸收特性 · 直接晋升</button>}
         <button type="button" disabled={disabled} onClick={() => onLocalTool("item.inspect", { instanceId: selected.instanceId }, `检查${selected.name}`)}>检查</button>
-        {(isConsumable(selected) || medicineRecipe(selected)) && !selected.potion && !talisman && <button type="button" disabled={disabled} onClick={() => onLocalTool("item.use", { instanceId: selected.instanceId }, `主动使用${selected.name}`)}>使用</button>}
+        {(isConsumable(selected) || medicineRecipe(selected)) && !selected.potion && !selected.characteristic && !talisman && <button type="button" disabled={disabled} onClick={() => onLocalTool("item.use", { instanceId: selected.instanceId }, `主动使用${selected.name}`)}>使用</button>}
         {selected.tags.includes("装备") && <button type="button" disabled={disabled} onClick={() => onLocalTool(selected.equipped ? "item.unequip" : "item.equip", { instanceId: selected.instanceId }, `玩家${selected.equipped ? "卸下" : "装备"}${selected.name}`)}>{selected.equipped ? "卸下" : "装备"}</button>}
         <button type="button" className={styles.danger} disabled={disabled} onClick={() => { if (window.confirm(`丢弃一件“${selected.name}”？`)) { onLocalTool("inventory.remove", { instanceId: selected.instanceId, quantity: 1 }, `玩家主动丢弃${selected.name}`); returnToList(); } }}>丢弃</button>
       </div>
@@ -89,7 +96,7 @@ export function AuditPanel({ game }) {
     {!audit ? <p className={styles.empty}>完成行动后，这里会记录已确认的变化。</p> : <>
       <p className={styles.muted}>{confirmation?.status === "player-action" ? "来自主动进行的物品操作。" : "来自最近一次已完成回合。"}</p>
       {rows.length ? <ul className={styles.auditList}>{rows.map((row, i) => <li key={i} data-tone={row.tone}><span aria-hidden="true">{row.tone === "gain" ? "+" : row.tone === "loss" ? "−" : "·"}</span>{row.text}</li>)}</ul> : <p>没有已确认的物品、资金或属性变化。</p>}
-      {confirmation?.required && <p>{confirmation.advancement ? confirmation.advancement.status === "confirmed" ? `晋升已确认：${confirmation.advancement.target.sequenceName || confirmation.advancement.target.pathwayName}${confirmation.advancement.target.sequenceLabel}` : "已选择暂不服用，魔药保留。" : `重要物品：已确认 ${confirmation.confirmed} 项${confirmation.rejected ? `，拒绝 ${confirmation.rejected} 项` : ""}。`}</p>}
+      {confirmation?.required && <p>{confirmation.advancement ? confirmation.advancement.status === "confirmed" ? `晋升已确认：${confirmation.advancement.target.sequenceName || confirmation.advancement.target.pathwayName}${confirmation.advancement.target.sequenceLabel}` : confirmation.advancement.method === "characteristic" ? "已选择暂不吸收，非凡特性保留。" : "已选择暂不服用，魔药保留。" : `重要物品：已确认 ${confirmation.confirmed} 项${confirmation.rejected ? `，拒绝 ${confirmation.rejected} 项` : ""}。`}</p>}
     </>}
     <PerformanceDetails game={game} />
   </section>;

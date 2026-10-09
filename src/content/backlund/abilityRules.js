@@ -24,15 +24,107 @@ const PROFILES = {
   secret_suppliant: ["sanity", "analysis", "health", "hermit_rite", "隐修秘术", "damage", "shepherd_bind", "血肉束缚", "stun"],
 };
 
+// 仅借用职业特色；所有新能力仍由既有本地系统结算一次主要行动。
+const SEQUENCE_FOUR_ABILITIES = {
+  seer: [
+    ["marionette_coordination", "秘偶协同", "damage", "以灵体之线协调诡术，对选定敌人发动一次打击；不创建永久秘偶或额外行动。"],
+    ["spirit_thread_suppression", "灵线压制", "stun", "将灵体之线的牵制集中到选定敌人，暂时压制其行动。"],
+  ],
+  apprentice: [
+    ["space_concealment", "空间隐秘", "stun", "以隐秘空间暂时隔断选定敌人的行动；本地结算不改变地点或解锁地图。"],
+    ["illusion_discernment", "幻象辨析", "analysis", "以强化的灵性直觉和星象感知辨析已有证据中的幻象与异常。"],
+  ],
+  spectator: [
+    ["subconscious_manipulation", "潜意识操纵", "control", "以潜意识暗示逐步积累对选定敌人的控制；达到阈值后仅暂时阻止其行动。"],
+    ["mental_plague", "精神瘟疫", "damage", "将精神瘟疫化为一次针对选定敌人的心灵冲击；不向其他角色传播。"],
+  ],
+  sailor: [
+    ["hurricane_strike", "飓风冲击", "damage", "将猛烈飓风集中为对选定敌人的一次冲击。"],
+    ["storm_restraint", "风暴牵制", "stun", "以旋转风流困住选定敌人，使其暂时无法行动。"],
+  ],
+  bard: [
+    ["unshadowed_purification", "无暗净化", "damage", "以净化光辉灼伤选定敌人，伤害按本地固定比例结算。"],
+    ["purifying_serenity", "净光静心", "sanity", "以无暗光辉平复自身精神；仅恢复理智，不自动清除剧情诅咒。"],
+  ],
+  reader: [
+    ["prophetic_deduction", "未来推演", "analysis", "将预言家的推演用于梳理已有线索；不生成未来事实或提前揭示真相。"],
+    ["astral_mystic_art", "星界秘术", "damage", "调用已掌握的星界秘术，对选定敌人施加一次法术打击。"],
+  ],
+  sleepless: [
+    ["night_domain", "黑夜领域", "stun", "将黑夜领域的压制作用集中于选定敌人，暂时限制其行动。"],
+    ["deep_night_requiem", "深夜安魂", "sanity", "以安魂力量稳定自身灵魂，恢复受损的理智。"],
+  ],
+  corpse_collector: [
+    ["underworld_seal", "冥界封印", "stun", "借冥界之力暂时封住选定敌人的行动；不修改其永久属性。"],
+    ["undying_mending", "不死修复", "health", "以肉体与灵体交界处的韧性修补自身损伤；仅治疗，不复活或重置死亡。"],
+  ],
+  warrior: [
+    ["demon_hunting_eye", "猎魔之眼", "analysis", "以猎魔经验与灵性直觉，解析已有证据中的腐化痕迹和异常。"],
+    ["dawn_hunt", "曙光猎魔", "damage", "让当前武器披上曙光，对选定敌人发动一次猎魔打击。"],
+  ],
+  mystery_pryer: [
+    ["mystical_reenactment", "神秘再现", "damage", "从已掌握的神秘知识中重现固定法术，对选定敌人发动一次打击。"],
+    ["mystic_insight", "窥秘解析", "analysis", "借神秘知识辨析已有线索，不以未知秘密替代现场证据。"],
+  ],
+  generalist: [
+    ["alchemical_construct_strike", "炼金造物击", "damage", "以临时炼金造物攻击选定敌人；本地仅结算一次伤害，不额外生成物品。"],
+    ["artifact_trace", "器物追迹", "analysis", "以炼金器具梳理已有证物的关联，推进现存线索的解析。"],
+  ],
+  hunter: [
+    ["weaponized_strike", "武器化打击", "damage", "将当前武器的杀伤潜力化为一次铁血打击，攻击选定敌人。"],
+    ["iron_will", "铁血意志", "sanity", "以钢铁般勇气稳住自身精神，恢复受损的理智。"],
+  ],
+  marauder: [
+    ["deep_parasitism", "深层寄生", "control", "将寄生侵入改编为对选定敌人的控制进度；只产生暂时牵制，不创建宿主分身。"],
+    ["parasite_mending", "寄生修复", "health", "将寄生者的灵体韧性用于修复自身伤势，本地结算为定量治疗。"],
+  ],
+  assassin: [
+    ["despair_plague", "衰败瘟疫", "damage", "将衰败瘟疫集中为对选定敌人的一次伤害，不追加传播或持续扣血。"],
+    ["mirror_maze", "镜面迷宫", "stun", "以交错镜面迷惑选定敌人，暂时阻断其行动；不改变真实地点。"],
+  ],
+  arbiter: [
+    ["imperative_confinement", "律令禁锢", "stun", "以禁锢律令暂时禁止选定敌人的行动。"],
+    ["execution_verdict", "处刑裁决", "damage", "向选定敌人宣告处刑裁决；仅按固定伤害比例结算，不直接判定死亡。"],
+  ],
+  lawyer: [
+    ["negative_bestowal", "负面赐予", "stun", "向选定敌人赐予迟缓与意志涣散，暂时限制其行动。"],
+    ["magnified_strike", "攻击放大", "damage", "放大一次攻击的影响，对选定敌人造成固定比例伤害。"],
+  ],
+  prisoner: [
+    ["poltergeist_restraint", "死物牵制", "stun", "短暂活化周围死物以牵制选定敌人，不取得场景物品的所有权。"],
+    ["puppet_temperance", "木偶自制", "sanity", "以木偶化约束自身欲望，恢复理智；本次施放占用当前主要行动。"],
+  ],
+  criminal: [
+    ["hellfire", "地狱火", "damage", "以地狱火灼伤选定敌人，伤害由本地规则固定结算。"],
+    ["mind_misdirection", "心智误导", "stun", "以魔鬼般的狡诈干扰选定敌人的判断，令其暂时错失行动。"],
+  ],
+  planter: [
+    ["life_mutation", "生命畸变", "damage", "将生命畸变的力量集中于选定敌人；仅结算一次伤害，不永久改写其身体。"],
+    ["life_transmutation_mending", "炼生修复", "health", "以强化的生命炼成和治疗力量修复自身伤势，不凭空创建生命或物品。"],
+  ],
+  apothecary: [
+    ["blood_moon_arrow", "血月之箭", "damage", "凝聚血月力量，向选定敌人射出一次咒术箭矢。"],
+    ["abyss_shackles", "深渊枷锁", "stun", "以月亮与黑暗领域的枷锁暂时束缚选定敌人。"],
+  ],
+  monster: [
+    ["misfortune_field", "厄运领域", "stun", "将厄运场作用集中于选定敌人，令其暂时陷入无法行动的不利境地。"],
+    ["fate_perception", "命运感知", "analysis", "从现存线索中分析命运征兆；不生成确定预言或未知事实。"],
+  ],
+  secret_suppliant: [
+    ["spiritual_flesh_blade", "灵肉之刃", "damage", "以堕落之力凝成灵肉之刃，对选定敌人发动一次打击。"],
+    ["shadow_commandeering", "影子束缚", "stun", "操纵选定敌人的影子，将其暂时束缚在原地。"],
+  ],
+};
+
 export function abilityRule(effect, sequence = 9, upgraded = false) {
-  const tier = sequence <= 5 ? 3 : sequence <= 7 ? 2 : 1;
+  const tier = sequence <= 4 ? 4 : sequence <= 5 ? 3 : sequence <= 7 ? 2 : 1;
   const power = tier + (upgraded ? 1 : 0);
   const magnitude = effect === "damage"
-    ? { damagePercent: (tier === 3 ? 50 : tier === 2 ? 30 : 20) + (upgraded ? 10 : 0) }
-    : effect === "health" ? { healPercent: (tier === 3 ? 30 : tier === 2 ? 20 : 10) + (upgraded ? 5 : 0) }
+    ? { damagePercent: (tier === 4 ? 55 : tier === 3 ? 50 : tier === 2 ? 30 : 20) + (upgraded ? (tier === 4 ? 5 : 10) : 0) }
+    : effect === "health" ? { healPercent: (tier === 4 ? 40 : tier === 3 ? 30 : tier === 2 ? 20 : 10) + (upgraded ? 5 : 0) }
       : { amount: effect === "analysis" ? power : 1 + power };
   const target = ["damage", "stun", "control"].includes(effect) ? "enemy" : effect === "analysis" ? "clue" : "self";
-  return { effect, target: { kind: target }, cost: tier, ...magnitude, duration: effect === "stun" ? (upgraded ? 2 : 1) : 0 };
+  return { effect, target: { kind: target }, cost: tier, ...magnitude, duration: effect === "stun" ? (tier === 4 || upgraded ? 2 : 1) : 0 };
 }
 
 export function buildPathwayAbilities(pathwayId, sequence9) {
@@ -49,6 +141,11 @@ export function buildPathwayAbilities(pathwayId, sequence9) {
     if (pathwayId === "warrior" && effect === "damage") rule.weaponAttack = true;
     if (pathwayId === "prisoner" && sequence === 7) rule.preparation = { id: "wolf-strength", name: "狼人强化", multiplier: 1.2, maxStacks: 3, cost: 1, duration: 1 };
     abilities.push({ id: `${pathwayId}:${id}`, name, description: `${name}的本地规则效果（原著职业特色的游戏改编）。`, sequence, rule, upgrades: [] });
+  }
+  for (const [id, name, effect, description] of SEQUENCE_FOUR_ABILITIES[pathwayId]) {
+    const rule = abilityRule(effect, 4);
+    if (["warrior", "hunter"].includes(pathwayId) && effect === "damage") rule.weaponAttack = true;
+    abilities.push({ id: `${pathwayId}:${id}`, name, description: `${description}（原著职业特色的游戏改编。）`, sequence: 4, rule, upgrades: [] });
   }
   return abilities;
 }
