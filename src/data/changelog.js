@@ -181,7 +181,22 @@ export const LATEST_UPDATE = {
   channel: "web",
   version: RELEASE_VERSION,
   date: "2026-10-09", dateLabel: "2026.10.09",
-  title: `${RELEASE_VERSION} · 雾都书卷与午夜档案Web APK`,
+  title: `${RELEASE_VERSION} · 手机背景显示修复`,
+  summary: "修复手机日读与夜读背景被正文底色遮住的问题，保留雾都城市和台灯案卷，并保护文字与操作区的清晰度。",
+  changes: [
+    "手机及窄屏阅读区提高背景可见度，降低正文纸面的遮罩浓度，增加两侧背景留白，滚动长剧情时背景仍固定在阅读区。",
+    "日读背景靠左保留城市轮廓，夜读背景靠右保留台灯与案卷，避免竖屏居中裁切只剩空白纹理；平板与手机横屏同步生效。",
+    "日读说明小字加深，两种主题的正文维持清晰对比度；选项、输入框、生命理智灵性条、特殊行动和24小时等待圆钟保持原有功能。",
+    "发布1.8.1正式签名Web APK、网页与匹配的热更新包，沿用包名、签名和存档结构，递增构建号并提供SHA-256校验文件。",
+  ],
+};
+
+const RELEASE_180_UPDATE = {
+  pending: false,
+  channel: "web",
+  version: "1.8.0",
+  date: "2026-10-09", dateLabel: "2026.10.09",
+  title: "1.8.0 · 雾都书卷与午夜档案Web APK",
   summary: "继续使用React网页界面与Capacitor打包，内置雾都书卷和午夜档案背景，保留三色状态条、特殊行动及完整24小时等待圆钟。",
   changes: [
     "统一深绿、黄铜与暖纸的日读外观，以及墨蓝、暖白与冷金的夜读外观，细化正文、章节、选项和资料面板的字号、留白与描边；地图与档案弹窗跟随阅读主题。",
@@ -807,6 +822,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_180_UPDATE,
   RELEASE_NATIVE_180_UPDATE,
   RELEASE_175_UPDATE,
   RELEASE_174_UPDATE,

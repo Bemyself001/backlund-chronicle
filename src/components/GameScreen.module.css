@@ -210,7 +210,14 @@
 .dossierScroll { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--panel-line) transparent; }
 .readingNotice { margin: 1rem; color: var(--panel-accent); font-size: .8rem; }
 @media (min-width: 1280px) { .workspace.hasPanel { grid-template-columns: 5rem minmax(0, 1fr) 24rem; } .dossier { position: relative; top: auto; right: auto; bottom: auto; left: auto; inset: auto; grid-column: 3; grid-row: 1; width: auto; } .panelScrim { display: none; } .hasPanel .manuscript { padding-left: 2rem; padding-right: 2rem; padding-inline: 2rem; } }
-@media (max-width: 1000px) { .chapter { display: none; } .vital { width: 6rem; } .vitals { gap: .9rem; }
+@media (max-width: 1000px) {
+  .shell { --manuscript-surface: #f4eedfd9; --game-muted: #58564a; }
+  .shell[data-theme="night"] { --manuscript-surface: #1b2833e0; --game-muted: #adb8b8; }
+  /* Narrow reading panes need visible art beneath the paper and at its edges. */
+  .storyViewport::before { background-position: left bottom; opacity: .9; }
+  .shell[data-theme="night"] .storyViewport::before { background-position: right bottom; }
+  .manuscript { width: calc(100% - 1rem); }
+  .chapter { display: none; } .vital { width: 6rem; } .vitals { gap: .9rem; }
 :global(.no-flex-gap) .vitals { gap: 0; }
 :global(.no-flex-gap) .vitals > :not(:last-child) { margin-right: .9rem; margin-bottom: 0; }
 .statusbar { gap: 1rem; }
@@ -264,7 +271,6 @@
   .story { grid-column: 1; grid-row: 1; }
   .navigation { grid-column: 1; grid-row: 2; display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; padding: 0; padding-bottom: env(safe-area-inset-bottom); border: 0; border-top: 1px solid #a18a5759; }
   .navigation::before { display: none; }
-  .storyViewport::before { opacity: .45; }
 
 :global(.no-flex-gap) .navigation { gap: 0 0; }
 :global(.no-flex-gap) .navigation > :not(:last-child) { margin-right: 0; margin-bottom: 0; }
@@ -274,7 +280,7 @@
 :global(.no-flex-gap) .navigation button > :not(:last-child) { margin-right: 0; margin-bottom: .2rem; }
   .navigation svg { width: 1.05rem; height: 1.05rem; }
   .navigation button[aria-current] { box-shadow: inset 0 2px #c4aa76; }
-  .manuscript { padding: 1.35rem 1.15rem 2rem; }
+  .manuscript { padding: 1.35rem .65rem 2rem; }
   .sceneHeading { margin-bottom: 1.25rem; padding-bottom: .65rem; font-size: .7rem; }
   .sceneHeading > span:first-child { letter-spacing: .08em; }
   .chapterHeading { margin-bottom: 1.3rem; }
