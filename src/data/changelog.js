@@ -181,7 +181,22 @@ export const LATEST_UPDATE = {
   channel: "web",
   version: RELEASE_VERSION,
   date: "2026-10-09", dateLabel: "2026.10.09",
-  title: `${RELEASE_VERSION} · 手机背景显示修复`,
+  title: `${RELEASE_VERSION} · 实景背景与阅读时钟`,
+  summary: "让日夜图片直接作为剧情背景，去掉整块纸面遮罩；增加半屏阅读留白，并重新排版日期与时钟。",
+  changes: [
+    "日读与夜读原图直接铺在阅读区底层，取消背景透明度与整块正文纸面覆盖；文字使用轻微阴影，行动选项和输入仍有清楚承托。",
+    "剧情与行动建议之后增加随阅读区高度变化的半屏空白，最后一行可以滚到中间，手机短屏与键盘弹出时同步适应；最新内容判断排除留白，避免已读到末尾仍显示回到最新。",
+    "状态栏时间分为年份、日期、星期与醒目的等宽时钟，并显示清晨、午后或入夜等时段；游戏历法和实际结算时钟保持一致。",
+    "发布1.8.2正式签名Web APK、网页和匹配的热更新包，沿用原包名、签名与存档结构，递增Android构建号，并提供SHA-256校验文件。",
+  ],
+};
+
+const RELEASE_181_UPDATE = {
+  pending: false,
+  channel: "web",
+  version: "1.8.1",
+  date: "2026-10-09", dateLabel: "2026.10.09",
+  title: "1.8.1 · 手机背景显示修复",
   summary: "修复手机日读与夜读背景被正文底色遮住的问题，保留雾都城市和台灯案卷，并保护文字与操作区的清晰度。",
   changes: [
     "手机及窄屏阅读区提高背景可见度，降低正文纸面的遮罩浓度，增加两侧背景留白，滚动长剧情时背景仍固定在阅读区。",
@@ -822,6 +837,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_181_UPDATE,
   RELEASE_180_UPDATE,
   RELEASE_NATIVE_180_UPDATE,
   RELEASE_175_UPDATE,

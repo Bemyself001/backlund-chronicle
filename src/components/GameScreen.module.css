@@ -2,13 +2,13 @@
 .shell {
   --game-paper: #f4eedf;
   --game-raised: #f8f2e7;
-  --game-ink: #30372e;
-  --game-muted: #706e60;
+  --game-ink: #26332b;
+  --game-muted: #414b40;
   --game-line: #d4c9b3;
   --game-green: #35614e;
   --game-danger: #8c3930;
   --archive-art: url("../../assets/ui-archive-day.png");
-  --manuscript-surface: #f4eedff0;
+  --reading-halo: #f8f2e7;
   display: flex;
   flex-direction: column;
   height: 100svh;
@@ -19,7 +19,7 @@
   color: var(--frame-text);
 }
 .shell[data-theme="night"] { --game-paper: #1b2833; --game-raised: #22323e; --game-ink: #e8e2d3; --game-muted: #adb8b8; --game-line: #3d4d58; --game-green: #c8b58a; --game-danger: #f0a49a; --frame: #111b24; --frame-raised: #1b2833; --frame-text: #e8e2d3; --frame-muted: #b3bdbe; --brass: #b6a277; --brass-light: #b6a277; --panel-bg: #1b2833; --panel-raised: #22323e; --panel-line: #3d4d58; --panel-text: #e8e2d3; --panel-muted: #adb8b8; --panel-accent: #c8b58a; --panel-health: #efa29a; --panel-sanity: #99c5f0; --panel-spirituality: #e6c56f; --clock-face: #22323e; --clock-track: #45555f; --clock-hand: #d4bf94; --clock-mark: #b6a277; }
-.shell[data-theme="night"] { --archive-art: url("../../assets/ui-archive-night.png"); --manuscript-surface: #1b2833f2; }
+.shell[data-theme="night"] { --archive-art: url("../../assets/ui-archive-night.png"); --reading-halo: #0b141c; }
 .topbar { flex: 0 0 auto; display: flex; align-items: center; gap: 1.5rem; padding: .65rem 1.4rem; min-height: 3.8rem; border-bottom: 1px solid #baa16a38; background: var(--frame); }
 
 :global(.no-flex-gap) .topbar { gap: 0; }
@@ -57,7 +57,19 @@
 :global(.no-flex-gap) .whereabouts button { gap: 0; }
 :global(.no-flex-gap) .whereabouts button > :not(:last-child) { margin-right: .6rem; margin-bottom: 0; }
 .whereabouts button span { color: var(--brass-light); flex-shrink: 0; }
-.worldTime { font-size: .75rem; color: var(--frame-muted); font-variant-numeric: tabular-nums; }
+.worldTime { display: flex; flex-wrap: wrap; align-items: center; gap: .25rem .75rem; color: var(--frame-muted); font-size: .75rem; font-variant-numeric: tabular-nums; }
+.timeDate { display: inline-flex; flex-wrap: wrap; align-items: baseline; column-gap: .4rem; }
+.timeDate strong { color: var(--frame-text); font: 500 .82rem var(--font-serif); }
+.timeYear { color: var(--brass-light); font-family: var(--font-serif); }
+.timeClock { display: inline-flex; align-items: center; column-gap: .35rem; padding-left: .7rem; border-left: 1px solid #bfa36b55; color: var(--brass-light); }
+.timeClock svg { width: .9rem; height: .9rem; }
+.timeClock strong { color: var(--frame-text); font: 500 1rem/1.3 var(--font-mono); letter-spacing: .04em; }
+.timeClock small { margin-left: .1rem; font: .68rem var(--font-serif); letter-spacing: .08em; }
+.timeColon { padding: 0 .06em; color: var(--brass-light); }
+:global(.no-flex-gap) .worldTime { gap: 0; }
+:global(.no-flex-gap) .worldTime > :not(:last-child) { margin-right: .75rem; }
+:global(.no-flex-gap) .timeDate > :not(:last-child) { margin-right: .4rem; }
+:global(.no-flex-gap) .timeClock > :not(:last-child) { margin-right: .35rem; }
 .vitals { display: flex; flex-shrink: 0; gap: 1.2rem; align-items: center; }
 
 :global(.no-flex-gap) .vitals { gap: 0; }
@@ -104,10 +116,12 @@
 .navigation button[data-navigation="special"] { color: var(--brass-light); }
 .navigation svg { flex-shrink: 0; width: 1.25rem; height: 1.25rem; }
 .story { position: relative; grid-column: 2; grid-row: 1; display: flex; flex-direction: column; min-width: 0; min-height: 0; background: var(--game-paper); color: var(--game-ink); }
-.storyViewport { position: relative; isolation: isolate; flex: 1; min-height: 0; }
-.storyViewport::before { content: ""; position: absolute; inset: 0; z-index: -1; pointer-events: none; background: var(--archive-art) center bottom / cover no-repeat; opacity: .85; }
+.storyViewport { position: relative; isolation: isolate; flex: 1; min-height: 0; background: var(--archive-art) center bottom / cover no-repeat; }
 .storyScroll { position: relative; height: 100%; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; scrollbar-color: var(--game-line) transparent; overflow-anchor: none; }
-.manuscript { max-width: var(--reading-width); margin: 0 auto; padding: 2.7rem 2.8rem 3.5rem; background: var(--manuscript-surface); }
+/* Percentage height follows the reading pane, including short screens and the keyboard. */
+.storyScroll::after { content: ""; display: block; height: 50%; min-height: 2rem; pointer-events: none; }
+.manuscript { max-width: var(--reading-width); margin: 0 auto; padding: 2.7rem 2.8rem 3.5rem; }
+.sceneHeading, .chapterHeading, .turnDivider, .narrative, .turnStatus, .turnResult, .choiceHeading, .choiceNote { text-shadow: -1px 0 1px var(--reading-halo), 1px 0 1px var(--reading-halo), 0 -1px 1px var(--reading-halo), 0 1px 1px var(--reading-halo), 0 0 4px var(--reading-halo); }
 .sceneHeading { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; margin-bottom: 2rem; padding-bottom: .8rem; border-bottom: 1px solid var(--game-line); color: var(--game-muted); font-size: .75rem; }
 
 :global(.no-flex-gap) .sceneHeading { gap: 0; }
@@ -211,11 +225,8 @@
 .readingNotice { margin: 1rem; color: var(--panel-accent); font-size: .8rem; }
 @media (min-width: 1280px) { .workspace.hasPanel { grid-template-columns: 5rem minmax(0, 1fr) 24rem; } .dossier { position: relative; top: auto; right: auto; bottom: auto; left: auto; inset: auto; grid-column: 3; grid-row: 1; width: auto; } .panelScrim { display: none; } .hasPanel .manuscript { padding-left: 2rem; padding-right: 2rem; padding-inline: 2rem; } }
 @media (max-width: 1000px) {
-  .shell { --manuscript-surface: #f4eedfd9; --game-muted: #58564a; }
-  .shell[data-theme="night"] { --manuscript-surface: #1b2833e0; --game-muted: #adb8b8; }
-  /* Narrow reading panes need visible art beneath the paper and at its edges. */
-  .storyViewport::before { background-position: left bottom; opacity: .9; }
-  .shell[data-theme="night"] .storyViewport::before { background-position: right bottom; }
+  .storyViewport { background-position: left bottom; }
+  .shell[data-theme="night"] .storyViewport { background-position: right bottom; }
   .manuscript { width: calc(100% - 1rem); }
   .chapter { display: none; } .vital { width: 6rem; } .vitals { gap: .9rem; }
 :global(.no-flex-gap) .vitals { gap: 0; }
@@ -248,7 +259,12 @@
 
 :global(.no-flex-gap) .whereabouts > :not(:last-child) { margin-right: 0; margin-bottom: 0; }
   .whereabouts button { grid-area: place; min-height: 1.75rem; font-size: .85rem; align-self: start; }
-  .worldTime { grid-area: time; font-size: .7rem; line-height: 1.55; }
+  .worldTime { grid-area: time; padding: .15rem 0; font-size: .7rem; line-height: 1.55; }
+  .timeDate { column-gap: .35rem; }
+  .timeDate strong { font-size: .75rem; }
+  .timeClock { padding-left: .6rem; column-gap: .3rem; }
+  .timeClock strong { font-size: .95rem; }
+  .timeClock small { font-size: .65rem; }
   .vitals { grid-area: vitals; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); width: 100%; min-width: 0; gap: .25rem .85rem; margin-top: .1rem; }
 
 :global(.no-flex-gap) .vitals { gap: .25rem .85rem; }

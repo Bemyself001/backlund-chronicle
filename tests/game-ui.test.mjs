@@ -1,7 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { readFileSync } from "node:fs";
-import { normalizeReadingPreferences, shouldSubmitAction, getAuditRows, RISK_LABELS } from "../src/components/gameUi.js";
+import { normalizeReadingPreferences, shouldSubmitAction, getAuditRows, RISK_LABELS, worldTimeDisplay } from "../src/components/gameUi.js";
+import { advanceWorldTime } from "../src/engine/worldTime.js";
 import { createInitialGame, EMPTY_CHARACTER } from "../src/data/defaults.js";
 import { createAuditBaseline, auditTurnChanges } from "../src/engine/audit.js";
 import { moneyFromPence } from "../src/system/money.js";
@@ -27,6 +28,27 @@ test("Enter submits while Chinese IME confirmation and Shift+Enter do not", () =
 
 test("risk labels describe risk, not an invented action type", () => {
   assert.deepEqual(RISK_LABELS, { low: "低风险", medium: "中风险", high: "高风险", unknown: "风险未标注" });
+});
+
+test("world clock follows the game calendar across midnight without changing stored time", () => {
+  const original = "1349年 10月17日 · 周二 · 23:40";
+  const start = worldTimeDisplay(original);
+  assert.equal(start.label, original);
+  assert.equal(start.weekday, "星期二");
+  assert.equal(start.period, "深夜");
+  const arrival = worldTimeDisplay(advanceWorldTime(original, 20));
+  assert.equal(arrival.dateTime, "1349-10-18T00:00:00.000Z");
+  assert.equal(arrival.monthDay, "10月18日");
+  assert.equal(arrival.weekday, "星期三");
+  assert.equal(`${arrival.hour}:${arrival.minute}`, "00:00");
+  assert.equal(arrival.period, "凌晨");
+});
+
+test("clock presentation accepts legacy punctuation and falls back for unrecognized dates", () => {
+  assert.equal(worldTimeDisplay("1349年 10月17日 · 星期二 · 6：05").hour, "06");
+  for (const value of [null, "旧存档中的未知时刻", "1349年 13月17日 · 周二 · 18:20", "1349年 10月17日 · 周二 · 24:00"]) {
+    assert.equal(worldTimeDisplay(value), null);
+  }
 });
 
 test("UI summaries use actual confirmed audit deltas and ignore narrative claims", () => {

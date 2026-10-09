@@ -1,8 +1,28 @@
 import { STAT_LABELS } from "../engine/statChanges.js";
 import { formatSignedMoney } from "../system/money.js";
+import { formatWorldTime, parseWorldTime } from "../engine/worldTime.js";
 
 export const READING_KEY = "mist-reading-preferences";
 export const RISK_LABELS = { low: "低风险", medium: "中风险", high: "高风险", unknown: "风险未标注" };
+
+export function worldTimeDisplay(value) {
+  const date = parseWorldTime(value);
+  if (!date) return null;
+  const hour = date.getUTCHours();
+  const period = hour < 5 ? "凌晨" : hour < 8 ? "清晨" : hour < 12 ? "上午"
+    : hour < 17 ? "午后" : hour < 19 ? "傍晚" : hour < 23 ? "入夜" : "深夜";
+  const label = formatWorldTime(date);
+  return {
+    label,
+    dateTime: date.toISOString(),
+    year: `${date.getUTCFullYear()}年`,
+    monthDay: `${date.getUTCMonth() + 1}月${date.getUTCDate()}日`,
+    weekday: label.split(" · ")[1].replace("周", "星期"),
+    hour: String(hour).padStart(2, "0"),
+    minute: String(date.getUTCMinutes()).padStart(2, "0"),
+    period,
+  };
+}
 
 export function choiceStatusMessage(meta) {
   const reason = {

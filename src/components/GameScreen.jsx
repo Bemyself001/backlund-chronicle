@@ -1,7 +1,7 @@
 import { memo, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { CharacterPanel, InventoryPanel, JournalPanel, MenuPanel } from "./GamePanels.jsx";
 import GameIcon from "./GameIcon.jsx";
-import { choiceStatusMessage, getAuditRows, normalizeReadingPreferences, READING_KEY, RISK_LABELS, shouldSubmitAction } from "./gameUi.js";
+import { choiceStatusMessage, getAuditRows, normalizeReadingPreferences, READING_KEY, RISK_LABELS, shouldSubmitAction, worldTimeDisplay } from "./gameUi.js";
 import { formatMoney, normalizeMoney } from "../system/money.js";
 import { APP_VERSION } from "../services/updates.js";
 import { RELEASE_NAME } from "../data/release.js";
@@ -21,6 +21,20 @@ const PHASE_MESSAGES = {
 function loadReading() {
   try { return normalizeReadingPreferences(JSON.parse(localStorage.getItem(READING_KEY))); }
   catch { return normalizeReadingPreferences(); }
+}
+
+function WorldClock({ value }) {
+  const display = worldTimeDisplay(value);
+  if (!display) return <span className={styles.worldTime}>{value}</span>;
+  return <time className={styles.worldTime} dateTime={display.dateTime} aria-label={`${display.label}，${display.period}`}>
+    <span className={styles.timeDate}><span className={styles.timeYear}>{display.year}</span><strong>{display.monthDay}</strong><span>{display.weekday}</span></span>
+    <span className={styles.timeClock}><GameIcon name="wait" /><strong>{display.hour}<span className={styles.timeColon}>:</span>{display.minute}</strong><small>{display.period}</small></span>
+  </time>;
+}
+
+function latestIsVisible(scroller) {
+  const latest = scroller.firstElementChild;
+  return !latest || latest.getBoundingClientRect().bottom - scroller.getBoundingClientRect().top - scroller.clientHeight < 72;
 }
 
 function useWideScreen() {
@@ -126,7 +140,7 @@ function GameSession({ game, loading, turnPhase, streamText, error, onAction, on
       else scroller.scrollTop = Math.min(anchor.top, scroller.scrollHeight - scroller.clientHeight);
     }
     previousFirstRef.current = first;
-    const nearBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 72;
+    const nearBottom = latestIsVisible(scroller);
     followRef.current = nearBottom;
     setFollowingLatest(nearBottom);
     // Completion preserves reading position instead of jumping past new narrative.
@@ -159,7 +173,7 @@ function GameSession({ game, loading, turnPhase, streamText, error, onAction, on
   const handleScroll = () => {
     const scroller = storyRef.current;
     if (!scroller) return;
-    const nearBottom = scroller.scrollHeight - scroller.scrollTop - scroller.clientHeight < 72;
+    const nearBottom = latestIsVisible(scroller);
     followRef.current = nearBottom;
     setFollowingLatest(nearBottom);
     rememberPosition();
@@ -208,7 +222,7 @@ function GameSession({ game, loading, turnPhase, streamText, error, onAction, on
       <div className={styles.topActions}><button type="button" className={styles.modeButton} onClick={onOpenApi}>AI 模式</button><button type="button" onClick={onOpenSaves} className={styles.quickSave}>存档</button><button type="button" className={styles.menuButton} onClick={event => changePanel("menu", event)} aria-expanded={panel === "menu"} aria-controls="game-dossier"><GameIcon name="menu" /><span>菜单</span></button></div>
     </header>
     <div className={styles.statusbar}>
-      <div className={styles.whereabouts}><button type="button" onClick={onOpenMap}>{game.location.name}<span aria-hidden="true">↗</span></button><span className={styles.worldTime}>{game.worldTime}</span></div>
+      <div className={styles.whereabouts}><button type="button" onClick={onOpenMap}>{game.location.name}<span aria-hidden="true">↗</span></button><WorldClock value={game.worldTime} /></div>
       <div className={styles.vitals}>
         {[["health", "生命"], ["sanity", "理智"], ["spirituality", "灵性"]].map(([key, label]) => {
           const max = game.character.stats[`max${key[0].toUpperCase()}${key.slice(1)}`];
