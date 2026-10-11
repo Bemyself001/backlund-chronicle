@@ -3,7 +3,8 @@ import assert from "node:assert/strict";
 import { createInitialGame, EMPTY_CHARACTER } from "../src/data/defaults.js";
 import { normalizeInventoryItem } from "../src/system/items.js";
 import { BEYONDER_EQUIPMENT_SLOTS, isBeyonderEquipment } from "../src/system/beyonderItems.js";
-import { beyonderEquipmentSlots, canEquipItem } from "../src/system/equipment.js";
+import { beyonderEquipmentLimit, beyonderEquipmentSlots, canEquipItem } from "../src/system/equipment.js";
+import { PATHWAYS } from "../src/content/index.js";
 import { executeToolCalls } from "../src/engine/tools.js";
 import { migrateSave } from "../src/services/storage.js";
 import { visibleGameState } from "../src/services/memory.js";
@@ -28,6 +29,9 @@ function withArtifacts() {
   return game;
 }
 const equippedIds = game => beyonderEquipmentSlots(game).map(entry => entry.item?.instanceId || null);
+const ranked = (sequence, pathway = PATHWAYS.find(entry => entry.id === "seer")) => createInitialGame({
+  ...EMPTY_CHARACTER, name: "第三栏测试员", extraordinary: "low", pathway: `${pathway.name}（序列${sequence}）`,
+});
 
 test("registered artifacts receive a separate equipment tag while ordinary descriptions confer no powers", () => {
   for (const category of ["非凡物品", "神奇物品", "封印物"]) {
@@ -205,4 +209,138 @@ test("planning and rendering see exact slot occupancy, the two-item limit and no
   assert.deepEqual(visible.beyonderEquipment.slots.map(entry => entry.instanceId), ["a", null]);
   assert.equal(visible.equipment[BEYONDER_EQUIPMENT_SLOTS[0]], "a");
   assert.equal(JSON.stringify(visible).includes("尚未发现的能力"), false);
+});
+
+test("all pathways unlock a third slot exactly at sequence five and retain it through sequence zero", () => {
+  for (const pathway of PATHWAYS) for (let sequence = 9; sequence >= 0; sequence -= 1) {
+    const game = ranked(sequence, pathway);
+    const limit = sequence <= 5 ? 3 : 2;
+    assert.equal(beyonderEquipmentLimit(game), limit, `${pathway.id}:${sequence}`);
+    assert.deepEqual(beyonderEquipmentSlots(game).map(entry => entry.slot), BEYONDER_EQUIPMENT_SLOTS.slice(0, limit));
+  }
+  assert.equal(beyonderEquipmentLimit(fresh()), 2);
+  for (const sequence of [-1, 10, "not-a-sequence"]) {
+    const game = ranked(6);
+    game.character.advancement.sequence = sequence;
+    assert.equal(beyonderEquipmentLimit(game), 2, "invalid sequence does not unlock a slot");
+  }
+});
+
+test("both promotion methods unlock slot three immediately and allow equipping within the same execution", () => {
+  for (const method of ["potion", "characteristic"]) {
+    let game = ranked(6);
+    game.turn = 4;
+    game.inventory.push(artifact("a"), artifact("b"), artifact("c"));
+    game = equip(equip(game, "a").game, "b").game;
+    game.inventory.push(normalizeInventoryItem({ instanceId: "rank-five-resource", name: `秘偶大师${method === "potion" ? "魔药" : "非凡特性"}`,
+      quantity: 1, [method]: { pathwayId: "seer", sequence: 5, identified: true } }));
+    const promotion = call("advancement.promote", { pathwayId: "seer", sequence: 5,
+      [method === "potion" ? "potionInstanceId" : "characteristicInstanceId"]: "rank-five-resource", evidence: "玩家明确确认并实际完成本次晋升" });
+    const before = structuredClone(game);
+    const result = executeToolCalls(game, [promotion, call("item.equip", { instanceId: "c" })], {
+      playerAction: method === "potion" ? "服用魔药并正式晋升" : "吸收非凡特性并正式晋升",
+    });
+    assert.ok(result.results.every(entry => entry.ok), method);
+    assert.equal(beyonderEquipmentLimit(result.game), 3);
+    assert.deepEqual(equippedIds(result.game), ["a", "b", "c"]);
+    assert.match(result.results[1].log, /栏位三/);
+    assert.equal(result.game.inventory.some(entry => entry.instanceId === "rank-five-resource"), false);
+    assert.deepEqual(game, before, "preview never changes the saved pre-promotion state");
+  }
+});
+
+test("failed or declined promotions leave the third slot locked and preserve the resource", () => {
+  let game = ranked(6);
+  game.inventory.push(artifact("a"), artifact("b"), artifact("c"), normalizeInventoryItem({ instanceId: "resource", name: "秘偶大师魔药", quantity: 1,
+    potion: { pathwayId: "seer", sequence: 5, identified: true } }));
+  game = equip(equip(game, "a").game, "b").game;
+  for (const [playerAction, sequence] of [["暂不服用魔药", 5], ["服用魔药并正式晋升", 4]]) {
+    const promotion = call("advancement.promote", { pathwayId: "seer", sequence, potionInstanceId: "resource", evidence: "准备使用晋升物品" });
+    const result = executeToolCalls(game, [promotion, call("item.equip", { instanceId: "c" })], { playerAction });
+    assert.ok(result.results.every(entry => !entry.ok));
+    assert.equal(beyonderEquipmentLimit(result.game), 2);
+    assert.deepEqual(result.game.inventory, game.inventory);
+    assert.deepEqual(result.game.equipment, game.equipment);
+  }
+});
+
+test("three slots reject a fourth atomically and reequipping preserves all occupied positions", () => {
+  let game = ranked(5);
+  game.inventory.push(artifact("a"), artifact("b"), artifact("c"), artifact("d"), ordinaryWeapon());
+  for (const id of ["normal-gun", "a", "b", "c"]) game = equip(game, id).game;
+  const before = structuredClone(game);
+  const fourth = equip(game, "d");
+  assert.equal(fourth.results[0].ok, false);
+  assert.match(fourth.results[0].reason, /最多同时装备三件/);
+  assert.deepEqual(fourth.game.inventory, before.inventory);
+  assert.deepEqual(fourth.game.equipment, before.equipment);
+  for (const id of ["a", "b", "c"]) game = equip(game, id).game;
+  assert.deepEqual(equippedIds(game), ["a", "b", "c"]);
+  assert.equal(game.equipment["武器"], "normal-gun");
+  assert.equal(game.inventory.filter(item => item.category === "服装" && item.equipped).length, 4);
+});
+
+test("unloading and removing slot three frees only its own position for reuse", () => {
+  let game = ranked(5);
+  game.inventory.push(artifact("a"), artifact("b"), artifact("c"), artifact("d"));
+  for (const id of ["a", "b", "c"]) game = equip(game, id).game;
+  game = unequip(game, "c").game;
+  assert.deepEqual(equippedIds(game), ["a", "b", null]);
+  game = equip(game, "d").game;
+  assert.deepEqual(equippedIds(game), ["a", "b", "d"]);
+  game = executeToolCalls(game, [call("inventory.remove", { instanceId: "d", quantity: 1 })]).game;
+  assert.deepEqual(equippedIds(game), ["a", "b", null]);
+  assert.equal(game.equipment[BEYONDER_EQUIPMENT_SLOTS[2]], undefined);
+  assert.equal(equip(game, "c").results[0].data.equipmentSlot, BEYONDER_EQUIPMENT_SLOTS[2]);
+});
+
+test("ranked legacy saves gain a third empty slot and preserve occupied slot three across repeated reloads", () => {
+  const raw = ranked(5);
+  raw.inventory.push(artifact("a", { equipped: true }), artifact("b", { equipped: true }));
+  raw.equipment[BEYONDER_EQUIPMENT_SLOTS[0]] = "a";
+  raw.equipment[BEYONDER_EQUIPMENT_SLOTS[1]] = "b";
+  const migrated = migrateSave(raw);
+  assert.deepEqual(equippedIds(migrated), ["a", "b", null]);
+  migrated.inventory.push(artifact("c"), artifact("d"));
+  let game = equip(migrated, "c").game;
+  game = unequip(game, "b").game;
+  game.inventory.find(item => item.instanceId === "d").equipped = true;
+  game.equipment[BEYONDER_EQUIPMENT_SLOTS[1]] = "d";
+  const before = structuredClone(game);
+  const loaded = migrateSave(JSON.parse(JSON.stringify(game)));
+  assert.deepEqual(equippedIds(loaded), ["a", "d", "c"]);
+  assert.deepEqual(game, before);
+  const reloaded = migrateSave(JSON.parse(JSON.stringify(loaded)));
+  assert.deepEqual(reloaded.equipment, loaded.equipment);
+  assert.deepEqual(reloaded.inventory, loaded.inventory);
+  const gap = migrateSave(unequip(loaded, "d").game);
+  assert.deepEqual(equippedIds(gap), ["a", null, "c"], "slot three is not moved into an earlier gap");
+  loaded.character = ranked(6).character;
+  const locked = migrateSave(loaded);
+  assert.deepEqual(equippedIds(locked), ["a", "d"]);
+  assert.equal(locked.equipment[BEYONDER_EQUIPMENT_SLOTS[2]], undefined);
+  assert.equal(locked.inventory.find(item => item.instanceId === "c").equipped, false);
+  assert.equal(locked.inventory.find(item => item.instanceId === "c").quantity, 1);
+});
+
+test("a weapon in slot three supplies the single weapon bonus without stacking or taking the normal slot", () => {
+  let game = ranked(4);
+  game.inventory.push(artifact("a"), artifact("b"), artifact("magic-blade", { name: "非凡长剑", weapon: { version: 1, kind: "melee", quality: "extraordinary", bonusPercent: 22 } }), ordinaryWeapon());
+  for (const id of ["a", "b", "magic-blade"]) game = equip(game, id).game;
+  assert.equal(equippedWeapon(game).instanceId, "magic-blade");
+  assert.equal(equippedWeapon(game).bonusPercent, 22);
+  game = equip(game, "normal-gun").game;
+  assert.equal(equippedWeapon(game).instanceId, "normal-gun");
+  assert.deepEqual(equippedIds(migrateSave(game)), ["a", "b", "magic-blade"]);
+});
+
+test("AI state reports the unlocked three-slot limit and exact positions without hidden information", () => {
+  let game = ranked(5);
+  game.inventory.push(artifact("a"), artifact("b"), artifact("c", { hiddenInfo: "尚未确认的神奇能力" }));
+  for (const id of ["a", "b", "c"]) game = equip(game, id).game;
+  const visible = visibleGameState(game);
+  assert.equal(visible.beyonderEquipment.limit, 3);
+  assert.deepEqual(visible.beyonderEquipment.slots.map(entry => entry.instanceId), ["a", "b", "c"]);
+  assert.equal(visible.equipment[BEYONDER_EQUIPMENT_SLOTS[2]], "c");
+  assert.equal(JSON.stringify(visible).includes("尚未确认的神奇能力"), false);
 });

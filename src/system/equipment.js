@@ -2,6 +2,7 @@ import { isConsumable } from "./items.js";
 import { normalizeCharacteristic } from "./characteristics.js";
 import { equipmentSlot } from "./loadout.js";
 import { normalizeWeaponEquipment } from "./weapons.js";
+import { getAdvancement } from "./character.js";
 import { BEYONDER_EQUIPMENT_SLOTS, BEYONDER_ITEM_TAG, isBeyonderEquipment } from "./beyonderItems.js";
 
 export function canEquipItem(item = {}) {
@@ -12,10 +13,19 @@ export function canEquipItem(item = {}) {
     && (isBeyonderEquipment(item) || tags.includes("装备"));
 }
 
+export function beyonderEquipmentLimit(game) {
+  const advancement = getAdvancement(game.character);
+  return advancement.type === "extraordinary" && advancement.sequence <= 5 ? 3 : 2;
+}
+
+function beyonderLimitReason(game) {
+  return `非凡物品最多同时装备${beyonderEquipmentLimit(game) === 3 ? "三" : "两"}件，请先卸下一件。`;
+}
+
 export function beyonderEquipmentSlots(game) {
   const items = (game.inventory || []).filter(item => item.equipped && item.quantity > 0 && isBeyonderEquipment(item));
   const used = new Set();
-  const slots = BEYONDER_EQUIPMENT_SLOTS.map(slot => {
+  const slots = BEYONDER_EQUIPMENT_SLOTS.slice(0, beyonderEquipmentLimit(game)).map(slot => {
     const item = items.find(entry => entry.instanceId === game.equipment?.[slot] && !used.has(entry.instanceId));
     if (item) used.add(item.instanceId);
     return { slot, item: item || null };
@@ -31,8 +41,8 @@ export function equipmentGate(game, item) {
   if (!item || !(item.quantity > 0)) return "找不到要装备的物品";
   if (!canEquipItem(item)) return "该物品不允许装备";
   if (isBeyonderEquipment(item) && !item.equipped
-    && (game.inventory || []).filter(entry => entry.equipped && entry.quantity > 0 && isBeyonderEquipment(entry)).length >= BEYONDER_EQUIPMENT_SLOTS.length) {
-    return "非凡物品最多同时装备两件，请先卸下一件。";
+    && (game.inventory || []).filter(entry => entry.equipped && entry.quantity > 0 && isBeyonderEquipment(entry)).length >= beyonderEquipmentLimit(game)) {
+    return beyonderLimitReason(game);
   }
   return "";
 }
@@ -50,7 +60,7 @@ export function equipItem(game, item) {
   if (isBeyonderEquipment(item)) {
     const slots = beyonderEquipmentSlots(game);
     slot = (slots.find(entry => entry.item?.instanceId === item.instanceId) || slots.find(entry => !entry.item))?.slot;
-    if (!slot) return { ok: false, reason: "非凡物品最多同时装备两件，请先卸下一件。" };
+    if (!slot) return { ok: false, reason: beyonderLimitReason(game) };
   } else {
     slot = equipmentSlot(item);
     for (const old of game.inventory) if (old.instanceId !== item.instanceId && old.equipped

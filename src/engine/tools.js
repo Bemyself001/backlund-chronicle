@@ -7,7 +7,7 @@ import { amountToPence, formatMoney, moneyFromPence, moneyToPence } from "../sys
 import { isConsumable, isImportantNonMoneyItem, normalizeInventoryItem, normalizeItemImportance, playerVisibleItem } from "../system/items.js";
 import { normalizeCharacteristic } from "../system/characteristics.js";
 import { equipItem, normalizeEquipment, unequipItem } from "../system/equipment.js";
-import { BEYONDER_ITEM_TAG, isBeyonderEquipment } from "../system/beyonderItems.js";
+import { BEYONDER_ITEM_TAG, beyonderSlotLabel, isBeyonderEquipment } from "../system/beyonderItems.js";
 import { describeWeapon, newWeaponGate, weaponProfile } from "../system/weapons.js";
 import { applyAdvancement, getAdvancement, isExplicitAdvancementIntent } from "../system/character.js";
 import { getOrganization, getPathway, RENARD_AUCTION_MEDICINE, SPECIAL_RECIPES } from "../content/index.js";
@@ -587,7 +587,7 @@ function executeOne(game, call, options = {}) {
       const result = equipItem(game, target);
       if (!result.ok) return fail(call.name, result.reason);
       Object.assign(target, normalizeInventoryItem(target));
-      return succeed(call.name, `${turnLabel}：装备「${target.name}」${isBeyonderEquipment(target) ? `至非凡物品栏位${result.slot.endsWith(":1") ? "一" : "二"}` : ""}。${weaponProfile(target) ? `${describeWeapon(target)}。` : ""}`, { equipmentSlot: result.slot });
+      return succeed(call.name, `${turnLabel}：装备「${target.name}」${isBeyonderEquipment(target) ? `至非凡物品栏位${beyonderSlotLabel(result.slot)}` : ""}。${weaponProfile(target) ? `${describeWeapon(target)}。` : ""}`, { equipmentSlot: result.slot });
     }
     case "item.unequip": {
       const target = findItem();

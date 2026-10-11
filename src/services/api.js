@@ -162,7 +162,7 @@ const TOOL_PARAMETER_SCHEMAS = {
           rarity: { type: "string" },
           condition: { type: "string" },
           importance: { type: "string", enum: ["normal", "important"], description: "仅任务、关键证据、身份、非凡能力或后续剧情入口相关物品使用 important；普通物品与货币使用 normal" },
-          tags: { type: "array", items: { type: "string" }, description: "已确认的非凡道具加非凡物品标签，本地补齐装备标签；与普通装备共用装备工具，但只有两个非凡专属栏位。不要只因普通道具描述涉及非凡就添加此标签" },
+          tags: { type: "array", items: { type: "string" }, description: "已确认的非凡道具加非凡物品标签，本地补齐装备标签；与普通装备共用装备工具，通常有两个非凡专属栏位，正式晋升至序列5及以上解锁第三栏。不要只因普通道具描述涉及非凡就添加此标签" },
           properties: { type: "object" },
           weapon: { type: "object", additionalProperties: false, required: ["kind", "quality"],
             description: "只在创建武器时填写种类与有剧情依据的品质，伤害值由本地生成并永久固定",
@@ -281,7 +281,7 @@ const TOOL_PARAMETER_SCHEMAS = {
   },
   "item.equip": {
     type: "object",
-    description: "装备已持有的物品；非凡物品自动进入两个独立栏位之一，满两件须先卸下，不自动替换；普通武器与服装使用原栏位",
+    description: "装备已持有的物品；非凡物品进入独立栏位，普通人和序列9至6最多两件，序列5至0最多三件；达到本地beyonderEquipment.limit时须先卸下，不自动替换；普通武器与服装使用原栏位",
     additionalProperties: false,
     required: ["reason"],
     properties: {

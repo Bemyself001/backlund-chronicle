@@ -181,7 +181,23 @@ export const LATEST_UPDATE = {
   channel: "web",
   version: RELEASE_VERSION,
   date: "2026-10-11", dateLabel: "2026.10.11",
-  title: `${RELEASE_VERSION} · 非凡物品独立装备栏`,
+  title: `${RELEASE_VERSION} · 序列五解锁第三装备栏`,
+  summary: "序列五及更高位阶拥有三个非凡物品专属装备栏位，晋升成功后即时解锁，旧档读取自动识别。",
+  changes: [
+    "普通人和序列九至六保留两个非凡物品栏位；正式晋升至序列五时解锁第三栏，序列四至零继续保留三个栏位，全部途径使用同一规则。",
+    "第三栏继续共用装备、卸下按钮，与普通武器和衣物栏独立；上限、栏位名称、占用数量和满栏提示随当前序列同步变化。",
+    "本地工具与规划、叙事上下文读取同一装备上限，未成功晋升不能提前解锁，已满三件时须先卸下，不能自动替换现有装备。",
+    "已达到序列五及以上的旧存档读取后直接获得第三栏，保留已有装备位置；卸下、丢弃和重复读档正确维护第三栏，超出当前上限的物品只卸下并留在背包。",
+    "发布1.8.6正式签名Web APK、网页及同次构建的热更新包，沿用原包名与签名，递增构建号，并提供SHA-256校验文件。",
+  ],
+};
+
+const RELEASE_185_UPDATE = {
+  pending: false,
+  channel: "web",
+  version: "1.8.5",
+  date: "2026-10-11", dateLabel: "2026.10.11",
+  title: "1.8.5 · 非凡物品独立装备栏",
   summary: "非凡道具加入独立标签和两个专属装备栏位，沿用装备与卸下按钮，并在本地限制同时装备数量。",
   changes: [
     "非凡道具、神奇物品和封印物统一显示非凡物品标签，可在行囊中独立筛选；魔药、非凡特性、符咒与材料继续按各自用途使用。",
@@ -892,6 +908,7 @@ const APK_PLUGIN_UPDATE = {
 };
 
 export const PREVIOUS_UPDATES = [
+  RELEASE_185_UPDATE,
   RELEASE_184_UPDATE,
   RELEASE_183_UPDATE,
   RELEASE_182_UPDATE,
