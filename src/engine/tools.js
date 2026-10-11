@@ -9,6 +9,7 @@ import { normalizeCharacteristic } from "../system/characteristics.js";
 import { equipItem, normalizeEquipment, unequipItem } from "../system/equipment.js";
 import { BEYONDER_ITEM_TAG, beyonderSlotLabel, isBeyonderEquipment } from "../system/beyonderItems.js";
 import { describeWeapon, newWeaponGate, weaponProfile } from "../system/weapons.js";
+import { gatheringView } from "./gatherings.js";
 import { applyAdvancement, getAdvancement, isExplicitAdvancementIntent } from "../system/character.js";
 import { getOrganization, getPathway, RENARD_AUCTION_MEDICINE, SPECIAL_RECIPES } from "../content/index.js";
 import { medicinePurchaseGate } from "./medicineAccess.js";
@@ -890,6 +891,11 @@ export function executeToolCalls(currentGame, calls = [], options = {}) {
     }
     const validationError = validateCall(game, call);
     if (validationError) { results.push(fail(call.name, validationError)); continue; }
+    if (["money.add", "money.remove", "inventory.add", "inventory.remove", "inventory.update"].includes(call.name)
+      && (gatheringView(currentGame).inside || /聚会.*(?:购买|出售|交易|成交|付款|扣款|调制)|雾灯聚会|gathering-/.test(`${call.reason || ""} ${JSON.stringify(call.args || {})}`))) {
+      results.push(fail(call.name, "聚会买卖与调制需在特殊行动的交易清单确认，交谈不会扣款或交付物品"));
+      processed.add(callId); continue;
+    }
     if (call.name === "money.add" && /任务.*(?:报酬|酬金|奖励)|报酬|酬金|领奖|交差/.test(call.reason) && calls.some(item => item.name?.replace("__", ".") === "quest.resolve")) {
       results.push(succeed(call.name, "任务报酬由原任务统一结算，本次不重复增加资金。", { handledByQuest: true }));
       processed.add(callId);

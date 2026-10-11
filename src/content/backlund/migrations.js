@@ -1,6 +1,9 @@
 import { WATCH_NOTE_DETAIL } from "./watchNote.js";
 
 export const CONTENT_MIGRATIONS = [
+  { id: "backlund.occult-entry-and-gathering", fromVersion: "2026.10.09.1", toVersion: "2026.10.11.1", definitionRefreshes: [
+    ...["occult.entry.hidden-receipt", "occult.entry.midnight-employer", "occult.entry.seer.reversed-reflection"].map(definitionId => ({ definitionId, toDefinitionVersion: 2, refreshPresentation: true })),
+  ] },
   { id: "backlund.sequence-four", fromVersion: "2026.10.06.3", toVersion: "2026.10.09.1" },
   { id: "backlund.south-bank-districts", fromVersion: "2026.10.06.2", toVersion: "2026.10.06.3" },
   {

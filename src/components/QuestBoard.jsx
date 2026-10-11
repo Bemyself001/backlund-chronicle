@@ -5,6 +5,7 @@ import { getMapLocation } from "../system/map.js";
 import { inspectQuestTracking } from "../services/questTracking.js";
 import { formatMoney, moneyFromPence } from "../system/money.js";
 import styles from "./QuestBoard.module.css";
+import { gatheringView } from "../engine/gatherings.js";
 
 const FILTERS = [["active", "进行中"], ["issued", "我发布的委托"], ["opportunities", "可接机会"], ["archive", "归档"]];
 const STATUS = { available: "尚未接受", engaged: "正在追踪", completed: "已完成", failed: "已失败", abandoned: "已放下", expired: "已过期" };
@@ -33,6 +34,7 @@ export default function QuestBoard({ game, onAction, disabled, selectedId }) {
   const [cancellingId, setCancellingId] = useState(null);
   const focused = useRef(null);
   const projection = projectQuestJournal(game);
+  const gathering = gatheringView(game);
   const selectedGroup = selectedId && FILTERS.find(([key]) => projection[key].some(task => task.id === selectedId))?.[0];
   const [visitedSelection, setVisitedSelection] = useState(null);
   const shownFilter = selectedId && selectedId !== visitedSelection && selectedGroup ? selectedGroup : filter;
@@ -53,6 +55,7 @@ export default function QuestBoard({ game, onAction, disabled, selectedId }) {
   };
   return <section className={styles.board} aria-label="任务簿">
     <div className={styles.heading}><div><p>调查手记</p><h3>每次，推进一件事</h3></div><span>{projection.active.length} 项进行中</span></div>
+    {gathering.access && <aside className={styles.card} aria-label="非凡聚会日程"><h4>{gathering.name} · 介绍资格已登记</h4><p className={styles.objective}>{gathering.schedule?.open ? "正在开放" : "下次开放"} · {gathering.schedule?.startsAt || "时间待确认"}</p><p className={styles.hint}>{gathering.room} · 每周二、周五20:00—22:00。到“特殊行动 → 非凡聚会”查看清单、赴会或找联络人留言。{gathering.requests.some(entry => entry.status === "pending") ? "你有待答复的留言。" : ""}</p></aside>}
     <nav className={styles.filters} aria-label="任务状态">{FILTERS.map(([key, label]) => <button key={key} type="button" aria-pressed={shownFilter === key} onClick={() => { setFilter(key); setVisitedSelection(selectedId); }}>{label}<span>{projection[key].length}</span></button>)}</nav>
     <p className={styles.hint}>{shownFilter === "active" ? "选择一个目标，继续它的剧情。" : shownFilter === "issued" ? "你发布、受托人执行。查看进度不耗回合；当面确认、询问或领取报告消耗1回合。" : shownFilter === "opportunities" ? "这些只是机会。是否接受，由你决定。" : "已结束的任务保留在这里，方便回顾。"}</p>
     {notice && <p role="status" className={styles.timer}>{notice}</p>}
@@ -68,6 +71,7 @@ export default function QuestBoard({ game, onAction, disabled, selectedId }) {
       return <article key={task.id} className={styles.card} data-tracked={tracked || undefined} tabIndex={-1} ref={task.id === selectedId ? focused : null}>
         <div className={styles.meta}><span>{task.commission ? `${tracked ? "当前追踪 · " : ""}${task.commission.label}` : tracked ? "当前追踪" : STATUS[task.status] || task.status}</span><span>{task.commission ? "我发布的委托" : task.policy?.finale ? "终章" : task.source === "特殊行动" ? "日常委托" : "案件"}</span></div>
         <h4>{task.title}</h4><p className={styles.objective}>{task.objective || task.summary}</p>
+        {task.entryProgress && <label className={styles.progress}>入口调查 · {task.entryProgress.done}/{task.entryProgress.total}<progress max={task.entryProgress.total} value={task.entryProgress.done} /></label>}
         {locationId && <p className={styles.hint}>地点 · {getMapLocation(locationId, game)?.name || "待调查"}</p>}
         {shownFilter === "opportunities" && remaining != null && <p className={styles.timer}>剩余 {remaining} 回合可接受</p>}
         {guidance.timers.map(timer => <p key={timer.id} className={styles.timer} role="status">剩余 {timer.remaining} 次行动{timer.remaining <= 1 ? " · 请立即脱离危险" : ""}</p>)}

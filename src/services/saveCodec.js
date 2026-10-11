@@ -9,6 +9,7 @@ import { buildWorld, reconcileWorld } from "../system/hexworld.js";
 import { normalizeMemoryState } from "./memoryState.js";
 import { normalizeTriggerState, syncLegacyOccult } from "../engine/triggerState.js";
 import { syncQuestJournal } from "../engine/questRuntime.js";
+import { gatheringState } from "../engine/gatherings.js";
 import { migrateContentState } from "../engine/contentMigrations.js";
 import { normalizeWorldTime } from "../engine/worldTime.js";
 import { applyTalent } from "../system/talents.js";
@@ -117,6 +118,7 @@ export function migrateSave(raw) {
   result.triggerState = normalizeTriggerState(result);
   validateCommissionRecords(result);
   migrateContentState(result);
+  result.gatherings = gatheringState(result);
   syncLegacyOccult(result, result.triggerState);
   syncQuestJournal(result);
   result.memoryState = normalizeMemoryState(result);

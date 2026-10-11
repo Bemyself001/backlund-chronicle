@@ -30,6 +30,10 @@ function journalEntry(game, instance) {
     summary: text(instance.lastProgressEvidence) || text(instance.presentation?.text) || text(goal), objective: text(goal),
     status: instance.status, stage: instance.stage, revision: `${instance.status}:${instance.stage}:${instance.stageHistory?.length || 0}:${guidance.key}`,
     expiresAtTurn: instance.status === "available" ? instance.expiresTurn : undefined,
+    ...(definition?.category === "occult-entry" && definition.stages?.length ? {
+      entryProgress: { done: instance.status === "completed" ? definition.stages.length : Math.max(0, definition.stages.findIndex(entry => entry.id === instance.stage)), total: definition.stages.length },
+      locationId: stage?.locationId,
+    } : {}),
     ...(instance.definitionId === "side.queens.renard-fall" ? { treatmentReady: instance.treatmentReady === 1 ? 1 : 0 } : {}),
     startedTurn: instance.engagedTurn ?? instance.createdTurn, updatedTurn: game.turn,
     policy: questStagePolicy(definition, stage),

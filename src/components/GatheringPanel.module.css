@@ -1,0 +1,25 @@
+.panel { display: grid; gap: 1rem; min-width: 0; line-height: 1.7; }
+.card, .invitation, .confirm { display: grid; gap: .7rem; min-width: 0; padding: 1rem; border: 1px solid var(--panel-line); border-radius: var(--radius-panel); background: var(--panel-raised); }
+.invitation { border-top: 3px solid var(--panel-accent); }
+.confirm { border-color: var(--panel-accent); scroll-margin-top: 1rem; }
+.meta, .heading, .buttons { display: flex; flex-wrap: wrap; gap: .5rem; align-items: center; justify-content: space-between; }
+.meta, .hint { color: var(--panel-muted); font-size: .8rem; }
+.date { color: var(--panel-accent); font-size: 1.05rem; font-variant-numeric: tabular-nums; }
+.price { color: var(--panel-accent); font-variant-numeric: tabular-nums; }
+.filters { display: flex; flex-wrap: wrap; gap: .4rem; margin: .7rem 0; }
+.filters button[aria-pressed="true"] { background: var(--panel-bg); border-color: var(--panel-accent); color: var(--panel-accent); }
+.offers { display: grid; gap: .8rem; }
+.sale { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: space-between; align-items: center; padding-top: .7rem; border-top: 1px solid var(--panel-line); }
+.fields { display: grid; gap: .7rem; }
+.fields label { display: grid; gap: .3rem; font-size: .85rem; min-width: 0; }
+.fields select { width: 100%; max-width: 100%; min-height: 44px; padding: .6rem; border: 1px solid var(--panel-line); border-radius: var(--radius-control); background: var(--panel-bg); color: var(--panel-text); font: inherit; }
+.fields option { background: var(--panel-bg); color: var(--panel-text); }
+.fields select:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: 3px; }
+.panel .primary { background: var(--brass-light); color: #17241c; border-color: var(--brass-light); font-weight: 700; }
+.panel .link { border: 0; padding: .3rem 0; text-decoration: underline; background: none; font-size: .85rem; }
+.record { display: grid; gap: .4rem; padding-top: .8rem; border-top: 1px solid var(--panel-line); overflow-wrap: anywhere; }
+.panel h3, .panel h4, .panel p { margin: 0; }
+.buttons { justify-content: flex-start; }
+@media (min-width: 640px) { .offers { grid-template-columns: repeat(2, minmax(0, 1fr)); } .fields { grid-template-columns: repeat(3, minmax(0, 1fr)); } }
+:global(.no-flex-gap) .buttons, :global(.no-flex-gap) .filters { gap: 0; }
+:global(.no-flex-gap) .buttons > :not(:last-child), :global(.no-flex-gap) .filters > :not(:last-child) { margin-right: .5rem; margin-bottom: .5rem; }

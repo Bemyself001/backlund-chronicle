@@ -12,6 +12,7 @@ import { visitPerson } from "./visitablePeople.js";
 import { quickWaitGate, quickWaitPreview } from "./quickWait.js";
 import { normalizeInventoryItem } from "../system/items.js";
 import { describeWeapon } from "../system/weapons.js";
+import { executeGatheringAction } from "./gatherings.js";
 
 export function specialState(game) {
   const raw = game.specialActions || {};
@@ -112,7 +113,9 @@ export function executeSpecialAction(game, request) {
     requireHealthy(next);
     requireCondition(!state.active, "请先完成或放弃当前委托");
   }
-  if (operation === "visit-person") {
+  if (operation?.startsWith("gathering-")) {
+    ({ action, narrative, minutes } = executeGatheringAction(next, request));
+  } else if (operation === "visit-person") {
     ({ action, narrative, minutes } = visitPerson(next, request.id));
   } else if (operation === "wait") {
     requireCondition(request.expectedTurn === game.turn && request.expectedWorldTime === game.worldTime, "时间或回合已更新，请重新选择等待时长");
@@ -257,7 +260,7 @@ export function executeSpecialAction(game, request) {
   } else throw new Error("未知特殊行动");
 
   state.revision += 1;
-  const progress = resolveTurnProgress(next, action, "low", [], [], { elapsedMinutes: minutes });
+  const progress = resolveTurnProgress(next, action, "low", [], [], { elapsedMinutes: minutes, ...(operation?.startsWith("gathering-") ? { commissionOnly: true } : {}) });
   if (operation === "sleep") narrative += `\n\n${progress.restRecovery.map(change => `${change.label} ${change.before}→${change.after}`).join("；") || "生命与理智均已达到上限。"}`;
   next.turn = game.turn + 1;
   next.hiddenDanger = progress.hiddenDanger;

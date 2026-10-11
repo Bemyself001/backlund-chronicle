@@ -13,9 +13,13 @@ export function parseWorldTime(value) {
 }
 
 export function formatWorldTime(date) {
-  const days = Math.floor((date.getTime() - EPOCH) / DAY);
-  const weekday = WEEKDAYS[((2 + days) % 7 + 7) % 7];
+  const weekday = WEEKDAYS[worldWeekday(date)];
   return `${date.getUTCFullYear()}年 ${date.getUTCMonth() + 1}月${date.getUTCDate()}日 · 周${weekday} · ${String(date.getUTCHours()).padStart(2, "0")}:${String(date.getUTCMinutes()).padStart(2, "0")}`;
+}
+
+export function worldWeekday(date) {
+  const days = Math.floor((date.getTime() - EPOCH) / DAY);
+  return ((2 + days) % 7 + 7) % 7;
 }
 
 export function normalizeWorldTime(value) {

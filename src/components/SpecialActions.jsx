@@ -7,6 +7,7 @@ import { formatMoney, moneyToPence } from "../system/money.js";
 import PotionIdentification from "./PotionIdentification.jsx";
 import QuickWait from "./QuickWait.jsx";
 import InvestigationCommission from "./InvestigationCommission.jsx";
+import GatheringPanel from "./GatheringPanel.jsx";
 import styles from "./SpecialActions.module.css";
 import { medicinePurchaseGate } from "../engine/medicineAccess.js";
 import { hasMetPerson, visitPersonGate } from "../engine/visitablePeople.js";
@@ -40,8 +41,9 @@ export default function SpecialActions({ game, loading, onExecute, onOpenMap, on
     {tab !== "wait" && <header><p className={styles.eyebrow}>贝克兰德 · 日常与非凡</p><h3>今天，如何度过？</h3><p className={styles.hint}>{advancement.pathwayName || "普通人的城市生活"} · 从一件具体的小事开始。</p>
       <div className={styles.meta}><span>工作声誉 {state.reputation}</span><span>{formatMoney(game.money)}</span></div>
     </header>}
-    <nav className={styles.tabs} aria-label="特殊行动分类">{[["work", "委托"], ["people", "人物"], ["supplies", "补给"], ["craft", "制作"], ["organization", "组织"], ["wait", "等待"]].map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => { setTab(id); setNotice(""); }}>{label}</button>)}</nav>
+    <nav className={styles.tabs} aria-label="特殊行动分类">{[["work", "委托"], ["people", "人物"], ["gathering", "非凡聚会"], ["supplies", "补给"], ["craft", "制作"], ["organization", "组织"], ["wait", "等待"]].map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => { setTab(id); setNotice(""); }}>{label}</button>)}</nav>
     {notice && tab !== "wait" && <p role="status" className={styles.notice}>{notice}</p>}
+    {tab === "gathering" && <GatheringPanel game={game} disabled={loading} onExecute={request => execute(request.operation, undefined, undefined, request)} onOpenMap={onOpenMap} onAction={onAction} />}
     {tab === "wait" && <QuickWait game={game} loading={loading} onWait={hours => execute("wait", undefined, undefined, { hours, expectedTurn: game.turn, expectedWorldTime: game.worldTime })} />}
     {notice && tab === "wait" && <p role="status" className={styles.notice}>{notice}</p>}
     {tab === "people" && <section aria-label="人物拜访"><h3>可以拜访的人</h3>

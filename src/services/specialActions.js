@@ -6,6 +6,7 @@ import { makeId } from "../utils/id.js";
 import { createTurnResolution } from "./turnResolution.js";
 import { eventDirections, markNarrativeEventsDelivered } from "./narrativeEvents.js";
 import { visitablePerson } from "../engine/visitablePeople.js";
+import { gatheringView } from "../engine/gatherings.js";
 
 export function resolveSpecialAction(game, request) {
   const result = executeSpecialAction(game, request);
@@ -19,7 +20,12 @@ export function resolveSpecialAction(game, request) {
   for (const entry of memory.updates.storyHistory.slice(-2)) entry.source = "fixed";
   const trigger = progress.newTrigger?.presentation || next.triggerState?.active?.find((entry) => entry.status === "available")?.presentation;
   const visitedPerson = request.operation === "visit-person" ? visitablePerson(request.id) : null;
-  const choices = visitedPerson ? visitedPerson.topics.map(topic => ({ label: topic.action, intent: "social", risk: "low" })) : game.choices;
+  const gathering = request.operation?.startsWith("gathering-") ? gatheringView(next) : null;
+  const choices = gathering ? [
+    { label: gathering.inside ? "向聚会主持人询问已知商品与交易规矩" : "向旅店联络人询问聚会规矩", intent: "social", risk: "low" },
+    { label: "整理已经取得的配方、物品与线索", intent: "investigate", risk: "low" },
+    { label: "暂时放下聚会，继续自己的调查", intent: "redirect", risk: "low" },
+  ] : visitedPerson ? visitedPerson.topics.map(topic => ({ label: topic.action, intent: "social", risk: "low" })) : game.choices;
   return markNarrativeEventsDelivered({ ...next, ...memory.updates,
     choices: next.questFocus?.id ? choices : injectOccultEntryChoice(choices, trigger),
     worldEvents: [...game.worldEvents, ...(progress.newTrigger ? [{ id: makeId("event"), turn: next.turn, text: `特殊事件出现：${progress.newTrigger.presentation.title}` }] : [])].slice(-40),

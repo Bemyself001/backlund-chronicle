@@ -19,6 +19,10 @@ const renardKnown = any(quest(RENARD), fact("side.renard.completed"));
 const edmundMet = any(fact("side.renard.apothecary-met"), stage(RENARD, "auction-conversation", "auction-box", "shared-treatment"));
 
 export const STORY_PEOPLE = [
+  { id: "mist-lamp-contact", name: "灰手套", role: "雾灯聚会联络人", questIds: [], connection: "在雾鸦旅店接受聚会介绍与留言，不要求加入组织。", discoveries: [
+    event("known", fact("gathering.mist-lamp.contact"), "入口调查与旅店联络", "你已与戴灰手套的联络人核对来意。", { contact: "met", lastKnownLocation: "桥区·雾鸦旅店" }),
+    event("access", fact("gathering.mist-lamp.access"), "聚会介绍卡", "雾灯介绍资格已登记，可定期赴会；平时可向他求购或求售留言。", { contact: "met", lastKnownLocation: "桥区·雾鸦旅店" }),
+  ] },
   ...VISITABLE_PEOPLE.map(person => ({
     id: person.id, name: person.name, role: person.role, questIds: [],
     connection: person.description,

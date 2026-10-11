@@ -13,7 +13,7 @@ export function getInstanceTriggerDefinition(instance, game = null) {
   if (!instance) return null;
   const current = getTriggerDefinition(instance.definitionId);
   const currentVersion = Number(current?.version || 1);
-  if (!instance.definitionSnapshot && current && instance.status !== "eligible") {
+  if (!instance.definitionSnapshot && current && ["available", "engaged"].includes(instance.status)) {
     instance.definitionVersion = currentVersion;
     instance.definitionSnapshot = structuredClone(current);
   }
