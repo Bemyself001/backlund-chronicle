@@ -14,7 +14,7 @@ permissions:
   contents: write
 
 env:
-  PRODUCT_VERSION: "1.8.4"
+  PRODUCT_VERSION: "1.8.5"
 
 jobs:
   build-release-apk:

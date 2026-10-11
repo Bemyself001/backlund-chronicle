@@ -1,3 +1,5 @@
+import { BEYONDER_EQUIPMENT_SLOTS, isBeyonderEquipment } from "./beyonderItems.js";
+
 export const WEAPON_KINDS = { melee: "刀剑与近战武器", firearm: "枪械" };
 export const WEAPON_QUALITIES = {
   crude: { name: "粗制", melee: [2, 4], firearm: [5, 9] },
@@ -63,7 +65,10 @@ export function newWeaponGate(item = {}) {
 
 export function equippedWeapon(game) {
   const candidates = (game.inventory || []).filter(item => item.equipped && item.quantity > 0 && weaponProfile(item));
-  const item = candidates.find(entry => entry.instanceId === game.equipment?.["武器"]) || candidates[0];
+  const item = candidates.find(entry => !isBeyonderEquipment(entry) && entry.instanceId === game.equipment?.["武器"])
+    || candidates.find(entry => !isBeyonderEquipment(entry))
+    || BEYONDER_EQUIPMENT_SLOTS.map(slot => candidates.find(entry => entry.instanceId === game.equipment?.[slot])).find(Boolean)
+    || candidates[0];
   return item ? { instanceId: item.instanceId, name: item.name, ...weaponProfile(item) } : null;
 }
 
@@ -72,9 +77,11 @@ export function weaponBonus(game, rule) {
 }
 
 export function normalizeWeaponEquipment(game) {
-  const weapon = equippedWeapon(game);
+  const normalWeapons = (game.inventory || []).filter(item => !isBeyonderEquipment(item) && weaponProfile(item));
+  const weapon = normalWeapons.find(item => item.equipped && item.quantity > 0 && item.instanceId === game.equipment?.["武器"])
+    || normalWeapons.find(item => item.equipped && item.quantity > 0);
   game.equipment = { ...game.equipment };
-  const weaponIds = new Set((game.inventory || []).filter(item => weaponProfile(item)).map(item => item.instanceId));
+  const weaponIds = new Set(normalWeapons.map(item => item.instanceId));
   for (const [slot, id] of Object.entries(game.equipment)) if (slot === "武器" || weaponIds.has(id)) delete game.equipment[slot];
   for (const item of game.inventory || []) if (weaponIds.has(item.instanceId)) item.equipped = item.instanceId === weapon?.instanceId;
   if (weapon) game.equipment["武器"] = weapon.instanceId;

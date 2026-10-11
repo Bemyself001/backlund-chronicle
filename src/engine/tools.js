@@ -6,7 +6,8 @@ import { ensureWorld, travelToLocation } from "../system/hexworld.js";
 import { amountToPence, formatMoney, moneyFromPence, moneyToPence } from "../system/money.js";
 import { isConsumable, isImportantNonMoneyItem, normalizeInventoryItem, normalizeItemImportance, playerVisibleItem } from "../system/items.js";
 import { normalizeCharacteristic } from "../system/characteristics.js";
-import { equipmentSlot } from "../system/loadout.js";
+import { equipItem, normalizeEquipment, unequipItem } from "../system/equipment.js";
+import { BEYONDER_ITEM_TAG, isBeyonderEquipment } from "../system/beyonderItems.js";
 import { describeWeapon, newWeaponGate, weaponProfile } from "../system/weapons.js";
 import { applyAdvancement, getAdvancement, isExplicitAdvancementIntent } from "../system/character.js";
 import { getOrganization, getPathway, RENARD_AUCTION_MEDICINE, SPECIAL_RECIPES } from "../content/index.js";
@@ -451,6 +452,7 @@ function executeOne(game, call, options = {}) {
       const projected = weightOf(game.inventory) + Number(source.weight || 0) * quantity;
       if (projected > game.capacity.maxWeight) return fail(call.name, `背包将超过 ${game.capacity.maxWeight}kg 容量`);
       const existing = game.inventory.find((item) => item.itemId === source.itemId && !item.equipped && !weaponProfile(item) && !source.weapon
+        && !isBeyonderEquipment(item) && !isBeyonderEquipment(source)
         && JSON.stringify(item.potion || null) === JSON.stringify(source.potion || null)
         && JSON.stringify(item.characteristic || null) === JSON.stringify(source.characteristic || null));
       let changedItem;
@@ -463,9 +465,9 @@ function executeOne(game, call, options = {}) {
         existing.importance = normalizeItemImportance({ ...existing, importance: source.importance || existing.importance, tags: [...(existing.tags || []), ...(source.tags || [])] });
         changedItem = existing;
       } else {
-        changedItem = normalizeInventoryItem({ instanceId: makeId("item"), category: "杂物", weight: 0, rarity: "普通", condition: "良好", equipped: false, tags: [], properties: {}, hiddenInfo: "", discoveredInfo: source.description, ...source,
-          ...(source.weapon ? { instanceId: makeId("weapon"), equipped: false, weapon: { kind: source.weapon.kind, quality: source.weapon.quality } } : {}),
-          quantity, acquiredAt: turnLabel, source: source.source || call.reason, isNew: true });
+        changedItem = normalizeInventoryItem({ instanceId: makeId("item"), category: "杂物", weight: 0, rarity: "普通", condition: "良好", tags: [], properties: {}, hiddenInfo: "", discoveredInfo: source.description, ...source,
+          ...(source.weapon ? { instanceId: makeId("weapon"), weapon: { kind: source.weapon.kind, quality: source.weapon.quality } } : {}),
+          equipped: false, quantity, acquiredAt: turnLabel, source: source.source || call.reason, isNew: true });
         game.inventory.push(changedItem);
       }
       const visible = playerVisibleItem(changedItem);
@@ -495,10 +497,14 @@ function executeOne(game, call, options = {}) {
       if (!target) return fail(call.name, "背包中不存在该物品实例");
       if (["weapon", "bonusPercent", "damagePercent", "rarity", "quality"].some(key => Object.hasOwn(args.patch || {}, key))) return fail(call.name, "物品品质与武器伤害在创建时已固定，不能通过更新重掷或修改");
       const allowed = ["description", "condition", "discoveredInfo", "properties", "tags"];
+      const wasBeyonder = target.beyonder === true || isBeyonderEquipment(target);
+      const wasEquipped = target.equipped;
       Object.entries(args.patch || {}).forEach(([key, value]) => { if (allowed.includes(key)) target[key] = value; });
-      if (getChurchTalisman(target) || target.potion || target.characteristic || target.weapon) Object.assign(target, normalizeInventoryItem(target));
+      if (wasBeyonder) target.tags = [...new Set([...(Array.isArray(target.tags) ? target.tags : []), BEYONDER_ITEM_TAG])];
+      Object.assign(target, normalizeInventoryItem(target));
+      normalizeEquipment(game);
       const visible = playerVisibleItem(target);
-      return succeed(call.name, `${turnLabel}：更新「${visible.name}」——${visible.potionStatus === "unidentified" ? "身份仍未确认" : call.reason}。`);
+      return succeed(call.name, `${turnLabel}：更新「${visible.name}」——${visible.potionStatus === "unidentified" ? "身份仍未确认" : call.reason}。${wasEquipped && !target.equipped && isBeyonderEquipment(target) ? "非凡物品栏位已满，已卸下并保留在背包中。" : ""}`);
     }
     case "money.add": {
       const amountPence = amountToPence(amountArg(args));
@@ -578,22 +584,15 @@ function executeOne(game, call, options = {}) {
     }
     case "item.equip": {
       const target = findItem();
-      if (!target || target.quantity <= 0) return fail(call.name, "找不到要装备的物品");
-      if (!target.tags.includes("装备")) return fail(call.name, "该物品不允许装备");
-      const slot = equipmentSlot(target);
-      Object.entries(game.equipment).forEach(([key, id]) => {
-        const old = game.inventory.find((item) => item.instanceId === id);
-        if (old && equipmentSlot(old) === slot) { old.equipped = false; delete game.equipment[key]; }
-      });
-      target.equipped = true;
-      game.equipment[slot] = target.instanceId;
-      return succeed(call.name, `${turnLabel}：装备「${target.name}」。${weaponProfile(target) ? `${describeWeapon(target)}。` : ""}`);
+      const result = equipItem(game, target);
+      if (!result.ok) return fail(call.name, result.reason);
+      Object.assign(target, normalizeInventoryItem(target));
+      return succeed(call.name, `${turnLabel}：装备「${target.name}」${isBeyonderEquipment(target) ? `至非凡物品栏位${result.slot.endsWith(":1") ? "一" : "二"}` : ""}。${weaponProfile(target) ? `${describeWeapon(target)}。` : ""}`, { equipmentSlot: result.slot });
     }
     case "item.unequip": {
       const target = findItem();
       if (!target?.equipped) return fail(call.name, "该物品当前没有装备");
-      target.equipped = false;
-      Object.keys(game.equipment).forEach((slot) => { if (game.equipment[slot] === target.instanceId) delete game.equipment[slot]; });
+      unequipItem(game, target);
       return succeed(call.name, `${turnLabel}：卸下「${target.name}」。`);
     }
     case "occult.contact": {
@@ -902,6 +901,7 @@ export function executeToolCalls(currentGame, calls = [], options = {}) {
       if (gate) { results.push(fail(call.name, gate)); continue; }
     }
     const result = executeOne(game, call, options);
+    if (result.ok) normalizeEquipment(game);
     if (result.ok && combatItem) markMainAction(game, game.turn + 1);
     if (call.repairNote) {
       result.repairNote = call.repairNote;

@@ -17,6 +17,8 @@ import { isConsumable, playerVisibleItem } from "../system/items.js";
 import { getChurchTalisman } from "../system/talismans.js";
 import { describeWeapon, weaponProfile } from "../system/weapons.js";
 import SequenceFourDossier from "./SequenceFourDossier.jsx";
+import { BEYONDER_ITEM_TAG, isBeyonderEquipment } from "../system/beyonderItems.js";
+import { beyonderEquipmentSlots, canEquipItem, equipmentGate } from "../system/equipment.js";
 
 export const CharacterPanel = memo(function CharacterPanel({ game, onAction, disabled }) {
   const { character } = game;
@@ -46,12 +48,16 @@ export const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, 
   const backRef = useRef(null);
   const inventory = game.inventory.map(item => {
     const visible = playerVisibleItem(item);
-    return { ...visible, ...(visible.potionStatus === "unidentified" ? { potion: { identified: false } } : {}), ...(visible.characteristicStatus === "unidentified" ? { characteristic: { identified: false } } : {}) };
+    return { ...visible, ...(visible.potion || visible.potionStatus ? { category: "魔药" } : {}), ...(visible.characteristic || visible.characteristicStatus ? { category: "非凡特性" } : {}), ...(visible.potionStatus === "unidentified" ? { potion: { identified: false } } : {}), ...(visible.characteristicStatus === "unidentified" ? { characteristic: { identified: false } } : {}) };
   });
-  const categories = ["全部", ...new Set(inventory.map(item => item.category))];
+  const categories = ["全部", BEYONDER_ITEM_TAG, ...new Set(inventory.map(item => item.category).filter(value => value !== BEYONDER_ITEM_TAG))];
   const effectiveCategory = categories.includes(category) ? category : "全部";
-  const items = inventory.filter(item => (effectiveCategory === "全部" || item.category === effectiveCategory) && item.name.includes(search.trim()));
+  const items = inventory.filter(item => (effectiveCategory === "全部" || (effectiveCategory === BEYONDER_ITEM_TAG ? isBeyonderEquipment(item) : item.category === effectiveCategory)) && item.name.includes(search.trim()));
   const selected = inventory.find(item => item.instanceId === selectedId);
+  const beyonderSlots = beyonderEquipmentSlots(game);
+  const selectedBeyonder = selected && isBeyonderEquipment(selected);
+  const equipGate = selected && !selected.equipped ? equipmentGate(game, selected) : "";
+  const selectedSlot = beyonderSlots.find(entry => entry.item?.instanceId === selectedId);
   const potionGate = selected?.potion ? getPotionUseGate(game, selected.instanceId) : "";
   const characteristicGate = selected?.characteristic ? getCharacteristicUseGate(game, selected.instanceId) : "";
   const talisman = selected && getChurchTalisman(selected);
@@ -61,12 +67,18 @@ export const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, 
     setSelectedId(null);
     requestAnimationFrame(() => (itemRefs.current.get(lastSelectedRef.current) || searchRef.current)?.focus());
   };
+  const openItem = (item) => {
+    lastSelectedRef.current = item.instanceId;
+    setSelectedId(item.instanceId);
+    requestAnimationFrame(() => backRef.current?.focus());
+  };
   return <div className={styles.content}>
     <details className={styles.wallet}><summary><span>持有资金</span><strong>{formatMoney(game.money)}</strong></summary><p>1 镑 = 20 苏勒 = 240 便士</p></details>
     <div className={styles.capacity}><span>负重</span><strong>{weight.toFixed(1)} / {game.capacity.maxWeight} kg</strong><progress max={game.capacity.maxWeight} value={weight} aria-label="随身负重" /></div>
     {selected ? <section className={styles.itemDetail}>
       <button ref={backRef} type="button" className={styles.back} onClick={returnToList}>← 返回物品列表</button>
-      <p className={styles.muted}>{selected.rarity} · {selected.category}{selected.potion ? " · 魔药" : ""}</p><h3>{selected.name}</h3><p>{selected.discoveredInfo || selected.description}</p>
+      <p className={styles.muted}>{selected.rarity} · {selected.category}{selectedBeyonder && selected.category !== BEYONDER_ITEM_TAG && <span className={styles.beyonderTag}>{BEYONDER_ITEM_TAG}</span>}</p><h3>{selected.name}</h3><p>{selected.discoveredInfo || selected.description}</p>
+      {selectedBeyonder && <div className={styles.record} aria-label="非凡物品装备说明"><h4>非凡物品 · 独立装备</h4><p>{selected.equipped ? `已装备在栏位${selectedSlot?.slot.endsWith(":2") ? "二" : "一"}。` : "尚未装备。"}最多同时装备两件，与衣物和普通武器栏位独立。</p>{equipGate && <p role="status" className={styles.equipNotice}>{equipGate}</p>}</div>}
       {weapon && <div className={styles.record} aria-label="武器伤害"><h4>{describeWeapon(selected)}</h4><p>伤害在获得时固定。{selected.equipped ? "当前已装备。" : "装备后生效。"}只对普通攻击和武器类技能附加；每次只使用一件武器。</p><small>先加武器伤害，再计算强化；RP弱点成立时额外加5个百分点，总比例最高60%。</small></div>}
       {selected.potion && <div className={styles.record}><h4>{selected.potion.identified ? `${selected.potion.pathwayName}途径 · 序列${selected.potion.sequence}魔药` : "性质未明的魔药"}</h4><p>{selected.potion.identified ? potionGate || "已鉴定的成品魔药可直接服用。确认后生成晋升剧情并更新非凡档案。" : "可拜访明斯克街15号的夏洛克·莫里亚蒂，每瓶1镑鉴定；鉴定前不能服用。"}</p></div>}
       {selected.characteristic && <div className={styles.record} data-tone="loss"><h4>{selected.characteristic.identified ? `${selected.characteristic.pathwayName}途径 · 序列${selected.characteristic.sequence}非凡特性` : "身份尚未确认的非凡特性"}</h4><p>{characteristicGate || "可消耗一份特性直接晋升，无需另外调制魔药。三项上限正常增长，当前生命、理智和灵性先增加晋升增长值，再各自减半（向下取整），不会回满。"}</p></div>}
@@ -77,12 +89,16 @@ export const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, 
         {selected.characteristic && <button className={styles.primary} type="button" disabled={disabled || Boolean(characteristicGate)} title={characteristicGate || undefined} onClick={() => onAction(`吸收${selected.name}并正式晋升至${selected.characteristic.pathwayName}序列${selected.characteristic.sequence}，接受生命、理智和灵性在晋升增长后的当前值各扣除50%`, { advancementRequest: { characteristicInstanceId: selected.instanceId } })}>吸收特性 · 直接晋升</button>}
         <button type="button" disabled={disabled} onClick={() => onLocalTool("item.inspect", { instanceId: selected.instanceId }, `检查${selected.name}`)}>检查</button>
         {(isConsumable(selected) || medicineRecipe(selected)) && !selected.potion && !selected.characteristic && !talisman && <button type="button" disabled={disabled} onClick={() => onLocalTool("item.use", { instanceId: selected.instanceId }, `主动使用${selected.name}`)}>使用</button>}
-        {selected.tags.includes("装备") && <button type="button" disabled={disabled} onClick={() => onLocalTool(selected.equipped ? "item.unequip" : "item.equip", { instanceId: selected.instanceId }, `玩家${selected.equipped ? "卸下" : "装备"}${selected.name}`)}>{selected.equipped ? "卸下" : "装备"}</button>}
+        {canEquipItem(selected) && <button type="button" disabled={disabled || Boolean(equipGate)} title={equipGate || undefined} onClick={() => onLocalTool(selected.equipped ? "item.unequip" : "item.equip", { instanceId: selected.instanceId }, `玩家${selected.equipped ? "卸下" : "装备"}${selected.name}`)}>{selected.equipped ? "卸下" : "装备"}</button>}
         <button type="button" className={styles.danger} disabled={disabled} onClick={() => { if (window.confirm(`丢弃一件“${selected.name}”？`)) { onLocalTool("inventory.remove", { instanceId: selected.instanceId, quantity: 1 }, `玩家主动丢弃${selected.name}`); returnToList(); } }}>丢弃</button>
       </div>
     </section> : <>
       <div className={styles.filters}><label><span>搜索物品</span><input ref={searchRef} value={search} onChange={e => setSearch(e.target.value)} placeholder="名称…" /></label><label><span>分类</span><select value={effectiveCategory} onChange={e => setCategory(e.target.value)}>{categories.map(value => <option key={value}>{value}</option>)}</select></label></div>
-      {items.length === 0 ? <p className={styles.empty}>没有符合条件的物品。</p> : [["已穿戴", true], ["随身物品", false]].map(([label, equipped]) => <section key={label}><h3>{label}<small>{items.filter(item => Boolean(item.equipped) === equipped).length}</small></h3><div className={styles.itemList}>{items.filter(item => Boolean(item.equipped) === equipped).map(item => <button key={item.instanceId} ref={element => { if (element) itemRefs.current.set(item.instanceId, element); else itemRefs.current.delete(item.instanceId); }} type="button" className={styles.item} data-new={item.isNew || undefined} onClick={() => { lastSelectedRef.current = item.instanceId; setSelectedId(item.instanceId); requestAnimationFrame(() => backRef.current?.focus()); }}><span className={styles.glyph} aria-hidden="true">{item.name.slice(0, 1)}</span><span><strong>{item.name}</strong><small>{item.category} · {item.condition}{item.potion ? item.potion.identified ? ` · 序列${item.potion.sequence}` : " · 未鉴定" : ""}</small></span><span>×{item.quantity}</span></button>)}</div></section>)}
+      <section aria-label="非凡物品装备栏"><h3>非凡物品装备<small>{beyonderSlots.filter(entry => entry.item).length} / 2</small></h3><p className={styles.muted}>两个独立栏位，在物品详情中点击“装备”或“卸下”。</p><ul className={styles.equipmentSlots}>{beyonderSlots.map(({ slot, item }, index) => <li key={slot}>{item ? <button ref={element => { if (element) itemRefs.current.set(item.instanceId, element); else itemRefs.current.delete(item.instanceId); }} type="button" className={styles.equipmentSlot} aria-label={`非凡物品栏位${index + 1}：${item.name}`} onClick={() => openItem(item)}><span>栏位{index === 0 ? "一" : "二"}</span><strong>{item.name}</strong><small>查看 · 卸下</small></button> : <div className={styles.equipmentSlot} data-empty="true"><span>栏位{index === 0 ? "一" : "二"}</span><strong>空置</strong><small>尚未装备非凡物品</small></div>}</li>)}</ul></section>
+      {items.length === 0 ? <p className={styles.empty}>没有符合条件的物品。</p> : [["已穿戴", true], ["随身物品", false]].map(([label, equipped]) => {
+        const group = items.filter(item => Boolean(item.equipped) === equipped && !(equipped && isBeyonderEquipment(item)));
+        return <section key={label}><h3>{label}<small>{group.length}</small></h3><div className={styles.itemList}>{group.map(item => <button key={item.instanceId} ref={element => { if (element) itemRefs.current.set(item.instanceId, element); else itemRefs.current.delete(item.instanceId); }} type="button" className={styles.item} data-new={item.isNew || undefined} onClick={() => openItem(item)}><span className={styles.glyph} aria-hidden="true">{item.name.slice(0, 1)}</span><span><strong>{item.name}{isBeyonderEquipment(item) && <span className={styles.beyonderTag}>{BEYONDER_ITEM_TAG}</span>}</strong><small>{item.category} · {item.condition}{item.potion ? item.potion.identified ? ` · 序列${item.potion.sequence}` : " · 未鉴定" : ""}</small></span><span>×{item.quantity}</span></button>)}</div></section>;
+      })}
     </>}
   </div>;
 });

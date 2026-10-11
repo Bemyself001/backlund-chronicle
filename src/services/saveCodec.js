@@ -1,7 +1,7 @@
 import { ACTIVE_CONTENT, CONTENT_SCHEMA_VERSION, getOrganization } from "../content/index.js";
 import { GAME_SYSTEM_VERSION, SAVE_VERSION } from "../system/version.js";
 import { isMoneyItem, normalizeInventoryItem } from "../system/items.js";
-import { normalizeWeaponEquipment } from "../system/weapons.js";
+import { normalizeEquipment } from "../system/equipment.js";
 import { withAdvancement } from "../system/character.js";
 import { moneyFromPence } from "../system/money.js";
 import { getMapLocations, normalizeLocationKnowledge, normalizeMapExtensions } from "../system/map.js";
@@ -111,7 +111,7 @@ export function migrateSave(raw) {
   }
   migrateCharacterStatRules(result);
   migrateHealthEffects(result);
-  normalizeWeaponEquipment(result);
+  normalizeEquipment(result);
   grantOrganizationTalisman(result);
   result.specialActions = specialState(result);
   result.triggerState = normalizeTriggerState(result);

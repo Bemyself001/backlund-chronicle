@@ -2,6 +2,7 @@ import { PATHWAYS, getPathway, getSequenceName, pathwayIdForName } from "../cont
 import { normalizeTalismanItem } from "./talismans.js";
 import { normalizeWeaponItem } from "./weapons.js";
 import { normalizeCharacteristic } from "./characteristics.js";
+import { normalizeBeyonderItem } from "./beyonderItems.js";
 
 export const ITEM_IMPORTANCE = {
   NORMAL: "normal",
@@ -30,7 +31,8 @@ export function normalizeInventoryItem(item = {}) {
   const tags = [...new Set([...(Array.isArray(item.tags) ? item.tags : []), ...(potion ? ["魔药", "消耗品"] : []), ...(characteristic ? ["非凡特性", "非凡物品"] : [])])];
   const normalized = { ...base, tags, ...(potion ? { potion } : {}), ...(characteristic ? { characteristic } : {}),
     ...(potion?.identified && potion.sequence === 4 ? { name: `${getSequenceName(potion.pathwayId, 4)}魔药` } : {}) };
-  return normalizeWeaponItem(normalizeTalismanItem({ ...normalized, importance: normalizeItemImportance(normalized) }));
+  const classified = normalizeBeyonderItem(normalizeWeaponItem(normalizeBeyonderItem(normalizeTalismanItem(normalized))));
+  return { ...classified, importance: normalizeItemImportance(classified) };
 }
 
 export function isImportantNonMoneyItem(item = {}) {

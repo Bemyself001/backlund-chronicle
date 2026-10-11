@@ -2,6 +2,7 @@ import { makeId } from "../utils/id.js";
 import { getTalent } from "../content/index.js";
 import { normalizeWeaponItem, weaponProfile } from "./weapons.js";
 import { sefirahItemEasterEgg } from "./itemEasterEgg.js";
+import { BEYONDER_ITEM_TAG, isBeyonderEquipment } from "./beyonderItems.js";
 
 export const DEFAULT_CLOTHING = "旧呢外套、白衬衫、黑长裤、磨损的皮靴";
 export const CLOTHING_SLOTS = ["外套", "上装", "下装", "鞋履", "头饰", "手套", "围饰"];
@@ -13,6 +14,7 @@ const clothingPatterns = [
 ];
 
 export function equipmentSlot(item) {
+  if (isBeyonderEquipment(item)) return BEYONDER_ITEM_TAG;
   if (weaponProfile(item)) return "武器";
   return item.category === "服装" && CLOTHING_SLOTS.includes(item.slot) ? `服装:${item.slot}` : item.category;
 }

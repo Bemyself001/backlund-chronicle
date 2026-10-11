@@ -69,6 +69,15 @@
 .capacity { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: .45rem; margin: 1rem 0; font-size: .85rem; }
 .capacity strong { color: var(--panel-text); font: .8rem var(--font-mono); }
 .capacity progress { grid-column: 1 / -1; }
+.beyonderTag { display: inline-block; margin-left: .4rem; padding: .12rem .35rem; border: 1px solid var(--panel-accent); border-radius: var(--radius-control); color: var(--panel-accent); font: 500 .65rem/1.4 var(--font-sans); vertical-align: middle; }
+.equipmentSlots { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: .65rem; margin: .8rem 0 0; padding: 0; list-style: none; }
+.equipmentSlots li { min-width: 0; }
+.equipmentSlot { display: flex; flex-direction: column; align-items: flex-start; justify-content: center; width: 100%; min-height: 7rem; padding: .8rem; border: 1px solid var(--panel-line); border-left: 2px solid var(--panel-accent); border-radius: var(--radius-control); background: var(--panel-raised); text-align: left; overflow-wrap: anywhere; }
+.equipmentSlot > span { color: var(--panel-accent); font-size: .75rem; }
+.equipmentSlot strong { display: block; margin: .35rem 0; font-size: .875rem; }
+.equipmentSlot small { color: var(--panel-muted); font-size: .7rem; }
+.equipmentSlot[data-empty] { border-style: dashed; color: var(--panel-muted); }
+.content .equipNotice { color: var(--panel-health); font-size: .8rem; }
 .filters { display: grid; grid-template-columns: minmax(0, 1fr) 6.5rem; gap: .7rem; margin: 1rem 0 .4rem; }
 .filters label { min-width: 0; }
 .filters label > span { display: block; margin-bottom: .3rem; color: var(--panel-muted); font-size: .75rem; }

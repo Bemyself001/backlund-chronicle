@@ -28,6 +28,8 @@ import { questFocusContext, QUEST_FOCUS_RULE } from "../engine/questFocus.js";
 import { questRecoveryHistory, QUEST_RECOVERY_RULE } from "../engine/questRecovery.js";
 import { inferMapDestination } from "./mapTravel.js";
 import { publicCommissionQuest } from "../engine/commissions.js";
+import { BEYONDER_EQUIPMENT_RULE } from "../system/beyonderItems.js";
+import { beyonderEquipmentSlots } from "../system/equipment.js";
 
 const SHARED_AUTHORITY_RULES = LOCAL_STATE_AUTHORITY_RULES + "【地图调查与公共常识】玩家未揭开地图迷雾只表示其个人尚未确认地点，不表示当地居民不知道该地点。圣赛缪尔教堂是黑夜女神教会的公开教堂，永恒烈阳教堂也是公开宗教场所；正常描写居民指路、公开礼拜与日常活动，不因地图未发现就编造集体不知情、避讳或秘密据点。其他公共地点同理，按身份与当地知识差异自然回应。明确的地图调查在本轮正常完成后由本地规则确认所选地点，只揭开该地点，不自动到访、加入组织或解锁内部秘密；不要把本次调查写成仍无法确认地址。快速模式草稿先写核实过程，具体确认结果留给本地结算后的叙事。";
 
@@ -185,6 +187,8 @@ export function visibleGameState(game) {
     } : null,
     occult: game.occult,
     inventory: visibleInventory(game),
+    equipment: { ...game.equipment },
+    beyonderEquipment: { limit: 2, slots: beyonderEquipmentSlots(game).map(({ slot, item }) => ({ slot, instanceId: item?.instanceId || null, name: item?.name || null })), rule: BEYONDER_EQUIPMENT_RULE },
     knownClues: game.clues,
     activeQuests: (game.quests || []).map(quest => publicCommissionQuest(game, quest)),
     taskJournal: visibleQuestJournal(game).map(entry => ({ ...entry, assistance: questAssistance(game, entry) })),
