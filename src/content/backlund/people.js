@@ -107,7 +107,11 @@ export const STORY_PEOPLE = [
   },
   {
     id: "azik-eggers", name: "阿兹克·艾格斯", role: "铜哨所联系的收信人",
-    connection: "你得到了一枚可以向他寄信的铜哨。", questIds: [WATCH],
-    discoveries: [event("whistle", { item: "azik-copper-whistle" }, "阿兹克铜哨", "铜哨可召来向阿兹克送信的骸骨信使。获得铜哨不代表已经与他见面或建立交情。")],
+    connection: "旧档案与铜哨把你和这位收信人联系起来。", questIds: [WATCH, "mainline.fogbound-name"],
+    discoveries: [
+      event("whistle", { item: "azik-copper-whistle" }, "阿兹克铜哨", "铜哨可召来向阿兹克送信的骸骨信使。获得铜哨不代表已经与他见面或建立交情。"),
+      event("corresponded", fact("person.azik-eggers.corresponded"), "信使往来", "你已经通过骸骨信使向阿兹克写信，并收到了他的回信。", { contact: "known", status: "已建立书信联系" }),
+      event("met", fact("person.azik-eggers.met"), "公共图书馆之约", "你与阿兹克当面核对过旧档案；他承认自己存在记忆空缺。", { contact: "met", role: "查访旧事的历史研究者", lastKnownLocation: "乔伍德区公共图书馆（会面时）" }),
+    ],
   },
 ];

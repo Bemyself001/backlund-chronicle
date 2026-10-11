@@ -112,13 +112,14 @@ test("all three authored MI9 assignments and both options survive saves, settle 
       const joined = run(atHeadquarters(), "register", "mi9");
       for (let attempt = 0; commissionOffer(joined, work).id !== offer.id && attempt < 100; attempt += 1) joined.turn += 3;
       assert.equal(commissionOffer(joined, work).id, offer.id);
+      const quoted = commissionOffer(joined, work);
       const beforeMoney = moneyToPence(joined.money);
       const accepted = run(joined, "accept", work.id);
       assert.throws(() => run(accepted, "accept", work.id), /当前委托/);
       const loaded = migrateSave(JSON.parse(JSON.stringify(accepted)));
-      assert.deepEqual(loaded.specialActions.active.offer, offer);
+      assert.deepEqual(loaded.specialActions.active.offer, quoted);
       const settled = run(loaded, "resolve", loaded.specialActions.active.id, option.id);
-      assert.equal(moneyToPence(settled.money) - beforeMoney, option.reward);
+      assert.equal(moneyToPence(settled.money) - beforeMoney, option.reward * 2);
       assert.equal(settled.specialActions.active, null);
       assert.equal(settled.quests.find(entry => entry.id === loaded.specialActions.active.id).status, "completed");
       assert.match(settled.recentDialogues.at(-1).content, new RegExp(option.ending));

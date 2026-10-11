@@ -1,4 +1,4 @@
-import { SPECIAL_ACTIONS, SPECIAL_RECIPES, SPECIAL_CONTACTS, getOrganization } from "../content/index.js";
+import { SPECIAL_ACTIONS, SPECIAL_RECIPES, SPECIAL_CONTACTS, ECONOMY, getOrganization } from "../content/index.js";
 import { getMapLocation } from "../system/map.js";
 import { getAdvancement } from "../system/character.js";
 import { moneyFromPence, moneyToPence } from "../system/money.js";
@@ -13,6 +13,16 @@ import { quickWaitGate, quickWaitPreview } from "./quickWait.js";
 import { normalizeInventoryItem } from "../system/items.js";
 import { describeWeapon } from "../system/weapons.js";
 import { executeGatheringAction } from "./gatherings.js";
+import { executeTradeAction } from "./trading.js";
+import { executeMainlineAction, mainlineView } from "./mainline.js";
+import { executeConversationAction } from "./conversations.js";
+
+const workDefinitions = [...SPECIAL_ACTIONS, ...ECONOMY.jobs];
+export function commissionBonus(game, definition) {
+  if (definition?.ordinary || definition?.stake) return 0;
+  const rank = getAdvancement(game.character);
+  return rank.type === "extraordinary" ? Math.min(ECONOMY.income.maxSequenceBonusPence, Math.max(0, 9 - rank.sequence) * ECONOMY.income.sequenceBonusPence) : 0;
+}
 
 export function specialState(game) {
   const raw = game.specialActions || {};
@@ -38,9 +48,11 @@ function membership(game, organizationId) {
 export function actionGate(game, definition) {
   const advancement = getAdvancement(game.character);
   if (!definition) return "未知行动";
-  if (advancement.type !== "extraordinary") return "成为非凡者后解锁途径行动";
-  if (definition.pathwayId !== advancement.pathwayId && !definition.sharedOrganization) return "当前途径不可用";
-  if (advancement.sequence > definition.maxSequence) return `序列${definition.maxSequence}及以上解锁`;
+  if (!definition.ordinary) {
+    if (advancement.type !== "extraordinary") return "成为非凡者后解锁途径行动";
+    if (definition.pathwayId !== advancement.pathwayId && !definition.sharedOrganization) return "当前途径不可用";
+    if (advancement.sequence > definition.maxSequence) return `序列${definition.maxSequence}及以上解锁`;
+  }
   if (definition.organizationId && !membership(game, definition.organizationId)) return `需正式加入${getOrganization(definition.organizationId)?.name || "所属组织"}`;
   if (definition.locationId && game.location.id !== definition.locationId) return "需到达指定地点";
   if (definition.license === "gravekeeper" && !specialState(game).gravekeeper) return "需先登记为守墓人";
@@ -49,7 +61,7 @@ export function actionGate(game, definition) {
 
 export function availableSpecialActions(game) {
   const advancement = getAdvancement(game.character);
-  return SPECIAL_ACTIONS.filter((definition) => definition.pathwayId === advancement.pathwayId || definition.sharedOrganization);
+  return workDefinitions.filter((definition) => definition.ordinary || definition.pathwayId === advancement.pathwayId || definition.sharedOrganization);
 }
 
 export function watchContactText(game) {
@@ -84,7 +96,8 @@ export function commissionOffer(game, definition) {
   const seed = `${game.id}:${definition.id}:${Math.floor(game.turn / 3)}:${state.completed.length}`;
   let index = hash(seed) % definition.pool.length;
   if (definition.pool[index].id === state.lastPool[definition.id]) index = (index + 1) % definition.pool.length;
-  return definition.pool[index];
+  const offer = definition.pool[index];
+  return { ...offer, options: offer.options.map(option => ({ ...option, reward: option.reward * (definition.ordinary || definition.stake ? 1 : ECONOMY.income.commissionMultiplier) })) };
 }
 
 function requireCondition(condition, message) { if (!condition) throw new Error(message); }
@@ -109,11 +122,18 @@ export function executeSpecialAction(game, request) {
   let minutes = 5;
   const logs = [];
   const operation = request.operation;
+  requireCondition(!mainlineView(game).aboveGrayFog || ["mainline-step", "mainline-defer"].includes(operation), "请先在主线档案确认入会或暂缓告辞，结束灰雾会面后再行动");
   if (["accept", "craft", "register"].includes(operation)) {
     requireHealthy(next);
     requireCondition(!state.active, "请先完成或放弃当前委托");
   }
-  if (operation?.startsWith("gathering-")) {
+  if (operation?.startsWith("mainline-")) {
+    ({ action, narrative, minutes } = executeMainlineAction(next, request));
+  } else if (operation === "conversation-send") {
+    ({ action, narrative, minutes } = executeConversationAction(next, request));
+  } else if (operation?.startsWith("trade-")) {
+    ({ action, narrative, minutes } = executeTradeAction(next, request));
+  } else if (operation?.startsWith("gathering-")) {
     ({ action, narrative, minutes } = executeGatheringAction(next, request));
   } else if (operation === "visit-person") {
     ({ action, narrative, minutes } = visitPerson(next, request.id));
@@ -131,7 +151,7 @@ export function executeSpecialAction(game, request) {
     narrative = "你在雾鸦旅店安静睡了八小时，起身时检查了自己的身体与精神状况。";
     minutes = 480;
   } else if (operation === "accept") {
-    const definition = SPECIAL_ACTIONS.find((entry) => entry.id === request.id);
+    const definition = workDefinitions.find((entry) => entry.id === request.id);
     const reason = actionGate(next, definition);
     requireCondition(!reason, reason);
     requireCondition(next.turn >= state.availableTurn, `还需 ${state.availableTurn - next.turn} 回合才能接取新委托`);
@@ -151,7 +171,7 @@ export function executeSpecialAction(game, request) {
   } else if (operation === "resolve" || operation === "abandon") {
     const active = state.active;
     requireCondition(active && active.id === request.id, "委托已结算或不再有效");
-    const definition = SPECIAL_ACTIONS.find((entry) => entry.id === active.definitionId);
+    const definition = workDefinitions.find((entry) => entry.id === active.definitionId);
     let reward = 0;
     if (operation === "resolve") {
       requireHealthy(next);
@@ -165,7 +185,7 @@ export function executeSpecialAction(game, request) {
         reward = active.roll < 45 ? active.stake * 2 : active.roll < 65 ? active.stake : 0;
         narrative += `\n\n本局${reward > active.stake ? "小有收获" : reward === active.stake ? "打平" : "失利"}，扣除预留赌注后净收入 ${reward - active.stake} 便士。`;
       }
-      if (!active.stake) reward += Math.min(72, Math.max(0, 9 - getAdvancement(next.character).sequence) * 12);
+      reward += commissionBonus(next, definition);
       if (option.health) {
         const delta = applyStatDelta(next, "health", option.health);
         if (delta) logs.push(`竞技损耗：生命 ${delta.before}→${delta.after}`);
@@ -260,7 +280,7 @@ export function executeSpecialAction(game, request) {
   } else throw new Error("未知特殊行动");
 
   state.revision += 1;
-  const progress = resolveTurnProgress(next, action, "low", [], [], { elapsedMinutes: minutes, ...(operation?.startsWith("gathering-") ? { commissionOnly: true } : {}) });
+  const progress = resolveTurnProgress(next, action, "low", [], [], { elapsedMinutes: minutes, ...(/^(gathering|trade|mainline|conversation)-/.test(operation) ? { commissionOnly: true } : {}) });
   if (operation === "sleep") narrative += `\n\n${progress.restRecovery.map(change => `${change.label} ${change.before}→${change.after}`).join("；") || "生命与理智均已达到上限。"}`;
   next.turn = game.turn + 1;
   next.hiddenDanger = progress.hiddenDanger;

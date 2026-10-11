@@ -12,12 +12,12 @@ export const GATHERING = {
   labels: { recipe: "配方", material: "材料", potion: "魔药", characteristic: "非凡特性", equipment: "非凡物品" },
   // 序列3—0尚无可用能力，聚会不会凭空提供其晋升商品。
   prices: {
-    9: { recipe: 1200, material: 4800, potion: 9600, characteristic: 7200 },
-    8: { recipe: 2400, material: 12000, potion: 19200, characteristic: 16800 },
-    7: { recipe: 4800, material: 24000, potion: 36000, characteristic: 30000 },
-    6: { recipe: 9600, material: 48000, potion: 72000, characteristic: 60000 },
-    5: { recipe: 19200, material: 96000, potion: 144000, characteristic: 120000 },
-    4: { recipe: 48000, material: 240000, potion: 360000, characteristic: 300000 },
+    9: { recipe: 7200, material: 9600, potion: 15600, characteristic: 12000 },
+    8: { recipe: 12000, material: 19200, potion: 28800, characteristic: 24000 },
+    7: { recipe: 21600, material: 36000, potion: 52800, characteristic: 43200 },
+    6: { recipe: 38400, material: 72000, potion: 108000, characteristic: 86400 },
+    5: { recipe: 72000, material: 144000, potion: 216000, characteristic: 172800 },
+    4: { recipe: 144000, material: 336000, potion: 480000, characteristic: 384000 },
   },
   equipment: {
     itemId: "gathering-mist-dagger", name: "雾纹短刀", category: "非凡物品", rarity: "非凡", beyonder: true,

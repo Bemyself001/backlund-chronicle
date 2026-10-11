@@ -55,6 +55,8 @@ export const ITEM_BEHAVIORS = [
   },
   {
     itemId: "azik-copper-whistle",
+    questRewardOnly: true,
+    rewardNames: ["阿兹克铜哨", "阿兹克的铜哨"],
     actions: {
       use: [
         {

@@ -37,8 +37,13 @@
 .qqLabel strong { font-size: .95rem; }
 .qqLabel small { color: #abcce5; font-size: .68rem; letter-spacing: .06em; }
 .adNote { margin: -.2rem 0 0; font-size: .78rem; color: #c5bcae; text-align: right; }
-.enterButton { border: 1px solid #c5a773; border-radius: 2px; background: #121510b8; color: #edd7b0; font-family: var(--font-serif); }
-.enterButton:hover { background: #c5a77322; border-color: #ecd3a5; }
+.enterButton { min-height: 4.8rem; padding: .9rem 1.2rem; border: 1px solid #f1d89c; border-radius: 5px; background: #dfbf7c; color: #252a21; font-family: var(--font-serif); line-height: 1.4; box-shadow: inset 0 1px 0 #fff2c780, 0 5px 18px #0006; transition: background-color .18s ease, border-color .18s ease, box-shadow .18s ease, transform .18s ease; }
+.enterLabel { display: grid; gap: .3rem; min-width: 0; text-align: left; }
+.enterKicker { color: #554622; font-family: var(--font-sans); font-size: .68rem; line-height: 1.3; letter-spacing: .16em; }
+.enterLabel strong { font-size: 1.08rem; font-weight: 700; letter-spacing: .02em; }
+.enterArrow { display: grid; place-items: center; flex: 0 0 auto; width: 2.4rem; height: 2.4rem; border: 1px solid #314337; border-radius: 50%; background: #24382f; color: #f6deb0; font-family: var(--font-sans); font-size: 1.3rem; line-height: 1; }
+.enterButton:hover { background: #f0d093; border-color: #fff0be; box-shadow: inset 0 1px 0 #fff2c7, 0 7px 22px #0007; transform: translateY(-1px); }
+.enterButton:active { background: #d4b26c; box-shadow: inset 0 2px 7px #402e2330, 0 2px 8px #0005; transform: translateY(1px); }
 .tapButton:focus-visible, .qqButton:focus-visible, .enterButton:focus-visible { outline: 3px solid #fff2cd; outline-offset: 5px; }
 .footer { padding-top: 1rem; padding-bottom: max(1.5rem, env(safe-area-inset-bottom)); color: #beb098; }
 @media (max-width: 600px) {
@@ -54,7 +59,8 @@
   .subtitle { margin: 1rem 0 1.5rem; letter-spacing: .04em; }
   .actions { max-width: none; }
   .externalActions { grid-template-columns: 1fr; gap: .7rem; }
-  .enterButton { font-size: .95rem; padding-left: 1rem; padding-right: 1rem; padding-inline: 1rem; }
+  .enterButton { padding-left: 1rem; padding-right: 1rem; padding-inline: 1rem; }
+  .enterLabel strong { font-size: 1rem; }
   .adNote { text-align: left; line-height: 1.5; }
   .footer { padding-left: 6vw; padding-right: 6vw; padding-inline: 6vw; padding-bottom: max(1rem, env(safe-area-inset-bottom)); font-size: .875rem; letter-spacing: .03em; }
 }
@@ -64,7 +70,12 @@
   .content h1 { font-size: 2.8rem; }
   .content h1 span { font-size: 2.2rem; }
   .subtitle { margin-top: .75rem; margin-bottom: 1rem; margin-block: .75rem 1rem; }
-  .tapButton, .qqButton, .enterButton { min-height: 3.35rem; padding-top: .65rem; padding-bottom: .65rem; padding-block: .65rem; }
+  .tapButton, .qqButton { min-height: 3.35rem; padding-top: .65rem; padding-bottom: .65rem; padding-block: .65rem; }
+  .enterButton { min-height: 4.4rem; padding-top: .75rem; padding-bottom: .75rem; padding-block: .75rem; }
   .actions, .externalActions { gap: .6rem; }
 }
 @media (max-width: 360px) { .content h1 { font-size: 2.8rem; } .content h1 span { font-size: 2rem; } }
+@media (prefers-reduced-motion: reduce) {
+  .enterButton { transition: none; }
+  .enterButton:hover, .enterButton:active { transform: none; }
+}

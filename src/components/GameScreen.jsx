@@ -16,6 +16,7 @@ const PHASE_MESSAGES = {
   streaming: "剧情正在抵达", budgetRecovery: "正在继续生成，请稍候", toolRetry: "正在整理行动结果",
   choiceRetry: "正在生成行动建议", reasoningRetry: "正在重新生成，请稍候", validating: "正在核对行动结果",
   itemConfirmation: "等待你确认重要变更", finalizing: "正在整理本轮结果",
+  correspondence: "正在等候阿兹克的回信",
 };
 
 function loadReading() {
@@ -75,7 +76,7 @@ export default function GameScreen(props) {
   return <GameSession key={props.game.id} {...props} />;
 }
 
-function GameSession({ game, loading, turnPhase, streamText, error, onAction, onAbort, onRetry, onRegenerateChoices, onLocalTool, onOpenMap, onOpenApi, onOpenPrompt, onOpenSaves, onHome, onSpecialAction }) {
+function GameSession({ game, loading, turnPhase, streamText, error, onAction, onAbort, onRetry, onRegenerateChoices, onLocalTool, onOpenMap, onOpenApi, onOpenPrompt, onOpenSaves, onHome, onSpecialAction, onConversation, conversationDrafts }) {
   const [input, setInput] = useState("");
   const [panel, setPanel] = useState(null);
   const [specialEntry, setSpecialEntry] = useState({ tab: "work", revision: 0 });
@@ -271,9 +272,9 @@ function GameSession({ game, loading, turnPhase, streamText, error, onAction, on
       </section>
       {panelOpen && <><button className={styles.panelScrim} type="button" onClick={closePanel} aria-label="关闭资料面板" tabIndex={-1} /><aside id="game-dossier" className={styles.dossier} aria-label={PANEL_NAMES[panel]}><div className={styles.dossierHeading}><div><small>PRIVATE DOSSIER</small><h2>{PANEL_NAMES[panel]}</h2></div><button ref={closeRef} type="button" onClick={closePanel} aria-label="关闭资料，返回剧情">返回剧情 <span aria-hidden="true">×</span></button></div><div className={styles.dossierScroll} ref={paneRef}>
         <div hidden={panel !== "character"}><CharacterPanel game={game} onAction={performAction} disabled={loading} /></div>
-        <div hidden={panel !== "inventory"}><InventoryPanel game={game} onLocalTool={(name, args, reason) => onLocalTool(name, args, reason, () => setPanel(null))} onAction={performAction} disabled={loading} /></div>
-        <div hidden={panel !== "journal"}><JournalPanel key={journalRequest} game={game} onAction={performAction} disabled={loading} /></div>
-        {panel === "special" && <SpecialActions key={specialEntry.revision} initialTab={specialEntry.tab} game={game} loading={loading} onExecute={onSpecialAction} onOpenMap={onOpenMap} onAction={performAction} />}
+        <div hidden={panel !== "inventory"}><InventoryPanel game={game} onLocalTool={(name, args, reason) => onLocalTool(name, args, reason, () => setPanel(null))} onAction={performAction} onConversation={() => changePanel("special", null, true, "dialogue")} disabled={loading} /></div>
+        <div hidden={panel !== "journal"}><JournalPanel key={journalRequest} game={game} onAction={performAction} onOpenMainline={() => changePanel("special", null, true, "mainline")} disabled={loading} /></div>
+        {panel === "special" && <SpecialActions key={specialEntry.revision} initialTab={specialEntry.tab} game={game} loading={loading} onExecute={onSpecialAction} onOpenMap={onOpenMap} onAction={performAction} onConversation={onConversation} drafts={conversationDrafts} onAbort={onAbort} onOpenApi={onOpenApi} />}
         <div hidden={panel !== "menu"}><MenuPanel loading={loading} reading={reading} onReadingChange={updateReading} onOpenApi={onOpenApi} onOpenPrompt={onOpenPrompt} onOpenSaves={onOpenSaves} onHome={onHome} version={`${RELEASE_NAME} · ${APP_VERSION}`} />{readingNotice && <p className={styles.readingNotice} role="status">{readingNotice}</p>}</div>
       </div></aside></>}
     </div>

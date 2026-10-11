@@ -265,7 +265,7 @@ test('old active definitions migrate, terminal history stays historical, reward 
   assert.equal(loaded.triggerState.history[0].stage, 'old-ending');
 });
 
-test('wages are 10–15 solers with half pay for limited work; gambling unchanged; content validates', () => {
+test('authored wage bands retain proportional partial pay before income multipliers; gambling unchanged; content validates', () => {
   for (const definition of SPECIAL_ACTIONS.filter(entry => !entry.stake)) {
     for (const offer of definition.pool) {
       assert.ok(offer.options[0].reward >= 120 && offer.options[0].reward <= 180);
@@ -277,7 +277,7 @@ test('wages are 10–15 solers with half pay for limited work; gambling unchange
 });
 
 test('new wages are paid by settlement, sequence bonus is capped, UI visits do not advance timers', () => {
-  for (const [sequence, bonus] of [[9, 0], [8, 12], [0, 72]]) {
+  for (const [sequence, bonus] of [[9, 0], [8, 24], [0, 144]]) {
     const start = fresh(WATCH, 'trace-uncle');
     start.location.id = 'divination-association';
     start.character.advancement.sequence = sequence;

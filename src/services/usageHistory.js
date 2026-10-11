@@ -7,7 +7,7 @@ const listeners = new Set();
 let ledger;
 const number = value => ["number", "string"].includes(typeof value) && String(value).trim() && Number.isFinite(Number(value)) && Number(value) >= 0 ? Number(value) : null;
 const text = (value, max = 160) => typeof value === "string" ? value.slice(0, max) : "";
-const PHASES = ["planning", "narrative", "draft", "repair", "choices", "memory", "inspection", "prayer", "loadout"];
+const PHASES = ["planning", "narrative", "draft", "repair", "choices", "memory", "inspection", "prayer", "loadout", "conversation"];
 const enumText = (value, allowed, fallback = "") => allowed.includes(value) ? value : fallback;
 
 function safeEvent(event, turn) {

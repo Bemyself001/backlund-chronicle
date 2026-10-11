@@ -22,12 +22,17 @@ import { PATHWAY_QUEST_DEFINITIONS } from "./pathwayQuests/index.js";
 import { SPECIAL_ACTIONS, SPECIAL_RECIPES, SPECIAL_CONTACTS } from "./specialActions.js";
 import { SEQUENCE_FOUR_PROFILES, SEQUENCE_FOUR_POTIONS } from "./sequenceFour.js";
 import { GATHERING } from "./gatherings.js";
+import { ECONOMY } from "./economy.js";
+import { MAINLINE, MAINLINE_TRIGGER, DIALOGUE_PEOPLE } from "./mainline.js";
 
 export const BACKLUND_CONTENT = {
   id: "backlund-core",
   name: "贝克兰德核心内容",
   schemaVersion: 2,
-  contentVersion: "2026.10.11.1",
+  contentVersion: "2026.10.11.3",
+  mainline: MAINLINE,
+  dialoguePeople: DIALOGUE_PEOPLE,
+  economy: ECONOMY,
   gathering: GATHERING,
   sequenceFour: { profiles: SEQUENCE_FOUR_PROFILES, potions: SEQUENCE_FOUR_POTIONS },
   specialActions: SPECIAL_ACTIONS,
@@ -44,6 +49,7 @@ export const BACKLUND_CONTENT = {
   visitablePeople: VISITABLE_PEOPLE,
   itemBehaviors: ITEM_BEHAVIORS,
   triggers: [
+    MAINLINE_TRIGGER,
     ...OCCULT_ENTRY_DEFINITIONS,
     ...SPECIAL_QUEST_DEFINITIONS,
     ...PATHWAY_QUEST_DEFINITIONS,

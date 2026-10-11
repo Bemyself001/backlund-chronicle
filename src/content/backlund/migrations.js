@@ -1,6 +1,10 @@
 import { WATCH_NOTE_DETAIL } from "./watchNote.js";
 
 export const CONTENT_MIGRATIONS = [
+  { id: "backlund.mainline-and-correspondence", fromVersion: "2026.10.11.2", toVersion: "2026.10.11.3", locationRumors: [{ locationId: "queen-library" }] },
+  { id: "backlund.economy-and-trading", fromVersion: "2026.10.11.1", toVersion: "2026.10.11.2", locationRumors: [
+    { locationId: "dock-workers-square" }, { locationId: "hillston-market" },
+  ] },
   { id: "backlund.occult-entry-and-gathering", fromVersion: "2026.10.09.1", toVersion: "2026.10.11.1", definitionRefreshes: [
     ...["occult.entry.hidden-receipt", "occult.entry.midnight-employer", "occult.entry.seer.reversed-reflection"].map(definitionId => ({ definitionId, toDefinitionVersion: 2, refreshPresentation: true })),
   ] },

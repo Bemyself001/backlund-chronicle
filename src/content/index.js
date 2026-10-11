@@ -41,6 +41,9 @@ export const SPECIAL_ACTIONS = ACTIVE_CONTENT.specialActions;
 export const SPECIAL_RECIPES = ACTIVE_CONTENT.specialRecipes;
 export const SPECIAL_CONTACTS = ACTIVE_CONTENT.specialContacts;
 export const GATHERING = ACTIVE_CONTENT.gathering;
+export const ECONOMY = ACTIVE_CONTENT.economy;
+export const MAINLINE = ACTIVE_CONTENT.mainline;
+export const DIALOGUE_PEOPLE = ACTIVE_CONTENT.dialoguePeople;
 export const RENARD_AUCTION_MEDICINE = ACTIVE_CONTENT.renardAuctionMedicine;
 export const RENARD_TREATMENT_SCENES = ACTIVE_CONTENT.renardTreatmentScenes;
 
@@ -225,6 +228,23 @@ export function validateContentPack(pack = ACTIVE_CONTENT) {
   const locations = new Set(asArray(pack?.map?.locations).map((entry) => entry?.id));
   const pathways = new Set(asArray(pack?.pathways).map((entry) => entry?.id));
   const organizations = new Set(asArray(pack?.organizations).map((entry) => entry?.id));
+  if (pack?.mainline) {
+    const line = pack.mainline, trigger = asArray(pack.triggers).find(entry => entry.id === line.id);
+    const chapters = new Set(asArray(line.chapters).map(entry => entry.id));
+    if (!line.title || !trigger?.localOnly || !line.steps?.length || duplicateIds(line.steps).length || !chapters.size || duplicateIds(line.chapters).length) errors.push("主线章节或本地任务定义无效");
+    if (!Array.isArray(line.codenames) || !line.codenames.length || new Set(line.codenames).size !== line.codenames.length || line.codenames.some(name => typeof name !== "string" || !name.trim())) errors.push("主线塔罗代号无效");
+    for (const step of asArray(line.steps)) {
+      if (!chapters.has(step.chapter) || !locations.has(step.locationId) || !Number.isInteger(step.minutes) || step.minutes <= 0 || !step.label || !step.objective || !step.scene || !step.narrative
+        || !trigger?.stages?.some(stage => stage.id === step.id)) errors.push(`主线节点 ${step.id} 的目标、地点或剧情无效`);
+    }
+  }
+  if (pack?.dialoguePeople) {
+    if (!Array.isArray(pack.dialoguePeople) || duplicateIds(pack.dialoguePeople).length) errors.push("人物对话联系人无效");
+    for (const person of asArray(pack.dialoguePeople)) {
+      if (!person.name || !person.shortName || !person.channel || !person.persona || !person.requiredItemId || !asArray(pack.itemBehaviors).some(item => item.itemId === person.requiredItemId)
+        || !person.topics?.length || person.topics.some(topic => typeof topic !== "string" || !topic.trim())) errors.push(`人物对话 ${person.id} 的身份、联络物品或话题无效`);
+    }
+  }
   if (!Array.isArray(pack?.visitablePeople) || duplicateIds(pack.visitablePeople).length) errors.push("可拜访人物数据无效或ID重复");
   for (const person of asArray(pack?.visitablePeople)) {
     if (!locations.has(person.locationId) || !person.name || !person.role || !person.metFact || !person.description || !person.behavior || !person.introduction || !person.greeting) errors.push(`可拜访人物 ${person.id} 的地点或档案不完整`);
@@ -261,6 +281,31 @@ export function validateContentPack(pack = ACTIVE_CONTENT) {
   }
   for (const route of asArray(pack?.map?.routes)) {
     if (!locations.has(route?.from) || !locations.has(route?.to)) errors.push(`路线引用不存在的地点：${route?.from} → ${route?.to}`);
+  }
+  if (pack?.economy) {
+    const economy = pack.economy;
+    if (!Number.isInteger(economy.income?.commissionMultiplier) || economy.income.commissionMultiplier < 1
+      || !Number.isInteger(economy.income?.sequenceBonusPence) || economy.income.sequenceBonusPence < 0
+      || !Number.isInteger(economy.income?.maxSequenceBonusPence) || economy.income.maxSequenceBonusPence < 0) errors.push("经济收入参数无效");
+    if (!Array.isArray(economy.jobs) || duplicateIds(economy.jobs).length) errors.push("普通短工目录无效");
+    for (const job of asArray(economy.jobs)) {
+      if (!job.ordinary || !locations.has(job.locationId) || !Number.isInteger(job.minutes) || job.minutes <= 0 || job.pool?.length < 3) errors.push("普通短工地点或耗时无效");
+      for (const scene of asArray(job.pool)) {
+        if (!scene.id || !scene.title || !scene.scene || scene.options?.length < 2) errors.push("普通短工剧情不完整");
+        for (const option of asArray(scene.options)) if (!option.label || !option.ending || !Number.isInteger(option.reward) || option.reward < 0) errors.push("普通短工报酬无效");
+      }
+    }
+    const trade = economy.trade;
+    if (!Number.isInteger(trade?.maxQuantity) || trade.maxQuantity < 1 || !Array.isArray(trade?.goods) || !Array.isArray(trade?.channels)
+      || duplicateIds(trade?.goods).length || duplicateIds(trade?.channels).length) errors.push("交易市场目录无效");
+    for (const good of asArray(trade?.goods)) {
+      if (!good.name || !good.description || !(good.weight > 0)) errors.push("贸易货物档案无效");
+      for (const channel of asArray(trade?.channels)) {
+        const quote = channel.prices?.[good.id];
+        if (!locations.has(channel.locationId) || !channel.name || !quote || ![quote.buy, quote.sell, quote.stock, quote.demand].every(value => Number.isInteger(value) && value > 0)
+          || quote.sell >= quote.buy) errors.push("交易渠道报价或限额无效");
+      }
+    }
   }
   for (const opening of asArray(pack?.openings).filter(Boolean)) {
     if (!locations.has(opening.locationId)) errors.push(`开局 ${opening.id || opening.district} 的起点不存在：${opening.locationId}`);

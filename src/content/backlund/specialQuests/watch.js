@@ -16,7 +16,7 @@ const CHARACTERISTIC_REWARD = { id: "watch.late-hour.characteristic", type: "ite
     source: "雷金纳德{characterSurnameSuffix}的遗留",
   } };
 
-const AZIK_WHISTLE_REWARD = { id: "watch.late-hour.azik-whistle", type: "item", item: {
+export const AZIK_WHISTLE_REWARD = { id: "watch.late-hour.azik-whistle", type: "item", item: {
     instanceId: "reward-watch-azik-copper-whistle",
     itemId: "azik-copper-whistle",
     name: "阿兹克铜哨",

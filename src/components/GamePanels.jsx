@@ -19,11 +19,13 @@ import { describeWeapon, weaponProfile } from "../system/weapons.js";
 import SequenceFourDossier from "./SequenceFourDossier.jsx";
 import { BEYONDER_ITEM_TAG, beyonderSlotLabel, isBeyonderEquipment } from "../system/beyonderItems.js";
 import { beyonderEquipmentSlots, canEquipItem, equipmentGate } from "../system/equipment.js";
+import { tarotMembership } from "../engine/mainline.js";
 
 export const CharacterPanel = memo(function CharacterPanel({ game, onAction, disabled }) {
   const { character } = game;
   const advancement = getAdvancement(character);
   const talent = getTalent(character.talent);
+  const tarot = tarotMembership(game);
   return <div className={styles.content}>
     <div className={styles.profile}>
       <div className={styles.avatar}>{character.avatar ? <img src={character.avatar} alt={`${character.name}的头像`} /> : <span aria-hidden="true">{character.name.slice(0, 1)}</span>}</div>
@@ -33,12 +35,13 @@ export const CharacterPanel = memo(function CharacterPanel({ game, onAction, dis
     <section><h3>当前影响</h3>{game.statusEffects.length ? game.statusEffects.map(status => <article className={styles.record} key={status.id} data-tone={status.kind === "danger" ? "loss" : "neutral"}><h4>{status.name}</h4><p>{status.description}</p>{status.healthEffect && <small>每轮生命{status.healthEffect.percent > 0 ? "+" : ""}{Number(status.healthEffect.percent.toFixed(3))}%最大生命值 · {status.healthEffect.remainingTurns === null ? "至状态解除" : `剩余${status.healthEffect.remainingTurns}回合`}</small>}{status.tick && <small>每轮：{Object.entries(status.tick).map(([key, delta]) => `${STAT_LABELS[key] || key}${delta > 0 ? "+" : ""}${delta}`).join("，")}</small>}</article>) : <p className={styles.muted}>状态稳定。</p>}</section>
     <section><h3>非凡档案</h3><p className={styles.highlight}>{advancement.sequenceName || advancement.pathwayName || "普通人"}{advancement.pathwayName && ` · ${advancement.sequenceLabel} · ${advancement.pathwayName}途径`}</p><p className={styles.muted}>状态：{({ stable: "稳定", none: "未接触", newly_promoted: "刚完成晋升" })[advancement.status] || advancement.status}</p><p className={styles.muted}>{game.occult?.contact === 1 ? "已接触非凡世界" : "尚未接触非凡世界"}{game.occult?.entryAvailable ? " · 有入口可选" : ""}</p><SequenceFourDossier advancement={advancement} /><CharacterAbilities game={game} abilities={advancement.unlockedAbilities || []} onAction={onAction} disabled={disabled} /></section>
     {game.organizationState?.membership?.status === "active" && <section><h3>组织身份</h3><p className={styles.highlight}>{game.organizationState.membership.name}</p><p className={styles.muted}>{game.organizationState.membership.kind === "official" ? "官方组织成员" : "非官方组织成员"} · 第 {game.organizationState.membership.joinedTurn} 轮登记</p></section>}
+    {tarot && <section aria-label="塔罗会身份"><h3>灰雾之上的席位</h3><p className={styles.highlight}>塔罗会 · 「{tarot.codename}」</p><p className={styles.muted}>正式成员 · 第{tarot.joinedTurn}轮加入</p></section>}
     {talent.id !== "none" && <section><h3>天赋 · {talent.name}</h3><p>{talent.description}</p></section>}
     <details><summary>个人背景与动机</summary>{[["出身", "origin"], ["外貌", "appearance"], ["性格", "personality"], ["欲望", "desire"], ["恐惧", "fear"], ["私人秘密", "secret"], ["背景", "background"]].filter(([, key]) => character[key]).map(([label, key]) => <div className={styles.biography} key={key}><h4>{label}</h4><p>{character[key]}</p></div>)}</details>
   </div>;
 });
 
-export const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, onAction, disabled }) {
+export const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, onAction, onConversation, disabled }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("全部");
   const [selectedId, setSelectedId] = useState(null);
@@ -79,6 +82,7 @@ export const InventoryPanel = memo(function InventoryPanel({ game, onLocalTool, 
     {selected ? <section className={styles.itemDetail}>
       <button ref={backRef} type="button" className={styles.back} onClick={returnToList}>← 返回物品列表</button>
       <p className={styles.muted}>{selected.rarity} · {selected.category}{selectedBeyonder && selected.category !== BEYONDER_ITEM_TAG && <span className={styles.beyonderTag}>{BEYONDER_ITEM_TAG}</span>}</p><h3>{selected.name}</h3><p>{selected.discoveredInfo || selected.description}</p>
+      {selected.itemId === "azik-copper-whistle" && onConversation && <button type="button" disabled={disabled} onClick={onConversation}>用铜哨联系阿兹克 · 打开书信</button>}
       {selectedBeyonder && <div className={styles.record} aria-label="非凡物品装备说明"><h4>非凡物品 · 独立装备</h4><p>{selected.equipped ? `已装备在栏位${beyonderSlotLabel(selectedSlot?.slot)}。` : "尚未装备。"}最多同时装备{beyonderLimit === 3 ? "三" : "两"}件，与衣物和普通武器栏位独立。{beyonderLimit === 2 && "晋升至序列五解锁第三栏。"}</p>{equipGate && <p role="status" className={styles.equipNotice}>{equipGate}</p>}</div>}
       {weapon && <div className={styles.record} aria-label="武器伤害"><h4>{describeWeapon(selected)}</h4><p>伤害在获得时固定。{selected.equipped ? "当前已装备。" : "装备后生效。"}只对普通攻击和武器类技能附加；每次只使用一件武器。</p><small>先加武器伤害，再计算强化；RP弱点成立时额外加5个百分点，总比例最高60%。</small></div>}
       {selected.potion && <div className={styles.record}><h4>{selected.potion.identified ? `${selected.potion.pathwayName}途径 · 序列${selected.potion.sequence}魔药` : "性质未明的魔药"}</h4><p>{selected.potion.identified ? potionGate || "已鉴定的成品魔药可直接服用。确认后生成晋升剧情并更新非凡档案。" : "可拜访明斯克街15号的夏洛克·莫里亚蒂，每瓶1镑鉴定；鉴定前不能服用。"}</p></div>}
@@ -119,14 +123,14 @@ export function AuditPanel({ game }) {
   </section>;
 }
 
-export const JournalPanel = memo(function JournalPanel({ game, onAction, disabled }) {
+export const JournalPanel = memo(function JournalPanel({ game, onAction, onOpenMainline, disabled }) {
   const [tab, setTab] = useState("quests");
   const [selectedQuest, setSelectedQuest] = useState(null);
   const tasks = visibleQuestJournal(game);
   return <div className={styles.content}>
     <nav className={styles.filtersNav} aria-label="手记类别">{[["changes", "记录"], ["quests", "任务"], ["clues", "线索"], ["people", "人物"]].map(([id, label]) => <button type="button" key={id} aria-pressed={tab === id} onClick={() => setTab(id)}>{label}</button>)}</nav>
     {tab === "changes" && <><AuditPanel game={game} /><details><summary>近期变更记录</summary><ol className={styles.logs}>{game.changeLog.slice().reverse().map((entry, i) => <li key={entry.id || `entry-${i}`} data-tone={entry.tone}><small>{typeof entry === "string" ? "探索" : `第 ${entry.turn} 轮`}</small><p>{typeof entry === "string" ? entry : entry.text}</p></li>)}</ol></details><p className={styles.muted}>此处展示近期记录；完整历史正文尚未归档。</p></>}
-    {tab === "quests" && <QuestBoard game={game} onAction={onAction} disabled={disabled} selectedId={selectedQuest} />}
+    {tab === "quests" && <QuestBoard game={game} onAction={onAction} onOpenMainline={onOpenMainline} disabled={disabled} selectedId={selectedQuest} />}
     {tab === "clues" && <section><h3>已确认线索 <small>{game.clues.length}</small></h3>{game.clues.length ? game.clues.map(clue => <article className={styles.record} key={clue.id}><h4>{clue.title}</h4><p>{clue.detail}</p><small>{clue.discoveredAt}{clue.analysisProgress ? ` · 解析 ${clue.analysisProgress}/5` : ""}</small></article>) : <p className={styles.empty}>尚未确认任何线索。</p>}</section>}
     {tab === "people" && <PeoplePanel game={game} tasks={tasks} onSelectQuest={id => { setSelectedQuest(id); setTab("quests"); }} />}
   </div>;

@@ -100,14 +100,14 @@ test("in-progress instances keep old definition snapshots while terminal history
 
 test("content validation handles one thousand indexed trigger definitions within a bounded startup cost", () => {
   const pack = structuredClone(ACTIVE_CONTENT);
-  pack.triggers = Array.from({ length: 1000 }, (_, index) => ({
+  pack.triggers = [pack.triggers.find(trigger => trigger.id === pack.mainline.id), ...Array.from({ length: 999 }, (_, index) => ({
     id: `performance.trigger.${index}`,
     version: 1,
     category: "performance-test",
     eligibility: [],
     appearWhen: [{ type: "action", terms: [`signal-${index}`] }],
     stages: [],
-  }));
+  }))];
   const started = performance.now();
   assert.deepEqual(validateContentPack(pack), []);
   assert.ok(performance.now() - started < 1000);

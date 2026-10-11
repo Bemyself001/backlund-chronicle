@@ -1,0 +1,25 @@
+.panel { display: grid; gap: 1rem; min-width: 0; line-height: 1.7; }
+.intro, .card, .confirm { display: grid; gap: .75rem; min-width: 0; padding: 1rem; border: 1px solid var(--panel-line); border-radius: var(--radius-panel); background: var(--panel-raised); overflow-wrap: anywhere; }
+.intro { border-top: 3px solid var(--panel-accent); }
+.eyebrow { color: var(--panel-accent); font-size: .8rem; letter-spacing: .12em; }
+.meta, .buttons { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; }
+.meta { justify-content: space-between; font-size: .85rem; }
+.hint { color: var(--panel-muted); font-size: .82rem; }
+.buttons button[aria-pressed="true"] { border-color: var(--panel-accent); background: var(--panel-bg); color: var(--panel-accent); }
+.panel .primary { background: var(--brass-light); color: #17241c; border-color: var(--brass-light); font-weight: 700; }
+.quantity { display: flex; flex-wrap: wrap; gap: .7rem; align-items: center; font-size: .9rem; }
+.quantity input { width: 5rem; min-height: 44px; border: 1px solid var(--panel-line); border-radius: var(--radius-control); padding: .5rem; background: var(--panel-bg); color: var(--panel-text); font: inherit; }
+.quantity input:focus-visible { outline: 2px solid var(--panel-accent); outline-offset: 3px; }
+.offers { display: grid; gap: .8rem; margin-top: .8rem; }
+.quote { display: grid; gap: .5rem; margin: 0; font-variant-numeric: tabular-nums; }
+.quote div { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .5rem; }
+.quote dt { color: var(--panel-muted); }
+.quote dd { margin: 0; color: var(--panel-accent); font-weight: 700; }
+.compare { padding-top: .6rem; border-top: 1px solid var(--panel-line); font-size: .83rem; }
+.profit { color: var(--panel-accent); font-size: .85rem; font-variant-numeric: tabular-nums; }
+.lot { display: grid; gap: .5rem; border-top: 1px solid var(--panel-line); padding-top: .8rem; }
+.confirm { border-color: var(--panel-accent); scroll-margin-top: 1rem; }
+.panel h3, .panel h4, .panel p { margin: 0; }
+@media (min-width: 640px) { .offers { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+:global(.no-flex-gap) .buttons, :global(.no-flex-gap) .meta, :global(.no-flex-gap) .quantity, :global(.no-flex-gap) .quote div { gap: 0; }
+:global(.no-flex-gap) .buttons > :not(:last-child), :global(.no-flex-gap) .meta > :not(:last-child), :global(.no-flex-gap) .quantity > :not(:last-child), :global(.no-flex-gap) .quote div > :not(:last-child) { margin-right: .6rem; margin-bottom: .6rem; }

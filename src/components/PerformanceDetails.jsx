@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import { recentUsage, subscribeUsage, usageSnapshot } from "../services/usageHistory.js";
 import styles from "./GamePanels.module.css";
 
-const phases = { planning: "状态规划", narrative: "最终叙事", draft: "剧情草稿", repair: "工具修复", choices: "行动选项", memory: "记忆整理", inspection: "物品检查", prayer: "祷文", loadout: "开局行装" };
+const phases = { planning: "状态规划", narrative: "最终叙事", draft: "剧情草稿", repair: "工具修复", choices: "行动选项", memory: "记忆整理", inspection: "物品检查", prayer: "祷文", loadout: "开局行装", conversation: "人物书信" };
 const token = value => value == null ? "未返回" : String(value);
 const rate = value => value == null ? "未返回" : `${value}%`;
 

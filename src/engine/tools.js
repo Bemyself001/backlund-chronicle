@@ -10,8 +10,9 @@ import { equipItem, normalizeEquipment, unequipItem } from "../system/equipment.
 import { BEYONDER_ITEM_TAG, beyonderSlotLabel, isBeyonderEquipment } from "../system/beyonderItems.js";
 import { describeWeapon, newWeaponGate, weaponProfile } from "../system/weapons.js";
 import { gatheringView } from "./gatherings.js";
+import { isTradeToolCall } from "./trading.js";
 import { applyAdvancement, getAdvancement, isExplicitAdvancementIntent } from "../system/character.js";
-import { getOrganization, getPathway, RENARD_AUCTION_MEDICINE, SPECIAL_RECIPES } from "../content/index.js";
+import { getOrganization, getPathway, ITEM_BEHAVIORS, RENARD_AUCTION_MEDICINE, SPECIAL_RECIPES } from "../content/index.js";
 import { medicinePurchaseGate } from "./medicineAccess.js";
 import { abandonTrigger, engageTrigger, progressTrigger } from "./triggerEngine.js";
 import { normalizeTriggerState } from "./triggerState.js";
@@ -435,6 +436,7 @@ function executeOne(game, call, options = {}) {
       const weaponGate = newWeaponGate(args.item || {});
       if (weaponGate) return fail(call.name, weaponGate);
       const source = normalizeInventoryItem(args.item || {});
+      if (ITEM_BEHAVIORS.some(behavior => behavior.questRewardOnly && (behavior.itemId === source?.itemId || behavior.rewardNames?.includes(source?.name)))) return fail(call.name, "这件任务物品只由已登记任务结算，交谈不能提前发放或重复生成");
       const purchasedMedicine = SPECIAL_RECIPES.some(recipe => recipe.stat && (source?.itemId === `special-${recipe.id}` || source?.name === recipe.name))
         && /买|购|purchase|buy/i.test(`${options.playerAction || ""} ${call.reason || ""} ${source?.source || ""}`);
       if (purchasedMedicine && medicinePurchaseGate(game)) return fail(call.name, medicinePurchaseGate(game));
@@ -879,8 +881,10 @@ export function executeToolCalls(currentGame, calls = [], options = {}) {
   const game = structuredClone(currentGame);
   const processed = new Set(game.processedToolCalls || []);
   const results = [];
+  const normalizedCalls = normalizeToolCalls(calls, game);
+  const tradeMutation = normalizedCalls.some(entry => isTradeToolCall(currentGame, entry));
   // Preserve one result per call while allowing every registered foe to respond.
-  for (const [index, call] of normalizeToolCalls(calls, game).slice(0, 12 + MAX_COMBAT_ENEMIES).entries()) {
+  for (const [index, call] of normalizedCalls.slice(0, 12 + MAX_COMBAT_ENEMIES).entries()) {
     if (index >= 12 && call.name !== "enemy.act") { results.push(fail(call.name, "本轮非敌方回应的工具调用超出上限")); continue; }
     const callId = call.id || signature(game.turn + 1, call);
     if (processed.has(callId)) { results.push(fail(call.name, "重复工具调用已忽略")); continue; }
@@ -891,6 +895,11 @@ export function executeToolCalls(currentGame, calls = [], options = {}) {
     }
     const validationError = validateCall(game, call);
     if (validationError) { results.push(fail(call.name, validationError)); continue; }
+    if (["money.add", "money.remove", "inventory.add", "inventory.remove", "inventory.update"].includes(call.name)
+      && tradeMutation) {
+      results.push(fail(call.name, "市场成交与贸易货物变更需在特殊行动的交易市场确认，交谈不会扣款、交货或产生利润"));
+      processed.add(callId); continue;
+    }
     if (["money.add", "money.remove", "inventory.add", "inventory.remove", "inventory.update"].includes(call.name)
       && (gatheringView(currentGame).inside || /聚会.*(?:购买|出售|交易|成交|付款|扣款|调制)|雾灯聚会|gathering-/.test(`${call.reason || ""} ${JSON.stringify(call.args || {})}`))) {
       results.push(fail(call.name, "聚会买卖与调制需在特殊行动的交易清单确认，交谈不会扣款或交付物品"));

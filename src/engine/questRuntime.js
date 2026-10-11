@@ -30,6 +30,7 @@ function journalEntry(game, instance) {
     summary: text(instance.lastProgressEvidence) || text(instance.presentation?.text) || text(goal), objective: text(goal),
     status: instance.status, stage: instance.stage, revision: `${instance.status}:${instance.stage}:${instance.stageHistory?.length || 0}:${guidance.key}`,
     expiresAtTurn: instance.status === "available" ? instance.expiresTurn : undefined,
+    ...(definition?.localOnly ? { localModule: "mainline", kind: "main", locationId: stage?.locationId } : {}),
     ...(definition?.category === "occult-entry" && definition.stages?.length ? {
       entryProgress: { done: instance.status === "completed" ? definition.stages.length : Math.max(0, definition.stages.findIndex(entry => entry.id === instance.stage)), total: definition.stages.length },
       locationId: stage?.locationId,
@@ -142,6 +143,7 @@ export function settleQuestAttempts(game, calls, results, turn, action = "") {
       if (entry.commission || entry.status !== "engaged" || attempts.has(entry.id)) continue;
       const instance = game.triggerState?.active?.find(item => item.instanceId === entry.id);
       const definition = instance && getInstanceTriggerDefinition(instance, game);
+      if (definition?.localOnly) continue;
       const stage = definition?.stages?.find(item => item.id === instance.stage);
       const words = `${entry.objective}${entry.title}`;
       const specific = Array.from(words).some((_, index) => {

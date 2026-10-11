@@ -16,8 +16,8 @@ export function resolveSpecialAction(game, request) {
   const resolution = createTurnResolution([], [], progress, next);
   const hints = eventDirections(resolution.derivedEffects.narrativeEvents);
   const memory = computeMemoryUpdate(game, action, [narrative, hints].filter(Boolean).join('\n\n'), { ...resolution, specialAction: { operation: request.operation, action }, audit }, { settledGame: next });
-  // 固定内容明确标注来源，既写入阅读历史，也保留给后续 AI 的场景上下文。
-  for (const entry of memory.updates.storyHistory.slice(-2)) entry.source = "fixed";
+  // 自由书信包含模型回信，其余本地事件使用固定正文。
+  for (const entry of memory.updates.storyHistory.slice(-2)) entry.source = request.operation === "conversation-send" ? "ai" : "fixed";
   const trigger = progress.newTrigger?.presentation || next.triggerState?.active?.find((entry) => entry.status === "available")?.presentation;
   const visitedPerson = request.operation === "visit-person" ? visitablePerson(request.id) : null;
   const gathering = request.operation?.startsWith("gathering-") ? gatheringView(next) : null;

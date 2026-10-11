@@ -227,6 +227,7 @@ function advanceExisting(game, state, signals, action, turn, events, travelOnly 
   for (const instance of [...state.active]) {
     const definition = getInstanceTriggerDefinition(instance, game);
     if (!definition) continue;
+    if (definition.localOnly) continue;
     if (!travelOnly && instance.status === "available" && definition.autoEngageWhen?.length && allConditionsMatch(definition.autoEngageWhen, context)) {
       instance.status = "engaged";
       instance.engagedTurn = turn;
@@ -337,7 +338,7 @@ export function processTriggers(game, { action = "", toolCalls = [], toolResults
   return { state, signals, events, newTrigger: events.available[0] || null, occultEntry: events.available.find((entry) => entry.category === "occult-entry") || null };
 }
 
-export function engageTrigger(game, instanceId, turn, action = "") {
+export function engageTrigger(game, instanceId, turn, action = "", options = {}) {
   const state = normalizeTriggerState(game);
   game.triggerState = state;
   migrateQuestLifecycle(game, turn);
@@ -345,6 +346,7 @@ export function engageTrigger(game, instanceId, turn, action = "") {
   if (!instance || instance.status !== "available") return { ok: false, reason: "当前没有匹配的可追查事件" };
   if (instance.expiresTurn != null && turn >= instance.expiresTurn) return { ok: false, reason: "该随机机会已到期，不能接取" };
   const definition = getInstanceTriggerDefinition(instance, game);
+  if (definition?.localOnly && !options.local) return { ok: false, reason: "请通过主线档案亲自确认当前行动" };
   const previousStage = instance.stage;
   instance.status = "engaged";
   instance.engagedTurn = turn;
@@ -364,6 +366,7 @@ export function abandonTrigger(game, instanceId, turn) {
   game.triggerState = state;
   const instance = state.active.find((entry) => entry.instanceId === instanceId);
   if (!instance || !["available", "engaged"].includes(instance.status)) return { ok: false, reason: "当前没有匹配的可放弃事件" };
+  if (getInstanceTriggerDefinition(instance, game)?.localOnly) return { ok: false, reason: "主线可以暂时搁置，进度会保留；请在主线档案继续" };
   const abandoned = terminalTrigger(state, instance, "abandoned", turn);
   syncLegacyOccult(game, state);
   syncQuestJournal(game);
@@ -376,6 +379,7 @@ export function progressTrigger(game, instanceId, objectiveId, turn, action = ""
   const instance = state.active.find((entry) => entry.instanceId === instanceId && entry.status === "engaged");
   if (!instance) return { ok: false, reason: "当前没有匹配的进行中特殊任务" };
   const definition = getInstanceTriggerDefinition(instance, game);
+  if (definition?.localOnly && !assessment.local) return { ok: false, reason: "主线进展与入会须由主线档案亲自确认" };
   const stage = (definition?.stages || []).find((entry) => entry.id === instance.stage);
   const transition = (stage?.transitions || []).find((entry) => entry.objectiveId === objectiveId);
   if (!transition) return { ok: false, reason: "该目标不属于任务当前阶段，不能跳过或倒退" };
@@ -414,7 +418,7 @@ export function progressTrigger(game, instanceId, objectiveId, turn, action = ""
 
 // Sequential execution is reserved for the semantic task tool. Legacy signals
 // remain supported; confirmed transitions are applied here before the next step.
-export function settleQuestStep(game, instanceId, objectiveId, turn, action, evidence, actionQuote) {
+export function settleQuestStep(game, instanceId, objectiveId, turn, action, evidence, actionQuote, options = {}) {
   const instance = game.triggerState?.active?.find(entry => entry.instanceId === instanceId);
   const definition = getInstanceTriggerDefinition(instance, game);
   const stage = definition?.stages?.find(entry => entry.id === instance?.stage);
@@ -422,7 +426,7 @@ export function settleQuestStep(game, instanceId, objectiveId, turn, action, evi
   const quote = String(actionQuote || "").trim();
   if (quote.length < 2 || !String(action).includes(quote)) return { ok: false, reason: "必须引用本轮玩家的真实行动原话" };
   if (/不要|不愿|不想|不再|拒绝|是否|能否|如果|假如/.test(quote) && !stage?.transitions?.find(entry => entry.objectiveId === objectiveId)?.actionTerms?.some(term => quote.includes(term) && /不|拒绝|放弃/.test(term))) return { ok: false, reason: "否定或假设不能被解释为实际完成" };
-  const result = progressTrigger(game, instanceId, objectiveId, turn, action, evidence, { semantic: !policy.isolated, chain: true });
+  const result = progressTrigger(game, instanceId, objectiveId, turn, action, evidence, { semantic: !policy.isolated, chain: true, local: options.local === true });
   if (!result.ok) return result;
   const state = game.triggerState;
   const current = state.active.find(entry => entry.instanceId === instanceId);

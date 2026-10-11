@@ -31,6 +31,9 @@ import { publicCommissionQuest } from "../engine/commissions.js";
 import { BEYONDER_EQUIPMENT_RULE } from "../system/beyonderItems.js";
 import { beyonderEquipmentLimit, beyonderEquipmentSlots } from "../system/equipment.js";
 import { gatheringView, GATHERING_RULE } from "../engine/gatherings.js";
+import { tradeView, TRADE_RULE } from "../engine/trading.js";
+import { mainlineView, MAINLINE_RULE, tarotMembership } from "../engine/mainline.js";
+import { conversationState, CONVERSATION_RULE } from "../engine/conversations.js";
 
 const SHARED_AUTHORITY_RULES = LOCAL_STATE_AUTHORITY_RULES + "【地图调查与公共常识】玩家未揭开地图迷雾只表示其个人尚未确认地点，不表示当地居民不知道该地点。圣赛缪尔教堂是黑夜女神教会的公开教堂，永恒烈阳教堂也是公开宗教场所；正常描写居民指路、公开礼拜与日常活动，不因地图未发现就编造集体不知情、避讳或秘密据点。其他公共地点同理，按身份与当地知识差异自然回应。明确的地图调查在本轮正常完成后由本地规则确认所选地点，只揭开该地点，不自动到访、加入组织或解锁内部秘密；不要把本次调查写成仍无法确认地址。快速模式草稿先写核实过程，具体确认结果留给本地结算后的叙事。";
 
@@ -49,6 +52,8 @@ function fixedContext(systemPrompt) {
     { role: "system", content: QUEST_FOCUS_RULE },
     { role: "system", content: QUEST_RECOVERY_RULE },
     { role: "system", content: GATHERING_RULE },
+    { role: "system", content: TRADE_RULE },
+    { role: "system", content: MAINLINE_RULE + CONVERSATION_RULE },
     { role: "system", content: SCENARIO_RULES },
   ];
 }
@@ -59,9 +64,23 @@ function relevantContext(game, action) {
 }
 
 const TERMINAL_TASKS = new Set(["completed", "failed", "abandoned", "expired"]);
+const TRADE_CONTEXT_HINT = /交易|贸易|市场|倒卖|买|卖|货物|货包|茶叶|棉布|草药|零件|供货摊|商会街|利润|价差|报价|运货|trade-/;
+
+function tradingPromptState(view, action) {
+  return {
+    day: view.day,
+    revision: view.revision,
+    channels: view.channels.map(({ id, name, locationId, onSite, quotes }) => ({ id, name, locationId, onSite,
+      ...(TRADE_CONTEXT_HINT.test(action) ? { quotes: quotes.map(({ id, name, weight, buyPence, sellPence, stock, demand }) => ({ id, name, weight, buyPence, sellPence, stock, demand })) } : {}),
+    })),
+    lots: view.lots,
+    receipts: view.receipts.slice(-3),
+  };
+}
 
 export function promptGameState(game, action = "", phase = "planning", context = relevantContext(game, action)) {
   const state = visibleGameState(game);
+  state.trading = tradingPromptState(state.trading, action);
   state.currentQuestFocus = questFocusContext(game, action);
   if (phase === "rendering" && game.questFocus?.id) state.currentQuestFocus = state.taskJournal.find(entry => entry.id === game.questFocus.id) || null;
   if (/任务|委托|报酬|酬金|交差|结算|领奖/.test(action)) state.questRecoveryHistory = questRecoveryHistory(game, action);
@@ -87,18 +106,40 @@ export function publicStateChanges(before, after) {
   const changedFields = (oldValue, newValue) => Object.fromEntries([...new Set([...Object.keys(oldValue || {}), ...Object.keys(newValue || {})])]
     .filter(key => key !== "updatedTurn" && JSON.stringify(oldValue?.[key]) !== JSON.stringify(newValue?.[key]))
     .map(key => [key, { before: oldValue?.[key] ?? null, after: newValue?.[key] ?? null }]));
+  const changedEntries = (oldList, newList) => {
+    const id = entry => entry.instanceId || entry.id || entry.itemId || entry.name;
+    const oldEntries = new Map((oldList || []).map(entry => [id(entry), entry]));
+    const newEntries = new Map((newList || []).map(entry => [id(entry), entry]));
+    const added = [...newEntries].filter(([id]) => !oldEntries.has(id)).map(([, entry]) => entry);
+    const removed = [...oldEntries].filter(([id]) => !newEntries.has(id)).map(([, entry]) => entry);
+    const updated = [...newEntries].filter(([id]) => oldEntries.has(id)).map(([id, entry]) => ({ id, fields: changedFields(oldEntries.get(id), entry) })).filter(entry => Object.keys(entry.fields).length);
+    return added.length || removed.length || updated.length ? { added, removed, updated } : null;
+  };
   for (const key of Object.keys(newState)) {
     if (key === "lastTurnAudit" || JSON.stringify(oldState[key]) === JSON.stringify(newState[key])) continue;
     if (key === "character") {
       changes.character = changedFields(oldState.character, newState.character);
+    } else if (key === "trading") {
+      const old = oldState.trading, next = newState.trading;
+      const delta = changedFields({ day: old.day, revision: old.revision }, { day: next.day, revision: next.revision });
+      const lots = changedEntries(old.lots, next.lots);
+      if (lots) delta.lots = lots;
+      const receipts = next.receipts.filter(entry => !old.receipts.some(previous => previous.id === entry.id));
+      if (receipts.length) delta.receipts = receipts;
+      // Daily quotes are derived from the game date. Report real quota changes,
+      // without repeating both complete catalogues when a normal turn crosses midnight.
+      if (old.day === next.day) {
+        const quotas = next.channels.flatMap(channel => channel.quotes.flatMap(quote => {
+          const previous = old.channels.find(entry => entry.id === channel.id)?.quotes.find(entry => entry.id === quote.id);
+          const fields = changedFields({ stock: previous?.stock, demand: previous?.demand }, { stock: quote.stock, demand: quote.demand });
+          return Object.keys(fields).length ? [{ channelId: channel.id, goodId: quote.id, fields }] : [];
+        }));
+        if (quotas.length) delta.quotas = quotas;
+      }
+      if (Object.keys(delta).length) changes.trading = delta;
     } else if (["inventory", "taskJournal", "activeQuests", "relationships", "knownClues", "specialEvents"].includes(key)) {
-      const id = entry => entry.instanceId || entry.id || entry.itemId || entry.name;
-      const oldEntries = new Map((oldState[key] || []).map(entry => [id(entry), entry]));
-      const newEntries = new Map((newState[key] || []).map(entry => [id(entry), entry]));
-      const added = [...newEntries].filter(([id]) => !oldEntries.has(id)).map(([, entry]) => entry);
-      const removed = [...oldEntries].filter(([id]) => !newEntries.has(id)).map(([, entry]) => entry);
-      const updated = [...newEntries].filter(([id]) => oldEntries.has(id)).map(([id, entry]) => ({ id, fields: changedFields(oldEntries.get(id), entry) })).filter(entry => Object.keys(entry.fields).length);
-      if (added.length || removed.length || updated.length) changes[key] = { added, removed, updated };
+      const delta = changedEntries(oldState[key], newState[key]);
+      if (delta) changes[key] = delta;
     } else changes[key] = { before: oldState[key] ?? null, after: newState[key] ?? null };
   }
   return changes;
@@ -189,6 +230,11 @@ export function visibleGameState(game) {
     } : null,
     occult: game.occult,
     gathering: gatheringView(game),
+    trading: tradeView(game),
+    mainline: mainlineView(game),
+    tarotClub: tarotMembership(game),
+    correspondence: Object.entries(conversationState(game).threads).map(([personId, thread]) => ({ personId, exchanges: thread.revision,
+      latest: thread.messages.slice(-2).map(({ role, content, turn }) => ({ role, content, turn })) })),
     inventory: visibleInventory(game),
     equipment: { ...game.equipment },
     beyonderEquipment: { limit: beyonderEquipmentLimit(game), slots: beyonderEquipmentSlots(game).map(({ slot, item }) => ({ slot, instanceId: item?.instanceId || null, name: item?.name || null })), rule: BEYONDER_EQUIPMENT_RULE },
@@ -236,8 +282,9 @@ function privatePlanningState(game, options = {}) {
       stage: entry.stage,
       requiresEngagement: entry.status === "available",
       taskPolicy: questStagePolicy(definition, stage),
-      consecutiveObjectives: consecutiveQuestObjectives(definition, stage),
-      engagementRule: "优先使用quest.resolve引用玩家原话；主动追查时start=true，steps按本轮真实结果列出。兼容旧接口trigger.engage及trigger.progress，不必让玩家再说一次接受任务。仅看消息、问路或路过不自动接取。没有transitions的信号任务按advanceWhen使用对应工具产生本地事实。",
+      consecutiveObjectives: definition?.localOnly ? [] : consecutiveQuestObjectives(definition, stage),
+      engagementRule: definition?.localOnly ? "本地主线档案：只介绍当前已知目标，提示玩家到特殊行动→主线继续。不要提交任务推进工具或代替玩家选择入会。"
+        : "优先使用quest.resolve引用玩家原话；主动追查时start=true，steps按本轮真实结果列出。兼容旧接口trigger.engage及trigger.progress，不必让玩家再说一次接受任务。仅看消息、问路或路过不自动接取。没有transitions的信号任务按advanceWhen使用对应工具产生本地事实。",
       guidance: stage?.guidance || "",
       timers: (definition.timers || []).filter(timer => timer.stages.includes(entry.stage)).map(timer => ({ id: timer.id, remainingActions: entry.timers?.[timer.id] ? Math.max(0, entry.timers[timer.id].deadline - Number(game.turn || 0)) : timer.turns, message: timer.message })),
       objectives: (stage?.transitions || []).map(({ objectiveId, description, requirements, requirementMessage, actionTerms, rejectActionTerms }) => ({

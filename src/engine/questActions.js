@@ -52,6 +52,7 @@ export function resolveQuestAction(game, args, action, turn) {
   const quote = String(args.actionQuote || "").trim();
   let evidence = String(args.evidence || "").trim();
   if (!entry) return { ok: false, reason: "任务必须已经可见或通过quest.add登记" };
+  if (entry.localModule === "mainline") return { ok: false, reason: "请在主线档案亲自确认当前步骤，书信与交谈不会自动推进主线" };
   if (entry.commission || draft.quests.some(quest => `quest:${quest.id}` === id && isIssuedCommission(quest))) return { ok: false, reason: "玩家发布的委托由受托人执行，请通过任务簿跟进或领取报告" };
   if (entry.source === "quest" && draft.quests.find(item => item.id === entry.questId)?.source === "特殊行动") return { ok: false, reason: "此委托由特殊行动引擎结算，请在特殊行动内选择处理方式" };
   if (quote.length < 2 || !String(action || "").includes(quote)) return { ok: false, reason: "任务判断必须引用玩家本轮真实行动" };

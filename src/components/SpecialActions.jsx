@@ -1,19 +1,22 @@
 import { useState } from "react";
 import { SPECIAL_RECIPES, SPECIAL_CONTACTS, ORGANIZATIONS, VISITABLE_PEOPLE, getOrganization } from "../content/index.js";
-import { availableSpecialActions, actionGate, commissionOffer, registrationGate, specialState } from "../engine/specialActions.js";
+import { availableSpecialActions, actionGate, commissionOffer, commissionBonus, registrationGate, specialState } from "../engine/specialActions.js";
 import { getAdvancement } from "../system/character.js";
 import { getMapLocation } from "../system/map.js";
-import { formatMoney, moneyToPence } from "../system/money.js";
+import { formatMoney, moneyFromPence, moneyToPence } from "../system/money.js";
 import PotionIdentification from "./PotionIdentification.jsx";
 import QuickWait from "./QuickWait.jsx";
 import InvestigationCommission from "./InvestigationCommission.jsx";
 import GatheringPanel from "./GatheringPanel.jsx";
+import TradePanel from "./TradePanel.jsx";
+import MainlinePanel from "./MainlinePanel.jsx";
+import ConversationPanel from "./ConversationPanel.jsx";
 import styles from "./SpecialActions.module.css";
 import { medicinePurchaseGate } from "../engine/medicineAccess.js";
 import { hasMetPerson, visitPersonGate } from "../engine/visitablePeople.js";
 
-export default function SpecialActions({ game, loading, onExecute, onOpenMap, onAction, initialTab = "work" }) {
-  const [tab, setTab] = useState(initialTab === "wait" ? "wait" : "work");
+export default function SpecialActions({ game, loading, onExecute, onOpenMap, onAction, onConversation, drafts, onAbort, onOpenApi, initialTab = "work" }) {
+  const [tab, setTab] = useState(["wait", "mainline", "dialogue"].includes(initialTab) ? initialTab : "work");
   const [showLockedWork, setShowLockedWork] = useState(false);
   const [notice, setNotice] = useState("");
   const [confirmJoin, setConfirmJoin] = useState(null);
@@ -41,9 +44,12 @@ export default function SpecialActions({ game, loading, onExecute, onOpenMap, on
     {tab !== "wait" && <header><p className={styles.eyebrow}>贝克兰德 · 日常与非凡</p><h3>今天，如何度过？</h3><p className={styles.hint}>{advancement.pathwayName || "普通人的城市生活"} · 从一件具体的小事开始。</p>
       <div className={styles.meta}><span>工作声誉 {state.reputation}</span><span>{formatMoney(game.money)}</span></div>
     </header>}
-    <nav className={styles.tabs} aria-label="特殊行动分类">{[["work", "委托"], ["people", "人物"], ["gathering", "非凡聚会"], ["supplies", "补给"], ["craft", "制作"], ["organization", "组织"], ["wait", "等待"]].map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => { setTab(id); setNotice(""); }}>{label}</button>)}</nav>
+    <nav className={styles.tabs} aria-label="特殊行动分类">{[["mainline", "主线"], ["dialogue", "人物对话"], ["work", "委托"], ["people", "人物"], ["gathering", "非凡聚会"], ["trade", "交易市场"], ["supplies", "补给"], ["craft", "制作"], ["organization", "组织"], ["wait", "等待"]].map(([id, label]) => <button key={id} type="button" aria-pressed={tab === id} onClick={() => { setTab(id); setNotice(""); }}>{label}</button>)}</nav>
     {notice && tab !== "wait" && <p role="status" className={styles.notice}>{notice}</p>}
+    {tab === "mainline" && <MainlinePanel game={game} disabled={loading} onExecute={request => execute(request.operation, undefined, undefined, request)} onOpenMap={onOpenMap} onConversation={() => { setNotice(""); setTab("dialogue"); }} />}
+    {tab === "dialogue" && <ConversationPanel game={game} disabled={loading} drafts={drafts} onSend={onConversation} onAbort={onAbort} onOpenApi={onOpenApi} onMainline={() => { setNotice(""); setTab("mainline"); }} />}
     {tab === "gathering" && <GatheringPanel game={game} disabled={loading} onExecute={request => execute(request.operation, undefined, undefined, request)} onOpenMap={onOpenMap} onAction={onAction} />}
+    {tab === "trade" && <TradePanel game={game} disabled={loading} onExecute={request => execute(request.operation, undefined, undefined, request)} onOpenMap={onOpenMap} />}
     {tab === "wait" && <QuickWait game={game} loading={loading} onWait={hours => execute("wait", undefined, undefined, { hours, expectedTurn: game.turn, expectedWorldTime: game.worldTime })} />}
     {notice && tab === "wait" && <p role="status" className={styles.notice}>{notice}</p>}
     {tab === "people" && <section aria-label="人物拜访"><h3>可以拜访的人</h3>
@@ -79,23 +85,23 @@ export default function SpecialActions({ game, loading, onExecute, onOpenMap, on
       {activeReason && <p>{activeReason}</p>}
       {locationLink(activeDefinition?.locationId)}
       <div className={styles.options}>{state.active.offer.options.map((option) => <button key={option.id} type="button" disabled={loading || Boolean(activeReason)} onClick={() => execute("resolve", state.active.id, option.id)}>
-        <strong>{option.label}</strong><small>{state.active.stake ? option.id === "limited" ? "退回预留赌注" : "只赌一局 · 可能亏损全部6便士赌注，净收益最多6便士" : `基础报酬 ${option.reward} 便士${option.health ? ` · 生命 ${option.health}` : ""}${option.reputation < 0 ? " · 工作声誉 −1" : ""}`} · 消耗1回合</small>
+        <strong>{option.label}</strong><small>{state.active.stake ? option.id === "limited" ? "退回预留赌注" : "只赌一局 · 可能亏损全部6便士赌注，净收益最多6便士" : `报酬 ${formatMoney(moneyFromPence(option.reward + commissionBonus(game, activeDefinition)))}${option.health ? ` · 生命 ${option.health}` : ""}${option.reputation < 0 ? " · 工作声誉 −1" : ""}`} · 消耗1回合约{activeDefinition?.minutes || 30}分钟</small>
       </button>)}</div>
       <button className={styles.link} type="button" disabled={loading} onClick={() => execute("abandon", state.active.id)}>放弃委托 · 不领取报酬，消耗1回合</button>
     </section>}
 
-    {tab === "work" && <section aria-labelledby="work-list"><h3 id="work-list">可接工作</h3><details><summary>接单与报酬规则</summary><p className={styles.hint}>同时接取一份；接单1回合，完成1回合约30分钟。结算后间隔3回合再接新单。每3回合换一条未连续重复的候选。</p></details>
+    {tab === "work" && <section aria-labelledby="work-list"><h3 id="work-list">可接工作</h3><details><summary>接单与报酬规则</summary><p className={styles.hint}>同时接取一份；接单1回合，完成1回合，耗时按工作登记。普通短工所有人均可接；非凡委托基础报酬已提高，每晋升一级额外2苏勒，最多12苏勒。结算后间隔3回合再接新单，每3回合换一条未连续重复的候选。</p></details>
       {visibleWork.map((definition) => {
         const reason = actionGate(game, definition);
         const offer = commissionOffer(game, definition);
         const disabledReason = reason || (state.active ? "已有进行中的委托" : remaining ? `还需 ${remaining} 回合接新单` : money < (definition.stake || 0) ? "赌注不足" : "");
         return <article key={definition.id} className={styles.card}><div className={styles.meta}><span>{definition.name}</span><span>{disabledReason ? "条件未满足" : "可接取"}</span></div><h4>{offer.title}</h4><details><summary>委托详情与报酬</summary><p>{offer.scene}</p>
-          <p className={styles.hint}>{definition.stake ? "预留6便士，仅一局小赌；45%赢6便士、20%打平、35%输6便士。" : `基础报酬 ${Math.min(...offer.options.map((option) => option.reward))}—${Math.max(...offer.options.map((option) => option.reward))} 便士；每晋升一级额外1苏勒，最多6苏勒（1苏勒=12便士）。`}</p>
+          <p className={styles.hint}>{definition.stake ? "预留6便士，仅一局小赌；45%赢6便士、20%打平、35%输6便士。" : `本次报酬 ${formatMoney(moneyFromPence(Math.min(...offer.options.map(option => option.reward)) + commissionBonus(game, definition)))} 至 ${formatMoney(moneyFromPence(Math.max(...offer.options.map(option => option.reward)) + commissionBonus(game, definition)))}；完成约${definition.minutes}分钟。${definition.ordinary ? "普通人和所有途径均可接取。" : "已包含当前序列补贴。"}`}</p>
           </details>{locationLink(definition.locationId || getOrganization(definition.organizationId)?.headquarters)}
           <button type="button" className="button button--primary" disabled={loading || Boolean(disabledReason)} onClick={() => execute("accept", definition.id)}>{disabledReason || "接取委托"}</button>
         </article>;
       })}
-      {advancement.type === "ordinary" && <p>成为非凡者后，这里会显示对应途径的工作与能力。</p>}
+      {advancement.type === "ordinary" && <p>可以先做普通短工积攒资金；成为非凡者后会增加对应途径的委托。</p>}
       {definitions.some(lockedWork) && <button className={styles.link} type="button" aria-expanded={showLockedWork} onClick={() => setShowLockedWork(!showLockedWork)}>{showLockedWork ? "收起其他组织的委托" : `查看需加入组织的委托（${definitions.filter(lockedWork).length}）`}</button>}
     </section>}
 

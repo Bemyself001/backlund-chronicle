@@ -56,6 +56,8 @@ import { validatePlayerActions, ensurePlayerActionTools } from "./services/playe
 import { inspectQuestTracking } from "./services/questTracking.js";
 import { inferCommissionInquiry, ensureCommissionOfferTool, inferCommissionTrackingRequest, restoreCommissionRecord, appendCommissionReport } from "./services/commissions.js";
 import { prepareContextIndex } from "./services/contextIndex.js";
+import { prepareConversationRequest, generateConversationReply } from "./services/conversations.js";
+import { mainlineView } from "./engine/mainline.js";
 
 export default function App() {
   const [screen, setScreen] = useState("splash");
@@ -86,6 +88,8 @@ export default function App() {
   const streamTimerRef = useRef(null);
   const pendingStreamRef = useRef("");
   const summaryJobRef = useRef(null);
+  const [conversationDraftEntries, setConversationDraftEntries] = useState({});
+  const conversationDrafts = { entries: conversationDraftEntries, update: (key, patch) => setConversationDraftEntries(current => ({ ...current, [key]: { ...current[key], ...patch } })) };
   const refreshSaves = () => setSaves(listSaves());
 
   useEffect(() => { saveOnboarding(onboardingStep); }, [onboardingStep]);
@@ -212,6 +216,7 @@ export default function App() {
 
   const runTurn = async (action, options = {}) => {
     if (!game || busyRef.current || !action.trim()) return false;
+    if (mainlineView(game).aboveGrayFog) { setError("请先在特殊行动的主线档案确认入会或暂缓告辞，结束灰雾会面后再行动。"); return false; }
     let questTrackingPlan = null;
     let playerRequests;
     try {
@@ -637,8 +642,27 @@ export default function App() {
       return { ok: false, error: err.message };
     } finally { busyRef.current = false; }
   };
+  const handleConversation = async (personId, text) => {
+    if (!game || busyRef.current) return { ok: false, error: "本轮正在处理中，请稍后写信。" };
+    let request;
+    try { request = prepareConversationRequest(game, personId, text); }
+    catch (err) { return { ok: false, error: err.message }; }
+    busyRef.current = true; setLoading(true); setTurnPhase("correspondence"); resetAction();
+    const controller = new AbortController(); controllerRef.current = controller;
+    const timer = setTimeout(() => controller.abort(), 90000);
+    try {
+      const reply = await generateConversationReply(game, request, settings, controller.signal, event => recordUsageEvent(game.id, game.turn, event));
+      if (controller.signal.aborted) throw new DOMException("写信已中止", "AbortError");
+      const next = resolveSpecialAction(game, { ...request, reply });
+      commitGame(next);
+      return { ok: true };
+    } catch (err) {
+      return { ok: false, error: err.name === "AbortError" ? "等候回信已中止或超时。草稿保留，未消耗游戏时间，可重新寄送。" : `回信未完成：${err.message}。草稿保留，未消耗游戏时间。` };
+    } finally { clearTimeout(timer); controllerRef.current = null; busyRef.current = false; setLoading(false); setTurnPhase("idle"); }
+  };
   const handleExplore = (cell) => {
     if (!game || busyRef.current) return;
+    if (mainlineView(game).aboveGrayFog) { setError("请先结束主线档案中的灰雾会面。"); return; }
     const next = structuredClone(game);
     const result = exploreHex(next, cell.q, cell.r);
     if (!result.ok) return;
@@ -657,10 +681,10 @@ export default function App() {
     {screen === "splash" && <Splash onEnter={() => setScreen("welcome")} />}
     {screen === "welcome" && <Welcome loading={loading} hasSave={saves.some((slot) => slot.slotId === "autosave")} saves={saves} apiSettings={settings} onNew={() => { if (!busyRef.current) setScreen("create"); }} onContinue={handleContinue} onLoadSlot={loadSlot} onImport={handleImport} onApi={() => setModal("api")} onUpdate={() => setModal("update")} onChangelog={() => setModal("changelog")} onDiagnostics={openStartupDiagnostics} onboardingStep={!modal && onboardingStep !== "complete" ? onboardingStep : null} onOnboardingStep={setOnboardingStep} />}
     {screen === "create" && <CharacterCreation onBack={() => setScreen("welcome")} onCreate={handleCreate} settings={settings} onApi={() => setModal("api")} />}
-    {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onRegenerateChoices={regenerateChoices} onLocalTool={runLocalTool} onOpenMap={openMap} onSpecialAction={handleSpecialAction} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => { if (!busyRef.current) { resetAction(); setScreen("welcome"); } }} />}
+    {screen === "game" && game && <GameScreen game={game} loading={loading} turnPhase={turnPhase} streamText={streamText} error={error} onAction={runTurn} onAbort={() => controllerRef.current?.abort()} onRetry={retryLastTurn} onRegenerateChoices={regenerateChoices} onLocalTool={runLocalTool} onOpenMap={openMap} onSpecialAction={handleSpecialAction} onConversation={handleConversation} conversationDrafts={conversationDrafts} onOpenApi={() => setModal("api")} onOpenPrompt={() => setModal("prompt")} onOpenSaves={() => { refreshSaves(); setModal("saves"); }} onHome={() => { if (!busyRef.current) { resetAction(); setScreen("welcome"); } }} />}
     {itemConfirmation && <ImportantItemConfirmation changes={itemConfirmation.changes} onConfirm={(approvedKeys) => settleImportantItemConfirmation({ approvedKeys })} onCancel={() => settleImportantItemConfirmation({ cancelled: true })} />}
     {modal === "map" && game && <WorldMap game={game} loading={loading} initialLocationId={mapFocus} onSpecial={() => setModal("special")} onClose={() => setModal(null)} onTravel={(location) => { setModal(null); return runTurn(`前往${location.name}`, { mapDestination: location }); }} onInvestigate={(location, knowledge) => { setModal(null); return runTurn(`根据地图上的传闻，调查${knowledge.note || location.district}。`, { mapInvestigation: { locationId: location.id, currentStatus: knowledge.status, rumor: knowledge.note || location.rumor } }); }} onExplore={handleExplore} onPray={handlePray} />}
-    {modal === "special" && game && <Modal title="特殊行动" onClose={() => setModal(null)}><SpecialActions game={game} loading={loading} onExecute={handleSpecialAction} onOpenMap={openMap} onAction={(action, options) => { setModal(null); return runTurn(action, options); }} /></Modal>}
+    {modal === "special" && game && <Modal title="特殊行动" onClose={() => setModal(null)}><SpecialActions game={game} loading={loading} onExecute={handleSpecialAction} onOpenMap={openMap} onConversation={handleConversation} drafts={conversationDrafts} onAbort={() => controllerRef.current?.abort()} onOpenApi={() => setModal("api")} onAction={(action, options) => { setModal(null); return runTurn(action, options); }} /></Modal>}
     {modal === "api" && <ApiSettings settings={settings} onSave={handleSettingsSave} onClose={() => setModal(null)} onSetupComplete={screen === "welcome" && onboardingStep === "setup" ? () => { setOnboardingStep("import"); setScreen("welcome"); setModal(null); } : undefined} />}
     {(modal === "update" || modal === "update-auto") && <UpdateDialog automatic={modal === "update-auto"} onClose={() => setModal(null)} />}
     {modal === "changelog" && <ChangelogDialog onClose={() => setModal(null)} />}

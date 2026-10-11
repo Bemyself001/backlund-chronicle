@@ -27,7 +27,7 @@ function CommissionDetails({ task, relatedTitle }) {
   </div>;
 }
 
-export default function QuestBoard({ game, onAction, disabled, selectedId }) {
+export default function QuestBoard({ game, onAction, onOpenMainline, disabled, selectedId }) {
   const [filter, setFilter] = useState("active");
   const [routeTask, setRouteTask] = useState(null);
   const [notice, setNotice] = useState("");
@@ -77,7 +77,7 @@ export default function QuestBoard({ game, onAction, disabled, selectedId }) {
         {guidance.timers.map(timer => <p key={timer.id} className={styles.timer} role="status">剩余 {timer.remaining} 次行动{timer.remaining <= 1 ? " · 请立即脱离危险" : ""}</p>)}
         {task.treatmentReady != null && task.status === "engaged" && <p className={styles.hint}>{task.treatmentReady ? "已具备治疗条件 · 返回雷纳德宅邸" : "治疗准备 0/1 · 寻找治疗药剂或药师埃德蒙"}</p>}
         {task.commission ? <CommissionDetails task={task} relatedTitle={Object.values(game.questJournal?.entries || {}).find(entry => entry.id === task.commission.relatedQuestId)?.title} /> : <details><summary>案件详情</summary><p>{task.summary}</p>{assistance?.text && <p>{assistance.text}</p>}</details>}
-        {task.commission && task.status === "engaged" ? <div className={styles.routes}>
+        {task.localModule === "mainline" ? <button className={styles.primary} type="button" disabled={disabled || !onOpenMainline} onClick={onOpenMainline}>{task.status === "completed" ? "查看主线与塔罗身份" : "在主线档案继续"}</button> : task.commission && task.status === "engaged" ? <div className={styles.routes}>
           <button className={styles.track} type="button" disabled={disabled || !onAction} onClick={() => track(task)}>查看并追踪进度 · 不耗回合</button>
           <button className={styles.primary} type="button" disabled={disabled || !onAction} onClick={() => track(task, `commission:${task.commission.phase === "offered" ? "accept" : task.commission.phase === "ready" ? "collect" : "check"}`)}>{game.location.id !== task.locationId ? "前往受托人处 · 到达后再操作" : task.commission.phase === "offered" ? `确认委托 · ${formatMoney(moneyFromPence(task.commission.feePence))}` : task.commission.phase === "ready" ? "领取调查报告 · 1回合" : "当面询问进度 · 1回合"}</button>
           {cancellingId === task.id ? <div><p className={styles.timer}>{task.commission.feePaid ? "已开展调查的费用不退还。确认取消这项委托？" : "尚未付款，取消不会扣费。确认取消这项委托？"}</p><div className={styles.routes}><button type="button" disabled={disabled || !onAction} onClick={() => track(task, "commission:cancel")}>确认取消委托</button><button type="button" onClick={() => setCancellingId(null)}>保留委托</button></div></div>
