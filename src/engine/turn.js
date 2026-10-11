@@ -8,7 +8,6 @@ import { isRewardClaimAction } from "./questLifecycle.js";
 import { settleHealthEffects } from "./healthEffects.js";
 import { chooseQuestFocus } from "./questFocus.js";
 import { syncIssuedCommissions } from "./commissions.js";
-import { advancementHealthTarget } from "../system/characterStats.js";
 
 export { advanceWorldTime } from "./worldTime.js";
 
@@ -103,15 +102,16 @@ export function resolveTurnProgress(game, action, selectedRisk, toolCalls = [], 
   // Use the accepted local result, never an AI-supplied method or an old save field.
   const promotionIndex = toolCalls.findIndex((call, index) => call.name === "advancement.promote" && toolResults[index]?.ok);
   const promotionMethod = promotionIndex >= 0 ? toolResults[promotionIndex].data?.advancement?.method : null;
-  const advancementRecovery = promotionIndex >= 0
+  // Characteristic growth and the one-time penalty were applied by the tool.
+  // Only potion promotion restores stats after the rest of this turn settles.
+  const advancementRecovery = promotionIndex >= 0 && promotionMethod === "potion"
     ? ["health", "sanity"].map(stat => {
       const maxKey = `max${stat[0].toUpperCase()}${stat.slice(1)}`;
-      const target = stat === "health" ? advancementHealthTarget(game.character.stats, promotionMethod) : game.character.stats[maxKey];
-      return applyStatDelta(game, stat, target - game.character.stats[stat]);
+      return applyStatDelta(game, stat, game.character.stats[maxKey] - game.character.stats[stat]);
     }).filter(Boolean) : [];
   if (advancementRecovery.length) {
     syncStatCollapseStatuses(game);
-    statusTickLogs.push(...advancementRecovery.map(change => `${promotionMethod === "characteristic" ? "特性晋升结算（生命50%）" : "晋升恢复"}：${change.label} ${change.before}→${change.after}`));
+    statusTickLogs.push(...advancementRecovery.map(change => `魔药晋升恢复：${change.label} ${change.before}→${change.after}`));
   }
   const occultEntry = triggerProgress.occultEntry ? { id: triggerProgress.occultEntry.instanceId, turn: triggerProgress.occultEntry.createdTurn, ...triggerProgress.occultEntry.presentation } : null;
   return {

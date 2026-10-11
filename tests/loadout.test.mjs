@@ -7,6 +7,46 @@ import { executeToolCalls } from "../src/engine/tools.js";
 import { migrateSave } from "../src/services/storage.js";
 
 const profile = { ...EMPTY_CHARACTER, name: "行装测试员", talent: "heirloom-watch", carriedItemName: "旧相机", carriedItemDescription: "镜头有一道划痕。" };
+const sefirot = ["源堡", "混沌海", "母巢", "永暗之河", "灾祸之城", "失序之国", "暗影世界", "知识荒野", "光之钥"];
+
+test("all nine sefirot are refused before transport or creation, including a forged confirmed loadout", async (t) => {
+  let requests = 0;
+  t.mock.method(globalThis, "fetch", async () => { requests += 1; throw new Error("unexpected request"); });
+  const confirmed = localLoadout(profile);
+  for (const name of sefirot) {
+    const blocked = { ...profile, carriedItemName: `  ${name}  ` };
+    assert.throws(() => loadoutInput(blocked), /这场诸神的游戏/, name);
+    assert.throws(() => localLoadout(blocked), /这场诸神的游戏/, name);
+    assert.throws(() => createInitialGame(blocked), /这场诸神的游戏/, name);
+    assert.throws(() => createInitialGame(blocked, confirmed), /这场诸神的游戏/, name);
+    await assert.rejects(generateLoadout(blocked, DEFAULT_API_SETTINGS), /这场诸神的游戏/, name);
+  }
+  assert.throws(() => localLoadout({ ...profile, carriedItemName: "混 沌 海" }), /全知全能者/);
+  assert.equal(requests, 0);
+});
+
+test("ordinary souvenirs merely mentioning a sefirah remain normal starting items", () => {
+  for (const name of sefirot) {
+    const souvenir = { ...profile, carriedItemName: `${name}主题明信片`, carriedItemDescription: "普通的纸质明信片，没有特殊力量。" };
+    const game = createInitialGame(souvenir, localLoadout(souvenir));
+    const item = game.inventory.find(entry => entry.name === souvenir.carriedItemName);
+    assert.ok(item);
+    assert.equal(item.quantity, 1);
+    assert.equal(item.rarity, "普通");
+  }
+});
+
+test("the creation-only sefirah refusal does not rewrite existing save profiles or inventory", () => {
+  const game = createInitialGame(profile);
+  for (const name of sefirot) {
+    const existing = structuredClone(game);
+    existing.character.carriedItemName = name;
+    const loaded = migrateSave(existing);
+    assert.equal(loaded.character.carriedItemName, name);
+    assert.deepEqual(loaded.inventory, game.inventory);
+    assert.deepEqual(loaded.character.stats, game.character.stats);
+  }
+});
 
 test("confirmed clothes, one personal item and bonus watch are independent and survive reload", () => {
   const loadout = localLoadout(profile);

@@ -1,6 +1,7 @@
 import { makeId } from "../utils/id.js";
 import { getTalent } from "../content/index.js";
 import { normalizeWeaponItem, weaponProfile } from "./weapons.js";
+import { sefirahItemEasterEgg } from "./itemEasterEgg.js";
 
 export const DEFAULT_CLOTHING = "旧呢外套、白衬衫、黑长裤、磨损的皮靴";
 export const CLOTHING_SLOTS = ["外套", "上装", "下装", "鞋履", "头饰", "手套", "围饰"];
@@ -20,6 +21,8 @@ export function loadoutInput(character) {
   const clothing = String(character.clothingDescription ?? DEFAULT_CLOTHING).trim();
   const name = String(character.carriedItemName || "").trim();
   const description = String(character.carriedItemDescription || "").trim();
+  const itemEasterEgg = sefirahItemEasterEgg(name);
+  if (itemEasterEgg) throw new Error(itemEasterEgg.message);
   if (!clothing || clothing.length > 600) throw new Error("请填写 1—600 字的衣着描述。");
   if (name.length > 40 || description.length > 300) throw new Error("随身物品名称最多 40 字，描述最多 300 字。");
   if (!name && description) throw new Error("请为随身物品填写名称，或清空描述以不携带物品。");

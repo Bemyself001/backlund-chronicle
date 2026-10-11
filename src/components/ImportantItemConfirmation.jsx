@@ -25,7 +25,7 @@ export default function ImportantItemConfirmation({ changes, onConfirm, onCancel
     {promotion ? <>
       <div className={`${styles.intro} ${styles.advancementIntro}`}>
         <strong>{resourceName}尚未消耗，晋升也尚未写入存档</strong>
-        <p>本地规则已验证{resourceName}身份、途径与目标序列。确认后生成晋升剧情；剧情完成后消耗{characteristicPromotion ? "一份非凡特性" : "一瓶魔药"}，更新人物类型与能力，增加三项上限。{characteristicPromotion ? "生命降至晋升后上限的50%（向下取整），理智回满；灵性保留已消耗部分。" : "生命和理智回满，灵性保留已消耗部分。"}</p>
+        <p>本地规则已验证{resourceName}身份、途径与目标序列。确认后生成晋升剧情；剧情完成后消耗{characteristicPromotion ? "一份非凡特性" : "一瓶魔药"}，更新人物类型与能力，增加三项上限。{characteristicPromotion ? "当前生命、理智和灵性先增加晋升增长值，再各自扣除50%（剩余值向下取整）；不会先回满，惩罚仅扣一次。" : "生命和理智回满，灵性保留已消耗部分。"}</p>
       </div>
       <section className={styles.advancement} aria-label="晋升结果预览">
         <div className={styles.advancementRoute}>
@@ -34,10 +34,10 @@ export default function ImportantItemConfirmation({ changes, onConfirm, onCancel
         <div className={styles.potionCost}><span aria-hidden="true">−</span><p><strong>将消耗「{promotion.name}」×{promotion.quantity}</strong><small>{promotion.reason}</small></p></div>
         <dl className={styles.statPreview}>
           {[["maxHealth", "生命上限"], ["maxSanity", "理智上限"]].map(([key, label]) => promotion.advancement.statChanges[key] && <div key={key}><dt>{label}</dt><dd>{promotion.advancement.statChanges[key].before} → {promotion.advancement.statChanges[key].after}</dd></div>)}
-          <div><dt>当前灵性</dt><dd>{promotion.advancement.statChanges.spirituality.before} → {promotion.advancement.statChanges.spirituality.after}</dd></div>
+          <div><dt>{characteristicPromotion ? "灵性 · 增长后减半" : "当前灵性"}</dt><dd>{promotion.advancement.statChanges.spirituality.before} → {promotion.advancement.statChanges.spirituality.after}</dd></div>
           <div><dt>灵性上限</dt><dd>{promotion.advancement.statChanges.maxSpirituality.before} → {promotion.advancement.statChanges.maxSpirituality.after}</dd></div>
-          {promotion.advancement.statChanges.health && <div><dt>{characteristicPromotion ? "生命 · 新上限50%" : "生命回满"}</dt><dd>{promotion.advancement.statChanges.health.before} → {promotion.advancement.statChanges.health.after}</dd></div>}
-          {promotion.advancement.statChanges.sanity && <div><dt>理智回满</dt><dd>{promotion.advancement.statChanges.sanity.before} → {promotion.advancement.statChanges.sanity.after}</dd></div>}
+          {promotion.advancement.statChanges.health && <div><dt>{characteristicPromotion ? "生命 · 增长后减半" : "生命回满"}</dt><dd>{promotion.advancement.statChanges.health.before} → {promotion.advancement.statChanges.health.after}</dd></div>}
+          {promotion.advancement.statChanges.sanity && <div><dt>{characteristicPromotion ? "理智 · 增长后减半" : "理智回满"}</dt><dd>{promotion.advancement.statChanges.sanity.before} → {promotion.advancement.statChanges.sanity.after}</dd></div>}
         </dl>
         {promotion.advancement.newlyUnlockedAbilities.length > 0 && <div className={styles.abilities}><p>将解锁的非凡能力</p><ul>{promotion.advancement.newlyUnlockedAbilities.map((ability) => <li key={ability.id}><strong>{ability.name}</strong><span>{ability.description}</span></li>)}</ul></div>}
         {promotion.advancement.strengthenedAbilities?.length > 0 && <div className={styles.abilities}><p>将强化的非凡能力</p><ul>{promotion.advancement.strengthenedAbilities.map(ability => <li key={ability.id}><strong>{ability.name}</strong><span>{ability.description}</span></li>)}</ul></div>}

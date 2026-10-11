@@ -183,7 +183,7 @@ const TOOL_PARAMETER_SCHEMAS = {
             properties: {
               pathwayId: { type: "string", enum: PATHWAYS.map(pathway => pathway.id) },
               sequence: { type: "integer", minimum: 0, maximum: 9 },
-              identified: { type: "boolean", description: "只有可靠确认途径与序列后才为true；序列4起可用于同途径下一级直接晋升，不能同时填写potion" },
+              identified: { type: "boolean", description: "只有可靠确认途径与序列后才为true；序列7起可用于同途径下一级直接晋升，当前生命、理智和灵性在增长后各减半，不能同时填写potion" },
             },
           },
           source: { type: "string" },
@@ -369,7 +369,7 @@ const TOOL_PARAMETER_SCHEMAS = {
       pathwayId: { type: "string", enum: PATHWAYS.map((pathway) => pathway.id), description: "目标途径的规范 ID" },
       sequence: { type: "integer", minimum: 0, maximum: 9, description: "普通人只能填 9；非凡者只能填当前序列减 1" },
       potionInstanceId: { type: "string", description: "背包中已鉴定且完全匹配的魔药 instanceId" },
-      characteristicInstanceId: { type: "string", description: "序列4起，背包中已确认的同途径下一序列非凡特性instanceId；与potionInstanceId必须且只能选一个，消耗后生命为新上限50%" },
+      characteristicInstanceId: { type: "string", description: "目标序列7至0，背包中已确认的同途径下一序列非凡特性instanceId；与potionInstanceId必须且只能选一个。三项上限正常增长，当前生命、理智和灵性在晋升增长后各扣除50%（剩余值向下取整），不先回满，仅扣一次" },
       recipeClueId: { type: "string", description: "可选的配方出处；已持有成品魔药时无需配方" },
       evidence: { type: "string", description: "本轮剧情中实际完成的准备、服用与引导条件" },
       reason: { type: "string", description: "玩家主动晋升的原因" },

@@ -7,7 +7,8 @@ import { loadoutInput } from "../system/loadout.js";
 import { MAX_STARTING_MONEY_PENCE, PENCE_PER_POUND, moneyFromPence, formatMoney } from "../system/money.js";
 import styles from "./CharacterCreation.module.css";
 import { getMapLocation } from "../system/map.js";
-import { SEFIRAH_CASTLE_EASTER_EGG } from "../content/backlund/easterEggs.js";
+import { tarotNameEasterEgg } from "../system/nameEasterEgg.js";
+import { sefirahItemEasterEgg } from "../system/itemEasterEgg.js";
 import Modal from "./Modal.jsx";
 
 const AVATAR_SIZE = 192;
@@ -48,7 +49,11 @@ export default function CharacterCreation({ onBack, onCreate, settings, onApi })
   const [error, setError] = useState("");
   const [generating, setGenerating] = useState(false);
   const [review, setReview] = useState(null);
-  const [showEasterEgg, setShowEasterEgg] = useState(false);
+  const [easterEgg, setEasterEgg] = useState(null);
+  const nameInputRef = useRef(null);
+  const carriedItemInputRef = useRef(null);
+  const nameComposingRef = useRef(false);
+  const notifiedNameRef = useRef(null);
   const controllerRef = useRef(null);
   const previewRef = useRef(null);
   const preview = review?.character === character && review?.settings === settings ? review.loadout : null;
@@ -68,7 +73,26 @@ export default function CharacterCreation({ onBack, onCreate, settings, onApi })
       setError(avatarError.message);
     }
   };
-  const update = (key, value) => setCharacter((current) => ({ ...current, [key]: value }));
+  const update = (key, value) => {
+    if (key === "name") notifiedNameRef.current = null;
+    setCharacter((current) => ({ ...current, [key]: value }));
+  };
+  const showNameEasterEgg = (name, force = false) => {
+    const match = tarotNameEasterEgg(name);
+    if (!match) return false;
+    if (force || notifiedNameRef.current !== name) {
+      notifiedNameRef.current = name;
+      setError("");
+      setReview(null);
+      setEasterEgg(match);
+    }
+    return true;
+  };
+  const closeEasterEgg = () => {
+    setEasterEgg(null);
+    if (easterEgg?.code) requestAnimationFrame(() => nameInputRef.current?.focus());
+    else if (easterEgg?.itemName) requestAnimationFrame(() => carriedItemInputRef.current?.focus());
+  };
   const selectExtraordinary = (extraordinary) => setCharacter((current) => ({
     ...current,
     extraordinary,
@@ -76,12 +100,13 @@ export default function CharacterCreation({ onBack, onCreate, settings, onApi })
   }));
   const submit = async (event) => {
     event.preventDefault();
-    if (controllerRef.current) return;
-    if (character.carriedItemName.trim() === SEFIRAH_CASTLE_EASTER_EGG.itemName
-      || character.name.trim() === SEFIRAH_CASTLE_EASTER_EGG.characterName) {
+    if (controllerRef.current || nameComposingRef.current) return;
+    if (showNameEasterEgg(character.name, true)) return;
+    const itemEasterEgg = sefirahItemEasterEgg(character.carriedItemName);
+    if (itemEasterEgg) {
       setError("");
       setReview(null);
-      setShowEasterEgg(true);
+      setEasterEgg(itemEasterEgg);
       return;
     }
     if (!character.name.trim() || !character.background.trim()) { setError("请至少填写姓名与个人背景。"); return; }
@@ -152,7 +177,14 @@ export default function CharacterCreation({ onBack, onCreate, settings, onApi })
             {fields.map(([key, label, type, options]) => <label key={key} className={`${styles.field} ${type === "textarea" ? styles.spanTwo : ""}`}><span>{label}{["name", "background"].includes(key) && " *"}</span>
               {type === "select" ? <select value={character[key]} onChange={(e) => update(key, e.target.value)}>{options.map((option) => <option key={option}>{option}</option>)}</select>
                 : type === "textarea" ? <textarea rows={key === "background" ? 4 : 2} value={character[key]} onChange={(e) => update(key, e.target.value)} />
-                  : <input type={type} min={type === "number" ? 16 : undefined} max={type === "number" ? 80 : undefined} value={character[key]} onChange={(e) => update(key, e.target.value)} />}
+                  : <input type={type} min={type === "number" ? 16 : undefined} max={type === "number" ? 80 : undefined} value={character[key]} onChange={(e) => update(key, e.target.value)}
+                    ref={key === "name" ? nameInputRef : undefined}
+                    onBlur={key === "name" ? (event) => { if (!nameComposingRef.current) showNameEasterEgg(event.currentTarget.value); } : undefined}
+                    onCompositionStart={key === "name" ? () => { nameComposingRef.current = true; } : undefined}
+                    onCompositionEnd={key === "name" ? (event) => {
+                      nameComposingRef.current = false;
+                      if (document.activeElement !== event.currentTarget) showNameEasterEgg(event.currentTarget.value);
+                    } : undefined} />}
               {key === "name" && <small className={styles.fieldHint}>可使用虚构昵称；仅用于角色扮演，详见<a href="/privacy.html" target="_blank" rel="noreferrer">隐私政策</a></small>}
             </label>)}
           </div>
@@ -160,7 +192,7 @@ export default function CharacterCreation({ onBack, onCreate, settings, onApi })
             <legend>开局行装</legend>
             <label className={styles.field}><span>衣着描述 *</span><textarea required maxLength={600} rows={3} value={character.clothingDescription} onChange={(event) => update("clothingDescription", event.target.value)} aria-describedby="clothing-help" /></label>
             <p id="clothing-help">描述身上穿戴的衣物，例如：深灰呢大衣、白衬衫、黑长裤和磨损的皮靴。整理后可预览衣物、穿戴部位和估算重量。</p>
-            <label className={styles.field}><span>随身物品名称（可留空）</span><input maxLength={40} value={character.carriedItemName} onChange={(event) => update("carriedItemName", event.target.value)} placeholder="例如：旧相机" aria-describedby="carried-help" /></label>
+            <label className={styles.field}><span>随身物品名称（可留空）</span><input ref={carriedItemInputRef} maxLength={40} value={character.carriedItemName} onChange={(event) => update("carriedItemName", event.target.value)} placeholder="例如：旧相机" aria-describedby="carried-help" /></label>
             <label className={styles.field}><span>随身物品描述</span><textarea maxLength={300} rows={2} value={character.carriedItemDescription} onChange={(event) => update("carriedItemDescription", event.target.value)} placeholder="例如：父亲留下的折叠式相机，镜头边缘有一道划痕。" /></label>
             <p id="carried-help">可自选一件普通随身物品，数量为 1；容器按空容器计算，描述不会直接赋予特殊能力。家传怀表由对应天赋额外发放，不占此名额。罗盘、笔记本和火柴不再默认赠送。</p>
             <p>使用当前配置的 AI 整理行装，仅发送衣着和随身物品描述。 <button className={styles.apiLink} type="button" onClick={onApi}>API 设置</button></p>
@@ -188,9 +220,9 @@ export default function CharacterCreation({ onBack, onCreate, settings, onApi })
           <footer className={styles.formFooter}><p>{preview ? "确认这份行装后，将建立档案并进入所选大区。" : "先整理并确认行装，再进入故事。修改角色资料后需重新整理。"}</p><button className="button button--primary button--large" type="submit" disabled={generating}>{generating ? "正在整理…" : preview ? "确认行装并进入贝克兰德" : "整理开局行装"}</button></footer>
         </form>
       </section>
-      {showEasterEgg && <Modal title={SEFIRAH_CASTLE_EASTER_EGG.title} onClose={() => setShowEasterEgg(false)}>
-        <p className={styles.easterEggMessage}>{SEFIRAH_CASTLE_EASTER_EGG.message}</p>
-        <button className="button button--primary" type="button" onClick={() => setShowEasterEgg(false)}>{SEFIRAH_CASTLE_EASTER_EGG.closeLabel}</button>
+      {easterEgg && <Modal title={easterEgg.title} onClose={closeEasterEgg}>
+        <p className={styles.easterEggMessage}>{easterEgg.message}</p>
+        <button className="button button--primary" type="button" onClick={closeEasterEgg}>{easterEgg.closeLabel}</button>
       </Modal>}
     </main>
   );

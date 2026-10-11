@@ -1,6 +1,6 @@
 import { getAdvancement } from "../system/character.js";
 import { normalizePotion } from "../system/items.js";
-import { normalizeCharacteristic } from "../system/characteristics.js";
+import { CHARACTERISTIC_MAX_SEQUENCE, normalizeCharacteristic } from "../system/characteristics.js";
 
 export function getCharacteristicUseGate(game, characteristicInstanceId) {
   const item = (game?.inventory || []).find(entry => entry.instanceId === characteristicInstanceId);
@@ -8,7 +8,7 @@ export function getCharacteristicUseGate(game, characteristicInstanceId) {
   const characteristic = normalizeCharacteristic(item);
   if (!characteristic) return "该物品不是完整的非凡特性";
   if (!characteristic.identified) return "必须先可靠确认非凡特性的途径和序列";
-  if (characteristic.sequence > 4) return "只有序列4及以上的非凡特性可以直接晋升；低序列特性仍需调制为魔药";
+  if (characteristic.sequence > CHARACTERISTIC_MAX_SEQUENCE) return "只有序列7及以上的非凡特性可以直接晋升；序列8和9的低序列特性仍需调制为魔药";
   const before = getAdvancement(game.character);
   if (before.type === "ordinary") return "普通人只能先服用序列9魔药，不能直接吸收高序列非凡特性";
   if (before.sequence === 0) return "已达到序列0，无法继续晋升";
@@ -62,7 +62,7 @@ export function ensureRequestedAdvancementToolCall(toolCalls = [], request, turn
       sequence: identity.sequence,
       [method === "characteristic" ? "characteristicInstanceId" : "potionInstanceId"]: item.instanceId,
       ...(recipe ? { recipeClueId: recipe.id } : {}),
-      evidence: method === "characteristic" ? "玩家明确选择吸收已确认的非凡特性直接晋升，接受生命降至新上限50%，并进入永久晋升确认流程" : "玩家从物品栏明确选择服用已鉴定魔药，并进入永久晋升确认流程",
+      evidence: method === "characteristic" ? "玩家明确选择吸收已确认的非凡特性直接晋升，接受生命、理智和灵性在晋升增长后的当前值各扣除50%，并进入永久晋升确认流程" : "玩家从物品栏明确选择服用已鉴定魔药，并进入永久晋升确认流程",
     },
     reason: `玩家明确选择${method === "characteristic" ? "吸收" : "服用"}${item.name}并承担晋升结果`,
   };

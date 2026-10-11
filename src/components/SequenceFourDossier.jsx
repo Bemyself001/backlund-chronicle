@@ -8,6 +8,6 @@ export default function SequenceFourDossier({ advancement }) {
     <h4>{advancement.sequence === 5 ? "下一序列 · 半神" : "序列四 · 半神档案"}<span>序列4</span></h4>
     <p className={styles.highlight}>{profile.potionName}</p>
     <p>{profile.summary}</p>
-    <small>沿当前途径逐级晋升。服用对应魔药恢复生命和理智；直接吸收对应非凡特性，生命为新上限50%，理智回满。</small>
+    <small>沿当前途径逐级晋升。服用对应魔药恢复生命和理智；从序列七起直接吸收对应非凡特性，当前生命、理智和灵性在增长后各自减半，上限正常增长。</small>
   </article>;
 }

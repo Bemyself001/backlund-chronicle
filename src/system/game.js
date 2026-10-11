@@ -67,6 +67,7 @@ export function migrateSystemPrompt(prompt = "") {
   if (!migrated.includes("【非凡特性晋升】") && migrated.includes("8. 只有 occult.contact=1 后，才允许登记非凡知识。")) {
     migrated = migrated.replace(/(8\. 只有 occult\.contact=1 后，才允许登记非凡知识。[^\n]*)/, `$1${CHARACTERISTIC_ADVANCEMENT_RULE}`);
   }
+  migrated = migrated.replace(/【非凡特性晋升】[^\n]*?晋升与能力效果必须等待本地确认结果。/g, () => CHARACTERISTIC_ADVANCEMENT_RULE);
   if (!migrated.includes("location.archive")) migrated = migrated.includes(previousMap) ? migrated.replace(previousMap, nextMap) : migrated.replace(legacyMap, nextMap);
   if (!migrated.includes("importance 设为 important")) migrated = migrated.replace("资金使用 money.add、money.remove", "新增物品只有在会影响任务、案件证据、身份、非凡能力或后续剧情入口时，才将 importance 设为 important；普通消耗品、生活用品、材料和货币必须使用 normal。资金使用 money.add、money.remove");
   if (!migrated.includes("增减量而非目标值")) migrated = migrated.replace("例如 {\"amount\":{\"solers\":2,\"pence\":6}}。", "例如 {\"amount\":{\"solers\":2,\"pence\":6}}。角色数值使用 character.update 调整，patch 填写增减量而非目标值（例如 {\"sanity\":-2} 表示理智减少 2 点），本地引擎会把结果截断到 0 至上限，并在数值归零或恢复时自动维护对应状态。status.add 可通过 tick 字段声明该状态存在期间每轮的数值增减（仅理智与灵性的变化，单项 ±3），由本地引擎逐轮结算。");

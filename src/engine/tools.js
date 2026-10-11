@@ -54,7 +54,7 @@ export const TOOL_SCHEMAS = {
   "trigger.abandon": { required: ["instanceId"], description: "确认玩家明确放弃一个已出现或正在追查的特殊事件" },
   "organization.join": { required: ["organizationId", "name", "kind", "evidence"], description: "在玩家明确加入后登记当前组织成员身份" },
   "occult.reveal": { required: ["topic", "evidence"], description: "在已有非凡接触后揭示有限神秘知识" },
-  "advancement.promote": { required: ["pathwayId", "sequence", "evidence"], description: "按当前途径逐级晋升；指定potionInstanceId服用魔药，或从序列4起指定characteristicInstanceId吸收非凡特性（生命降至新上限50%），两者互斥且均需确认" },
+  "advancement.promote": { required: ["pathwayId", "sequence", "evidence"], description: "按当前途径逐级晋升；指定potionInstanceId服用魔药，或从目标序列7起指定characteristicInstanceId吸收非凡特性（当前生命、理智和灵性在增长后各扣除50%），两者互斥且均需确认" },
   "character.update": { required: ["patch"], description: "以增减量调整受限角色数值（可为负），由引擎截断到 0 至上限" },
   "status.add": { required: ["status"], description: "添加描述性状态；tick仅允许理智、灵性（单项±3），生命效果必须由登记技能产生" },
   "status.remove": { required: ["statusId"], description: "移除状态效果" },
@@ -562,7 +562,7 @@ function executeOne(game, call, options = {}) {
       }
       if (target.itemId === RENARD_AUCTION_MEDICINE.itemId) return fail(call.name, "这份重伤治疗药剂用于「高窗之下」；持有药剂返回雷纳德宅邸后，任务会自动结算救治和酬金");
       if (target.potion) return fail(call.name, target.potion.identified ? "魔药不能作为普通消耗品使用；必须通过晋升验证" : "未知魔药尚未鉴定，不能直接服用");
-      if (normalizeCharacteristic(target)) return fail(call.name, "非凡特性必须通过序列4起的晋升验证与玩家确认，不能作为普通消耗品使用");
+      if (normalizeCharacteristic(target)) return fail(call.name, "非凡特性必须通过序列7起的晋升验证与玩家确认，不能作为普通消耗品使用");
       const contentAction = executeItemContentAction(game, target, "use", { turn: game.turn + 1, playerAction: options.playerAction ?? call.reason });
       if (contentAction?.handled) {
         if (!contentAction.ok) return fail(call.name, contentAction.reason);
@@ -680,14 +680,14 @@ function executeOne(game, call, options = {}) {
       const previouslyUnlockedIds = new Set((before.unlockedAbilities || []).map((ability) => ability.id));
       const organizationProvision = grantOrganizationTalisman(game, game.turn + 1);
       const spiritualGrowth = game.character.stats.maxSpirituality - beforeStats.maxSpirituality;
-      const recoveryText = method === "characteristic" ? "生命降至晋升后上限的50%（向下取整），理智回满" : "生命与理智回满";
-      return succeed(call.name, `${turnLabel}：${method === "characteristic" ? "吸收已确认的非凡特性，直接" : "服用已鉴定的魔药，"}晋升为${pathway.sequences[9 - sequence]}（序列${sequence}）；当前灵性与上限各增加${spiritualGrowth}点，${recoveryText}——${call.reason}。`, {
+      const growthText = method === "characteristic" ? `三项上限各增加${spiritualGrowth}点，当前生命、理智和灵性分别增加${spiritualGrowth}点后减半（剩余值向下取整），不回满` : `当前灵性与上限各增加${spiritualGrowth}点，生命与理智回满`;
+      return succeed(call.name, `${turnLabel}：${method === "characteristic" ? "吸收已确认的非凡特性，直接" : "服用已鉴定的魔药，"}晋升为${pathway.sequences[9 - sequence]}（序列${sequence}）；${growthText}——${call.reason}。`, {
         inventoryChange: consumed,
         autoStatuses,
         ...(organizationProvision ? { organizationProvision } : {}),
         advancement: {
           method,
-          healthRatio: method === "characteristic" ? 0.5 : 1,
+          currentStatPenalty: method === "characteristic" ? { ratio: 0.5, basis: "after-growth-current", stats: ["health", "sanity", "spirituality"] } : null,
           before,
           after,
           newlyUnlockedAbilities: (after.unlockedAbilities || []).filter((ability) => !previouslyUnlockedIds.has(ability.id)),

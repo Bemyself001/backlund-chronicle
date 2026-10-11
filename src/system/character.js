@@ -1,5 +1,6 @@
 import { getUnlockedAbilities, getSequenceName, pathwayIdForName, pathwayNameForId } from "../content/index.js";
-import { advancementHealthTarget, spiritualGrowthForSequence } from "./characterStats.js";
+import { advancementCurrentStats, spiritualGrowthForSequence } from "./characterStats.js";
+import { CHARACTERISTIC_MAX_SEQUENCE } from "./characteristics.js";
 
 export function createAdvancement(character = {}) {
   if (character.extraordinary !== "low") {
@@ -69,18 +70,16 @@ export function applyAdvancement(character = {}, pathwayId, sequence, acquiredAt
   const previous = getAdvancement(character);
   if (previous.type === "ordinary" ? sequence !== 9 : previous.pathwayId !== pathwayId || sequence !== previous.sequence - 1) return null;
   const method = options.method || "potion";
-  if (!["potion", "characteristic"].includes(method) || (method === "characteristic" && sequence > 4)) return null;
+  if (!["potion", "characteristic"].includes(method) || (method === "characteristic" && sequence > CHARACTERISTIC_MAX_SEQUENCE)) return null;
   const spiritualGrowth = spiritualGrowthForSequence(sequence);
   const stats = { ...(character.stats || {}) };
   const previousMax = Number(stats.maxSpirituality || 0);
   stats.maxSpirituality = previousMax + spiritualGrowth;
-  stats.spirituality = Math.min(stats.maxSpirituality, Number(stats.spirituality || 0) + spiritualGrowth);
   if (sequence < 9) {
     stats.maxHealth = Number(stats.maxHealth) + spiritualGrowth;
     stats.maxSanity = Number(stats.maxSanity) + spiritualGrowth;
   }
-  stats.health = advancementHealthTarget(stats, method);
-  stats.sanity = Number(stats.maxSanity);
+  Object.assign(stats, advancementCurrentStats(stats, spiritualGrowth, method));
   return {
     ...character,
     extraordinary: "low",

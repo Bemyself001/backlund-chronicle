@@ -11,8 +11,9 @@ import { createTurnResolution } from "../src/services/turnResolution.js";
 import { requestAI } from "../src/services/api.js";
 import { buildPlanningContext, visibleGameState } from "../src/services/memory.js";
 import { DEFAULT_API_SETTINGS, DEFAULT_SYSTEM_PROMPT, migrateSystemPrompt } from "../src/system/game.js";
-import { getAdvancement, isExplicitAdvancementIntent } from "../src/system/character.js";
-import { normalizeCharacteristic } from "../src/system/characteristics.js";
+import { applyAdvancement, getAdvancement, isExplicitAdvancementIntent } from "../src/system/character.js";
+import { CHARACTERISTIC_ADVANCEMENT_RULE, normalizeCharacteristic } from "../src/system/characteristics.js";
+import { PATHWAYS } from "../src/content/index.js";
 import { normalizeInventoryItem, playerVisibleItem } from "../src/system/items.js";
 
 const action = "吸收已确认的非凡特性，正式晋升";
@@ -31,6 +32,8 @@ test("native tool transport offers characteristic promotion without requiring a 
   assert.equal(promote.required.includes("potionInstanceId"), false);
   assert.equal(promote.properties.characteristicInstanceId.type, "string");
   assert.match(promote.properties.characteristicInstanceId.description, /50%/);
+  assert.match(promote.properties.characteristicInstanceId.description, /目标序列7至0/);
+  assert.match(promote.properties.characteristicInstanceId.description, /当前生命、理智和灵性/);
   const characteristicSchema = schema("inventory__add").properties.item.properties.characteristic;
   assert.deepEqual(characteristicSchema.required, ["pathwayId", "sequence", "identified"]);
   assert.equal(characteristicSchema.properties.pathwayId.enum.length, 22);
@@ -41,7 +44,8 @@ test("planning and migrated default prompts carry canonical names and the charac
   const context = buildPlanningContext(game, action, DEFAULT_SYSTEM_PROMPT, { advancementRequest: { characteristicInstanceId: item.instanceId } });
   const text = JSON.stringify(context);
   assert.match(text, /characteristicInstanceId/);
-  assert.match(text, /新上限50%|晋升后上限50%/);
+  assert.match(text, /目标序列7至0/);
+  assert.match(text, /增长后的当前值/);
   assert.equal(visibleGameState(game).sequenceFourDossier.potionName, "诡法师魔药");
   assert.equal(visibleGameState(fresh(9)).sequenceFourDossier, null);
   const previous = DEFAULT_SYSTEM_PROMPT.replace(/【非凡特性晋升】[^\n]*/, "");
@@ -57,6 +61,16 @@ test("only identified sequence-four potions receive their canonical profession n
   assert.equal(normalizeInventoryItem({ ...raw, potion: { ...raw.potion, identified: false }, name: "陌生的紫色魔药" }).name, "陌生的紫色魔药");
   assert.equal(playerVisibleItem({ ...raw, potion: { ...raw.potion, identified: false } }).name, "未鉴定魔药");
   assert.equal(normalizeInventoryItem({ ...potion(5), name: "秘偶大师魔药" }).name, "秘偶大师魔药");
+});
+
+test("stored sequence-four half-health prompts migrate to current-stat penalties and preserve custom additions", () => {
+  const previousRule = "【非凡特性晋升】目标序列4至0可直接晋升，生命设为新上限50%，理智回满。晋升与能力效果必须等待本地确认结果。";
+  const previous = DEFAULT_SYSTEM_PROMPT.replace(CHARACTERISTIC_ADVANCEMENT_RULE, previousRule + "保留我的额外叙事约定。");
+  const migrated = migrateSystemPrompt(previous);
+  assert.ok(migrated.includes(CHARACTERISTIC_ADVANCEMENT_RULE));
+  assert.ok(migrated.includes("保留我的额外叙事约定。"));
+  assert.ok(!migrated.includes(previousRule));
+  assert.equal(migrateSystemPrompt(migrated), migrated);
 });
 
 function fresh(sequence = 5) {
@@ -118,9 +132,79 @@ function settle(game, calls, options = {}) {
   return { ...execution, progress };
 }
 
-for (const [sequence, maxHealth, health] of [[4, 40, 20], [3, 47, 23], [2, 55, 27], [1, 64, 32], [0, 74, 37]]) {
+test("all 22 pathways allow identified next-rank characteristics for sequences seven, six and five", () => {
+  for (const pathway of PATHWAYS) {
+    for (const [sequence, expected] of [[7, [4, 4, 3]], [6, [5, 4, 4]], [5, [5, 5, 4]]]) {
+      const game = createInitialGame({ ...EMPTY_CHARACTER, name: "中序列晋升验收", talent: "none", extraordinary: "low", pathway: `${pathway.name}（序列${sequence + 1}）` });
+      Object.assign(game.character.stats, { health: 6, sanity: 5, spirituality: 4 });
+      const item = characteristic(sequence, { name: `${pathway.sequences[9 - sequence]}非凡特性`, characteristic: { pathwayId: pathway.id, sequence, identified: true } });
+      game.inventory.push(item);
+      const call = promotionCall(item, sequence);
+      call.args.pathwayId = pathway.id;
+      assert.equal(getCharacteristicUseGate(game, item.instanceId), "");
+      assert.deepEqual(inferPotionRequest(game, action), { characteristicInstanceId: item.instanceId });
+      const result = settle(game, [call]);
+      assert.equal(result.results[0].ok, true, `${pathway.name}序列${sequence}`);
+      assert.deepEqual([result.game.character.stats.health, result.game.character.stats.sanity, result.game.character.stats.spirituality], expected);
+      assert.equal(getAdvancement(result.game.character).sequence, sequence);
+      assert.equal(result.game.inventory.length, game.inventory.length - 1);
+    }
+  }
+});
+
+test("domain-level characteristic advancement rejects sequences eight and nine even without the service gate", () => {
+  assert.equal(applyAdvancement(fresh(9).character, "seer", 8, "第1轮", { method: "characteristic" }), null);
+  assert.equal(applyAdvancement(fresh(null).character, "seer", 9, "第1轮", { method: "characteristic" }), null);
+  assert.equal(getAdvancement(applyAdvancement(fresh(8).character, "seer", 7, "第1轮", { method: "characteristic" })).sequence, 7);
+});
+
+test("potion professor characteristics remain distinct from potions and incomplete materials", () => {
+  const legacy = normalizeInventoryItem({ instanceId: "potion-professor", name: "魔药教授非凡特性", quantity: 1 });
+  assert.deepEqual(legacy.characteristic, { pathwayId: "apothecary", pathwayName: "药师", sequence: 6, identified: true });
+  assert.equal(Boolean(legacy.potion), false);
+  const unidentified = normalizeInventoryItem({ ...legacy, characteristic: { ...legacy.characteristic, identified: false } });
+  assert.equal(unidentified.characteristic.identified, false);
+  for (const name of ["魔药教授非凡特性碎片", "魔药教授魔药", "魔药教授非凡特性原料"]) {
+    assert.equal(normalizeCharacteristic({ ...legacy, name }), null, name);
+  }
+});
+
+test("switching between characteristic and potion promotions on later turns keeps each settlement separate", () => {
+  const { game, call } = ready(7);
+  const first = settle(game, [call]);
+  assert.deepEqual([first.game.character.stats.health, first.game.character.stats.sanity, first.game.character.stats.spirituality], [12, 2, 4]);
+  first.game.turn += 1;
+  const bottle = potion(6);
+  first.game.inventory.push(bottle);
+  const second = settle(first.game, [promotionCall(bottle, 6, "potion")]);
+  assert.equal(second.results[0].ok, true);
+  assert.deepEqual(second.game.character.stats, { health: 29, maxHealth: 29, sanity: 19, maxSanity: 19, spirituality: 8, maxSpirituality: 17 });
+  assert.equal(second.results[0].data.advancement.currentStatPenalty, null);
+  second.game.turn += 1;
+  const next = characteristic(5);
+  second.game.inventory.push(next);
+  const third = settle(second.game, [promotionCall(next, 5)]);
+  assert.equal(third.results[0].ok, true);
+  assert.deepEqual(third.game.character.stats, { health: 17, maxHealth: 34, sanity: 12, maxSanity: 24, spirituality: 6, maxSpirituality: 22 });
+});
+
+test("loading an already-promoted 1.8.3 character never charges the new penalty retroactively", () => {
+  let game = fresh(4);
+  game.turn = 8;
+  Object.assign(game.character.advancement, { method: "characteristic", acquiredAt: "第8轮", previousSequence: 5 });
+  Object.assign(game.character.stats, { health: 20, sanity: 30, spirituality: 24 });
+  const originalStats = structuredClone(game.character.stats);
+  for (let round = 0; round < 3; round += 1) {
+    game = migrateSave(JSON.parse(JSON.stringify(cleanGame(game))));
+    assert.deepEqual(game.character.stats, originalStats);
+    assert.deepEqual(resolveTurnProgress(game, "等待片刻", "low").advancementRecovery, []);
+    assert.deepEqual(game.character.stats, originalStats);
+  }
+});
+
+for (const [sequence, maxHealth, health, sanity, spirituality] of [[7, 25, 12, 2, 4], [6, 29, 14, 3, 6], [5, 34, 17, 3, 9], [4, 40, 20, 4, 12], [3, 47, 23, 4, 15], [2, 55, 27, 5, 19], [1, 64, 32, 5, 24], [0, 74, 37, 6, 29]]) {
   for (const extraHealth of [0, 1]) {
-    test("characteristic promotion to sequence " + sequence + " sets exact half of max HP " + (maxHealth + extraHealth), () => {
+    test("characteristic promotion to sequence " + sequence + " grows maxima then halves current stats with max HP " + (maxHealth + extraHealth), () => {
       const { game, item, call } = ready(sequence);
       game.character.stats.maxHealth += extraHealth;
       game.character.stats.health = game.character.stats.maxHealth;
@@ -130,11 +214,12 @@ for (const [sequence, maxHealth, health] of [[4, 40, 20], [3, 47, 23], [2, 55, 2
       const stats = result.game.character.stats;
       assert.equal(stats.maxHealth, maxHealth + extraHealth);
       assert.equal(stats.health, extraHealth && maxHealth % 2 ? health + 1 : health);
-      assert.equal(stats.sanity, stats.maxSanity);
+      assert.equal(stats.sanity, sanity);
       assert.equal(stats.maxSanity, game.character.stats.maxSanity + 10 - sequence);
       assert.equal(stats.maxSpirituality, game.character.stats.maxSpirituality + 10 - sequence);
-      assert.equal(stats.spirituality, game.character.stats.spirituality + 10 - sequence);
-      assert.equal(stats.maxSpirituality - stats.spirituality, 4);
+      assert.equal(stats.spirituality, spirituality);
+      assert.deepEqual(result.results[0].data.advancement.currentStatPenalty, { ratio: 0.5, basis: "after-growth-current", stats: ["health", "sanity", "spirituality"] });
+      assert.deepEqual(result.progress.advancementRecovery, []);
       assert.equal(getAdvancement(result.game.character).sequence, sequence);
       assert.equal(result.results[0].data.advancement.method, "characteristic");
       assert.equal(result.results[0].data.inventoryChange.delta, -1);
@@ -144,12 +229,12 @@ for (const [sequence, maxHealth, health] of [[4, 40, 20], [3, 47, 23], [2, 55, 2
   }
 }
 
-test("an injured character is still set to the exact new half-health target", () => {
+test("an injured and depleted character halves grown current values without being healed to half maxima", () => {
   const { game, call } = ready();
   game.character.stats.health = 1;
   const result = settle(game, [call]);
   assert.equal(result.results[0].ok, true);
-  assert.equal(result.game.character.stats.health, 20);
+  assert.deepEqual(result.game.character.stats, { health: 3, maxHealth: 40, sanity: 4, maxSanity: 30, spirituality: 12, maxSpirituality: 28 });
 });
 
 test("characteristic promotion consumes exactly one unit and neither call replay nor old rank reuse consumes twice", () => {
@@ -173,7 +258,7 @@ test("characteristic promotion consumes exactly one unit and neither call replay
 test("invalid characteristic promotions reject without consuming or changing character stats", async t => {
   const cases = [
     ["low sequence", ({ game, item, call }) => {
-      game.character = fresh(6).character; item.characteristic.sequence = 5; call.args.sequence = 5;
+      game.character = fresh(9).character; item.characteristic.sequence = 8; call.args.sequence = 8;
     }],
     ["ordinary character", ({ game }) => { game.character = fresh(null).character; }],
     ["already sequence zero", ({ game }) => { game.character = fresh(0).character; }],
@@ -297,7 +382,7 @@ test("only unambiguous current affirmative prose becomes a characteristic advanc
   assert.equal(inferPotionRequest(game, "吸收这份非凡特性"), null, "multiple unnamed resources must not be guessed");
 });
 
-test("important confirmation and audit show permanent half-health promotion; declining reruns from the original", () => {
+test("important confirmation and audit show all three current stat penalties; declining reruns from the original", () => {
   const { game, item, call } = ready();
   item.quantity = 2;
   item.importance = "normal";
@@ -314,11 +399,14 @@ test("important confirmation and audit show permanent half-health promotion; dec
   assert.equal(confirmation.quantity, 1);
   assert.equal(confirmation.advancement.method, "characteristic");
   assert.deepEqual(confirmation.advancement.statChanges.health, { before: 34, after: 20 });
-  assert.deepEqual(confirmation.advancement.statChanges.sanity, { before: 2, after: 30 });
+  assert.deepEqual(confirmation.advancement.statChanges.sanity, { before: 2, after: 4 });
+  assert.deepEqual(confirmation.advancement.statChanges.spirituality, { before: 18, after: 12 });
   assert.equal(confirmation.advancement.after.sequence, 4);
   assert.ok(Array.isArray(confirmation.advancement.newlyUnlockedAbilities));
   const audit = auditTurnChanges(createAuditBaseline(game), preview.game);
   assert.deepEqual(audit.character.stats.health, { before: 34, after: 20, delta: -14 });
+  assert.deepEqual(audit.character.stats.sanity, { before: 2, after: 4, delta: 2 });
+  assert.deepEqual(audit.character.stats.spirituality, { before: 18, after: 12, delta: -6 });
   const blocked = settle(game, [call], { blockedCallIndexes: confirmations.map(entry => entry.callIndex) });
   assert.equal(blocked.results[0].ok, false);
   assert.deepEqual(blocked.game.character, original.character);
@@ -328,36 +416,37 @@ test("important confirmation and audit show permanent half-health promotion; dec
   assert.deepEqual(game, original);
 });
 
-for (const delta of [-100, 100]) {
-  test("final characteristic recovery overrides same-turn HP delta " + delta + " and ticks, then resumes normal ticks", () => {
+for (const delta of [-3, 3]) {
+  test("characteristic penalty applies once and subsequent HP delta " + delta + " and status ticks remain effective", () => {
     const { game, call } = ready();
     game.statusEffects.push({
       id: "bleeding", name: "失血与恐惧", kind: "danger",
       tick: { sanity: -2, spirituality: -1 },
       healthEffect: { percent: -5, remainingTurns: null, startsTurn: game.turn + 1, lastTickTurn: game.turn },
     }, { id: "curse", name: "仍未解除的诅咒", kind: "danger" });
-    const calls = [call, { id: "same-turn-delta", name: "character.update", args: { patch: { health: delta, sanity: -100 } }, reason: "仪式环境的伤势变化" }];
+    const calls = [call, { id: "same-turn-delta", name: "character.update", args: { patch: { health: delta, sanity: -1, spirituality: -1 } }, reason: "晋升之后的伤势变化与精神消耗" }];
     const result = settle(game, calls);
     assert.ok(result.results.every(entry => entry.ok));
-    assert.equal(result.game.character.stats.health, 20);
-    assert.equal(result.game.character.stats.sanity, 30);
-    assert.equal(result.game.character.stats.spirituality, 23);
+    assert.equal(result.results[0].data.advancement.statChanges.health.after, 20);
+    assert.equal(result.game.character.stats.health, 18 + delta);
+    assert.equal(result.game.character.stats.sanity, 1);
+    assert.equal(result.game.character.stats.spirituality, 10);
     assert.deepEqual(result.game.statusEffects.map(status => status.id), ["bleeding", "curse"]);
     assert.equal(result.game.statusEffects.find(status => status.id === "bleeding").healthEffect.lastTickTurn, game.turn + 1);
-    if (delta > 0) assert.ok(result.progress.statusTicks.some(change => change.stat === "health"));
-    assert.deepEqual(result.progress.advancementRecovery.map(change => change.stat), ["health", "sanity"]);
+    assert.ok(result.progress.statusTicks.some(change => change.stat === "health"));
+    assert.deepEqual(result.progress.advancementRecovery, []);
     const resolution = createTurnResolution(calls, result.results, result.progress, result.game);
     assert.deepEqual(resolution.derivedEffects.advancementRecovery, result.progress.advancementRecovery);
     result.game.turn += 1;
     const next = resolveTurnProgress(result.game, "等待片刻", "low");
-    assert.equal(result.game.character.stats.health, 18);
-    assert.equal(result.game.character.stats.sanity, 28);
-    assert.equal(result.game.character.stats.spirituality, 22);
+    assert.equal(result.game.character.stats.health, 16 + delta);
+    assert.equal(result.game.character.stats.sanity, 0);
+    assert.equal(result.game.character.stats.spirituality, 9);
     assert.deepEqual(next.advancementRecovery, []);
   });
 }
 
-test("save export and repeated migration preserve characteristic consumption and wounds without repeating growth or half-health reset", () => {
+test("save export and repeated migration preserve characteristic consumption without repeating growth or any stat penalty", () => {
   const { game, item, call } = ready();
   item.quantity = 2;
   const accepted = settle(game, [call]).game;
@@ -382,8 +471,9 @@ test("save export and repeated migration preserve characteristic consumption and
   const next = settle(loaded, [promotionCall(nextItem, 3)]);
   assert.equal(next.results[0].ok, true, "a new turn can advance one further rank after loading");
   assert.equal(next.game.character.stats.maxHealth, 47);
-  assert.equal(next.game.character.stats.health, 23);
-  assert.equal(next.game.character.stats.maxSpirituality - next.game.character.stats.spirituality, 6);
+  assert.equal(next.game.character.stats.health, 7);
+  assert.equal(next.game.character.stats.sanity, 5);
+  assert.equal(next.game.character.stats.spirituality, 8);
 });
 
 test("structured characteristic stacking never merges distinct pathway, rank, or identification identities", () => {
